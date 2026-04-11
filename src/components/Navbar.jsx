@@ -45,11 +45,93 @@ export default function Navbar() {
   return (
     <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''} ${hidden ? 'navbar--hidden' : ''}`}>
       <div className="navbar__container">
+        {/* 左侧：首页 */}
+        <div className="navbar__slot navbar__slot--left">
+          <Link
+            to="/"
+            className={`navbar__link ${isActive('/') ? 'navbar__link--active' : ''}`}
+          >
+            首页
+          </Link>
+          <Link
+            to="/timeline"
+            className={`navbar__link ${isActive('/timeline') ? 'navbar__link--active' : ''}`}
+          >
+            历史
+          </Link>
+        </div>
+
+        {/* 中间：Logo */}
         <Link to="/" className="navbar__logo">
           <img src="/logo.png" alt="RIEMer Land" className="navbar__logo-img" />
           <span className="navbar__logo-text">RIEMer Land</span>
         </Link>
 
+        {/* 右侧：文章 + 成员入口 */}
+        <div className="navbar__slot navbar__slot--right">
+          <Link
+            to="/articles"
+            className={`navbar__link ${isActive('/articles') || location.pathname.startsWith('/article/') ? 'navbar__link--active' : ''}`}
+          >
+            文章
+          </Link>
+
+          {isAuthenticated && (
+            <div className="navbar__dropdown">
+              <button
+                className={`navbar__link navbar__dropdown-trigger ${
+                  location.pathname.startsWith('/internal') ? 'navbar__link--active' : ''
+                }`}
+                onClick={() => setInternalOpen(!internalOpen)}
+              >
+                内部空间 <ChevronDown size={14} />
+              </button>
+              <div className={`navbar__dropdown-menu ${internalOpen ? 'navbar__dropdown-menu--open' : ''}`}>
+                <Link to="/internal/documents" className="navbar__dropdown-item">
+                  文档管理
+                </Link>
+                <Link to="/internal/tasks" className="navbar__dropdown-item">
+                  事项追踪
+                </Link>
+                {user?.role === 'admin' && (
+                  <Link to="/internal/users" className="navbar__dropdown-item">
+                    用户管理
+                  </Link>
+                )}
+                {user?.role === 'admin' && (
+                  <Link to="/internal/content" className="navbar__dropdown-item">
+                    内容管理
+                  </Link>
+                )}
+              </div>
+            </div>
+          )}
+
+          <div className="navbar__auth">
+            {isAuthenticated ? (
+              <div className="navbar__user">
+                <span className="navbar__user-name">{user?.name}</span>
+                <button onClick={handleLogout} className="btn btn-ghost btn-sm">
+                  <LogOut size={16} />
+                  退出
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="navbar__member-entry">成员入口</Link>
+            )}
+          </div>
+        </div>
+
+        {/* 手机端汉堡菜单按钮 */}
+        <button
+          className="navbar__toggle"
+          onClick={() => setIsOpen(!isOpen)}
+          aria-label="Toggle menu"
+        >
+          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        </button>
+
+        {/* 手机端展开菜单 */}
         <div className={`navbar__links ${isOpen ? 'navbar__links--open' : ''}`}>
           <Link
             to="/"
@@ -118,28 +200,6 @@ export default function Navbar() {
             )}
           </div>
         </div>
-
-        <div className="navbar__right">
-          {isAuthenticated ? (
-            <div className="navbar__user">
-              <span className="navbar__user-name">{user?.name}</span>
-              <button onClick={handleLogout} className="btn btn-ghost btn-sm">
-                <LogOut size={16} />
-                退出
-              </button>
-            </div>
-          ) : (
-            <Link to="/login" className="navbar__member-entry">成员入口</Link>
-          )}
-        </div>
-
-        <button
-          className="navbar__toggle"
-          onClick={() => setIsOpen(!isOpen)}
-          aria-label="Toggle menu"
-        >
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
-        </button>
       </div>
     </nav>
   );
