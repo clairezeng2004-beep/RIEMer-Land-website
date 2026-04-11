@@ -15,7 +15,6 @@ export const clubInfo = {
     '建立紧密的学术社区与校友网络',
   ],
   stats: [
-    { label: '活跃成员', value: '120+' },
     { label: '学术活动', value: '50+' },
     { label: '发表文章', value: '200+' },
   ],

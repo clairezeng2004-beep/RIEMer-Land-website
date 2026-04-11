@@ -233,14 +233,14 @@
   margin-top: var(--space-2xl);
 }
 
-/* 有"查看全部"按钮的 section，减小底部 padding，避免和下一个 section 间距过大 */
+/* 有"查看全部"按钮的 section，适当减小底部 padding */
 .featured.section:has(.featured__more) {
-  padding-bottom: var(--space-lg);
+  padding-bottom: var(--space-2xl);
 }
 
 /* ============ Compact Section ============ */
 .section--compact {
-  padding-top: var(--space-md);
+  padding-top: var(--space-lg);
 }
 
 /* ============ Responsive ============ */
@@ -273,7 +273,7 @@
   .hero__title { font-size: var(--text-xl); }
   .hero__tagline { font-size: var(--text-xs); }
   .featured__grid { gap: var(--space-sm); }
-  .featured.section:has(.featured__more) { padding-bottom: var(--space-sm); }
+  .featured.section:has(.featured__more) { padding-bottom: var(--space-lg); }
   .stats__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
   .stats__value { font-size: var(--text-xl); }
 }

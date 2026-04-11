@@ -165,6 +165,11 @@
   padding: var(--space-xs);
 }
 
+/* 菜单内的成员入口/用户信息 — 桌面端隐藏 */
+.navbar__mobile-auth {
+  display: none;
+}
+
 @media (max-width: 768px) {
   .navbar__container {
     padding: 0 var(--space-xl);
@@ -175,7 +180,25 @@
   }
 
   .navbar__right {
-    margin-right: var(--space-sm);
+    display: none;
+  }
+
+  .navbar__mobile-auth {
+    display: block;
+    padding-top: var(--space-md);
+    margin-top: var(--space-sm);
+    border-top: 1px solid var(--color-border-light);
+  }
+
+  .navbar__mobile-user {
+    display: flex;
+    align-items: center;
+    gap: var(--space-sm);
+    padding: 0.5rem 1rem;
+  }
+
+  .navbar__mobile-entry {
+    color: var(--color-text-muted);
   }
 
   .navbar__links {

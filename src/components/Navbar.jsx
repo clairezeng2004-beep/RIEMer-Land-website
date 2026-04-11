@@ -100,6 +100,23 @@ export default function Navbar() {
               </div>
             </div>
           )}
+
+          {/* 手机端菜单内的成员入口/用户信息 */}
+          <div className="navbar__mobile-auth">
+            {isAuthenticated ? (
+              <div className="navbar__mobile-user">
+                <span className="navbar__user-name">{user?.name}</span>
+                <button onClick={handleLogout} className="btn btn-ghost btn-sm">
+                  <LogOut size={16} />
+                  退出
+                </button>
+              </div>
+            ) : (
+              <Link to="/login" className="navbar__link navbar__mobile-entry">
+                成员入口
+              </Link>
+            )}
+          </div>
         </div>
 
         <div className="navbar__right">

@@ -30,7 +30,7 @@ export default function Home() {
           <p className="hero__subtitle">{content.heroDescription}</p>
           <div className="hero__actions">
             <Link to="/articles" className="btn btn-primary">
-              浏览文章 <ArrowRight size={16} />
+              浏览文章
             </Link>
             <Link to="/timeline" className="btn btn-ghost">
               了解历史
