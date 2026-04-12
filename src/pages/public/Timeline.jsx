@@ -99,8 +99,6 @@ export default function Timeline() {
       {/* Horizontal Timeline */}
       <section className="timeline section">
         <div className="container timeline__container">
-          <h2 className="section-title">社团历程</h2>
-
           {/* 左箭头 */}
           <button
             className={`timeline__arrow timeline__arrow--left ${canScrollLeft ? '' : 'timeline__arrow--hidden'}`}
@@ -169,11 +167,6 @@ export default function Timeline() {
       {/* Members Section */}
       <section className="members section">
         <div className="container">
-          <h2 className="section-title">主理团队</h2>
-          <p className="section-subtitle">
-            感谢每一位为 RIEMer Land 付出的伙伴
-          </p>
-
           <div className="members__grid">
             {membersData.map((member) => (
               <div key={member.id} className="member-card card">
