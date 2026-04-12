@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import {
@@ -10,20 +10,21 @@ import {
   CheckCircle2,
   Circle,
   Ban,
+  Compass,
 } from 'lucide-react';
 import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import './Tasks.css';
 
 const statusIcons = {
-  '待办': <Circle size={16} />,
+  '规划中': <Compass size={16} />,
   '进行中': <Clock size={16} />,
   '已完成': <CheckCircle2 size={16} />,
   '已取消': <Ban size={16} />,
 };
 
 const statusColors = {
-  '待办': '#8A9A8C',
+  '规划中': '#8A9A8C',
   '进行中': '#6B8F3C',
   '已完成': '#3A6B35',
   '已取消': '#C0392B',
@@ -50,8 +51,9 @@ export default function Tasks() {
     title: '',
     description: '',
     category: taskCategories[0] || '',
-    status: '待办',
+    status: '规划中',
     assignee: '',
+    helpers: [],
   });
   const [notes, setNotes] = useState({});
 
@@ -78,8 +80,9 @@ export default function Tasks() {
       title: '',
       description: '',
       category: taskCategories[0] || '',
-      status: '待办',
+      status: '规划中',
       assignee: '',
+      helpers: [],
     });
     setShowForm(false);
   };
@@ -123,7 +126,7 @@ export default function Tasks() {
   // Stats
   const stats = {
     total: tasks.length,
-    pending: tasks.filter((t) => t.status === '待办').length,
+    pending: tasks.filter((t) => t.status === '规划中').length,
     inProgress: tasks.filter((t) => t.status === '进行中').length,
     completed: tasks.filter((t) => t.status === '已完成').length,
   };
@@ -155,7 +158,7 @@ export default function Tasks() {
           </div>
           <div className="tasks-stat tasks-stat--pending">
             <div className="tasks-stat__value">{stats.pending}</div>
-            <div className="tasks-stat__label">待办</div>
+            <div className="tasks-stat__label">规划中</div>
           </div>
           <div className="tasks-stat tasks-stat--progress">
             <div className="tasks-stat__value">{stats.inProgress}</div>
@@ -257,15 +260,19 @@ export default function Tasks() {
             <thead>
               <tr>
                 <th>状态</th>
-                <th>标题</th>
                 <th>分类</th>
+                <th>标题</th>
                 <th>负责人</th>
+                <th>协助者</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((task) => {
                 const member = memberMap[task.assignee];
+                const helperMembers = (task.helpers || [])
+                  .map((hId) => memberMap[hId])
+                  .filter(Boolean);
                 return (
                 <tr key={task.id} className={`tasks-table__row tasks-table__row--${task.status === '已完成' ? 'done' : ''}`}>
                   <td>
@@ -278,6 +285,9 @@ export default function Tasks() {
                     </div>
                   </td>
                   <td>
+                    <span className="badge badge-secondary">{task.category}</span>
+                  </td>
+                  <td>
                     <div className="tasks-table__title-cell">
                       <span className="tasks-table__title">{task.title}</span>
                       {task.description && (
@@ -286,16 +296,25 @@ export default function Tasks() {
                     </div>
                   </td>
                   <td>
-                    <span className="badge badge-secondary">{task.category}</span>
-                  </td>
-                  <td>
                     {member ? (
-                      <div className="tasks-table__member">
-                        <span className="tasks-table__member-name">{member.name}</span>
-                        <span className="tasks-table__member-role">{member.role}</span>
-                      </div>
+                      <Link to={member.profileUrl} className="tasks-table__member-link">
+                        @{member.name}
+                      </Link>
                     ) : (
                       <span className="tasks-table__assignee">{task.assignee || '—'}</span>
+                    )}
+                  </td>
+                  <td>
+                    {helperMembers.length > 0 ? (
+                      <div className="tasks-table__helpers">
+                        {helperMembers.map((h) => (
+                          <Link key={h.id} to={h.profileUrl} className="tasks-table__member-link">
+                            @{h.name}
+                          </Link>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="tasks-table__assignee">—</span>
                     )}
                   </td>
                   <td>

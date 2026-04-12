@@ -644,13 +644,13 @@ export const documentsData = [
 ];
 
 export const taskCategories = ['线上分享', '课程测评', '公众号文章'];
-export const taskStatuses = ['待办', '进行中', '已完成', '已取消'];
+export const taskStatuses = ['规划中', '进行中', '已完成', '已取消'];
 
-// 模拟成员数据（用于负责人选择）
+// 成员数据（用于负责人 / 协助者选择）
 export const teamMembers = [
-  { id: 'member-1', name: '陈思雨', role: '内容策划' },
-  { id: 'member-2', name: '林子墨', role: '运营推广' },
-  { id: 'member-3', name: '周悦然', role: '访谈采编' },
+  { id: 'member-1', name: '陈思雨', role: '内容策划', profileUrl: '/internal/users#member-1' },
+  { id: 'member-2', name: '林子墨', role: '运营推广', profileUrl: '/internal/users#member-2' },
+  { id: 'member-3', name: '周悦然', role: '访谈采编', profileUrl: '/internal/users#member-3' },
 ];
 
 export const notificationsData = [
@@ -696,6 +696,7 @@ export const initialTasks = [
     category: '线上分享',
     status: '进行中',
     assignee: 'member-1',
+    helpers: ['member-3'],
     createdAt: '2025-03-20',
   },
   {
@@ -703,8 +704,9 @@ export const initialTasks = [
     title: '征集大二上课程测评',
     description: '面向全院征集大二上学期各方向课程评价',
     category: '课程测评',
-    status: '待办',
+    status: '规划中',
     assignee: 'member-3',
+    helpers: [],
     createdAt: '2025-03-15',
   },
   {
@@ -712,8 +714,9 @@ export const initialTasks = [
     title: '筹备 RIEMer\'s Space 第十一期分享会',
     description: '确定主题、邀请分享人、制作宣传海报',
     category: '线上分享',
-    status: '待办',
+    status: '规划中',
     assignee: 'member-2',
+    helpers: ['member-1'],
     createdAt: '2025-03-18',
   },
   {
@@ -723,6 +726,7 @@ export const initialTasks = [
     category: '公众号文章',
     status: '进行中',
     assignee: 'member-2',
+    helpers: [],
     createdAt: '2025-03-10',
   },
   {
@@ -732,6 +736,7 @@ export const initialTasks = [
     category: '公众号文章',
     status: '已完成',
     assignee: 'member-1',
+    helpers: ['member-2', 'member-3'],
     createdAt: '2025-02-15',
   },
 ];

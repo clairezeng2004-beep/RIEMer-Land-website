@@ -39,7 +39,7 @@ export default function InternalHome() {
 
   // 统计数据
   const stats = useMemo(() => {
-    const todoTasks = initialTasks.filter((t) => t.status === '待办' || t.status === '进行中').length;
+    const todoTasks = initialTasks.filter((t) => t.status === '规划中' || t.status === '进行中').length;
     const totalDocs = documentsData.length;
     return { unreadCount, todoTasks, totalDocs };
   }, [unreadCount]);

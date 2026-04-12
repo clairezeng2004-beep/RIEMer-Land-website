@@ -228,21 +228,30 @@
   color: var(--color-text-muted);
 }
 
-.tasks-table__member {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.tasks-table__member-name {
-  font-weight: 500;
-  color: var(--color-text);
+.tasks-table__member-link {
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
   font-size: var(--text-sm);
+  font-weight: 500;
+  text-decoration: none;
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+  background: rgba(91, 140, 62, 0.06);
+  transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
-.tasks-table__member-role {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
+.tasks-table__member-link:hover {
+  background: rgba(91, 140, 62, 0.14);
+  color: var(--color-primary-dark);
+  text-decoration: none;
+}
+
+.tasks-table__helpers {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
 .tasks-table__assignee {
