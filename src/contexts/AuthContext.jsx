@@ -6,11 +6,10 @@ const AuthContext = createContext(null);
 // ============================================
 // 角色层级定义
 // ============================================
-// owner  — 超级管理员（你本人），可管理所有用户角色
-// admin  — 管理员，可编辑网站内容、管理普通成员
-// member — 普通成员，仅可访问内部文件资料
-const ROLES = ['owner', 'admin', 'member'];
-const ROLE_LABELS = { owner: '超级管理员', admin: '管理员', member: '成员' };
+// admin  — 管理员，可编辑网站内容、授权用户、管理成员
+// member — 成员，可访问内部文件资料
+const ROLES = ['admin', 'member'];
+const ROLE_LABELS = { admin: '管理员', member: '成员' };
 
 function hasRole(userRole, requiredRole) {
   const userLevel = ROLES.indexOf(userRole);
@@ -44,7 +43,7 @@ const getLocalUsers = () => {
       email: 'admin@riemerland.org',
       password: 'admin123',
       name: 'Admin',
-      role: 'owner',
+      role: 'admin',
       authorized: true,
       createdAt: new Date().toISOString(),
     },
@@ -321,8 +320,7 @@ export function AuthProvider({ children }) {
   // ---- 权限判断工具 ----
   const userRole = user?.role || 'member';
   const isAuthenticated = !!user;
-  const isOwner = userRole === 'owner';
-  const isAdmin = userRole === 'admin' || userRole === 'owner'; // owner 继承 admin 的所有权限
+  const isAdmin = userRole === 'admin';
   const isMember = isAuthenticated;
 
   // 检查用户是否有某个最低角色权限
@@ -339,7 +337,6 @@ export function AuthProvider({ children }) {
         register,
         logout,
         isAuthenticated,
-        isOwner,
         isAdmin,
         isMember,
         hasMinRole,

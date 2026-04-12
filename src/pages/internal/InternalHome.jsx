@@ -30,7 +30,7 @@ function formatDate(dateStr) {
   return `${month}月${day}日`;
 }
 
-const ROLE_LABELS = { owner: '超级管理员', admin: '管理员', member: '成员' };
+const ROLE_LABELS = { admin: '管理员', member: '成员' };
 
 export default function InternalHome() {
   const { user, isAuthenticated, isAdmin } = useAuth();

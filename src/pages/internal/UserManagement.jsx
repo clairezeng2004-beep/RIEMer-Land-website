@@ -7,17 +7,14 @@ import {
   ShieldOff,
   Check,
   X,
-  Mail,
   Calendar,
   UserCheck,
   UserX,
-  Crown,
 } from 'lucide-react';
 import './UserManagement.css';
 
-const ROLE_LABELS = { owner: '超级管理员', admin: '管理员', member: '成员' };
+const ROLE_LABELS = { admin: '管理员', member: '成员' };
 const ROLE_COLORS = {
-  owner: '#8B5CF6',
   admin: '#4FBFC4',
   member: '#8A9A8C',
 };
@@ -27,7 +24,6 @@ export default function UserManagement() {
     user: currentUser,
     isAuthenticated,
     isAdmin,
-    isOwner,
     getAllUsers,
     authorizeUser,
     revokeUser,
@@ -74,28 +70,18 @@ export default function UserManagement() {
   // 判断当前用户是否可以管理目标用户的角色
   const canManageRole = (targetUser) => {
     if (targetUser.id === currentUser?.id) return false; // 不能改自己
-    if (isOwner) return targetUser.role !== 'owner'; // owner 可以管理所有非 owner
-    if (currentUser?.role === 'admin') return targetUser.role === 'member'; // admin 只能管理 member
-    return false;
+    return isAdmin; // 管理员可以管理其他用户的角色
   };
 
   // 当前用户可以设置的角色选项
-  const getAvailableRoles = (targetUser) => {
-    if (isOwner) {
-      // owner 可以设 admin 或 member（不能设 owner）
-      return ['admin', 'member'];
-    }
-    // admin 只能将 member 保持为 member（实际不显示选择器）
-    return ['member'];
+  const getAvailableRoles = () => {
+    return ['admin', 'member'];
   };
 
   // 判断是否可以授权/撤销
   const canManageAuth = (targetUser) => {
     if (targetUser.id === currentUser?.id) return false;
-    if (targetUser.role === 'owner') return false;
-    if (isOwner) return true;
-    if (currentUser?.role === 'admin') return targetUser.role === 'member';
-    return false;
+    return isAdmin;
   };
 
   return (
@@ -135,16 +121,10 @@ export default function UserManagement() {
           <h4>角色说明</h4>
           <div className="users-roles-info__grid">
             <div className="users-roles-info__item">
-              <span className="users-roles-info__badge" style={{ color: ROLE_COLORS.owner, background: `${ROLE_COLORS.owner}15` }}>
-                <Crown size={14} /> 超级管理员
-              </span>
-              <span>管理所有用户角色、授权与撤销</span>
-            </div>
-            <div className="users-roles-info__item">
               <span className="users-roles-info__badge" style={{ color: ROLE_COLORS.admin, background: `${ROLE_COLORS.admin}15` }}>
                 <Shield size={14} /> 管理员
               </span>
-              <span>编辑网站内容、管理普通成员授权</span>
+              <span>编辑网站组件内容、授权用户、管理成员角色</span>
             </div>
             <div className="users-roles-info__item">
               <span className="users-roles-info__badge" style={{ color: ROLE_COLORS.member, background: `${ROLE_COLORS.member}15` }}>
@@ -188,7 +168,7 @@ export default function UserManagement() {
                         <CustomSelect
                           value={u.role}
                           onChange={(val) => handleRoleChange(u.id, val)}
-                          options={getAvailableRoles(u).map((role) => ({
+                          options={getAvailableRoles().map((role) => ({
                             value: role,
                             label: ROLE_LABELS[role],
                           }))}
@@ -201,7 +181,6 @@ export default function UserManagement() {
                         className={`users-table__role users-table__role--${u.role}`}
                         style={{ color: ROLE_COLORS[u.role] }}
                       >
-                        {u.role === 'owner' && <Crown size={12} />}
                         {ROLE_LABELS[u.role]}
                       </span>
                     )}
