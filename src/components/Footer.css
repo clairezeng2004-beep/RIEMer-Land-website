@@ -12,8 +12,8 @@
 
 .footer__grid {
   display: grid;
-  grid-template-columns: auto auto 1fr auto;
-  gap: var(--space-2xl) var(--space-3xl);
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--space-2xl) var(--space-xl);
 }
 
 .footer__contact-item {
