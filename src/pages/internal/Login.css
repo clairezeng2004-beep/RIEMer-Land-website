@@ -181,3 +181,55 @@
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }
+
+/* ==================== 手机端紧凑布局 ==================== */
+@media (max-width: 768px) {
+  .login-page {
+    padding: var(--space-md);
+    align-items: flex-start;
+    padding-top: var(--space-xl);
+  }
+
+  .login-card {
+    padding: var(--space-xl) var(--space-lg);
+  }
+
+  .login-card__header {
+    margin-bottom: var(--space-md);
+  }
+
+  .login-card__logo {
+    width: 60px;
+    margin-bottom: var(--space-sm);
+  }
+
+  .login-card__header h2 {
+    font-size: var(--text-lg);
+    margin-bottom: 4px;
+  }
+
+  .login-card__tabs {
+    margin-bottom: var(--space-md);
+  }
+
+  .login-card__tab {
+    padding: 0.5rem;
+  }
+
+  .login-card__form {
+    gap: var(--space-md);
+  }
+
+  .login-card__input {
+    padding: 0.6rem 0.85rem;
+  }
+
+  .login-card__submit {
+    margin-top: 4px;
+  }
+
+  .login-card__hint {
+    margin-top: var(--space-md);
+    padding-top: var(--space-md);
+  }
+}

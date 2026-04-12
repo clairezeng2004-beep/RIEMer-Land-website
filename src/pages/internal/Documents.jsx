@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -10,8 +10,17 @@ import {
   Plus,
   File,
   FolderOpen,
-  Filter,
   X,
+  Eye,
+  Image,
+  FileSpreadsheet,
+  Presentation,
+  ChevronLeft,
+  UploadCloud,
+  Calendar,
+  User,
+  HardDrive,
+  BarChart3,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import './Documents.css';
@@ -25,12 +34,39 @@ const typeLabels = {
 };
 
 const typeColors = {
-  plan: '#5B8C3E',
+  plan: '#5EAD8C',
   regulation: '#4FBFC4',
   minutes: '#D4A44C',
   guide: '#8B5CF6',
   finance: '#EC4899',
 };
+
+const fileTypeIcons = {
+  pdf: FileText,
+  docx: FileText,
+  xlsx: FileSpreadsheet,
+  pptx: Presentation,
+  image: Image,
+};
+
+const fileTypeLabels = {
+  pdf: 'PDF 文档',
+  docx: 'Word 文档',
+  xlsx: 'Excel 表格',
+  pptx: 'PPT 演示',
+  image: '图片',
+};
+
+// 从文件名推断类型
+function inferFileType(fileName) {
+  if (!fileName) return 'pdf';
+  const ext = fileName.split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return 'image';
+  if (['xlsx', 'xls', 'csv'].includes(ext)) return 'xlsx';
+  if (['pptx', 'ppt'].includes(ext)) return 'pptx';
+  if (['docx', 'doc'].includes(ext)) return 'docx';
+  return 'pdf';
+}
 
 export default function Documents() {
   const { isAuthenticated, user } = useAuth();
@@ -39,6 +75,10 @@ export default function Documents() {
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
   const [newDoc, setNewDoc] = useState({ title: '', type: 'plan', description: '' });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewDoc, setPreviewDoc] = useState(null);
+  const [isDragOver, setIsDragOver] = useState(false);
+  const fileInputRef = useRef(null);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -48,26 +88,68 @@ export default function Documents() {
 
   const filtered = documents.filter((doc) => {
     const matchesSearch =
-      doc.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      doc.description.toLowerCase().includes(searchTerm.toLowerCase());
+      !searchTerm ||
+      pinyinMatch(doc.title, searchTerm) ||
+      pinyinMatch(doc.description, searchTerm);
     const matchesType = selectedType === '全部' || doc.type === selectedType;
     return matchesSearch && matchesType;
   });
 
+  const handleFileSelect = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!newDoc.title) {
+        setNewDoc((prev) => ({ ...prev, title: file.name.replace(/\.[^.]+$/, '') }));
+      }
+    }
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  };
+
+  const handleDragLeave = () => {
+    setIsDragOver(false);
+  };
+
+  const handleDrop = (e) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      if (!newDoc.title) {
+        setNewDoc((prev) => ({ ...prev, title: file.name.replace(/\.[^.]+$/, '') }));
+      }
+      if (!showUpload) setShowUpload(true);
+    }
+  };
+
   const handleAddDocument = (e) => {
     e.preventDefault();
     if (!newDoc.title) return;
+
+    const fileType = selectedFile ? inferFileType(selectedFile.name) : 'pdf';
+    const fileUrl = selectedFile ? URL.createObjectURL(selectedFile) : null;
+
     const doc = {
       id: Date.now().toString(),
       title: newDoc.title,
       type: newDoc.type,
+      fileType,
+      fileUrl,
       description: newDoc.description,
       uploadedBy: user?.name || 'Unknown',
       date: new Date().toISOString().split('T')[0],
-      size: '—',
+      size: selectedFile ? formatSize(selectedFile.size) : '—',
+      viewCount: 0,
+      _file: selectedFile,
     };
     setDocuments([doc, ...documents]);
     setNewDoc({ title: '', type: 'plan', description: '' });
+    setSelectedFile(null);
     setShowUpload(false);
   };
 
@@ -75,6 +157,27 @@ export default function Documents() {
     if (window.confirm('确定要删除这个文档吗？')) {
       setDocuments(documents.filter((d) => d.id !== id));
     }
+  };
+
+  const openPreview = (doc) => {
+    // 增加浏览次数
+    setDocuments((prev) =>
+      prev.map((d) => (d.id === doc.id ? { ...d, viewCount: (d.viewCount || 0) + 1 } : d))
+    );
+    setPreviewDoc(doc);
+  };
+
+  const closePreview = () => {
+    setPreviewDoc(null);
+  };
+
+  const canPreview = (doc) => {
+    return doc.fileUrl && ['pdf', 'image'].includes(doc.fileType);
+  };
+
+  const FileIcon = ({ fileType, size = 24 }) => {
+    const Icon = fileTypeIcons[fileType] || FileText;
+    return <Icon size={size} />;
   };
 
   return (
@@ -103,6 +206,45 @@ export default function Documents() {
               <Upload size={18} /> 上传新文档
             </h3>
             <form onSubmit={handleAddDocument} className="documents-upload__form">
+              {/* 拖拽上传区域 */}
+              <div
+                className={`documents-upload__dropzone ${isDragOver ? 'documents-upload__dropzone--active' : ''} ${selectedFile ? 'documents-upload__dropzone--has-file' : ''}`}
+                onDragOver={handleDragOver}
+                onDragLeave={handleDragLeave}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.jpg,.jpeg,.png,.gif,.webp"
+                  style={{ display: 'none' }}
+                />
+                {selectedFile ? (
+                  <div className="documents-upload__file-info">
+                    <FileIcon fileType={inferFileType(selectedFile.name)} size={32} />
+                    <div>
+                      <p className="documents-upload__file-name">{selectedFile.name}</p>
+                      <p className="documents-upload__file-size">{formatSize(selectedFile.size)}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className="documents-upload__file-remove"
+                      onClick={(e) => { e.stopPropagation(); setSelectedFile(null); }}
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="documents-upload__dropzone-content">
+                    <UploadCloud size={36} />
+                    <p>拖拽文件到此处，或点击选择文件</p>
+                    <span>支持 PDF、Word、Excel、PPT、图片等格式</span>
+                  </div>
+                )}
+              </div>
+
               <div className="documents-upload__row">
                 <div className="documents-upload__field">
                   <label>文档标题</label>
@@ -174,55 +316,196 @@ export default function Documents() {
           </div>
         </div>
 
-        {/* Documents List */}
-        <div className="documents-list">
+        {/* Documents Grid */}
+        <div className="documents-grid">
           {filtered.map((doc) => (
-            <div key={doc.id} className="document-item card">
+            <div
+              key={doc.id}
+              className="doc-card card"
+              onClick={() => openPreview(doc)}
+            >
+              {/* 文件类型图标区 */}
               <div
-                className="document-item__icon"
-                style={{ background: `${typeColors[doc.type]}15`, color: typeColors[doc.type] }}
+                className="doc-card__icon-area"
+                style={{ background: `${typeColors[doc.type]}10`, color: typeColors[doc.type] }}
               >
-                <FileText size={24} />
+                <FileIcon fileType={doc.fileType} size={36} />
+                <span className="doc-card__file-type">{fileTypeLabels[doc.fileType] || doc.fileType}</span>
               </div>
-              <div className="document-item__info">
-                <h4 className="document-item__title">{doc.title}</h4>
-                <p className="document-item__desc">{doc.description}</p>
-                <div className="document-item__meta">
+
+              {/* 信息区 */}
+              <div className="doc-card__body">
+                <h4 className="doc-card__title">{doc.title}</h4>
+                <p className="doc-card__desc">{doc.description}</p>
+
+                <div className="doc-card__meta">
                   <span
-                    className="document-item__type"
+                    className="doc-card__type-badge"
                     style={{ color: typeColors[doc.type], background: `${typeColors[doc.type]}12` }}
                   >
                     {typeLabels[doc.type]}
                   </span>
-                  <span className="document-item__date">{doc.date}</span>
-                  <span className="document-item__author">上传者: {doc.uploadedBy}</span>
-                  <span className="document-item__size">{doc.size}</span>
+                  <span className="doc-card__date">
+                    <Calendar size={12} /> {doc.date}
+                  </span>
+                </div>
+
+                <div className="doc-card__footer">
+                  <span className="doc-card__author">
+                    <User size={12} /> {doc.uploadedBy}
+                  </span>
+                  <span className="doc-card__stats">
+                    <Eye size={12} /> {doc.viewCount || 0}
+                    <HardDrive size={12} /> {doc.size}
+                  </span>
                 </div>
               </div>
-              <div className="document-item__actions">
-                <button className="btn btn-ghost btn-sm" title="下载">
-                  <Download size={16} />
+
+              {/* 操作栏 - 点击阅读为主，下载弱化 */}
+              <div className="doc-card__actions">
+                <button
+                  className="doc-card__action-main"
+                  onClick={(e) => { e.stopPropagation(); openPreview(doc); }}
+                  title="阅读文档"
+                >
+                  <Eye size={16} /> 阅读
                 </button>
                 <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => handleDelete(doc.id)}
+                  className="doc-card__action-secondary"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    if (doc.fileUrl) {
+                      const a = document.createElement('a');
+                      a.href = doc.fileUrl;
+                      a.download = doc.title;
+                      a.click();
+                    }
+                  }}
+                  title="下载原文件"
+                >
+                  <Download size={14} />
+                </button>
+                <button
+                  className="doc-card__action-secondary doc-card__action-danger"
+                  onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
                   title="删除"
                 >
-                  <Trash2 size={16} />
+                  <Trash2 size={14} />
                 </button>
               </div>
             </div>
           ))}
-
-          {filtered.length === 0 && (
-            <div className="documents-list__empty">
-              <File size={48} />
-              <h3>暂无文档</h3>
-              <p>点击"上传文档"按钮添加新文档</p>
-            </div>
-          )}
         </div>
+
+        {filtered.length === 0 && (
+          <div className="documents-list__empty">
+            <File size={48} />
+            <h3>暂无文档</h3>
+            <p>点击"上传文档"按钮添加新文档</p>
+          </div>
+        )}
       </div>
+
+      {/* Preview Modal */}
+      {previewDoc && (
+        <div className="doc-preview-overlay" onClick={closePreview}>
+          <div className="doc-preview" onClick={(e) => e.stopPropagation()}>
+            {/* 预览头部 */}
+            <div className="doc-preview__header">
+              <button className="doc-preview__back" onClick={closePreview}>
+                <ChevronLeft size={20} /> 返回列表
+              </button>
+              <div className="doc-preview__title-area">
+                <h3>{previewDoc.title}</h3>
+                <span className="doc-preview__meta">
+                  {previewDoc.uploadedBy} · {previewDoc.date} · {previewDoc.size}
+                </span>
+              </div>
+              <div className="doc-preview__header-actions">
+                {previewDoc.fileUrl && (
+                  <button
+                    className="doc-preview__download"
+                    onClick={() => {
+                      const a = document.createElement('a');
+                      a.href = previewDoc.fileUrl;
+                      a.download = previewDoc.title;
+                      a.click();
+                    }}
+                    title="下载原文件"
+                  >
+                    <Download size={16} /> 下载
+                  </button>
+                )}
+                <button className="doc-preview__close" onClick={closePreview}>
+                  <X size={20} />
+                </button>
+              </div>
+            </div>
+
+            {/* 预览内容区 */}
+            <div className="doc-preview__content">
+              {canPreview(previewDoc) ? (
+                previewDoc.fileType === 'pdf' ? (
+                  <iframe
+                    src={previewDoc.fileUrl}
+                    className="doc-preview__pdf"
+                    title={previewDoc.title}
+                  />
+                ) : previewDoc.fileType === 'image' ? (
+                  <div className="doc-preview__image-wrapper">
+                    <img
+                      src={previewDoc.fileUrl}
+                      alt={previewDoc.title}
+                      className="doc-preview__image"
+                    />
+                  </div>
+                ) : null
+              ) : (
+                <div className="doc-preview__no-preview">
+                  <FileIcon fileType={previewDoc.fileType} size={64} />
+                  <h3>{previewDoc.title}</h3>
+                  <p className="doc-preview__no-preview-desc">{previewDoc.description}</p>
+                  <div className="doc-preview__no-preview-info">
+                    <span><Calendar size={14} /> 上传日期: {previewDoc.date}</span>
+                    <span><User size={14} /> 上传者: {previewDoc.uploadedBy}</span>
+                    <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
+                    <span><BarChart3 size={14} /> 浏览次数: {previewDoc.viewCount || 0}</span>
+                  </div>
+                  {previewDoc.fileUrl ? (
+                    <p className="doc-preview__no-preview-hint">
+                      该文件格式暂不支持在线预览，请下载后使用本地应用打开。
+                    </p>
+                  ) : (
+                    <p className="doc-preview__no-preview-hint">
+                      该文档尚未关联文件，请重新上传以启用预览功能。
+                    </p>
+                  )}
+                  {previewDoc.fileUrl && (
+                    <button
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        const a = document.createElement('a');
+                        a.href = previewDoc.fileUrl;
+                        a.download = previewDoc.title;
+                        a.click();
+                      }}
+                    >
+                      <Download size={16} /> 下载文件
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function formatSize(bytes) {
+  if (!bytes) return '—';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }

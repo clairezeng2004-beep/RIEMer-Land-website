@@ -5,6 +5,17 @@ const AuthContext = createContext(null);
 // Simulated user database
 const USERS_DB_KEY = 'riemer_users';
 const AUTH_KEY = 'riemer_auth';
+const DEVICE_KEY = 'riemer_device_id';
+
+// 生成或获取设备唯一标识，确保同一设备可以长期保持登录
+const getDeviceId = () => {
+  let deviceId = localStorage.getItem(DEVICE_KEY);
+  if (!deviceId) {
+    deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).slice(2, 10);
+    localStorage.setItem(DEVICE_KEY, deviceId);
+  }
+  return deviceId;
+};
 
 const getUsers = () => {
   const stored = localStorage.getItem(USERS_DB_KEY);
@@ -36,12 +47,33 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const stored = localStorage.getItem(AUTH_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored);
-      const users = getUsers();
-      const found = users.find((u) => u.id === parsed.id);
-      if (found && found.authorized) {
-        setUser(found);
-      } else {
+      try {
+        const parsed = JSON.parse(stored);
+        const users = getUsers();
+        const found = users.find((u) => u.id === parsed.id);
+        if (found && found.authorized) {
+          // 用数据库中最新的用户信息更新（如角色变更等）
+          setUser(found);
+          // 同步更新 localStorage 中的用户信息快照
+          localStorage.setItem(
+            AUTH_KEY,
+            JSON.stringify({
+              id: found.id,
+              name: found.name,
+              email: found.email,
+              role: found.role,
+              deviceId: getDeviceId(),
+              loginAt: parsed.loginAt || new Date().toISOString(),
+              persistent: true,
+            })
+          );
+        } else if (parsed.persistent && parsed.id) {
+          // 用户数据库可能被重置但 localStorage 仍在，清除登录态
+          localStorage.removeItem(AUTH_KEY);
+        } else {
+          localStorage.removeItem(AUTH_KEY);
+        }
+      } catch {
         localStorage.removeItem(AUTH_KEY);
       }
     }
@@ -60,7 +92,18 @@ export function AuthProvider({ children }) {
       return { success: false, message: '您的账号尚未被授权，请联系管理员' };
     }
     setUser(found);
-    localStorage.setItem(AUTH_KEY, JSON.stringify({ id: found.id }));
+    localStorage.setItem(
+      AUTH_KEY,
+      JSON.stringify({
+        id: found.id,
+        name: found.name,
+        email: found.email,
+        role: found.role,
+        deviceId: getDeviceId(),
+        loginAt: new Date().toISOString(),
+        persistent: true,
+      })
+    );
     return { success: true };
   };
 

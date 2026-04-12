@@ -1,7 +1,7 @@
 /* ============ Articles Hero ============ */
 .articles-hero {
   padding: 140px 0 60px;
-  background: var(--color-bg-alt);
+  background: transparent;
   text-align: center;
 }
 
@@ -25,10 +25,7 @@
 .articles-filters {
   padding: var(--space-xl) 0;
   border-bottom: 1px solid var(--color-border-light);
-  background: var(--color-bg-card);
-  position: sticky;
-  top: 72px;
-  z-index: 50;
+  background: transparent;
 }
 
 .articles-filters__bar {
@@ -39,7 +36,7 @@
 
 .articles-filters__search {
   position: relative;
-  max-width: 500px;
+  width: 100%;
 }
 
 .articles-filters__search-icon {
@@ -110,17 +107,33 @@
 }
 
 .article-card {
-  padding: clamp(0.75rem, 2vw, 1.5rem);
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
   text-decoration: none;
   color: inherit;
-  height: 100%;
+  overflow: hidden;
+  transition: all var(--transition-normal);
 }
 
 .article-card:hover {
   color: inherit;
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-6px);
+}
+
+.article-card__accent {
+  height: 3px;
+  background: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.article-card__body {
+  padding: clamp(0.75rem, 2vw, 1.5rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  flex: 1;
+  overflow: hidden;
 }
 
 .article-card__top {
@@ -149,14 +162,13 @@
 
 .article-card__excerpt {
   color: var(--color-text-light);
-  font-size: var(--text-base);
+  font-size: var(--text-sm);
   line-height: 1.7;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   flex: 1 1 auto;
-  min-height: calc(var(--text-base) * 1.7 * 3);
 }
 
 .article-card__tags {
@@ -178,18 +190,11 @@
 
 .article-card__bottom {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
-  padding-top: var(--space-md);
+  padding-top: var(--space-sm);
   border-top: 1px solid var(--color-border-light);
-}
-
-.article-card__author {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
+  margin-top: auto;
 }
 
 .article-card__link {
@@ -199,6 +204,11 @@
   font-size: var(--text-sm);
   color: var(--color-primary);
   font-weight: 500;
+  transition: gap var(--transition-fast);
+}
+
+.article-card:hover .article-card__link {
+  gap: 8px;
 }
 
 .articles-list__empty {
@@ -226,15 +236,77 @@
 @media (max-width: 768px) {
   .articles-hero { padding: 120px 0 40px; }
   .articles-hero__content h1 { font-size: var(--text-2xl); }
-  .articles-list__grid {
-    grid-template-columns: repeat(2, 1fr);
+
+  .articles-filters {
+    padding: var(--space-md) 0;
   }
-  .article-card__title { font-size: var(--text-base); min-height: calc(var(--text-base) * 1.5 * 2); }
-  .article-card__excerpt { font-size: var(--text-sm); min-height: calc(var(--text-sm) * 1.7 * 3); }
+
+  .articles-list__grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-md);
+  }
+
+  .article-card__body {
+    padding: var(--space-lg);
+    gap: var(--space-sm);
+  }
+
+  .article-card__top {
+    margin-bottom: 2px;
+  }
+
+  .article-card__title {
+    font-size: var(--text-base);
+    min-height: unset;
+    line-height: 1.4;
+  }
+
+  .article-card__excerpt {
+    font-size: var(--text-sm);
+    -webkit-line-clamp: 2;
+    line-height: 1.6;
+  }
+
+  .article-card__tags {
+    gap: var(--space-xs);
+  }
+
+  .article-card__tag {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+
+  .article-card__meta {
+    font-size: var(--text-xs);
+  }
+
+  .article-card__link {
+    font-size: var(--text-xs);
+  }
 }
 
 @media (max-width: 480px) {
   .articles-hero { padding: 100px 0 30px; }
   .articles-hero__content h1 { font-size: var(--text-xl); }
-  .articles-filters__search { max-width: 100%; }
+
+  .articles-list__grid {
+    grid-template-columns: 1fr;
+    gap: var(--space-sm);
+  }
+
+  .article-card__body {
+    padding: var(--space-md);
+    gap: var(--space-xs);
+  }
+
+  .article-card__title {
+    font-size: 0.9rem;
+    line-height: 1.4;
+  }
+
+  .article-card__excerpt {
+    font-size: 0.8rem;
+    -webkit-line-clamp: 2;
+    line-height: 1.5;
+  }
 }

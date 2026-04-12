@@ -8,7 +8,7 @@ const CONTENT_KEY = 'riemer_site_content';
 // 可编辑的内容字段及其默认值
 const getDefaultContent = () => ({
   // Hero 区域
-  heroTagline: '探索 · 研究 · 交流',
+  heroTagline: '交流 · 互助 · 成长',
   heroTitle: 'RIEMer Land',
   heroDescription: clubInfo.description,
 
@@ -18,7 +18,7 @@ const getDefaultContent = () => ({
   // 使命区域
   missionSectionTitle: '我们的使命',
   missions: clubInfo.mission.map((desc, i) => ({
-    title: ['学术研究', '知识共享', '创新思维', '社区建设'][i],
+    title: ['经验交流', '心得共享', '朋辈互助', '多元可能'][i],
     desc,
   })),
 
@@ -36,7 +36,10 @@ export function SiteContentProvider({ children }) {
     const stored = localStorage.getItem(CONTENT_KEY);
     if (stored) {
       try {
-        return { ...getDefaultContent(), ...JSON.parse(stored) };
+        const parsed = JSON.parse(stored);
+        // stats 始终使用最新默认值，避免旧缓存残留
+        delete parsed.stats;
+        return { ...getDefaultContent(), ...parsed };
       } catch {
         return getDefaultContent();
       }

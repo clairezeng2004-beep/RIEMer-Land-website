@@ -16,28 +16,25 @@ export default function Home() {
 
   return (
     <div className="home">
-      {/* Hero Section */}
+      {/* Hero Section — 与 Articles / Timeline 保持一致的简洁风格 */}
       <section className="hero">
-        <div className="hero__bg">
-          <div className="hero__gradient" />
-        </div>
         <div className="hero__content container">
-          <p className="hero__tagline">{content.heroTagline}</p>
           <h1 className="hero__title">
             <span className="hero__title-accent">{content.heroTitle}</span>
           </h1>
-          <div className="hero__divider" />
           <p className="hero__subtitle">{content.heroDescription}</p>
-          <div className="hero__actions">
-            <Link to="/articles" className="btn btn-primary">
-              浏览文章
-            </Link>
-            <Link to="/timeline" className="btn btn-ghost">
-              了解历史
-            </Link>
-          </div>
         </div>
       </section>
+
+      {/* Quick Actions */}
+      <div className="hero-actions container">
+        <Link to="/articles" className="btn btn-primary">
+          浏览文章
+        </Link>
+        <Link to="/timeline" className="btn btn-ghost">
+          了解历史
+        </Link>
+      </div>
 
       {/* Stats Section */}
       <section className="stats section">

@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RIEMer Land — 字体选择 Playground</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <!-- Serif 衬线 -->
+  <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,500;0,8..60,600;0,8..60,700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&display=swap" rel="stylesheet" />
+
+  <!-- Sans-Serif 无衬线 -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Raleway:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Josefin+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Work+Sans:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Quicksand:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Monospace 等宽 -->
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Source+Code+Pro:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+
+  <!-- Handwriting 手写 -->
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Satisfy&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Patrick+Hand&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Kalam:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Sacramento&display=swap" rel="stylesheet" />
+
+  <!-- Display 展示 -->
+  <link href="https://fonts.googleapis.com/css2?family=Abril+Fatface&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Righteous&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Comfortaa:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Philosopher:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Italiana&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Yeseva+One&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --color-primary: #5B8C3E;
+      --color-primary-dark: #4A7A30;
+      --color-bg: #F7FAF5;
+      --color-bg-alt: #EFF5ED;
+      --color-text: #2C3E2D;
+      --color-text-light: #5A6B5C;
+      --color-text-muted: #8A9A8C;
+      --color-border: #D4E2D5;
+      --color-border-light: #E8F0E9;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--color-bg);
+      color: var(--color-text);
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ===== Header ===== */
+    .header {
+      background: white;
+      border-bottom: 1px solid var(--color-border-light);
+      padding: 1.5rem 2rem;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      box-shadow: 0 2px 12px rgba(44, 62, 45, 0.06);
+    }
+
+    .header__inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+
+    .header h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      color: var(--color-primary);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .header__controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .header__controls label {
+      font-size: 0.875rem;
+      color: var(--color-text-light);
+    }
+
+    .header__controls select,
+    .header__controls input {
+      padding: 0.4rem 0.75rem;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      font-size: 0.875rem;
+      font-family: inherit;
+      background: white;
+      color: var(--color-text);
+    }
+
+    .header__controls input[type="text"] {
+      width: 200px;
+    }
+
+    .toggle-group {
+      display: flex;
+      gap: 0;
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      overflow: hidden;
+    }
+
+    .toggle-group button {
+      padding: 0.4rem 0.75rem;
+      border: none;
+      background: white;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color: var(--color-text-light);
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .toggle-group button.active {
+      background: var(--color-primary);
+      color: white;
+    }
+
+    .toggle-group button:not(:last-child) {
+      border-right: 1px solid var(--color-border);
+    }
+
+    /* ===== Category Tabs ===== */
+    .category-bar {
+      max-width: 1200px;
+      margin: 1.25rem auto 0;
+      padding: 0 2rem;
+      display: flex;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+
+    .category-tab {
+      padding: 0.45rem 1rem;
+      border: 1.5px solid var(--color-border);
+      border-radius: 99px;
+      background: white;
+      font-size: 0.8rem;
+      font-family: inherit;
+      color: var(--color-text-light);
+      cursor: pointer;
+      transition: all 0.2s;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+    }
+
+    .category-tab:hover {
+      border-color: var(--color-primary);
+      color: var(--color-primary);
+    }
+
+    .category-tab.active {
+      background: var(--color-primary);
+      border-color: var(--color-primary);
+      color: white;
+    }
+
+    .category-tab__count {
+      font-size: 0.7rem;
+      opacity: 0.7;
+    }
+
+    /* ===== Loading ===== */
+    .loading-bar {
+      max-width: 1200px;
+      margin: 1rem auto 0;
+      padding: 0 2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.85rem;
+      color: var(--color-text-muted);
+    }
+
+    .loading-bar__spinner {
+      width: 16px;
+      height: 16px;
+      border: 2px solid var(--color-border);
+      border-top-color: var(--color-primary);
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .loading-bar.loaded {
+      color: var(--color-primary);
+    }
+
+    .loading-bar.loaded .loading-bar__spinner {
+      display: none;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    /* ===== Main Grid ===== */
+    .main {
+      max-width: 1200px;
+      margin: 1.25rem auto 6rem;
+      padding: 0 2rem;
+    }
+
+    .font-count {
+      font-size: 0.8rem;
+      color: var(--color-text-muted);
+      margin-bottom: 1rem;
+    }
+
+    .font-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1rem;
+    }
+
+    /* ===== Font Card ===== */
+    .font-card {
+      background: white;
+      border: 2px solid var(--color-border-light);
+      border-radius: 12px;
+      padding: 1.75rem 2rem;
+      cursor: pointer;
+      transition: all 0.25s ease;
+      position: relative;
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+    }
+
+    .font-card:hover {
+      border-color: var(--color-primary);
+      box-shadow: 0 4px 20px rgba(91, 140, 62, 0.12);
+      transform: translateY(-1px);
+    }
+
+    .font-card.selected {
+      border-color: var(--color-primary);
+      background: rgba(91, 140, 62, 0.03);
+      box-shadow: 0 4px 20px rgba(91, 140, 62, 0.15);
+    }
+
+    .font-card.selected::after {
+      content: '✓ 已选择';
+      position: absolute;
+      top: 1rem;
+      right: 1.25rem;
+      background: var(--color-primary);
+      color: white;
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.2rem 0.7rem;
+      border-radius: 99px;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+    }
+
+    .font-card__info {
+      flex-shrink: 0;
+      width: 200px;
+    }
+
+    .font-card__name {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--color-text);
+      margin-bottom: 0.25rem;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    .font-card__tag {
+      display: inline-block;
+      font-size: 0.6rem;
+      padding: 1px 6px;
+      border-radius: 4px;
+      margin-left: 4px;
+      vertical-align: middle;
+    }
+
+    .font-card__tag--current {
+      color: var(--color-primary);
+      background: rgba(91, 140, 62, 0.1);
+    }
+
+    .font-card__tag--serif {
+      color: #8B6914;
+      background: rgba(139, 105, 20, 0.1);
+    }
+
+    .font-card__tag--sans {
+      color: #2563EB;
+      background: rgba(37, 99, 235, 0.1);
+    }
+
+    .font-card__tag--mono {
+      color: #7C3AED;
+      background: rgba(124, 58, 237, 0.1);
+    }
+
+    .font-card__tag--handwriting {
+      color: #DB2777;
+      background: rgba(219, 39, 119, 0.1);
+    }
+
+    .font-card__tag--display {
+      color: #EA580C;
+      background: rgba(234, 88, 12, 0.1);
+    }
+
+    .font-card__desc {
+      font-size: 0.75rem;
+      color: var(--color-text-muted);
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      line-height: 1.5;
+    }
+
+    .font-card__preview {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-width: 0;
+    }
+
+    .font-card__preview-hero {
+      font-size: 3rem;
+      line-height: 1.2;
+      background: linear-gradient(135deg, #5B8C3E 0%, #3D6B2A 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .font-card__preview-nav {
+      font-size: 1.25rem;
+      color: var(--color-primary);
+      letter-spacing: 0.03em;
+    }
+
+    .font-card__preview-sentence {
+      font-size: 1rem;
+      color: var(--color-text-light);
+      line-height: 1.6;
+    }
+
+    /* ===== 显示模式 ===== */
+    body[data-mode="hero"] .font-card__preview-nav,
+    body[data-mode="hero"] .font-card__preview-sentence { display: none; }
+    body[data-mode="hero"] .font-card__preview-hero { font-size: 3.5rem; }
+
+    body[data-mode="nav"] .font-card__preview-hero,
+    body[data-mode="nav"] .font-card__preview-sentence { display: none; }
+    body[data-mode="nav"] .font-card__preview-nav { font-size: 1.5rem; }
+
+    /* ===== Result Bar ===== */
+    .result-bar {
+      position: fixed;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: white;
+      border-top: 1px solid var(--color-border-light);
+      padding: 1rem 2rem;
+      box-shadow: 0 -4px 20px rgba(0,0,0,0.08);
+      z-index: 100;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      gap: 1.5rem;
+    }
+
+    .result-bar.visible { display: flex; }
+
+    .result-bar__text {
+      font-size: 0.9rem;
+      color: var(--color-text);
+    }
+
+    .result-bar__text strong {
+      color: var(--color-primary);
+    }
+
+    .result-bar__code {
+      background: var(--color-bg-alt);
+      border: 1px solid var(--color-border);
+      border-radius: 6px;
+      padding: 0.4rem 0.8rem;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 0.8rem;
+      color: var(--color-text);
+      user-select: all;
+    }
+
+    .result-bar__btn {
+      padding: 0.5rem 1.25rem;
+      background: var(--color-primary);
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 500;
+      cursor: pointer;
+      font-family: -apple-system, BlinkMacSystemFont, sans-serif;
+      transition: all 0.2s;
+    }
+
+    .result-bar__btn:hover {
+      background: var(--color-primary-dark);
+    }
+
+    /* ===== Responsive ===== */
+    @media (max-width: 768px) {
+      .font-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        padding: 1.25rem 1.5rem;
+      }
+      .font-card__info { width: auto; }
+      .font-card__preview-hero { font-size: 2.25rem; }
+      .header__inner { flex-direction: column; align-items: flex-start; }
+      .result-bar { flex-direction: column; gap: 0.75rem; text-align: center; }
+    }
+  </style>
+</head>
+<body data-mode="all">
+
+  <div class="header">
+    <div class="header__inner">
+      <h1>🎨 RIEMer Land 字体选择器</h1>
+      <div class="header__controls">
+        <label>预览文字：</label>
+        <input type="text" id="customText" value="RIEMer Land" placeholder="自定义文字" />
+
+        <label>显示模式：</label>
+        <div class="toggle-group">
+          <button class="active" data-mode="all">全部</button>
+          <button data-mode="hero">Hero 大标题</button>
+          <button data-mode="nav">导航栏</button>
+        </div>
+
+        <label>字重：</label>
+        <select id="weightSelect">
+          <option value="400">400 Regular</option>
+          <option value="500">500 Medium</option>
+          <option value="600" selected>600 Semi-bold</option>
+          <option value="700">700 Bold</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="category-bar" id="categoryBar"></div>
+
+  <div class="loading-bar" id="loadingBar">
+    <div class="loading-bar__spinner"></div>
+    <span id="loadingText">正在加载字体…</span>
+  </div>
+
+  <div class="main">
+    <div class="font-count" id="fontCount"></div>
+    <div class="font-grid" id="fontGrid"></div>
+  </div>
+
+  <div class="result-bar" id="resultBar">
+    <span class="result-bar__text">已选择字体：<strong id="resultName"></strong></span>
+    <code class="result-bar__code" id="resultCode"></code>
+    <button class="result-bar__btn" onclick="copyCode()">复制字体名</button>
+  </div>
+
+  <script>
+    const fonts = [
+      // ─── Serif 衬线 ───
+      { name: 'EB Garamond',        family: 'EB Garamond',        category: 'serif', fallback: 'serif',      desc: '经典 Garamond 风格 · 素雅圆润', tag: '当前使用' },
+      { name: 'Libre Baskerville',   family: 'Libre Baskerville',  category: 'serif', fallback: 'serif',      desc: '稳重大气 · 高可读性 · 学术经典' },
+      { name: 'Source Serif 4',      family: 'Source Serif 4',     category: 'serif', fallback: 'serif',      desc: 'Adobe 出品 · 现代衬线 · 清晰端正' },
+      { name: 'Playfair Display',    family: 'Playfair Display',   category: 'serif', fallback: 'serif',      desc: '高对比现代衬线 · 优雅时尚 · 杂志风' },
+      { name: 'Lora',                family: 'Lora',               category: 'serif', fallback: 'serif',      desc: '圆润温和 · 正文优先设计 · 一致性强' },
+      { name: 'Cormorant',           family: 'Cormorant',          category: 'serif', fallback: 'serif',      desc: '纤细精致 · Garamond 变体 · 高端感' },
+      { name: 'DM Serif Display',    family: 'DM Serif Display',   category: 'serif', fallback: 'serif',      desc: '展示衬线 · 对比度高 · 标题专用' },
+      { name: 'Fraunces',            family: 'Fraunces',           category: 'serif', fallback: 'serif',      desc: '旧式风格 · 光学可变 · 独特个性' },
+
+      // ─── Sans-Serif 无衬线 ───
+      { name: 'Inter',               family: 'Inter',              category: 'sans',  fallback: 'sans-serif', desc: '当代经典 · 为屏幕而生 · GitHub/Figma 同款' },
+      { name: 'Poppins',             family: 'Poppins',            category: 'sans',  fallback: 'sans-serif', desc: '几何圆润 · 友好现代 · 科技感' },
+      { name: 'Outfit',              family: 'Outfit',             category: 'sans',  fallback: 'sans-serif', desc: '简洁几何 · 可变字重 · 全能型' },
+      { name: 'Plus Jakarta Sans',   family: 'Plus Jakarta Sans',  category: 'sans',  fallback: 'sans-serif', desc: '高品质几何无衬线 · 现代优雅' },
+      { name: 'DM Sans',             family: 'DM Sans',            category: 'sans',  fallback: 'sans-serif', desc: '低对比几何 · 清爽整洁 · Google 设计团队出品' },
+      { name: 'Space Grotesk',       family: 'Space Grotesk',      category: 'sans',  fallback: 'sans-serif', desc: '太空感怪诞体 · 有趣又专业' },
+      { name: 'Sora',                family: 'Sora',               category: 'sans',  fallback: 'sans-serif', desc: '日系简约 · 柔和圆角 · 科技品牌风' },
+      { name: 'Nunito',              family: 'Nunito',             category: 'sans',  fallback: 'sans-serif', desc: '圆角无衬线 · 亲和温暖 · 类似 Rounded Gothic' },
+      { name: 'Raleway',             family: 'Raleway',            category: 'sans',  fallback: 'sans-serif', desc: '精致优雅无衬线 · 细体惊艳 · 时尚感' },
+      { name: 'Montserrat',          family: 'Montserrat',         category: 'sans',  fallback: 'sans-serif', desc: '经典都市无衬线 · 布宜诺斯艾利斯街头灵感' },
+      { name: 'Josefin Sans',        family: 'Josefin Sans',       category: 'sans',  fallback: 'sans-serif', desc: '几何复古无衬线 · 北欧极简 · 大写优美' },
+      { name: 'Work Sans',           family: 'Work Sans',          category: 'sans',  fallback: 'sans-serif', desc: '实用主义 · Grotesk 风格 · 适合 UI' },
+      { name: 'Manrope',             family: 'Manrope',            category: 'sans',  fallback: 'sans-serif', desc: '现代半怪诞 · 介于几何与人文之间' },
+      { name: 'Quicksand',           family: 'Quicksand',          category: 'sans',  fallback: 'sans-serif', desc: '柔和圆润 · 手工感 · 亲切有趣' },
+
+      // ─── Monospace 等宽 ───
+      { name: 'JetBrains Mono',      family: 'JetBrains Mono',     category: 'mono',  fallback: 'monospace',  desc: '代码编辑器字体 · 清晰锐利 · JetBrains 出品' },
+      { name: 'Fira Code',           family: 'Fira Code',          category: 'mono',  fallback: 'monospace',  desc: '连字符等宽 · Mozilla 出品 · 编程首选' },
+      { name: 'Source Code Pro',     family: 'Source Code Pro',    category: 'mono',  fallback: 'monospace',  desc: 'Adobe 出品 · 端正清晰 · 经典等宽' },
+      { name: 'Space Mono',          family: 'Space Mono',         category: 'mono',  fallback: 'monospace',  desc: '未来感等宽 · 几何构造 · 独特韵味' },
+      { name: 'IBM Plex Mono',       family: 'IBM Plex Mono',      category: 'mono',  fallback: 'monospace',  desc: 'IBM 设计系统 · 工业精密 · 专业感' },
+
+      // ─── Handwriting 手写 ───
+      { name: 'Caveat',              family: 'Caveat',             category: 'handwriting', fallback: 'cursive', desc: '随性手写 · 笔记风 · 自然亲切' },
+      { name: 'Dancing Script',      family: 'Dancing Script',     category: 'handwriting', fallback: 'cursive', desc: '流畅草书 · 浪漫优雅 · 邀请函风格' },
+      { name: 'Pacifico',            family: 'Pacifico',           category: 'handwriting', fallback: 'cursive', desc: '冲浪文化 · 圆润有趣 · 复古加州' },
+      { name: 'Satisfy',             family: 'Satisfy',            category: 'handwriting', fallback: 'cursive', desc: '签名体 · 连笔优雅 · 个性鲜明' },
+      { name: 'Patrick Hand',        family: 'Patrick Hand',       category: 'handwriting', fallback: 'cursive', desc: '手写印刷体 · 黑板报风 · 日常感' },
+      { name: 'Kalam',               family: 'Kalam',              category: 'handwriting', fallback: 'cursive', desc: '钢笔手写 · 温暖朴实 · 日记本风' },
+      { name: 'Sacramento',          family: 'Sacramento',         category: 'handwriting', fallback: 'cursive', desc: '精致连笔 · 高端邀请函 · 花体签名' },
+
+      // ─── Display 展示 ───
+      { name: 'Abril Fatface',       family: 'Abril Fatface',      category: 'display', fallback: 'serif',     desc: '超粗衬线 · 海报标题 · Didone 风格' },
+      { name: 'Righteous',           family: 'Righteous',          category: 'display', fallback: 'sans-serif',desc: '圆润粗体 · 复古游戏 · 趣味十足' },
+      { name: 'Comfortaa',           family: 'Comfortaa',          category: 'display', fallback: 'sans-serif',desc: '圆角几何 · 可爱友好 · 品牌 Logo 适用' },
+      { name: 'Fredoka',             family: 'Fredoka',            category: 'display', fallback: 'sans-serif',desc: '胖乎乎圆体 · 儿童向 · 温暖有趣' },
+      { name: 'Bebas Neue',          family: 'Bebas Neue',         category: 'display', fallback: 'sans-serif',desc: '窄体大写 · 电影海报 · 强烈视觉冲击' },
+      { name: 'Archivo Black',       family: 'Archivo Black',      category: 'display', fallback: 'sans-serif',desc: '粗重怪诞 · 力量感 · 运动/音乐风' },
+      { name: 'Philosopher',         family: 'Philosopher',        category: 'display', fallback: 'sans-serif',desc: '人文主义 · 学术优雅 · 独特衬线细节' },
+      { name: 'Italiana',            family: 'Italiana',           category: 'display', fallback: 'serif',     desc: '纤细意式 · 时装杂志 · 极致优雅' },
+      { name: 'Cinzel',              family: 'Cinzel',             category: 'display', fallback: 'serif',     desc: '罗马碑文 · 全大写优化 · 庄严古典' },
+      { name: 'Yeseva One',          family: 'Yeseva One',         category: 'display', fallback: 'serif',     desc: '装饰衬线 · 标题重器 · 复古庄重' },
+    ];
+
+    const categories = [
+      { id: 'all',          label: '全部',           emoji: '🎨' },
+      { id: 'serif',        label: '衬线 Serif',     emoji: '📜' },
+      { id: 'sans',         label: '无衬线 Sans',    emoji: '🔤' },
+      { id: 'mono',         label: '等宽 Mono',      emoji: '💻' },
+      { id: 'handwriting',  label: '手写 Script',    emoji: '✍️' },
+      { id: 'display',      label: '展示 Display',   emoji: '🎭' },
+    ];
+
+    const categoryTagClass = {
+      serif: 'font-card__tag--serif',
+      sans: 'font-card__tag--sans',
+      mono: 'font-card__tag--mono',
+      handwriting: 'font-card__tag--handwriting',
+      display: 'font-card__tag--display',
+    };
+
+    const categoryLabel = {
+      serif: 'Serif',
+      sans: 'Sans',
+      mono: 'Mono',
+      handwriting: 'Script',
+      display: 'Display',
+    };
+
+    const grid = document.getElementById('fontGrid');
+    const customText = document.getElementById('customText');
+    const weightSelect = document.getElementById('weightSelect');
+    const resultBar = document.getElementById('resultBar');
+    const resultName = document.getElementById('resultName');
+    const resultCode = document.getElementById('resultCode');
+    const loadingBar = document.getElementById('loadingBar');
+    const loadingText = document.getElementById('loadingText');
+    const categoryBar = document.getElementById('categoryBar');
+    const fontCount = document.getElementById('fontCount');
+
+    let selectedFont = null;
+    let activeCategory = 'all';
+
+    // 渲染分类 Tab
+    function renderCategories() {
+      categoryBar.innerHTML = categories.map(cat => {
+        const count = cat.id === 'all' ? fonts.length : fonts.filter(f => f.category === cat.id).length;
+        return `
+          <button class="category-tab ${activeCategory === cat.id ? 'active' : ''}" data-category="${cat.id}">
+            ${cat.emoji} ${cat.label}
+            <span class="category-tab__count">(${count})</span>
+          </button>
+        `;
+      }).join('');
+
+      categoryBar.querySelectorAll('.category-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+          activeCategory = tab.dataset.category;
+          renderCategories();
+          render();
+        });
+      });
+    }
+
+    // 等待所有字体加载完成
+    document.fonts.ready.then(() => {
+      loadingBar.classList.add('loaded');
+      loadingText.textContent = `✓ ${fonts.length} 款字体已加载完成`;
+      setTimeout(() => { loadingBar.style.display = 'none'; }, 2000);
+    });
+
+    function getFilteredFonts() {
+      if (activeCategory === 'all') return fonts;
+      return fonts.filter(f => f.category === activeCategory);
+    }
+
+    function render() {
+      const text = customText.value || 'RIEMer Land';
+      const weight = weightSelect.value;
+      const filtered = getFilteredFonts();
+
+      fontCount.textContent = `共 ${filtered.length} 款字体`;
+
+      grid.innerHTML = filtered.map((f) => {
+        const globalIndex = fonts.indexOf(f);
+        const tagHtml = f.tag
+          ? `<span class="font-card__tag font-card__tag--current">${f.tag}</span>`
+          : `<span class="font-card__tag ${categoryTagClass[f.category] || ''}">${categoryLabel[f.category] || ''}</span>`;
+
+        return `
+          <div class="font-card ${selectedFont === globalIndex ? 'selected' : ''}" onclick="selectFont(${globalIndex})">
+            <div class="font-card__info">
+              <div class="font-card__name">
+                ${f.name}${tagHtml}
+              </div>
+              <div class="font-card__desc">${f.desc}</div>
+            </div>
+            <div class="font-card__preview">
+              <div class="font-card__preview-hero" style="font-family: '${f.family}', ${f.fallback}; font-weight: ${weight};">
+                ${text}
+              </div>
+              <div class="font-card__preview-nav" style="font-family: '${f.family}', ${f.fallback}; font-weight: ${weight};">
+                ${text}
+              </div>
+              <div class="font-card__preview-sentence" style="font-family: '${f.family}', ${f.fallback}; font-weight: ${Math.min(parseInt(weight), 500)};">
+                The quick brown fox jumps over the lazy dog. 0123456789
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function selectFont(index) {
+      selectedFont = index;
+      const f = fonts[index];
+      resultName.textContent = f.name;
+      resultCode.textContent = f.name;
+      resultBar.classList.add('visible');
+      render();
+    }
+
+    function copyCode() {
+      if (selectedFont === null) return;
+      const f = fonts[selectedFont];
+      navigator.clipboard.writeText(f.name).then(() => {
+        const btn = document.querySelector('.result-bar__btn');
+        btn.textContent = '✓ 已复制！';
+        setTimeout(() => { btn.textContent = '复制字体名'; }, 1500);
+      });
+    }
+
+    // 模式切换
+    document.querySelectorAll('.toggle-group button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.toggle-group button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        document.body.setAttribute('data-mode', btn.dataset.mode);
+      });
+    });
+
+    customText.addEventListener('input', render);
+    weightSelect.addEventListener('change', render);
+
+    renderCategories();
+    render();
+  </script>
+</body>
+</html>

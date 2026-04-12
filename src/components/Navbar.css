@@ -30,25 +30,10 @@
   display: flex;
   align-items: center;
   height: 72px;
+  gap: var(--space-lg);
 }
 
-/* ---- 三栏等分布局 ---- */
-.navbar__slot {
-  flex: 1;
-  display: flex;
-  align-items: center;
-  gap: var(--space-xs);
-}
-
-.navbar__slot--left {
-  justify-content: flex-start;
-}
-
-.navbar__slot--right {
-  justify-content: flex-end;
-}
-
-/* Logo 居中，不参与 flex-grow */
+/* ---- Logo 最左侧 ---- */
 .navbar__logo {
   display: flex;
   align-items: center;
@@ -56,22 +41,119 @@
   text-decoration: none;
   color: var(--color-text);
   flex-shrink: 0;
-  margin: 0 var(--space-lg);
+  position: relative;
+  top: 2px;
 }
 
 .navbar__logo-img {
-  height: 42px;
+  height: 52px;
   width: auto;
+  vertical-align: middle;
 }
 
 .navbar__logo-text {
-  font-size: var(--text-lg);
-  font-weight: 700;
-  color: var(--color-primary);
-  letter-spacing: 0.02em;
+  font-family: var(--font-brand);
+  font-size: var(--text-xl);
+  font-weight: 600;
+  color: var(--color-primary-dark);
+  letter-spacing: 0.03em;
+  line-height: 1;
 }
 
-/* ---- 链接样式 ---- */
+/* ---- 导航栏（嵌入 header） ---- */
+.navbar__nav-bar {
+  flex: 1.5;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  gap: 0;
+}
+
+.navbar__nav-item {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-light);
+  text-decoration: none;
+  transition: all var(--transition-fast);
+  position: relative;
+  white-space: nowrap;
+}
+
+.navbar__nav-item:hover {
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.04);
+}
+
+.navbar__nav-item--active {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
+/* 激活态底部指示条 */
+.navbar__nav-item--active::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 20%;
+  right: 20%;
+  height: 2.5px;
+  background: var(--color-primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.navbar__nav-item--active:hover {
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.04);
+}
+
+/* ---- 右侧：成员入口 ---- */
+.navbar__right {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  gap: var(--space-sm);
+  margin-left: var(--space-lg);
+  min-width: 60px;
+}
+
+.navbar__right-placeholder {
+  display: inline-block;
+  width: 60px;
+  height: 1em;
+}
+
+.navbar__member-entry {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  text-decoration: none;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  transition: color var(--transition-fast);
+  white-space: nowrap;
+}
+
+.navbar__member-entry:hover {
+  color: var(--color-primary);
+}
+
+.navbar__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.navbar__user-name {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+/* ---- 通用链接样式（用于手机端菜单和下拉菜单） ---- */
 .navbar__link {
   padding: 0.5rem 1rem;
   color: var(--color-text);
@@ -86,7 +168,6 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  white-space: nowrap;
 }
 
 .navbar__link:hover {
@@ -107,7 +188,7 @@
 .navbar__dropdown-menu {
   position: absolute;
   top: 100%;
-  left: 0;
+  right: 0;
   min-width: 160px;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
@@ -141,35 +222,50 @@
   background: rgba(91, 140, 62, 0.06);
 }
 
-/* ---- 成员入口（桌面端） ---- */
-.navbar__auth {
-  margin-left: var(--space-md);
-}
-
-.navbar__member-entry {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  text-decoration: none;
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  transition: color var(--transition-fast);
-  white-space: nowrap;
-}
-
-.navbar__member-entry:hover {
-  color: var(--color-primary);
-}
-
-.navbar__user {
+/* 通知入口菜单项 */
+.navbar__dropdown-item--notification {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: 6px;
+  border-bottom: 1px solid var(--color-border-light);
+  margin-bottom: 4px;
+  padding-bottom: 0.7rem;
 }
 
-.navbar__user-name {
-  font-size: var(--text-sm);
-  color: var(--color-text-muted);
-  font-weight: 500;
+.navbar__dropdown-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  margin-left: auto;
+  line-height: 1;
+}
+
+/* 角标（在"内部空间"按钮上） */
+.navbar__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--radius-full);
+  background: var(--color-danger);
+  color: white;
+  font-size: 0.6rem;
+  font-weight: 700;
+  line-height: 1;
+  margin-left: 4px;
+  position: relative;
+  top: -1px;
+  white-space: nowrap;
 }
 
 /* ---- 汉堡按钮 ---- */
@@ -181,29 +277,28 @@
   padding: var(--space-xs);
 }
 
-/* ---- 手机端展开菜单 ---- */
+/* ---- 手机端展开菜单（桌面隐藏） ---- */
 .navbar__links {
   display: none;
 }
 
-/* 菜单内的成员入口/用户信息 — 桌面端隐藏 */
 .navbar__mobile-auth {
   display: none;
 }
 
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
-  /* 手机端：隐藏左右 slot，显示 Logo + 汉堡 */
-  .navbar__slot {
+  /* 手机端：隐藏进度条导航和右侧区域 */
+  .navbar__nav-bar {
+    display: none;
+  }
+
+  .navbar__right {
     display: none;
   }
 
   .navbar__container {
     justify-content: space-between;
-  }
-
-  .navbar__logo {
-    margin: 0;
   }
 
   .navbar__toggle {

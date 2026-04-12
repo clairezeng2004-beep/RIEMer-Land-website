@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Menu, X, LogOut, ChevronDown } from 'lucide-react';
+import { useNotifications } from '../contexts/NotificationContext';
+import { Menu, X, LogOut } from 'lucide-react';
 import './Navbar.css';
 
 export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
-  const [internalOpen, setInternalOpen] = useState(false);
-  const { user, isAuthenticated, logout } = useAuth();
+  const { user, isAuthenticated, loading, logout } = useAuth();
+  const { unreadCount } = useNotifications();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -32,7 +33,6 @@ export default function Navbar() {
 
   useEffect(() => {
     setIsOpen(false);
-    setInternalOpen(false);
   }, [location.pathname]);
 
   const handleLogout = () => {
@@ -45,70 +45,51 @@ export default function Navbar() {
   return (
     <nav className={`navbar ${scrolled ? 'navbar--scrolled' : ''} ${hidden ? 'navbar--hidden' : ''}`}>
       <div className="navbar__container">
-        {/* 左侧：首页 */}
-        <div className="navbar__slot navbar__slot--left">
-          <Link
-            to="/"
-            className={`navbar__link ${isActive('/') ? 'navbar__link--active' : ''}`}
-          >
-            首页
-          </Link>
-          <Link
-            to="/timeline"
-            className={`navbar__link ${isActive('/timeline') ? 'navbar__link--active' : ''}`}
-          >
-            历史
-          </Link>
-        </div>
-
-        {/* 中间：Logo */}
+        {/* 最左侧：Logo */}
         <Link to="/" className="navbar__logo">
           <img src="/logo.png" alt="RIEMer Land" className="navbar__logo-img" />
           <span className="navbar__logo-text">RIEMer Land</span>
         </Link>
 
-        {/* 右侧：文章 + 成员入口 */}
-        <div className="navbar__slot navbar__slot--right">
+        {/* 中间：三个等宽导航按钮（进度条风格） */}
+        <div className="navbar__nav-bar">
+          <Link
+            to="/"
+            className={`navbar__nav-item ${isActive('/') ? 'navbar__nav-item--active' : ''}`}
+          >
+            首页
+          </Link>
           <Link
             to="/articles"
-            className={`navbar__link ${isActive('/articles') || location.pathname.startsWith('/article/') ? 'navbar__link--active' : ''}`}
+            className={`navbar__nav-item ${isActive('/articles') || location.pathname.startsWith('/article/') ? 'navbar__nav-item--active' : ''}`}
           >
-            文章
+            分享回顾
           </Link>
+          <Link
+            to="/timeline"
+            className={`navbar__nav-item ${isActive('/timeline') ? 'navbar__nav-item--active' : ''}`}
+          >
+            关于我们
+          </Link>
+        </div>
 
-          {isAuthenticated && (
-            <div className="navbar__dropdown">
-              <button
-                className={`navbar__link navbar__dropdown-trigger ${
+        {/* 最右侧：成员入口 / 用户信息 */}
+        <div className="navbar__right">
+          {loading ? (
+            <span className="navbar__right-placeholder" />
+          ) : isAuthenticated ? (
+            <>
+              <Link
+                to="/internal"
+                className={`navbar__link ${
                   location.pathname.startsWith('/internal') ? 'navbar__link--active' : ''
                 }`}
-                onClick={() => setInternalOpen(!internalOpen)}
               >
-                内部空间 <ChevronDown size={14} />
-              </button>
-              <div className={`navbar__dropdown-menu ${internalOpen ? 'navbar__dropdown-menu--open' : ''}`}>
-                <Link to="/internal/documents" className="navbar__dropdown-item">
-                  文档管理
-                </Link>
-                <Link to="/internal/tasks" className="navbar__dropdown-item">
-                  事项追踪
-                </Link>
-                {user?.role === 'admin' && (
-                  <Link to="/internal/users" className="navbar__dropdown-item">
-                    用户管理
-                  </Link>
+                内部空间
+                {unreadCount > 0 && (
+                  <span className="navbar__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
                 )}
-                {user?.role === 'admin' && (
-                  <Link to="/internal/content" className="navbar__dropdown-item">
-                    内容管理
-                  </Link>
-                )}
-              </div>
-            </div>
-          )}
-
-          <div className="navbar__auth">
-            {isAuthenticated ? (
+              </Link>
               <div className="navbar__user">
                 <span className="navbar__user-name">{user?.name}</span>
                 <button onClick={handleLogout} className="btn btn-ghost btn-sm">
@@ -116,10 +97,10 @@ export default function Navbar() {
                   退出
                 </button>
               </div>
-            ) : (
-              <Link to="/login" className="navbar__member-entry">成员入口</Link>
-            )}
-          </div>
+            </>
+          ) : (
+            <Link to="/login" className="navbar__member-entry">内部空间</Link>
+          )}
         </div>
 
         {/* 手机端汉堡菜单按钮 */}
@@ -140,52 +121,34 @@ export default function Navbar() {
             首页
           </Link>
           <Link
-            to="/timeline"
-            className={`navbar__link ${isActive('/timeline') ? 'navbar__link--active' : ''}`}
-          >
-            历史
-          </Link>
-          <Link
             to="/articles"
             className={`navbar__link ${isActive('/articles') || location.pathname.startsWith('/article/') ? 'navbar__link--active' : ''}`}
           >
-            文章
+            分享回顾
+          </Link>
+          <Link
+            to="/timeline"
+            className={`navbar__link ${isActive('/timeline') ? 'navbar__link--active' : ''}`}
+          >
+            关于我们
           </Link>
 
-          {isAuthenticated && (
-            <div className="navbar__dropdown">
-              <button
-                className={`navbar__link navbar__dropdown-trigger ${
-                  location.pathname.startsWith('/internal') ? 'navbar__link--active' : ''
-                }`}
-                onClick={() => setInternalOpen(!internalOpen)}
-              >
-                内部空间 <ChevronDown size={14} />
-              </button>
-              <div className={`navbar__dropdown-menu ${internalOpen ? 'navbar__dropdown-menu--open' : ''}`}>
-                <Link to="/internal/documents" className="navbar__dropdown-item">
-                  文档管理
-                </Link>
-                <Link to="/internal/tasks" className="navbar__dropdown-item">
-                  事项追踪
-                </Link>
-                {user?.role === 'admin' && (
-                  <Link to="/internal/users" className="navbar__dropdown-item">
-                    用户管理
-                  </Link>
-                )}
-                {user?.role === 'admin' && (
-                  <Link to="/internal/content" className="navbar__dropdown-item">
-                    内容管理
-                  </Link>
-                )}
-              </div>
-            </div>
+          {!loading && isAuthenticated && (
+            <Link
+              to="/internal"
+              className={`navbar__link ${
+                location.pathname.startsWith('/internal') ? 'navbar__link--active' : ''
+              }`}
+            >
+              内部空间
+              {unreadCount > 0 && (
+                <span className="navbar__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
+              )}
+            </Link>
           )}
 
-          {/* 手机端菜单内的成员入口/用户信息 */}
           <div className="navbar__mobile-auth">
-            {isAuthenticated ? (
+            {loading ? null : isAuthenticated ? (
               <div className="navbar__mobile-user">
                 <span className="navbar__user-name">{user?.name}</span>
                 <button onClick={handleLogout} className="btn btn-ghost btn-sm">
@@ -195,7 +158,7 @@ export default function Navbar() {
               </div>
             ) : (
               <Link to="/login" className="navbar__link navbar__mobile-entry">
-                成员入口
+                内部空间
               </Link>
             )}
           </div>

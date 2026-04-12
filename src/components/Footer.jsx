@@ -16,15 +16,15 @@ export default function Footer() {
             <div className="footer__nav">
               <h4 className="footer__nav-title">导航</h4>
               <Link to="/" className="footer__nav-link">首页</Link>
-              <Link to="/timeline" className="footer__nav-link">历史</Link>
-              <Link to="/articles" className="footer__nav-link">文章</Link>
+              <Link to="/articles" className="footer__nav-link">分享回顾</Link>
+              <Link to="/timeline" className="footer__nav-link">关于我们</Link>
             </div>
 
             <div className="footer__nav">
               <h4 className="footer__nav-title">关于我们</h4>
-              <span className="footer__nav-link">{clubInfo.fullName}</span>
-              <span className="footer__nav-link">跨学科学术交流</span>
-              <span className="footer__nav-link">开放包容的社区</span>
+              <span className="footer__nav-link">RIEM 学生互助平台</span>
+              <span className="footer__nav-link">经验交流 · 心得共享</span>
+              <span className="footer__nav-link">朋辈互助 · 多元可能</span>
             </div>
 
             <div className="footer__nav">
