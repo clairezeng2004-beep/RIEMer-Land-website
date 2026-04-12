@@ -50,6 +50,8 @@ export default function ArticleChat() {
     recognition.continuous = false;
     recognition.interimResults = true;
 
+    // 保存语音开始前输入框已有的文字，避免丢失
+    const prefixText = input;
     let finalTranscript = '';
 
     recognition.onresult = (event) => {
@@ -62,11 +64,8 @@ export default function ArticleChat() {
           interim += transcript;
         }
       }
-      // 实时更新输入框：已确认文字 + 临时文字
-      setInput((prev) => {
-        const base = prev.replace(/\u200B.*$/, ''); // 清理之前的临时标记
-        return finalTranscript || base + interim;
-      });
+      // 直接用"前缀 + 已确认 + 临时"拼接，避免依赖 prev 导致重复
+      setInput(prefixText + finalTranscript + interim);
     };
 
     recognition.onerror = (event) => {
@@ -81,9 +80,9 @@ export default function ArticleChat() {
     recognition.onend = () => {
       setIsListening(false);
       recognitionRef.current = null;
-      // 把最终结果写入输入框
+      // 把最终结果写入输入框（如果 onresult 还没写入的话）
       if (finalTranscript) {
-        setInput((prev) => prev || finalTranscript);
+        setInput(prefixText + finalTranscript);
       }
       inputRef.current?.focus();
     };
@@ -91,7 +90,7 @@ export default function ArticleChat() {
     recognitionRef.current = recognition;
     setIsListening(true);
     recognition.start();
-  }, [isListening, stopListening]);
+  }, [isListening, stopListening, input]);
 
   // 组件卸载或面板关闭时停止语音识别
   useEffect(() => {
