@@ -113,6 +113,8 @@
   font-size: var(--text-sm);
   border-radius: var(--radius-sm);
   gap: 4px;
+  min-width: 5.5em;
+  justify-content: space-between;
 }
 
 .custom-select--sm .custom-select__dropdown {

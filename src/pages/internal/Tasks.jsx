@@ -53,7 +53,7 @@ export default function Tasks() {
     status: '待办',
     assignee: '',
   });
-  const [changeReasons, setChangeReasons] = useState({});
+  const [notes, setNotes] = useState({});
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -85,14 +85,14 @@ export default function Tasks() {
   };
 
   const updateTaskStatus = (id, newStatus) => {
-    const reason = changeReasons[id] || '';
+    const note = notes[id] || '';
     setTasks(
       tasks.map((t) => {
         if (t.id !== id) return t;
         const record = {
           from: t.status,
           to: newStatus,
-          reason,
+          reason: note,
           date: new Date().toISOString().split('T')[0],
         };
         return {
@@ -102,16 +102,16 @@ export default function Tasks() {
         };
       })
     );
-    // 清空该任务的变更理由
-    setChangeReasons((prev) => {
+    // 清空该任务的备注
+    setNotes((prev) => {
       const next = { ...prev };
       delete next[id];
       return next;
     });
   };
 
-  const updateChangeReason = (id, reason) => {
-    setChangeReasons((prev) => ({ ...prev, [id]: reason }));
+  const updateNote = (id, value) => {
+    setNotes((prev) => ({ ...prev, [id]: value }));
   };
 
   const deleteTask = (id) => {
@@ -309,9 +309,9 @@ export default function Tasks() {
                       <input
                         type="text"
                         className="tasks-table__reason-input"
-                        placeholder="变更理由…"
-                        value={changeReasons[task.id] || ''}
-                        onChange={(e) => updateChangeReason(task.id, e.target.value)}
+                        placeholder="备注…"
+                        value={notes[task.id] || ''}
+                        onChange={(e) => updateNote(task.id, e.target.value)}
                       />
                       <button
                         onClick={() => deleteTask(task.id)}
