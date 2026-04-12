@@ -140,7 +140,7 @@ export default function Articles() {
         </div>
       </section>
 
-      {/* 文章助手对话窗口 */}
+      {/* 内容助手对话窗口 */}
       <ArticleChat />
     </div>
   );

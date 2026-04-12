@@ -78,10 +78,10 @@ export default function ArticleChat() {
       <button
         className={`article-chat__fab ${isOpen ? 'article-chat__fab--hidden' : ''}`}
         onClick={() => setIsOpen(true)}
-        aria-label="打开文章助手"
+        aria-label="打开内容助手"
       >
         <MessageCircle size={22} />
-        <span className="article-chat__fab-label">文章助手</span>
+        <span className="article-chat__fab-label">内容助手</span>
       </button>
 
       {/* 聊天面板 */}
@@ -90,7 +90,7 @@ export default function ArticleChat() {
         <div className="article-chat__header">
           <div className="article-chat__header-info">
             <span className="article-chat__header-dot" />
-            <h4>文章助手</h4>
+            <h4>内容助手</h4>
           </div>
           <button
             className="article-chat__close"

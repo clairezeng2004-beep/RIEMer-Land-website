@@ -25,7 +25,7 @@ function buildArticlesContext() {
 }
 
 // 系统 Prompt
-const SYSTEM_PROMPT = `你是 RIEMer Land 的文章助手，帮助用户找到感兴趣的文章。
+const SYSTEM_PROMPT = `你是 RIEMer Land 的内容助手，帮助用户找到感兴趣的内容。
 
 以下是所有可用文章：
 ${buildArticlesContext()}
