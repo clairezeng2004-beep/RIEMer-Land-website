@@ -125,7 +125,7 @@ export const membersData = [
 export const eventsData = [
   {
     id: '1',
-    title: '【RIEMer\'s Space 分享会第十期】快消行业与职业选择经验分享',
+    title: '快消行业与职业选择经验分享',
     date: '2025-03-06',
     category: '分享会',
     location: '线上',
@@ -134,7 +134,7 @@ export const eventsData = [
   },
   {
     id: '2',
-    title: '【RIEMer\'s Space 分享会第九期】数模备赛经验分享',
+    title: '数模备赛经验分享',
     date: '2025-08-12',
     category: '分享会',
     location: '线上',
@@ -143,7 +143,7 @@ export const eventsData = [
   },
   {
     id: '3',
-    title: 'RIEMer 小记｜关于保研论文的答疑解惑',
+    title: '关于保研论文的答疑解惑',
     date: '2025-03-02',
     category: '经验分享',
     location: '线上',
@@ -187,7 +187,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '2',
-    title: '听 RIEMer 说｜丁成：科技行业经济学就业分享',
+    title: '丁成：科技行业经济学就业分享',
     author: 'RIEMer Land',
     date: '2025-08-30',
     category: '听 RIEMer 说系列',
@@ -210,7 +210,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '3',
-    title: '听 RIEMer 说｜W 同学：经济学考研经验分享',
+    title: 'W 同学：经济学考研经验分享',
     author: 'RIEMer Land',
     date: '2025-08-19',
     category: '听 RIEMer 说系列',
@@ -279,7 +279,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '6',
-    title: 'RIEMer 课程测评｜RIEM 大一下专业必修与方向课测评',
+    title: 'RIEM 大一下专业必修与方向课测评',
     author: 'RIEMer Land',
     date: '2025-12-28',
     category: '课程测评',
@@ -302,7 +302,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '7',
-    title: '听 RIEMer 说｜陈蕴甜：老油条的保研秘笈',
+    title: '陈蕴甜：老油条的保研秘笈',
     author: 'RIEMer Land',
     date: '2025-12-05',
     category: '听 RIEMer 说系列',
@@ -329,7 +329,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '8',
-    title: '听 RIEMer 说｜梁晶晶：一尺阳光云雾散，半山鹧鸪半山青',
+    title: '梁晶晶：一尺阳光云雾散，半山鹧鸪半山青',
     author: 'RIEMer Land',
     date: '2025-12-02',
     category: '听 RIEMer 说系列',
@@ -356,7 +356,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '9',
-    title: '【RIEMer Land】课程测评分享征稿',
+    title: '课程测评分享征稿',
     author: 'RIEMer Land',
     date: '2025-11-26',
     category: '课程测评',
@@ -383,7 +383,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '10',
-    title: '听 RIEMer 说｜周越：You are very much ON TIME in your TIME ZONE',
+    title: '周越：You are very much ON TIME in your TIME ZONE',
     author: 'RIEMer Land',
     date: '2025-11-24',
     category: '听 RIEMer 说系列',
@@ -410,7 +410,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '11',
-    title: '听 RIEMer 说｜李苇行：申请经历分享——我最真实的故事',
+    title: '李苇行：申请经历分享——我最真实的故事',
     author: 'RIEMer Land',
     date: '2025-11-20',
     category: '听 RIEMer 说系列',
@@ -437,7 +437,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '12',
-    title: '听 RIEMer 说｜李正阳：中国人民大学财政金融学院金融直博保研分享',
+    title: '李正阳：中国人民大学财政金融学院金融直博保研分享',
     author: 'RIEMer Land',
     date: '2025-11-16',
     category: '听 RIEMer 说系列',
@@ -464,7 +464,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '13',
-    title: '听 RIEMer 说｜林飞扬：从西财到南开——我的保研旅程与成长记录',
+    title: '林飞扬：从西财到南开——我的保研旅程与成长记录',
     author: 'RIEMer Land',
     date: '2025-11-06',
     category: '听 RIEMer 说系列',
@@ -491,7 +491,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '14',
-    title: '听 RIEMer 说｜李沛欣：保研经验分享——经济学学术方向',
+    title: '李沛欣：保研经验分享——经济学学术方向',
     author: 'RIEMer Land',
     date: '2025-10-18',
     category: '听 RIEMer 说系列',
@@ -518,7 +518,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '15',
-    title: '听 RIEMer 说｜牟馨怡：经管跨保人工智能——跨保思路及经验分享',
+    title: '牟馨怡：经管跨保人工智能——跨保思路及经验分享',
     author: 'RIEMer Land',
     date: '2025-10-12',
     category: '听 RIEMer 说系列',
@@ -549,7 +549,7 @@ RIEM 开设的所有专业必修课、方向选修课、通识课程均可投稿
   },
   {
     id: '16',
-    title: '听 RIEMer 说｜陈忠怡：人大应经硕博直通项目保研分享',
+    title: '陈忠怡：人大应经硕博直通项目保研分享',
     author: 'RIEMer Land',
     date: '2025-09-30',
     category: '听 RIEMer 说系列',

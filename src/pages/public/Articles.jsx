@@ -17,17 +17,6 @@ export default function Articles() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
 
-  // 自动去掉标题中的系列名前缀
-  const cleanTitle = (title) => {
-    return title
-      .replace(/^【[^】]+】\s*/, '')           // 【RIEMer Land】...
-      .replace(/^听\s*RIEMer\s*说[｜|]\s*/, '') // 听 RIEMer 说｜...
-      .replace(/^RIEMer\s*课程测评[｜|]\s*/, '') // RIEMer 课程测评｜...
-      .replace(/^RIEMer['']?s?\s*Space\s*分享会[｜|]?\s*/, '') // RIEMer's Space 分享会...
-      .replace(/^RIEMer\s*小记[｜|]\s*/, '')     // RIEMer 小记｜...
-      .replace(/^RIEMer\s*Land[｜|]?\s*/, '');   // RIEMer Land...
-  };
-
   const categories = useMemo(() => {
     const cats = [...new Set(articlesData.map((a) => a.category))];
     return ['全部', ...cats];
@@ -114,7 +103,7 @@ export default function Articles() {
                       <span>{article.date}</span>
                     </div>
                   </div>
-                  <h3 className="article-card__title">{cleanTitle(article.title)}</h3>
+                  <h3 className="article-card__title">{article.title}</h3>
                   <p className="article-card__excerpt">{article.excerpt}</p>
                   <div className="article-card__tags">
                     {article.tags.map((tag) => (
