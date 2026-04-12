@@ -7,6 +7,11 @@
 
 .timeline.section {
   padding-top: var(--space-xl);
+  padding-bottom: var(--space-lg);
+}
+
+.members.section {
+  padding-top: var(--space-xl);
 }
 
 .timeline-hero__content {
