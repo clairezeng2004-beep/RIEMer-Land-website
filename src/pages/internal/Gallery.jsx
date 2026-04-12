@@ -102,11 +102,14 @@ export default function Gallery() {
 
   const handleAddPhotos = () => {
     if (!selectedAlbum || selectedFiles.length === 0) return;
-    const newPhotos = selectedFiles.map((f, i) => ({
-      id: `upload-${Date.now()}-${i}`,
-      url: f.url,
-      caption: f.caption,
-    }));
+    const newPhotos = selectedFiles.map((f, i) => {
+      const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
+      return {
+        id: `upload-${Date.now()}-${i}`,
+        url: f.url,
+        caption: f.caption === defaultCaption ? '' : f.caption,
+      };
+    });
     setAlbums((prev) =>
       prev.map((a) =>
         a.id === selectedAlbum.id
@@ -345,15 +348,30 @@ export default function Gallery() {
                 <div className="gallery-upload__preview">
                   {selectedFiles.map((f, i) => (
                     <div key={i} className="gallery-upload__preview-item">
-                      <img src={f.url} alt={f.caption} />
-                      <button
-                        className="gallery-upload__preview-remove"
-                        onClick={() =>
-                          setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i))
-                        }
-                      >
-                        <X size={14} />
-                      </button>
+                      <div className="gallery-upload__preview-img-wrapper">
+                        <img src={f.url} alt={f.caption} />
+                        <button
+                          className="gallery-upload__preview-remove"
+                          onClick={() =>
+                            setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i))
+                          }
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                      <input
+                        type="text"
+                        className="gallery-upload__caption-input"
+                        placeholder="添加注释（选填）"
+                        value={f.caption === f.file.name.replace(/\.[^.]+$/, '') ? '' : f.caption}
+                        onChange={(e) => {
+                          setSelectedFiles((prev) =>
+                            prev.map((item, idx) =>
+                              idx === i ? { ...item, caption: e.target.value } : item
+                            )
+                          );
+                        }}
+                      />
                     </div>
                   ))}
                 </div>

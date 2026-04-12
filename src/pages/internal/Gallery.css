@@ -306,18 +306,24 @@
 
 .gallery-upload__preview {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: var(--space-sm);
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: var(--space-md);
 }
 
 .gallery-upload__preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.gallery-upload__preview-img-wrapper {
   position: relative;
   aspect-ratio: 1;
   border-radius: var(--radius-md);
   overflow: hidden;
 }
 
-.gallery-upload__preview-item img {
+.gallery-upload__preview-img-wrapper img {
   width: 100%;
   height: 100%;
   object-fit: cover;
@@ -342,6 +348,29 @@
 
 .gallery-upload__preview-remove:hover {
   background: var(--color-danger);
+}
+
+.gallery-upload__caption-input {
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  transition: all var(--transition-fast);
+  box-sizing: border-box;
+}
+
+.gallery-upload__caption-input::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
+.gallery-upload__caption-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.1);
 }
 
 /* ============ Photo Grid ============ */
