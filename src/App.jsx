@@ -9,6 +9,7 @@ import Timeline from './pages/public/Timeline';
 import Articles from './pages/public/Articles';
 import ArticleDetail from './pages/public/ArticleDetail';
 import Login from './pages/internal/Login';
+import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
 import Tasks from './pages/internal/Tasks';
 import UserManagement from './pages/internal/UserManagement';
@@ -34,13 +35,15 @@ function App() {
                 {/* Auth */}
                 <Route path="/login" element={<Login />} />
 
-                {/* Internal Routes (Protected) */}
-                <Route path="/internal" element={<InternalHome />} />
-                <Route path="/internal/documents" element={<Documents />} />
-                <Route path="/internal/tasks" element={<Tasks />} />
-                <Route path="/internal/users" element={<UserManagement />} />
-                <Route path="/internal/content" element={<ContentManagement />} />
-                <Route path="/internal/notifications" element={<Notifications />} />
+                {/* Internal Routes (Protected) — 带侧边栏布局 */}
+                <Route path="/internal" element={<InternalLayout />}>
+                  <Route index element={<InternalHome />} />
+                  <Route path="documents" element={<Documents />} />
+                  <Route path="tasks" element={<Tasks />} />
+                  <Route path="users" element={<UserManagement />} />
+                  <Route path="content" element={<ContentManagement />} />
+                  <Route path="notifications" element={<Notifications />} />
+                </Route>
               </Routes>
             </main>
             <Footer />

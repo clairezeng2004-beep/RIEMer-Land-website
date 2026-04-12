@@ -14,7 +14,7 @@
 }
 
 .internal-home__welcome-card {
-  background: linear-gradient(135deg, #5EAD8C 0%, #4A9E7E 60%, #3D8D6E 100%);
+  background: linear-gradient(135deg, #5B8C3E 0%, #4A7A30 60%, #3D6B2A 100%);
   border-radius: var(--radius-xl);
   padding: var(--space-2xl) var(--space-2xl);
   color: white;

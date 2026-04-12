@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
@@ -48,7 +48,7 @@ export default function InternalHome() {
   }, [notifications]);
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+    return null;
   }
 
   const today = new Date();
