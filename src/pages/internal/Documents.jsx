@@ -144,7 +144,7 @@ export default function Documents() {
       fileType,
       fileUrl,
       description: newDoc.description,
-      uploadedBy: user?.name || 'Unknown',
+      uploadedBy: user?.nickname || user?.name || 'Unknown',
       uploadedById: user?.id || null,
       date: new Date().toISOString().split('T')[0],
       size: selectedFile ? formatSize(selectedFile.size) : '—',
@@ -195,6 +195,11 @@ export default function Documents() {
   const handleLike = (docId, e) => {
     if (e) e.stopPropagation();
     if (!user) return;
+    const likeData = {
+      userId: user.id,
+      userName: user.nickname || user.name || user.email,
+      userAvatar: user.avatar || null,
+    };
     setDocuments((prev) =>
       prev.map((d) => {
         if (d.id !== docId) return d;
@@ -204,7 +209,7 @@ export default function Documents() {
           ...d,
           likes: alreadyLiked
             ? likes.filter((l) => l.userId !== user.id)
-            : [...likes, { userId: user.id, userName: user.name || user.email }],
+            : [...likes, likeData],
         };
       })
     );
@@ -218,7 +223,7 @@ export default function Documents() {
           ...prev,
           likes: alreadyLiked
             ? likes.filter((l) => l.userId !== user.id)
-            : [...likes, { userId: user.id, userName: user.name || user.email }],
+            : [...likes, likeData],
         };
       });
     }
@@ -445,10 +450,14 @@ export default function Documents() {
                       <div
                         key={like.userId}
                         className="doc-card__like-avatar"
-                        style={{ background: getAvatarColor(like.userName) }}
+                        style={{ background: like.userAvatar ? 'transparent' : getAvatarColor(like.userName) }}
                         title={like.userName}
                       >
-                        {getInitial(like.userName)}
+                        {like.userAvatar ? (
+                          <img src={like.userAvatar} alt={like.userName} />
+                        ) : (
+                          getInitial(like.userName)
+                        )}
                       </div>
                     ))}
                     {(doc.likes || []).length > 5 && (
@@ -614,10 +623,14 @@ export default function Documents() {
                       <div
                         key={like.userId}
                         className="doc-preview__like-avatar"
-                        style={{ background: getAvatarColor(like.userName) }}
+                        style={{ background: like.userAvatar ? 'transparent' : getAvatarColor(like.userName) }}
                         title={like.userName}
                       >
-                        {getInitial(like.userName)}
+                        {like.userAvatar ? (
+                          <img src={like.userAvatar} alt={like.userName} />
+                        ) : (
+                          getInitial(like.userName)
+                        )}
                       </div>
                     ))}
                   </div>

@@ -140,6 +140,33 @@
   gap: var(--space-sm);
 }
 
+.navbar__user-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.navbar__user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.navbar__user-avatar span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: white;
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 50%;
+}
+
 .navbar__user-name {
   font-size: var(--text-sm);
   color: var(--color-text-muted);

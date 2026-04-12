@@ -81,7 +81,22 @@ export default function Navbar() {
                 )}
               </Link>
               <div className="navbar__user">
-                <span className="navbar__user-name">{user?.name}</span>
+                <div className="navbar__user-avatar">
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt="" />
+                  ) : (
+                    <span style={{ background: (() => {
+                      const name = user?.nickname || user?.name || '';
+                      const colors = ['#5B8C3E','#4FBFC4','#D4A44C','#8B5CF6','#EC4899','#3B82F6','#EF4444','#F59E0B','#10B981','#6366F1'];
+                      let hash = 0;
+                      for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+                      return colors[Math.abs(hash) % colors.length];
+                    })() }}>
+                      {(user?.nickname || user?.name || '?').charAt(0).toUpperCase()}
+                    </span>
+                  )}
+                </div>
+                <span className="navbar__user-name">{user?.nickname || user?.name}</span>
                 <button onClick={handleLogout} className="btn btn-ghost btn-sm">
                   <LogOut size={16} />
                   退出
@@ -140,7 +155,7 @@ export default function Navbar() {
           <div className="navbar__mobile-auth">
             {loading ? null : isAuthenticated ? (
               <div className="navbar__mobile-user">
-                <span className="navbar__user-name">{user?.name}</span>
+                <span className="navbar__user-name">{user?.nickname || user?.name}</span>
                 <button onClick={handleLogout} className="btn btn-ghost btn-sm">
                   <LogOut size={16} />
                   退出

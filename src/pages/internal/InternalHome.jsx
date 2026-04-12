@@ -1,9 +1,13 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
   ArrowRight,
+  Camera,
+  Edit3,
+  Check,
+  X,
 } from 'lucide-react';
 import { documentsData, initialTasks } from '../../data/siteData';
 import './InternalHome.css';
@@ -33,9 +37,65 @@ function formatDate(dateStr) {
 const ROLE_LABELS = { admin: '管理员', member: '成员' };
 
 export default function InternalHome() {
-  const { user, isAuthenticated, isAdmin } = useAuth();
+  const { user, isAuthenticated, isAdmin, updateProfile } = useAuth();
   const { notifications, unreadCount } = useNotifications();
   const navigate = useNavigate();
+  const avatarInputRef = useRef(null);
+
+  // 个人资料编辑状态
+  const [editingNickname, setEditingNickname] = useState(false);
+  const [nicknameInput, setNicknameInput] = useState('');
+
+  // 显示名：优先昵称，其次真名
+  const displayName = user?.nickname || user?.name;
+
+  // 根据用户名生成稳定的头像背景色
+  const getAvatarColor = (name) => {
+    const colors = [
+      '#5B8C3E', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899',
+      '#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#6366F1',
+    ];
+    let hash = 0;
+    for (let i = 0; i < (name || '').length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // 获取名字首字符
+  const getInitial = (name) => {
+    if (!name) return '?';
+    return name.charAt(0).toUpperCase();
+  };
+
+  // 处理头像上传
+  const handleAvatarUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 2 * 1024 * 1024) {
+      alert('头像文件不能超过 2MB');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      const dataUrl = ev.target.result;
+      await updateProfile({ avatar: dataUrl });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // 保存昵称
+  const saveNickname = async () => {
+    const trimmed = nicknameInput.trim();
+    await updateProfile({ nickname: trimmed });
+    setEditingNickname(false);
+  };
+
+  // 开始编辑昵称
+  const startEditNickname = () => {
+    setNicknameInput(user?.nickname || '');
+    setEditingNickname(true);
+  };
 
   // 统计数据
   const stats = useMemo(() => {
@@ -108,7 +168,7 @@ export default function InternalHome() {
               RIEMer Land
             </h1>
             <p className="internal-home__welcome-sub">
-              {getGreeting()}，{user?.name}。欢迎回到内部空间 ✨
+              {getGreeting()}，{displayName}。欢迎回到内部空间 ✨
             </p>
             <div className="internal-home__welcome-meta">
               <span className="internal-home__welcome-meta-item">
@@ -119,6 +179,94 @@ export default function InternalHome() {
                   {unreadCount} 条未读消息
                 </span>
               )}
+            </div>
+          </div>
+        </div>
+
+        {/* 个人资料卡片 */}
+        <div className="internal-home__profile-card">
+          <div className="internal-home__profile-avatar-section">
+            <div
+              className="internal-home__profile-avatar"
+              onClick={() => avatarInputRef.current?.click()}
+              title="点击更换头像"
+            >
+              {user?.avatar ? (
+                <img src={user.avatar} alt={displayName} />
+              ) : (
+                <div
+                  className="internal-home__profile-avatar-placeholder"
+                  style={{ background: getAvatarColor(displayName) }}
+                >
+                  {getInitial(displayName)}
+                </div>
+              )}
+              <div className="internal-home__profile-avatar-overlay">
+                <Camera size={16} />
+              </div>
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              style={{ display: 'none' }}
+            />
+          </div>
+          <div className="internal-home__profile-info">
+            <div className="internal-home__profile-name-row">
+              {editingNickname ? (
+                <div className="internal-home__profile-edit-row">
+                  <input
+                    className="internal-home__profile-nickname-input"
+                    value={nicknameInput}
+                    onChange={(e) => setNicknameInput(e.target.value)}
+                    placeholder="输入昵称（留空则显示真名）"
+                    maxLength={20}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') saveNickname();
+                      if (e.key === 'Escape') setEditingNickname(false);
+                    }}
+                  />
+                  <button
+                    className="internal-home__profile-edit-btn internal-home__profile-edit-btn--confirm"
+                    onClick={saveNickname}
+                    title="保存"
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button
+                    className="internal-home__profile-edit-btn internal-home__profile-edit-btn--cancel"
+                    onClick={() => setEditingNickname(false)}
+                    title="取消"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <span className="internal-home__profile-display-name">{displayName}</span>
+                  <button
+                    className="internal-home__profile-edit-trigger"
+                    onClick={startEditNickname}
+                    title="修改昵称"
+                  >
+                    <Edit3 size={13} />
+                  </button>
+                </>
+              )}
+            </div>
+            <div className="internal-home__profile-meta">
+              {user?.nickname && (
+                <span className="internal-home__profile-realname">真名：{user.name}</span>
+              )}
+              <span className="internal-home__profile-role">
+                {ROLE_LABELS[user?.role] || '成员'}
+              </span>
+            </div>
+            <div className="internal-home__profile-hint">
+              点击头像更换 · 点击笔图标修改昵称
             </div>
           </div>
         </div>

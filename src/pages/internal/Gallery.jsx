@@ -96,7 +96,7 @@ export default function Gallery() {
       coverIndex: 0,
       date: new Date().toISOString().split('T')[0],
       createdById: user?.id || null,
-      createdBy: user?.name || 'Unknown',
+      createdBy: user?.nickname || user?.name || 'Unknown',
       photos: [],
     };
     setAlbums([album, ...albums]);

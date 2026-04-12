@@ -43,6 +43,8 @@ const getLocalUsers = () => {
       email: 'admin@riemerland.org',
       password: 'admin123',
       name: 'Admin',
+      nickname: '',
+      avatar: null,
       role: 'admin',
       authorized: true,
       createdAt: new Date().toISOString(),
@@ -275,6 +277,8 @@ export function AuthProvider({ children }) {
         email,
         password,
         name,
+        nickname: '',
+        avatar: null,
         role: 'member',
         authorized: false,
         createdAt: new Date().toISOString(),
@@ -381,6 +385,48 @@ export function AuthProvider({ children }) {
     await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
   }, []);
 
+  // ---- 更新用户个人资料（昵称、头像等） ----
+  const updateProfile = useCallback(async (updates) => {
+    if (!user) return { success: false, message: '未登录' };
+
+    if (!isSupabaseConfigured) {
+      const users = getLocalUsers();
+      const idx = users.findIndex((u) => u.id === user.id);
+      if (idx >= 0) {
+        if (updates.nickname !== undefined) users[idx].nickname = updates.nickname;
+        if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
+        saveLocalUsers(users);
+        setUser({ ...users[idx] });
+        // 同步 AUTH_KEY
+        localStorage.setItem(
+          AUTH_KEY,
+          JSON.stringify({
+            id: users[idx].id,
+            name: users[idx].name,
+            email: users[idx].email,
+            role: users[idx].role,
+            deviceId: getDeviceId(),
+            loginAt: new Date().toISOString(),
+            persistent: true,
+          })
+        );
+      }
+      return { success: true };
+    }
+
+    // Supabase 模式
+    const updateData = {};
+    if (updates.nickname !== undefined) updateData.nickname = updates.nickname;
+    if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
+    const { error } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', user.id);
+    if (error) return { success: false, message: error.message };
+    setUser((prev) => ({ ...prev, ...updateData }));
+    return { success: true };
+  }, [user]);
+
   // ---- 权限判断工具 ----
   const userRole = user?.role || 'member';
   const isAuthenticated = !!user;
@@ -400,6 +446,7 @@ export function AuthProvider({ children }) {
         login,
         register,
         logout,
+        updateProfile,
         isAuthenticated,
         isAdmin,
         isMember,

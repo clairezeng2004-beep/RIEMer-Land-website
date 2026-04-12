@@ -38,7 +38,7 @@ export default function Login() {
       }
     } else {
       if (!name) {
-        setError('请填写姓名');
+        setError('请填写真名');
         return;
       }
       if (password.length < 6) {
@@ -101,13 +101,13 @@ export default function Login() {
           {!isLogin && (
             <div className="login-card__field">
               <label className="login-card__label">
-                <User size={16} /> 姓名
+                <User size={16} /> 真名 <span className="login-card__required">*必填</span>
               </label>
               <input
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="请输入您的姓名"
+                placeholder="请输入您的真实姓名"
                 className="login-card__input"
               />
             </div>
