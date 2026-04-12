@@ -25,12 +25,15 @@ import {
   Tag,
   Calendar,
   LayoutGrid,
+  MessageSquarePlus,
+  User,
+  Clock,
 } from 'lucide-react';
 import './ContentManagement.css';
 
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin } = useAuth();
-  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig } = useSiteContent();
+  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, suggestions, addSuggestion, updateSuggestion, deleteSuggestion } = useSiteContent();
 
   // 本地编辑状态
   const [form, setForm] = useState({ ...content });
@@ -48,6 +51,16 @@ export default function ContentManagement() {
   const [fetchError, setFetchError] = useState('');
   const [editingArticle, setEditingArticle] = useState(null); // 正在编辑的文章（新建或修改）
   const [editingArticleId, setEditingArticleId] = useState(null); // 正在编辑的已有文章 ID
+
+  // 建议管理状态
+  const [editingSuggestion, setEditingSuggestion] = useState(null); // 新建建议
+  const [editingSuggestionId, setEditingSuggestionId] = useState(null); // 正在编辑的建议 ID
+
+  // 头像 URL 生成
+  const sugAvatarUrl = (name) =>
+    name
+      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=5B8C3E&color=fff&size=80&font-size=0.4&rounded=true`
+      : null;
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -98,6 +111,7 @@ export default function ContentManagement() {
     { id: 'articles', label: '文章板块', icon: <FileText size={16} /> },
     { id: 'footer', label: '页脚信息', icon: <MapPin size={16} /> },
     { id: 'internal', label: '内部空间', icon: <LayoutGrid size={16} /> },
+    { id: 'suggestions', label: '建设建议', icon: <MessageSquarePlus size={16} /> },
   ];
 
   return (
@@ -1049,6 +1063,321 @@ export default function ContentManagement() {
                   <AlertCircle size={16} />
                   <span>修改后请点击顶部「保存更改」按钮，内部空间的文字将即时生效。</span>
                 </div>
+              </div>
+            )}
+
+            {/* 网站建设建议 */}
+            {activeTab === 'suggestions' && (
+              <div className="content-mgmt__section">
+                <h3 className="content-mgmt__section-title">网站建设建议</h3>
+                <p className="content-mgmt__section-desc">收集和追踪网站改进建议的进度</p>
+
+                {/* 添加新建议 */}
+                {!editingSuggestion && (
+                  <button
+                    className="content-mgmt__add-btn"
+                    style={{ marginBottom: 'var(--space-xl)' }}
+                    onClick={() => {
+                      setEditingSuggestion({
+                        id: `sug-${Date.now()}`,
+                        content: '',
+                        proposer: '',
+                        status: '修复中',
+                        statusUpdatedAt: new Date().toISOString().split('T')[0],
+                        statusUpdatedBy: '',
+                        statusUpdatedByAvatar: null,
+                        createdAt: new Date().toISOString().split('T')[0],
+                        resolver: '',
+                        skipReason: '',
+                      });
+                      setEditingSuggestionId(null);
+                    }}
+                  >
+                    <Plus size={16} /> 添加建议
+                  </button>
+                )}
+
+                {/* 新建表单 */}
+                {editingSuggestion && !editingSuggestionId && (
+                  <div className="content-mgmt__article-form" style={{ marginBottom: 'var(--space-xl)' }}>
+                    <div className="content-mgmt__article-form-header">
+                      <h4>新建建议</h4>
+                      <button
+                        className="content-mgmt__edit-btn"
+                        onClick={() => setEditingSuggestion(null)}
+                        title="取消"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="content-mgmt__field">
+                      <label>具体建议</label>
+                      <textarea
+                        value={editingSuggestion.content}
+                        onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                        className="content-mgmt__input content-mgmt__textarea"
+                        rows={3}
+                        placeholder="描述你的网站改进建议…"
+                      />
+                    </div>
+
+                    <div className="content-mgmt__inline-group">
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label><User size={14} /> 提出人</label>
+                        <input
+                          type="text"
+                          value={editingSuggestion.proposer}
+                          onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })}
+                          className="content-mgmt__input"
+                          placeholder="你的姓名"
+                        />
+                      </div>
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label><Calendar size={14} /> 提出时间</label>
+                        <input
+                          type="date"
+                          value={editingSuggestion.createdAt}
+                          onChange={(e) => setEditingSuggestion({ ...editingSuggestion, createdAt: e.target.value })}
+                          className="content-mgmt__input"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="content-mgmt__inline-group">
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>当前状态</label>
+                        <select
+                          value={editingSuggestion.status}
+                          onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })}
+                          className="content-mgmt__input"
+                        >
+                          <option value="修复中">修复中</option>
+                          <option value="已修复">已修复</option>
+                          <option value="暂时不做">暂时不做</option>
+                        </select>
+                      </div>
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>解决人</label>
+                        <input
+                          type="text"
+                          value={editingSuggestion.resolver}
+                          onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })}
+                          className="content-mgmt__input"
+                          placeholder="负责处理此建议的成员"
+                        />
+                      </div>
+                    </div>
+
+                    {editingSuggestion.status === '暂时不做' && (
+                      <div className="content-mgmt__field">
+                        <label><AlertCircle size={14} /> 暂不处理原因</label>
+                        <textarea
+                          value={editingSuggestion.skipReason}
+                          onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
+                          className="content-mgmt__input content-mgmt__textarea"
+                          rows={2}
+                          placeholder="请说明暂时不做的原因…"
+                        />
+                      </div>
+                    )}
+
+                    <div className="content-mgmt__article-form-actions">
+                      <button
+                        className="btn btn-primary"
+                        disabled={!editingSuggestion.content.trim() || !editingSuggestion.proposer.trim()}
+                        onClick={() => {
+                          addSuggestion({
+                            ...editingSuggestion,
+                            statusUpdatedBy: editingSuggestion.proposer,
+                            statusUpdatedByAvatar: sugAvatarUrl(editingSuggestion.proposer),
+                          });
+                          setEditingSuggestion(null);
+                        }}
+                      >
+                        <Plus size={16} /> 添加建议
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => setEditingSuggestion(null)}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 建议列表表格 */}
+                {suggestions.length > 0 && (
+                  <div className="sug-table-wrap">
+                    <table className="sug-table">
+                      <thead>
+                        <tr>
+                          <th className="sug-table__th">具体建议</th>
+                          <th className="sug-table__th">提出人</th>
+                          <th className="sug-table__th">当前状态</th>
+                          <th className="sug-table__th">提出时间</th>
+                          <th className="sug-table__th">状态更新时间</th>
+                          <th className="sug-table__th">解决人</th>
+                          <th className="sug-table__th">操作</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {suggestions.map((sug) => (
+                          editingSuggestionId === sug.id && editingSuggestion ? (
+                            <tr key={sug.id} className="sug-table__row sug-table__row--editing">
+                              <td colSpan={7} className="sug-table__td sug-table__td--edit">
+                                <div className="sug-edit-form">
+                                  <div className="content-mgmt__field">
+                                    <label>具体建议</label>
+                                    <textarea
+                                      value={editingSuggestion.content}
+                                      onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                                      className="content-mgmt__input content-mgmt__textarea"
+                                      rows={2}
+                                    />
+                                  </div>
+                                  <div className="content-mgmt__inline-group">
+                                    <div className="content-mgmt__field content-mgmt__field--flex">
+                                      <label>提出人</label>
+                                      <input type="text" value={editingSuggestion.proposer} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })} className="content-mgmt__input" />
+                                    </div>
+                                    <div className="content-mgmt__field content-mgmt__field--flex">
+                                      <label>当前状态</label>
+                                      <select value={editingSuggestion.status} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })} className="content-mgmt__input">
+                                        <option value="修复中">修复中</option>
+                                        <option value="已修复">已修复</option>
+                                        <option value="暂时不做">暂时不做</option>
+                                      </select>
+                                    </div>
+                                  </div>
+                                  <div className="content-mgmt__inline-group">
+                                    <div className="content-mgmt__field content-mgmt__field--flex">
+                                      <label>解决人</label>
+                                      <input type="text" value={editingSuggestion.resolver} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })} className="content-mgmt__input" />
+                                    </div>
+                                    <div className="content-mgmt__field content-mgmt__field--flex">
+                                      <label>状态更新人（显示头像）</label>
+                                      <input type="text" value={editingSuggestion.statusUpdatedBy} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, statusUpdatedBy: e.target.value })} className="content-mgmt__input" placeholder="谁更新了这个状态" />
+                                    </div>
+                                  </div>
+                                  {editingSuggestion.status === '暂时不做' && (
+                                    <div className="content-mgmt__field">
+                                      <label>暂不处理原因</label>
+                                      <textarea
+                                        value={editingSuggestion.skipReason}
+                                        onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
+                                        className="content-mgmt__input content-mgmt__textarea"
+                                        rows={2}
+                                        placeholder="请说明暂时不做的原因…"
+                                      />
+                                    </div>
+                                  )}
+                                  <div className="content-mgmt__article-form-actions">
+                                    <button
+                                      className="btn btn-primary"
+                                      onClick={() => {
+                                        updateSuggestion(sug.id, {
+                                          ...editingSuggestion,
+                                          statusUpdatedAt: new Date().toISOString().split('T')[0],
+                                          statusUpdatedByAvatar: sugAvatarUrl(editingSuggestion.statusUpdatedBy),
+                                        });
+                                        setEditingSuggestionId(null);
+                                        setEditingSuggestion(null);
+                                      }}
+                                    >
+                                      <Save size={14} /> 保存
+                                    </button>
+                                    <button
+                                      className="btn btn-ghost"
+                                      onClick={() => { setEditingSuggestionId(null); setEditingSuggestion(null); }}
+                                    >
+                                      取消
+                                    </button>
+                                  </div>
+                                </div>
+                              </td>
+                            </tr>
+                          ) : (
+                            <tr key={sug.id} className="sug-table__row">
+                              <td className="sug-table__td sug-table__td--content">
+                                <span>{sug.content}</span>
+                                {sug.status === '暂时不做' && sug.skipReason && (
+                                  <span className="sug-table__skip-reason">
+                                    <AlertCircle size={12} /> {sug.skipReason}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="sug-table__td">
+                                <span className="sug-table__person">
+                                  <img src={sugAvatarUrl(sug.proposer)} alt={sug.proposer} className="sug-table__avatar" />
+                                  {sug.proposer}
+                                </span>
+                              </td>
+                              <td className="sug-table__td">
+                                <span className={`sug-table__status sug-table__status--${sug.status === '已修复' ? 'done' : sug.status === '修复中' ? 'wip' : 'skip'}`}>
+                                  {sug.status}
+                                </span>
+                              </td>
+                              <td className="sug-table__td sug-table__td--date">{sug.createdAt}</td>
+                              <td className="sug-table__td sug-table__td--date">
+                                <span className="sug-table__person">
+                                  {sug.statusUpdatedByAvatar || sugAvatarUrl(sug.statusUpdatedBy) ? (
+                                    <img src={sug.statusUpdatedByAvatar || sugAvatarUrl(sug.statusUpdatedBy)} alt={sug.statusUpdatedBy} className="sug-table__avatar" />
+                                  ) : null}
+                                  <span>
+                                    <span className="sug-table__date-text">{sug.statusUpdatedAt}</span>
+                                    {sug.statusUpdatedBy && <span className="sug-table__updater">by {sug.statusUpdatedBy}</span>}
+                                  </span>
+                                </span>
+                              </td>
+                              <td className="sug-table__td">
+                                {sug.resolver ? (
+                                  <span className="sug-table__person">
+                                    <img src={sugAvatarUrl(sug.resolver)} alt={sug.resolver} className="sug-table__avatar" />
+                                    {sug.resolver}
+                                  </span>
+                                ) : (
+                                  <span className="sug-table__empty">未指派</span>
+                                )}
+                              </td>
+                              <td className="sug-table__td sug-table__td--actions">
+                                <button
+                                  className="content-mgmt__edit-btn"
+                                  onClick={() => {
+                                    setEditingSuggestionId(sug.id);
+                                    setEditingSuggestion({ ...sug });
+                                  }}
+                                  title="编辑"
+                                >
+                                  <Pencil size={14} />
+                                </button>
+                                <button
+                                  className="content-mgmt__remove-btn"
+                                  onClick={() => {
+                                    if (window.confirm(`确定删除这条建议吗？`)) {
+                                      deleteSuggestion(sug.id);
+                                    }
+                                  }}
+                                  title="删除"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              </td>
+                            </tr>
+                          )
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {suggestions.length === 0 && (
+                  <div className="content-mgmt__hint">
+                    <AlertCircle size={16} />
+                    <span>暂无建议，点击上方按钮添加第一条网站建设建议。</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

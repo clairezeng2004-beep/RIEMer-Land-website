@@ -7,6 +7,71 @@ const CONTENT_KEY = 'riemer_site_content';
 const FILTERS_KEY = 'riemer_filter_options';
 const ARTICLES_KEY = 'riemer_user_articles';
 const INTERNAL_CONFIG_KEY = 'riemer_internal_config';
+const SUGGESTIONS_KEY = 'riemer_site_suggestions';
+
+// 网站建设建议初始模拟数据
+const getDefaultSuggestions = () => [
+  {
+    id: 'sug-1',
+    content: '首页 Hero 区域增加轮播背景图，展示校园风光',
+    proposer: '陈思雨',
+    status: '修复中',
+    statusUpdatedAt: '2025-04-10',
+    statusUpdatedBy: '林子墨',
+    statusUpdatedByAvatar: null,
+    createdAt: '2025-03-20',
+    resolver: '王诗涵',
+    skipReason: '',
+  },
+  {
+    id: 'sug-2',
+    content: '文章详情页添加目录导航（TOC），方便长文阅读',
+    proposer: '周悦然',
+    status: '暂时不做',
+    statusUpdatedAt: '2025-04-08',
+    statusUpdatedBy: '陈思雨',
+    statusUpdatedByAvatar: null,
+    createdAt: '2025-03-25',
+    resolver: '',
+    skipReason: '当前文章篇幅较短，暂不需要目录导航功能',
+  },
+  {
+    id: 'sug-3',
+    content: '移动端侧边栏增加汉堡菜单按钮，改善手机端导航体验',
+    proposer: '张一帆',
+    status: '已修复',
+    statusUpdatedAt: '2025-04-05',
+    statusUpdatedBy: '王诗涵',
+    statusUpdatedByAvatar: null,
+    createdAt: '2025-03-15',
+    resolver: '王诗涵',
+    skipReason: '',
+  },
+  {
+    id: 'sug-4',
+    content: '「关于我们」页面增加团队成员个人主页链接',
+    proposer: '李明远',
+    status: '已修复',
+    statusUpdatedAt: '2025-04-12',
+    statusUpdatedBy: '林子墨',
+    statusUpdatedByAvatar: null,
+    createdAt: '2025-04-01',
+    resolver: '林子墨',
+    skipReason: '',
+  },
+  {
+    id: 'sug-5',
+    content: '内部空间首页增加最近编辑的文章快捷入口',
+    proposer: '林子墨',
+    status: '修复中',
+    statusUpdatedAt: '2025-04-11',
+    statusUpdatedBy: '张一帆',
+    statusUpdatedByAvatar: null,
+    createdAt: '2025-04-05',
+    resolver: '张一帆',
+    skipReason: '',
+  },
+];
 
 // 可编辑的内容字段及其默认值
 const getDefaultContent = () => ({
@@ -169,6 +234,19 @@ export function SiteContentProvider({ children }) {
     return getDefaultInternalConfig();
   });
 
+  // 网站建设建议
+  const [suggestions, setSuggestions] = useState(() => {
+    const stored = localStorage.getItem(SUGGESTIONS_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return getDefaultSuggestions();
+      }
+    }
+    return getDefaultSuggestions();
+  });
+
   useEffect(() => {
     localStorage.setItem(CONTENT_KEY, JSON.stringify(content));
   }, [content]);
@@ -184,6 +262,10 @@ export function SiteContentProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(internalConfig));
   }, [internalConfig]);
+
+  useEffect(() => {
+    localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions));
+  }, [suggestions]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));
@@ -237,12 +319,28 @@ export function SiteContentProvider({ children }) {
     setUserArticles((prev) => prev.filter((a) => a.id !== id));
   };
 
+  // 网站建设建议 CRUD
+  const addSuggestion = (suggestion) => {
+    setSuggestions((prev) => [suggestion, ...prev]);
+  };
+
+  const updateSuggestion = (id, updates) => {
+    setSuggestions((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, ...updates } : s))
+    );
+  };
+
+  const deleteSuggestion = (id) => {
+    setSuggestions((prev) => prev.filter((s) => s.id !== id));
+  };
+
   return (
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
       filterOptions, updateFilterOptions, resetFilterOptions,
       userArticles, addArticle, updateArticle, deleteArticle,
       internalConfig, updateInternalConfig, resetInternalConfig,
+      suggestions, addSuggestion, updateSuggestion, deleteSuggestion,
     }}>
       {children}
     </SiteContentContext.Provider>
