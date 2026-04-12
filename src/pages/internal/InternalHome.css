@@ -14,7 +14,7 @@
 }
 
 .internal-home__welcome-card {
-  background: linear-gradient(135deg, #5B8C3E 0%, #4A7A30 60%, #3D6B2A 100%);
+  background: linear-gradient(135deg, #6B9E4A 0%, #5B8C3E 50%, #4E7D35 100%);
   border-radius: var(--radius-xl);
   padding: var(--space-2xl) var(--space-2xl);
   color: white;
@@ -30,7 +30,7 @@
   width: 300px;
   height: 300px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.08);
   pointer-events: none;
 }
 
@@ -42,7 +42,7 @@
   width: 200px;
   height: 200px;
   border-radius: 50%;
-  background: rgba(255, 255, 255, 0.04);
+  background: rgba(255, 255, 255, 0.06);
   pointer-events: none;
 }
 
