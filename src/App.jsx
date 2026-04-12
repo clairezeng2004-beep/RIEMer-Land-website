@@ -15,6 +15,7 @@ import Tasks from './pages/internal/Tasks';
 import UserManagement from './pages/internal/UserManagement';
 import ContentManagement from './pages/internal/ContentManagement';
 import Notifications from './pages/internal/Notifications';
+import Gallery from './pages/internal/Gallery';
 import InternalHome from './pages/internal/InternalHome';
 
 function App() {
@@ -40,6 +41,7 @@ function App() {
                   <Route index element={<InternalHome />} />
                   <Route path="documents" element={<Documents />} />
                   <Route path="tasks" element={<Tasks />} />
+                  <Route path="gallery" element={<Gallery />} />
                   <Route path="users" element={<UserManagement />} />
                   <Route path="content" element={<ContentManagement />} />
                   <Route path="notifications" element={<Notifications />} />

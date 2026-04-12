@@ -6,6 +6,7 @@ import {
   Bell,
   FileText,
   CheckSquare,
+  Camera,
   Users,
   Settings,
 } from 'lucide-react';
@@ -25,6 +26,7 @@ export default function InternalSidebar() {
     },
     { to: '/internal/documents', icon: FileText, label: '文档管理' },
     { to: '/internal/tasks', icon: CheckSquare, label: '事项追踪' },
+    { to: '/internal/gallery', icon: Camera, label: '成员相册' },
   ];
 
   const adminItems = [

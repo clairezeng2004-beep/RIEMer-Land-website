@@ -73,6 +73,11 @@ export default function InternalHome() {
       desc: '跟踪待办事项、分配任务和查看进度',
       path: '/internal/tasks',
     },
+    {
+      name: '成员相册',
+      desc: '浏览和上传活动照片，记录每次相聚的美好瞬间',
+      path: '/internal/gallery',
+    },
     ...(isAdmin
       ? [
           {
