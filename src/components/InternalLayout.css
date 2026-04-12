@@ -5,10 +5,21 @@
 .internal-layout {
   display: flex;
   min-height: calc(100vh - 72px);
+  background: var(--color-bg);
 }
 
 .internal-layout__content {
   flex: 1;
   min-width: 0;
+  min-height: calc(100vh - 72px);
   overflow-x: hidden;
+  background: var(--color-bg);
+  margin-left: 220px;
+}
+
+/* 响应式：手机端侧边栏隐藏时去掉左边距 */
+@media (max-width: 768px) {
+  .internal-layout__content {
+    margin-left: 0;
+  }
 }

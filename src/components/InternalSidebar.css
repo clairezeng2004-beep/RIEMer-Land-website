@@ -12,9 +12,11 @@
   flex-direction: column;
   gap: var(--space-md);
   height: calc(100vh - 72px);
-  position: sticky;
+  position: fixed;
   top: 72px;
+  left: 0;
   overflow-y: auto;
+  z-index: 10;
 }
 
 .internal-sidebar__section {
