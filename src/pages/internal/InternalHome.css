@@ -150,7 +150,7 @@
 /* ---- Module Cards Grid ---- */
 .internal-home__modules {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--space-md);
   margin-bottom: var(--space-2xl);
 }
@@ -355,6 +355,10 @@
 /* ---- Responsive ---- */
 @media (max-width: 1024px) {
   .internal-home__stats {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .internal-home__modules {
     grid-template-columns: repeat(2, 1fr);
   }
 }
