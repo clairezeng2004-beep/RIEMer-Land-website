@@ -165,25 +165,14 @@ export const eventsData = [
   },
 ];
 
-// 示例封面图（picsum 随机图片，未来替换为真实封面）
-const COVER_PLACEHOLDERS = [
-  'https://picsum.photos/seed/riemer1/800/400',
-  'https://picsum.photos/seed/riemer2/800/400',
-  'https://picsum.photos/seed/riemer3/800/400',
-  'https://picsum.photos/seed/riemer4/800/400',
-  'https://picsum.photos/seed/riemer5/800/400',
-  'https://picsum.photos/seed/riemer6/800/400',
-  'https://picsum.photos/seed/riemer7/800/400',
-  'https://picsum.photos/seed/riemer8/800/400',
-  'https://picsum.photos/seed/riemer9/800/400',
-  'https://picsum.photos/seed/riemer10/800/400',
-  'https://picsum.photos/seed/riemer11/800/400',
-  'https://picsum.photos/seed/riemer12/800/400',
-  'https://picsum.photos/seed/riemer13/800/400',
-  'https://picsum.photos/seed/riemer14/800/400',
-  'https://picsum.photos/seed/riemer15/800/400',
-  'https://picsum.photos/seed/riemer16/800/400',
+// 封面图（校园实拍照片，循环使用）
+const COVER_PHOTOS = [
+  '/covers/IMG_4864.JPG',  // 水中倒影
+  '/covers/IMG_4865.JPG',  // 钟楼近景
+  '/covers/IMG_4868.JPG',  // 钟楼远景
+  '/covers/IMG_4867.JPG',  // 钟楼与花
 ];
+const COVER_PLACEHOLDERS = Array.from({ length: 16 }, (_, i) => COVER_PHOTOS[i % COVER_PHOTOS.length]);
 
 // 示例头像（ui-avatars 生成字母头像，未来替换为真实头像）
 function avatarUrl(name) {
