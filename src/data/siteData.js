@@ -643,9 +643,15 @@ export const documentsData = [
   },
 ];
 
-export const taskCategories = ['内容策划', '访谈采编', '活动组织', '运营推广', '课程测评'];
-export const taskPriorities = ['高', '中', '低'];
+export const taskCategories = ['线上分享', '课程测评', '公众号文章'];
 export const taskStatuses = ['待办', '进行中', '已完成', '已取消'];
+
+// 模拟成员数据（用于负责人选择）
+export const teamMembers = [
+  { id: 'member-1', name: '陈思雨', role: '内容策划' },
+  { id: 'member-2', name: '林子墨', role: '运营推广' },
+  { id: 'member-3', name: '周悦然', role: '访谈采编' },
+];
 
 export const notificationsData = [
   {
@@ -687,11 +693,9 @@ export const initialTasks = [
     id: '1',
     title: '策划「听 RIEMer 说」第十一期',
     description: '确定访谈对象、拟定采访提纲、排期发布',
-    category: '访谈采编',
-    priority: '高',
+    category: '线上分享',
     status: '进行中',
-    assignee: '主理团队',
-    dueDate: '2025-04-15',
+    assignee: 'member-1',
     createdAt: '2025-03-20',
   },
   {
@@ -699,43 +703,35 @@ export const initialTasks = [
     title: '征集大二上课程测评',
     description: '面向全院征集大二上学期各方向课程评价',
     category: '课程测评',
-    priority: '高',
     status: '待办',
-    assignee: '主理团队',
-    dueDate: '2025-05-30',
+    assignee: 'member-3',
     createdAt: '2025-03-15',
   },
   {
     id: '3',
     title: '筹备 RIEMer\'s Space 第十一期分享会',
     description: '确定主题、邀请分享人、制作宣传海报',
-    category: '活动组织',
-    priority: '中',
+    category: '线上分享',
     status: '待办',
-    assignee: '主理团队',
-    dueDate: '2025-04-20',
+    assignee: 'member-2',
     createdAt: '2025-03-18',
   },
   {
     id: '4',
     title: '公众号推文排版优化',
     description: '统一推文排版风格，更新封面模板',
-    category: '运营推广',
-    priority: '中',
+    category: '公众号文章',
     status: '进行中',
-    assignee: '主理团队',
-    dueDate: '2025-04-01',
+    assignee: 'member-2',
     createdAt: '2025-03-10',
   },
   {
     id: '5',
     title: '整理历史推文归档',
     description: '将公众号所有历史文章分类整理，同步到网站',
-    category: '内容策划',
-    priority: '低',
+    category: '公众号文章',
     status: '已完成',
-    assignee: '主理团队',
-    dueDate: '2025-03-01',
+    assignee: 'member-1',
     createdAt: '2025-02-15',
   },
 ];

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -6,17 +6,11 @@ import {
   Plus,
   X,
   Clock,
-  AlertTriangle,
   CheckCircle2,
   Circle,
   Ban,
-  ChevronDown,
-  Filter,
-  Calendar,
-  User,
-  Tag,
 } from 'lucide-react';
-import { initialTasks, taskCategories, taskPriorities, taskStatuses } from '../../data/siteData';
+import { initialTasks, taskCategories, taskStatuses, teamMembers } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import './Tasks.css';
 
@@ -34,11 +28,8 @@ const statusColors = {
   '已取消': '#C0392B',
 };
 
-const priorityColors = {
-  '高': '#C0392B',
-  '中': '#F39C12',
-  '低': '#27AE60',
-};
+// 成员 id → 名称 映射
+const memberMap = Object.fromEntries(teamMembers.map((m) => [m.id, m]));
 
 export default function Tasks() {
   const { isAuthenticated, user } = useAuth();
@@ -49,11 +40,9 @@ export default function Tasks() {
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    category: '活动策划',
-    priority: '中',
+    category: '线上分享',
     status: '待办',
     assignee: '',
-    dueDate: '',
   });
   const [changeReasons, setChangeReasons] = useState({});
 
@@ -79,11 +68,9 @@ export default function Tasks() {
     setNewTask({
       title: '',
       description: '',
-      category: '活动策划',
-      priority: '中',
+      category: '线上分享',
       status: '待办',
       assignee: '',
-      dueDate: '',
     });
     setShowForm(false);
   };
@@ -192,12 +179,13 @@ export default function Tasks() {
                 </div>
                 <div className="tasks-form__field">
                   <label>负责人</label>
-                  <input
-                    type="text"
-                    value={newTask.assignee}
-                    onChange={(e) => setNewTask({ ...newTask, assignee: e.target.value })}
-                    placeholder="负责人姓名"
-                    className="tasks-form__input"
+                  <CustomSelect
+                    value={newTask.assignee ? (memberMap[newTask.assignee]?.name || newTask.assignee) : '请选择'}
+                    onChange={(val) => {
+                      const member = teamMembers.find((m) => m.name === val);
+                      setNewTask({ ...newTask, assignee: member ? member.id : '' });
+                    }}
+                    options={teamMembers.map((m) => m.name)}
                   />
                 </div>
               </div>
@@ -211,32 +199,13 @@ export default function Tasks() {
                   rows={2}
                 />
               </div>
-              <div className="tasks-form__row tasks-form__row--3">
-                <div className="tasks-form__field">
-                  <label>分类</label>
-                  <CustomSelect
-                    value={newTask.category}
-                    onChange={(val) => setNewTask({ ...newTask, category: val })}
-                    options={taskCategories}
-                  />
-                </div>
-                <div className="tasks-form__field">
-                  <label>优先级</label>
-                  <CustomSelect
-                    value={newTask.priority}
-                    onChange={(val) => setNewTask({ ...newTask, priority: val })}
-                    options={taskPriorities}
-                  />
-                </div>
-                <div className="tasks-form__field">
-                  <label>截止日期</label>
-                  <input
-                    type="date"
-                    value={newTask.dueDate}
-                    onChange={(e) => setNewTask({ ...newTask, dueDate: e.target.value })}
-                    className="tasks-form__input"
-                  />
-                </div>
+              <div className="tasks-form__field">
+                <label>分类</label>
+                <CustomSelect
+                  value={newTask.category}
+                  onChange={(val) => setNewTask({ ...newTask, category: val })}
+                  options={taskCategories}
+                />
               </div>
               <button type="submit" className="btn btn-primary">
                 <Plus size={16} /> 创建事项
@@ -281,14 +250,14 @@ export default function Tasks() {
                 <th>状态</th>
                 <th>标题</th>
                 <th>分类</th>
-                <th>优先级</th>
                 <th>负责人</th>
-                <th>截止日期</th>
                 <th>操作</th>
               </tr>
             </thead>
             <tbody>
-              {filtered.map((task) => (
+              {filtered.map((task) => {
+                const member = memberMap[task.assignee];
+                return (
                 <tr key={task.id} className={`tasks-table__row tasks-table__row--${task.status === '已完成' ? 'done' : ''}`}>
                   <td>
                     <div
@@ -311,21 +280,14 @@ export default function Tasks() {
                     <span className="badge badge-secondary">{task.category}</span>
                   </td>
                   <td>
-                    <span
-                      className="tasks-table__priority"
-                      style={{
-                        color: priorityColors[task.priority],
-                        background: `${priorityColors[task.priority]}12`,
-                      }}
-                    >
-                      {task.priority}
-                    </span>
-                  </td>
-                  <td>
-                    <span className="tasks-table__assignee">{task.assignee || '—'}</span>
-                  </td>
-                  <td>
-                    <span className="tasks-table__date">{task.dueDate || '—'}</span>
+                    {member ? (
+                      <div className="tasks-table__member">
+                        <span className="tasks-table__member-name">{member.name}</span>
+                        <span className="tasks-table__member-role">{member.role}</span>
+                      </div>
+                    ) : (
+                      <span className="tasks-table__assignee">{task.assignee || '—'}</span>
+                    )}
                   </td>
                   <td>
                     <div className="tasks-table__actions">
@@ -369,7 +331,8 @@ export default function Tasks() {
                     )}
                   </td>
                 </tr>
-              ))}
+                );
+              })}
             </tbody>
           </table>
         </div>
