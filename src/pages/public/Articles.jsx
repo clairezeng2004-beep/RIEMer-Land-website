@@ -105,12 +105,6 @@ export default function Articles() {
               >
                 <div className="article-card__accent" />
                 <div className="article-card__body">
-                  <div className="article-card__top">
-                    <div className="article-card__meta">
-                      <Calendar size={14} />
-                      <span>{article.date}</span>
-                    </div>
-                  </div>
                   <h3 className="article-card__title">{article.title}</h3>
                   <p className="article-card__excerpt">{article.excerpt}</p>
                   <div className="article-card__tags">
@@ -121,8 +115,12 @@ export default function Articles() {
                     ))}
                   </div>
                   <div className="article-card__bottom">
+                    <span className="article-card__meta">
+                      <Calendar size={14} />
+                      <span>{article.date}</span>
+                    </span>
                     <span className="article-card__link">
-                      阅读 <ArrowRight size={14} />
+                      阅读全文 <ArrowRight size={14} />
                     </span>
                   </div>
                 </div>

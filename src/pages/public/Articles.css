@@ -196,7 +196,7 @@
 
 .article-card__bottom {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
   padding-top: var(--space-sm);
   border-top: 1px solid var(--color-border-light);

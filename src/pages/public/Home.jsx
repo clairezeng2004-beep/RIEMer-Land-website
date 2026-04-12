@@ -70,9 +70,9 @@ export default function Home() {
                       <Clock size={14} />
                       {article.date}
                     </span>
-                  </div>
-                  <div className="featured__read-more">
-                    阅读全文 <ArrowRight size={14} />
+                    <span className="featured__read-more">
+                      阅读全文 <ArrowRight size={14} />
+                    </span>
                   </div>
                 </div>
               </Link>
