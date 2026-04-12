@@ -59,7 +59,7 @@ export function NotificationProvider({ children }) {
   // 未读消息数同步到网页标题
   useEffect(() => {
     const baseTitle = 'RIEMer Land';
-    document.title = unreadCount > 0 ? `(${unreadCount}) ${baseTitle}` : baseTitle;
+    document.title = unreadCount > 0 ? `(${unreadCount}条未读消息) ${baseTitle}` : baseTitle;
   }, [unreadCount]);
 
   const markAsRead = useCallback((id) => {
