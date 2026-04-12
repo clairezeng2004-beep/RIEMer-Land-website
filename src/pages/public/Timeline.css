@@ -1,6 +1,6 @@
 /* ============ Timeline Hero ============ */
 .timeline-hero {
-  padding: 140px 0 20px;
+  padding: 68px 0 20px;
   background: transparent;
   text-align: center;
 }
@@ -378,7 +378,7 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  .timeline-hero { padding: 120px 0 40px; }
+  .timeline-hero { padding: 48px 0 40px; }
   .timeline-hero__content h1 { font-size: var(--text-2xl); }
 
   .timeline__arrow { display: none; }
@@ -404,7 +404,7 @@
 }
 
 @media (max-width: 480px) {
-  .timeline-hero { padding: 100px 0 30px; }
+  .timeline-hero { padding: 28px 0 30px; }
   .timeline-hero__content h1 { font-size: var(--text-xl); }
 
   .timeline__track {

@@ -104,6 +104,10 @@ body {
   overflow-x: hidden;
 }
 
+main {
+  padding-top: 72px;
+}
+
 h1, h2 {
   font-family: var(--font-display);
   line-height: 1.3;

@@ -1,6 +1,6 @@
 /* ============ Articles Hero ============ */
 .articles-hero {
-  padding: 140px 0 60px;
+  padding: 68px 0 60px;
   background: transparent;
   text-align: center;
 }
@@ -240,7 +240,7 @@
 }
 
 @media (max-width: 768px) {
-  .articles-hero { padding: 120px 0 40px; }
+  .articles-hero { padding: 48px 0 40px; }
   .articles-hero__content h1 { font-size: var(--text-2xl); }
 
   .articles-filters {
@@ -292,7 +292,7 @@
 }
 
 @media (max-width: 480px) {
-  .articles-hero { padding: 100px 0 30px; }
+  .articles-hero { padding: 28px 0 30px; }
   .articles-hero__content h1 { font-size: var(--text-xl); }
 
   .articles-list__grid {

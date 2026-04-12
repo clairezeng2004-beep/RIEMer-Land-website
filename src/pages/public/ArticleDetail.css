@@ -160,7 +160,7 @@
 }
 
 @media (max-width: 768px) {
-  .article-detail-page { padding-top: 100px; }
+  .article-detail-page { padding-top: 28px; }
   .article-detail__title { font-size: var(--text-2xl); }
   .article-detail__meta { flex-direction: column; gap: var(--space-sm); }
   .article-detail__related-grid { grid-template-columns: 1fr; }
