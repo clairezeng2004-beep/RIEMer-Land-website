@@ -13,8 +13,21 @@ import {
   Trash2,
   FolderPlus,
   Images,
+  Download,
 } from 'lucide-react';
 import './Gallery.css';
+
+/* ---------- 工具函数：从 URL 生成压缩版和原图版 ---------- */
+const getThumbUrl = (url) => {
+  // 如果已经带有 ?w= 参数，直接作为压缩版；否则追加 ?w=640
+  if (/[?&]w=\d+/.test(url)) return url;
+  return url + (url.includes('?') ? '&' : '?') + 'w=640&q=75';
+};
+
+const getOriginalUrl = (url) => {
+  // 去掉 w= 和 q= 参数以获取原图
+  return url.replace(/[?&](w|q)=\d+/g, '').replace(/\?$/, '');
+};
 
 /* ---------- 示例相册数据 ---------- */
 const initialAlbums = [
@@ -25,10 +38,10 @@ const initialAlbums = [
     coverIndex: 0,
     date: '2025-03-22',
     photos: [
-      { id: 'p1', url: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=640', caption: '合照' },
-      { id: 'p2', url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=640', caption: '烧烤现场' },
-      { id: 'p3', url: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=640', caption: '户外游戏' },
-      { id: 'p4', url: 'https://images.unsplash.com/photo-1523301343968-6a6ebf63c672?w=640', caption: '傍晚合影' },
+      { id: 'p1', url: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=640&q=75', caption: '合照' },
+      { id: 'p2', url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=640&q=75', caption: '烧烤现场' },
+      { id: 'p3', url: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=640&q=75', caption: '户外游戏' },
+      { id: 'p4', url: 'https://images.unsplash.com/photo-1523301343968-6a6ebf63c672?w=640&q=75', caption: '傍晚合影' },
     ],
   },
   {
@@ -38,8 +51,8 @@ const initialAlbums = [
     coverIndex: 0,
     date: '2025-02-15',
     photos: [
-      { id: 'p5', url: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=640', caption: '读书会截图' },
-      { id: 'p6', url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=640', caption: '推荐书单' },
+      { id: 'p5', url: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=640&q=75', caption: '读书会截图' },
+      { id: 'p6', url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=640&q=75', caption: '推荐书单' },
     ],
   },
   {
@@ -49,9 +62,9 @@ const initialAlbums = [
     coverIndex: 0,
     date: '2024-12-28',
     photos: [
-      { id: 'p7', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=640', caption: '总结会现场' },
-      { id: 'p8', url: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=640', caption: '颁奖环节' },
-      { id: 'p9', url: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=640', caption: '聚餐时光' },
+      { id: 'p7', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=640&q=75', caption: '总结会现场' },
+      { id: 'p8', url: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=640&q=75', caption: '颁奖环节' },
+      { id: 'p9', url: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=640&q=75', caption: '聚餐时光' },
     ],
   },
 ];
@@ -152,6 +165,26 @@ export default function Gallery() {
   const openLightbox = (index) => setLightboxIndex(index);
   const closeLightbox = () => setLightboxIndex(null);
 
+  /* ---- 下载原图 ---- */
+  const handleDownloadOriginal = async (photo) => {
+    try {
+      const originalUrl = getOriginalUrl(photo.url);
+      const response = await fetch(originalUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = (photo.caption || 'photo') + '.jpg';
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(blobUrl);
+    } catch {
+      // fallback: 直接在新标签页打开原图
+      window.open(getOriginalUrl(photo.url), '_blank');
+    }
+  };
+
   const lightboxPrev = () => {
     if (lightboxIndex === null || !selectedAlbum) return;
     setLightboxIndex(
@@ -236,7 +269,7 @@ export default function Gallery() {
                   >
                     <div className="album-card__cover">
                       {cover ? (
-                        <img src={cover.url} alt={album.title} />
+                        <img src={getThumbUrl(cover.url)} alt={album.title} loading="lazy" />
                       ) : (
                         <div className="album-card__cover-empty">
                           <Images size={40} />
@@ -392,21 +425,33 @@ export default function Gallery() {
                 className="photo-card"
                 onClick={() => openLightbox(index)}
               >
-                <img src={photo.url} alt={photo.caption} />
+                <img src={getThumbUrl(photo.url)} alt={photo.caption} loading="lazy" />
                 <div className="photo-card__overlay">
                   {photo.caption && (
                     <span className="photo-card__caption">{photo.caption}</span>
                   )}
-                  <button
-                    className="photo-card__delete"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeletePhoto(photo.id);
-                    }}
-                    title="删除照片"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  <div className="photo-card__actions">
+                    <button
+                      className="photo-card__download"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownloadOriginal(photo);
+                      }}
+                      title="下载原图"
+                    >
+                      <Download size={14} />
+                    </button>
+                    <button
+                      className="photo-card__delete"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeletePhoto(photo.id);
+                      }}
+                      title="删除照片"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}
@@ -425,7 +470,7 @@ export default function Gallery() {
         <div className="lightbox" onClick={closeLightbox}>
           <div className="lightbox__content" onClick={(e) => e.stopPropagation()}>
             <img
-              src={selectedAlbum.photos[lightboxIndex].url}
+              src={getThumbUrl(selectedAlbum.photos[lightboxIndex].url)}
               alt={selectedAlbum.photos[lightboxIndex].caption}
             />
             {selectedAlbum.photos[lightboxIndex].caption && (
@@ -434,6 +479,17 @@ export default function Gallery() {
               </div>
             )}
           </div>
+
+          <button
+            className="lightbox__download"
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDownloadOriginal(selectedAlbum.photos[lightboxIndex]);
+            }}
+            title="下载原图"
+          >
+            <Download size={20} /> 下载原图
+          </button>
 
           <button className="lightbox__close" onClick={closeLightbox}>
             <X size={24} />
