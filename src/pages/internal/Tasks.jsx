@@ -1,6 +1,7 @@
 import { useState, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import {
   CheckSquare,
   Plus,
@@ -10,7 +11,7 @@ import {
   Circle,
   Ban,
 } from 'lucide-react';
-import { initialTasks, taskCategories, taskStatuses, teamMembers } from '../../data/siteData';
+import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import './Tasks.css';
 
@@ -28,11 +29,19 @@ const statusColors = {
   '已取消': '#C0392B',
 };
 
-// 成员 id → 名称 映射
-const memberMap = Object.fromEntries(teamMembers.map((m) => [m.id, m]));
-
 export default function Tasks() {
   const { isAuthenticated, user } = useAuth();
+  const { filterOptions } = useSiteContent();
+
+  // 从 context 读取筛选选项
+  const taskCategories = filterOptions.taskCategories;
+  const taskStatuses = filterOptions.taskStatuses;
+  const teamMembers = filterOptions.teamMembers;
+  const memberMap = useMemo(
+    () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
+    [teamMembers]
+  );
+
   const [tasks, setTasks] = useState(initialTasks);
   const [showForm, setShowForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState('全部');
@@ -40,7 +49,7 @@ export default function Tasks() {
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
-    category: '线上分享',
+    category: taskCategories[0] || '',
     status: '待办',
     assignee: '',
   });
@@ -68,7 +77,7 @@ export default function Tasks() {
     setNewTask({
       title: '',
       description: '',
-      category: '线上分享',
+      category: taskCategories[0] || '',
       status: '待办',
       assignee: '',
     });

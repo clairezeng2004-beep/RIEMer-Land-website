@@ -1,9 +1,10 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { clubInfo } from '../data/siteData';
+import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers } from '../data/siteData';
 
 const SiteContentContext = createContext(null);
 
 const CONTENT_KEY = 'riemer_site_content';
+const FILTERS_KEY = 'riemer_filter_options';
 
 // 可编辑的内容字段及其默认值
 const getDefaultContent = () => ({
@@ -31,6 +32,13 @@ const getDefaultContent = () => ({
   footerLocation: clubInfo.contact.location,
 });
 
+// 筛选选项默认值
+const getDefaultFilters = () => ({
+  taskCategories: [...defaultTaskCategories],
+  taskStatuses: [...defaultTaskStatuses],
+  teamMembers: defaultTeamMembers.map((m) => ({ ...m })),
+});
+
 export function SiteContentProvider({ children }) {
   const [content, setContent] = useState(() => {
     const stored = localStorage.getItem(CONTENT_KEY);
@@ -47,9 +55,27 @@ export function SiteContentProvider({ children }) {
     return getDefaultContent();
   });
 
+  // 筛选选项状态
+  const [filterOptions, setFilterOptions] = useState(() => {
+    const stored = localStorage.getItem(FILTERS_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        return { ...getDefaultFilters(), ...parsed };
+      } catch {
+        return getDefaultFilters();
+      }
+    }
+    return getDefaultFilters();
+  });
+
   useEffect(() => {
     localStorage.setItem(CONTENT_KEY, JSON.stringify(content));
   }, [content]);
+
+  useEffect(() => {
+    localStorage.setItem(FILTERS_KEY, JSON.stringify(filterOptions));
+  }, [filterOptions]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));
@@ -61,8 +87,21 @@ export function SiteContentProvider({ children }) {
     localStorage.setItem(CONTENT_KEY, JSON.stringify(defaults));
   };
 
+  const updateFilterOptions = (updates) => {
+    setFilterOptions((prev) => ({ ...prev, ...updates }));
+  };
+
+  const resetFilterOptions = () => {
+    const defaults = getDefaultFilters();
+    setFilterOptions(defaults);
+    localStorage.setItem(FILTERS_KEY, JSON.stringify(defaults));
+  };
+
   return (
-    <SiteContentContext.Provider value={{ content, updateContent, resetContent }}>
+    <SiteContentContext.Provider value={{
+      content, updateContent, resetContent,
+      filterOptions, updateFilterOptions, resetFilterOptions,
+    }}>
       {children}
     </SiteContentContext.Provider>
   );

@@ -226,6 +226,73 @@
   margin-bottom: 0;
 }
 
+/* Subsection (filters) */
+.content-mgmt__subsection {
+  margin-bottom: var(--space-2xl);
+  padding-bottom: var(--space-xl);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.content-mgmt__subsection:last-of-type {
+  border-bottom: none;
+  margin-bottom: var(--space-lg);
+  padding-bottom: 0;
+}
+
+.content-mgmt__subsection-title {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-md);
+}
+
+/* Card header actions (edit + delete) */
+.content-mgmt__card-header-actions {
+  display: flex;
+  gap: var(--space-xs);
+}
+
+.content-mgmt__edit-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.content-mgmt__edit-btn:hover {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.05);
+}
+
+/* Member summary (collapsed state) */
+.content-mgmt__member-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+}
+
+.content-mgmt__member-name {
+  font-weight: 500;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.content-mgmt__member-role {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding: 2px 8px;
+  background: var(--color-bg-alt);
+  border-radius: var(--radius-full);
+}
+
 /* Hint */
 .content-mgmt__hint {
   display: flex;
