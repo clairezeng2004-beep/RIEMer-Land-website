@@ -397,24 +397,18 @@ export default function Documents() {
               className="doc-card card"
               onClick={() => openPreview(doc)}
             >
-              {/* 文件类型图标区 */}
+              {/* 顶部色条 */}
               <div
-                className="doc-card__icon-area"
-                style={{ background: `${typeColors[doc.type]}10`, color: typeColors[doc.type] }}
-              >
-                <FileIcon fileType={doc.fileType} size={36} />
-                <span className="doc-card__file-type">{fileTypeLabels[doc.fileType] || doc.fileType}</span>
-              </div>
+                className="doc-card__accent"
+                style={{ background: typeColors[doc.type] }}
+              />
 
               {/* 信息区 */}
               <div className="doc-card__body">
-                <h4 className="doc-card__title">{doc.title}</h4>
-                <p className="doc-card__desc">{doc.description}</p>
-
-                <div className="doc-card__meta">
+                <div className="doc-card__top">
                   <span
                     className="doc-card__type-badge"
-                    style={{ color: typeColors[doc.type], background: `${typeColors[doc.type]}12` }}
+                    style={{ color: typeColors[doc.type], background: `${typeColors[doc.type]}15` }}
                   >
                     {typeLabels[doc.type]}
                   </span>
@@ -423,85 +417,80 @@ export default function Documents() {
                   </span>
                 </div>
 
+                <h4 className="doc-card__title">{doc.title}</h4>
+                <p className="doc-card__desc">{doc.description}</p>
+
                 <div className="doc-card__footer">
                   <span className="doc-card__author">
                     <User size={12} /> {doc.uploadedBy}
                   </span>
                   <span className="doc-card__stats">
                     <Eye size={12} /> {doc.viewCount || 0}
-                    <HardDrive size={12} /> {doc.size}
                   </span>
                 </div>
               </div>
 
-              {/* 点赞区域 */}
-              <div className="doc-card__likes" onClick={(e) => e.stopPropagation()}>
-                <button
-                  className={`doc-card__like-btn ${hasLiked(doc) ? 'doc-card__like-btn--active' : ''}`}
-                  onClick={(e) => handleLike(doc.id, e)}
-                  title={hasLiked(doc) ? '取消点赞' : '点赞'}
-                >
-                  <ThumbsUp size={14} />
-                  <span>{(doc.likes || []).length}</span>
-                </button>
-                {(doc.likes || []).length > 0 && (
-                  <div className="doc-card__like-avatars">
-                    {(doc.likes || []).slice(0, 5).map((like) => (
-                      <div
-                        key={like.userId}
-                        className="doc-card__like-avatar"
-                        style={{ background: like.userAvatar ? 'transparent' : getAvatarColor(like.userName) }}
-                        title={like.userName}
-                      >
-                        {like.userAvatar ? (
-                          <img src={like.userAvatar} alt={like.userName} />
-                        ) : (
-                          getInitial(like.userName)
-                        )}
-                      </div>
-                    ))}
-                    {(doc.likes || []).length > 5 && (
-                      <div className="doc-card__like-avatar doc-card__like-avatar--more">
-                        +{(doc.likes || []).length - 5}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              {/* 操作栏 - 点击阅读为主，下载弱化 */}
-              <div className="doc-card__actions">
-                <button
-                  className="doc-card__action-main"
-                  onClick={(e) => { e.stopPropagation(); openPreview(doc); }}
-                  title="阅读文档"
-                >
-                  <Eye size={16} /> 阅读
-                </button>
-                <button
-                  className="doc-card__action-secondary"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (doc.fileUrl) {
-                      const a = document.createElement('a');
-                      a.href = doc.fileUrl;
-                      a.download = doc.title;
-                      a.click();
-                    }
-                  }}
-                  title="下载原文件"
-                >
-                  <Download size={14} />
-                </button>
-                {canModify(doc) && (
+              {/* 底部操作区：点赞 + 操作按钮 */}
+              <div className="doc-card__bottom" onClick={(e) => e.stopPropagation()}>
+                <div className="doc-card__bottom-left">
                   <button
-                    className="doc-card__action-secondary doc-card__action-danger"
-                    onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
-                    title="删除"
+                    className={`doc-card__like-btn ${hasLiked(doc) ? 'doc-card__like-btn--active' : ''}`}
+                    onClick={(e) => handleLike(doc.id, e)}
+                    title={hasLiked(doc) ? '取消点赞' : '点赞'}
                   >
-                    <Trash2 size={14} />
+                    <ThumbsUp size={14} />
+                    <span>{(doc.likes || []).length}</span>
                   </button>
-                )}
+                  {(doc.likes || []).length > 0 && (
+                    <div className="doc-card__like-avatars">
+                      {(doc.likes || []).slice(0, 5).map((like) => (
+                        <div
+                          key={like.userId}
+                          className="doc-card__like-avatar"
+                          style={{ background: like.userAvatar ? 'transparent' : getAvatarColor(like.userName) }}
+                          title={like.userName}
+                        >
+                          {like.userAvatar ? (
+                            <img src={like.userAvatar} alt={like.userName} />
+                          ) : (
+                            getInitial(like.userName)
+                          )}
+                        </div>
+                      ))}
+                      {(doc.likes || []).length > 5 && (
+                        <div className="doc-card__like-avatar doc-card__like-avatar--more">
+                          +{(doc.likes || []).length - 5}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+                <div className="doc-card__bottom-right">
+                  <button
+                    className="doc-card__action-icon"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      if (doc.fileUrl) {
+                        const a = document.createElement('a');
+                        a.href = doc.fileUrl;
+                        a.download = doc.title;
+                        a.click();
+                      }
+                    }}
+                    title="下载原文件"
+                  >
+                    <Download size={14} />
+                  </button>
+                  {canModify(doc) && (
+                    <button
+                      className="doc-card__action-icon doc-card__action-icon--danger"
+                      onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                      title="删除"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           ))}
