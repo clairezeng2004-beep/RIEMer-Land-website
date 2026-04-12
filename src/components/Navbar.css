@@ -85,23 +85,12 @@
 .navbar__nav-item--active {
   color: var(--color-primary);
   font-weight: 600;
-}
-
-/* 激活态底部指示条 */
-.navbar__nav-item--active::after {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 20%;
-  right: 20%;
-  height: 2.5px;
-  background: var(--color-primary);
-  border-radius: 2px 2px 0 0;
+  background: rgba(91, 140, 62, 0.10);
 }
 
 .navbar__nav-item--active:hover {
   color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.04);
+  background: rgba(91, 140, 62, 0.14);
 }
 
 /* ---- 右侧：成员入口 ---- */
