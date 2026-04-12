@@ -17,6 +17,7 @@ import {
   Tag,
 } from 'lucide-react';
 import { initialTasks, taskCategories, taskPriorities, taskStatuses } from '../../data/siteData';
+import CustomSelect from '../../components/CustomSelect';
 import './Tasks.css';
 
 const statusIcons = {
@@ -188,27 +189,19 @@ export default function Tasks() {
               <div className="tasks-form__row tasks-form__row--3">
                 <div className="tasks-form__field">
                   <label>分类</label>
-                  <select
+                  <CustomSelect
                     value={newTask.category}
-                    onChange={(e) => setNewTask({ ...newTask, category: e.target.value })}
-                    className="tasks-form__input"
-                  >
-                    {taskCategories.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setNewTask({ ...newTask, category: val })}
+                    options={taskCategories}
+                  />
                 </div>
                 <div className="tasks-form__field">
                   <label>优先级</label>
-                  <select
+                  <CustomSelect
                     value={newTask.priority}
-                    onChange={(e) => setNewTask({ ...newTask, priority: e.target.value })}
-                    className="tasks-form__input"
-                  >
-                    {taskPriorities.map((p) => (
-                      <option key={p} value={p}>{p}</option>
-                    ))}
-                  </select>
+                    onChange={(val) => setNewTask({ ...newTask, priority: val })}
+                    options={taskPriorities}
+                  />
                 </div>
                 <div className="tasks-form__field">
                   <label>截止日期</label>
@@ -311,15 +304,12 @@ export default function Tasks() {
                   </td>
                   <td>
                     <div className="tasks-table__actions">
-                      <select
+                      <CustomSelect
                         value={task.status}
-                        onChange={(e) => updateTaskStatus(task.id, e.target.value)}
-                        className="tasks-table__status-select"
-                      >
-                        {taskStatuses.map((s) => (
-                          <option key={s} value={s}>{s}</option>
-                        ))}
-                      </select>
+                        onChange={(val) => updateTaskStatus(task.id, val)}
+                        options={taskStatuses}
+                        size="sm"
+                      />
                       <button
                         onClick={() => deleteTask(task.id)}
                         className="tasks-table__delete"

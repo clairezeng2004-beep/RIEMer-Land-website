@@ -12,7 +12,6 @@ import {
   UserCheck,
   UserX,
   Crown,
-  ChevronDown,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -186,19 +185,16 @@ export default function UserManagement() {
                   <td>
                     {canManageRole(u) ? (
                       <div className="users-table__role-select-wrapper">
-                        <select
-                          className="users-table__role-select"
+                        <CustomSelect
                           value={u.role}
-                          onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                          onChange={(val) => handleRoleChange(u.id, val)}
+                          options={getAvailableRoles(u).map((role) => ({
+                            value: role,
+                            label: ROLE_LABELS[role],
+                          }))}
+                          size="sm"
                           style={{ color: ROLE_COLORS[u.role] }}
-                        >
-                          {getAvailableRoles(u).map((role) => (
-                            <option key={role} value={role}>
-                              {ROLE_LABELS[role]}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={12} className="users-table__role-select-icon" />
+                        />
                       </div>
                     ) : (
                       <span

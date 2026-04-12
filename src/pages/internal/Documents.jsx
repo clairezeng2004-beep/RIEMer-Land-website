@@ -259,17 +259,14 @@ export default function Documents() {
                 </div>
                 <div className="documents-upload__field">
                   <label>文档类型</label>
-                  <select
+                  <CustomSelect
                     value={newDoc.type}
-                    onChange={(e) => setNewDoc({ ...newDoc, type: e.target.value })}
-                    className="documents-upload__input"
-                  >
-                    {Object.entries(typeLabels).map(([key, label]) => (
-                      <option key={key} value={key}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={(val) => setNewDoc({ ...newDoc, type: val })}
+                    options={Object.entries(typeLabels).map(([key, label]) => ({
+                      value: key,
+                      label,
+                    }))}
+                  />
                 </div>
               </div>
               <div className="documents-upload__field">
