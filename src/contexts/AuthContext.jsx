@@ -63,7 +63,34 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // ---- Supabase 模式初始化 ----
+  // ---- 本地模式：从 localStorage 恢复登录态的辅助函数 ----
+  const restoreLocalAuth = useCallback(() => {
+    const stored = localStorage.getItem(AUTH_KEY);
+    if (stored) {
+      try {
+        const parsed = JSON.parse(stored);
+        const users = getLocalUsers();
+        const found = users.find((u) => u.id === parsed.id);
+        if (found && found.authorized) {
+          setUser(found);
+          return true;
+        } else {
+          localStorage.removeItem(AUTH_KEY);
+          setUser(null);
+          return false;
+        }
+      } catch {
+        localStorage.removeItem(AUTH_KEY);
+        setUser(null);
+        return false;
+      }
+    } else {
+      setUser(null);
+      return false;
+    }
+  }, []);
+
+  // ---- 初始化 ----
   useEffect(() => {
     if (!isSupabaseConfigured) {
       // 本地模式：从 localStorage 恢复登录态
@@ -126,6 +153,43 @@ export function AuthProvider({ children }) {
 
     return () => subscription?.unsubscribe();
   }, []);
+
+  // ---- 跨窗口 / 跨标签页同步登录状态 ----
+  useEffect(() => {
+    if (isSupabaseConfigured) return; // Supabase 模式有自己的监听机制
+
+    // 监听其他窗口/标签页对 localStorage 的修改
+    const handleStorageChange = (e) => {
+      if (e.key === AUTH_KEY) {
+        if (!e.newValue) {
+          // 另一个窗口执行了登出（删除了 AUTH_KEY）
+          setUser(null);
+        } else {
+          // 另一个窗口执行了登录或更新
+          restoreLocalAuth();
+        }
+      }
+      if (e.key === USERS_DB_KEY) {
+        // 用户数据库被更新（如授权状态变化），重新检查当前登录态
+        restoreLocalAuth();
+      }
+    };
+
+    // 当用户切回此标签页时，重新从 localStorage 检查登录态
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        restoreLocalAuth();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [restoreLocalAuth]);
 
   // 获取 Supabase profiles 表中的用户配置
   const fetchProfile = async (authUser) => {
