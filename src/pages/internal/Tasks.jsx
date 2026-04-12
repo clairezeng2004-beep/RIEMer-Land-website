@@ -24,8 +24,8 @@ const statusIcons = {
 
 const statusColors = {
   '待办': '#8A9A8C',
-  '进行中': '#4FBFC4',
-  '已完成': '#27AE60',
+  '进行中': '#6B8F3C',
+  '已完成': '#3A6B35',
   '已取消': '#C0392B',
 };
 
