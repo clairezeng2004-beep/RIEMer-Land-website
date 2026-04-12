@@ -23,6 +23,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
+import CustomSelect from '../../components/CustomSelect';
+import { pinyinMatch } from '../../utils/pinyinSearch';
 import './Documents.css';
 
 const typeLabels = {
