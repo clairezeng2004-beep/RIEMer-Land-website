@@ -279,7 +279,7 @@ ToB 销售岗位的日常工作内容、团队协作模式，以及互联网公�
   },
   {
     id: '6',
-    title: 'RIEM 大一下专业必修与方向课测评',
+    title: 'RIEMer 课程测评｜RIEM 大一下专业必修与方向课测评',
     author: 'RIEMer Land',
     date: '2025-12-28',
     category: '课程测评',
