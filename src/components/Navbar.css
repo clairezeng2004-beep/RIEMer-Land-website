@@ -41,14 +41,13 @@
   text-decoration: none;
   color: var(--color-text);
   flex-shrink: 0;
-  position: relative;
-  top: 2px;
 }
 
 .navbar__logo-img {
   height: 52px;
   width: auto;
-  vertical-align: middle;
+  display: block;
+  object-fit: contain;
 }
 
 .navbar__logo-text {
