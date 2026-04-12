@@ -19,10 +19,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-.navbar--hidden {
-  transform: translateY(-100%);
-}
-
 .navbar__container {
   width: 100%;
   margin: 0 auto;
