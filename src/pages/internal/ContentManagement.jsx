@@ -8,7 +8,6 @@ import {
   RotateCcw,
   Type,
   BarChart3,
-  Target,
   FileText,
   MapPin,
   Mail,
@@ -65,24 +64,9 @@ export default function ContentManagement() {
     setForm({ ...form, stats: form.stats.filter((_, i) => i !== index) });
   };
 
-  const updateMission = (index, field, value) => {
-    const newMissions = [...form.missions];
-    newMissions[index] = { ...newMissions[index], [field]: value };
-    setForm({ ...form, missions: newMissions });
-  };
-
-  const addMission = () => {
-    setForm({ ...form, missions: [...form.missions, { title: '', desc: '' }] });
-  };
-
-  const removeMission = (index) => {
-    setForm({ ...form, missions: form.missions.filter((_, i) => i !== index) });
-  };
-
   const tabs = [
     { id: 'hero', label: 'Hero 区域', icon: <Type size={16} /> },
     { id: 'stats', label: '数据统计', icon: <BarChart3 size={16} /> },
-    { id: 'mission', label: '使命板块', icon: <Target size={16} /> },
     { id: 'articles', label: '文章板块', icon: <FileText size={16} /> },
     { id: 'footer', label: '页脚信息', icon: <MapPin size={16} /> },
   ];
@@ -213,64 +197,6 @@ export default function ContentManagement() {
 
                 <button className="content-mgmt__add-btn" onClick={addStat}>
                   <Plus size={16} /> 添加统计项
-                </button>
-              </div>
-            )}
-
-            {/* 使命板块 */}
-            {activeTab === 'mission' && (
-              <div className="content-mgmt__section">
-                <h3 className="content-mgmt__section-title">使命板块</h3>
-                <p className="content-mgmt__section-desc">「我们的使命」区域的标题和内容</p>
-
-                <div className="content-mgmt__field">
-                  <label>板块标题</label>
-                  <input
-                    type="text"
-                    value={form.missionSectionTitle}
-                    onChange={(e) => setForm({ ...form, missionSectionTitle: e.target.value })}
-                    className="content-mgmt__input"
-                    placeholder="如：我们的使命"
-                  />
-                </div>
-
-                {form.missions.map((mission, i) => (
-                  <div key={i} className="content-mgmt__card">
-                    <div className="content-mgmt__card-header">
-                      <span className="content-mgmt__card-index">#{i + 1}</span>
-                      <button
-                        className="content-mgmt__remove-btn"
-                        onClick={() => removeMission(i)}
-                        title="删除"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                    <div className="content-mgmt__field">
-                      <label>标题</label>
-                      <input
-                        type="text"
-                        value={mission.title}
-                        onChange={(e) => updateMission(i, 'title', e.target.value)}
-                        className="content-mgmt__input"
-                        placeholder="使命标题"
-                      />
-                    </div>
-                    <div className="content-mgmt__field">
-                      <label>描述</label>
-                      <textarea
-                        value={mission.desc}
-                        onChange={(e) => updateMission(i, 'desc', e.target.value)}
-                        className="content-mgmt__input content-mgmt__textarea"
-                        rows={2}
-                        placeholder="使命描述"
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                <button className="content-mgmt__add-btn" onClick={addMission}>
-                  <Plus size={16} /> 添加使命项
                 </button>
               </div>
             )}
