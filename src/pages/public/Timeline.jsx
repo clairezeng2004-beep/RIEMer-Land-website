@@ -132,7 +132,7 @@ export default function Timeline() {
                 <div className={`timeline__card-wrapper ${index % 2 === 0 ? 'timeline__card-wrapper--top' : 'timeline__card-wrapper--bottom'}`}>
                   <div className="timeline__connector" />
                   <div className="timeline__card card">
-                    <div className="timeline__year">{item.year}</div>
+                    <div className="timeline__year">{item.year}.{item.month.padStart(2, '0')}</div>
                     <h3 className="timeline__title">{item.title}</h3>
                     <p className="timeline__desc">{item.description}</p>
                   </div>

@@ -29,6 +29,7 @@ export const clubInfo = {
 export const timelineData = [
   {
     year: '2024',
+    month: '9',
     title: '平台创立',
     description:
       'RIEMer Land 由西南财经大学 RIEM 学生自主发起，致力于搭建校友与在校学子的经验互助平台。',
@@ -36,6 +37,7 @@ export const timelineData = [
   },
   {
     year: '2025',
+    month: '1',
     title: '「听 RIEMer 说」系列上线',
     description:
       '推出「听 RIEMer 说」访谈系列，邀请 RIEM 校友分享就业、考研、留学等多元经验。',
@@ -43,27 +45,32 @@ export const timelineData = [
   },
   {
     year: '2025',
+    month: '3',
     title: 'RIEMer\'s Space 分享会启动',
     description: '举办线上线下分享会，覆盖数模备赛、快消行业、职业选择等实用主题。',
   },
   {
     year: '2025',
+    month: '5',
     title: '课程测评与专业方向指南发布',
     description: '发布 RIEM 专业方向课测评和大一下专业必修与方向课测评，帮助学弟学妹选课参考。',
     highlight: true,
   },
   {
     year: '2025',
+    month: '6',
     title: '保研经验专题',
     description: '推出保研论文答疑解惑系列，解答同学们最关心的八大问题。',
   },
   {
     year: '2025',
+    month: '8',
     title: '辩论赛经验分享',
     description: '发布「爱情之美的时间尺度」辩论表演赛经验分享，RIEM 与法学院联合呈现。',
   },
   {
     year: '2025',
+    month: '10',
     title: '主理团队招新',
     description: 'RIEMer Land 主理团队面向全院招新，壮大平台运营力量。',
     highlight: true,
