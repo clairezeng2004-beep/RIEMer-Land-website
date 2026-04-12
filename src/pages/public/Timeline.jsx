@@ -191,7 +191,6 @@ export default function Timeline() {
                 </div>
                 <div className="member-card__info">
                   <h3 className="member-card__name">{member.name}</h3>
-                  <span className="member-card__role">{member.role}</span>
                   <p className="member-card__bio">{member.bio}</p>
                 </div>
               </div>

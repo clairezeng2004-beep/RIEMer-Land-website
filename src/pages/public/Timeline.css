@@ -364,16 +364,6 @@
   color: var(--color-text);
 }
 
-.member-card__role {
-  display: inline-block;
-  font-size: var(--text-xs);
-  font-weight: 600;
-  color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.08);
-  padding: 2px 12px;
-  border-radius: var(--radius-full);
-}
-
 .member-card__bio {
   font-size: var(--text-sm);
   color: var(--color-text-light);

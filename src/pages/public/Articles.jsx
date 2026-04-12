@@ -56,7 +56,7 @@ export default function Articles() {
           <div className="articles-hero__content">
             <h1>文章索引</h1>
             <p>
-              汇聚成员的学术思考与研究成果，覆盖多个学科领域。
+              汇聚 RIEMers 的真实经历与多元心得，在这里找到属于你的那份启发。
             </p>
           </div>
         </div>
