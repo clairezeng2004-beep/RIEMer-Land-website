@@ -1,13 +1,19 @@
 import { useMemo } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, User, Tag, Clock, ExternalLink } from 'lucide-react';
-import { articlesData } from '../../data/siteData';
+import { articlesData, teamMembers } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import './ArticleDetail.css';
 
 export default function ArticleDetail() {
   const { id } = useParams();
   const { userArticles } = useSiteContent();
+
+  // 负责人映射
+  const memberMap = useMemo(
+    () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
+    []
+  );
 
   const allArticles = useMemo(
     () => [...userArticles, ...articlesData],
@@ -19,6 +25,8 @@ export default function ArticleDetail() {
   if (!article) {
     return <Navigate to="/articles" replace />;
   }
+
+  const leader = article.leaderId ? memberMap[article.leaderId] : null;
 
   // Simple markdown-like rendering
   const renderContent = (content) => {
@@ -72,6 +80,12 @@ export default function ArticleDetail() {
                 <Clock size={16} /> 约 {Math.ceil((article.content || '').length / 500)} 分钟阅读
               </span>
             </div>
+            {leader && (
+              <Link to={leader.profileUrl} className="article-detail__leader">
+                <img src={leader.avatar} alt={leader.name} className="article-detail__leader-avatar" />
+                <span>负责人：{leader.name}</span>
+              </Link>
+            )}
             <div className="article-detail__tags">
               {article.tags.map((tag) => (
                 <span key={tag} className="article-detail__tag">

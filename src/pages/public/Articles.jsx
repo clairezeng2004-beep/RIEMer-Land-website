@@ -9,7 +9,7 @@ import {
   Calendar,
   User,
 } from 'lucide-react';
-import { articlesData } from '../../data/siteData';
+import { articlesData, teamMembers } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import ArticleChat from '../../components/ArticleChat';
@@ -19,6 +19,12 @@ export default function Articles() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const { userArticles } = useSiteContent();
+
+  // 负责人映射
+  const memberMap = useMemo(
+    () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
+    []
+  );
 
   // 合并所有文章，按日期降序
   const allArticles = useMemo(
@@ -149,6 +155,19 @@ export default function Articles() {
                       <Calendar size={14} />
                       <span>{article.date}</span>
                     </span>
+                    {(() => {
+                      const leader = article.leaderId ? memberMap[article.leaderId] : null;
+                      return leader ? (
+                        <Link
+                          to={leader.profileUrl}
+                          className="article-card__leader"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <img src={leader.avatar} alt={leader.name} className="article-card__leader-avatar" />
+                          <span>{leader.name}</span>
+                        </Link>
+                      ) : null;
+                    })()}
                     <span className="article-card__link">
                       阅读全文 <ArrowRight size={14} />
                     </span>
