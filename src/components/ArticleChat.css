@@ -47,8 +47,8 @@
   position: fixed;
   bottom: 24px;
   right: 24px;
-  width: 380px;
-  max-height: 560px;
+  width: 480px;
+  max-height: 720px;
   background: var(--color-bg-card);
   border-radius: var(--radius-xl);
   box-shadow: 0 12px 48px rgba(44, 62, 45, 0.18);
