@@ -40,7 +40,7 @@
 /* ============ Stats ============ */
 .stats {
   padding-top: var(--space-xl);
-  padding-bottom: var(--space-3xl);
+  padding-bottom: var(--space-lg);
 }
 
 .stats__grid {
@@ -78,6 +78,10 @@
 }
 
 /* ============ Featured Articles ============ */
+.featured.section {
+  padding-top: var(--space-2xl);
+}
+
 .featured__header {
   margin-bottom: var(--space-2xl);
 }
