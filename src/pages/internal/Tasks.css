@@ -153,10 +153,12 @@
 
 .tasks-filters__btn:hover {
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: var(--color-text);
+  background: rgba(91, 140, 62, 0.06);
 }
 
-.tasks-filters__btn--active {
+.tasks-filters__btn--active,
+.tasks-filters__btn--active:hover {
   background: var(--color-primary);
   border-color: var(--color-primary);
   color: white;
