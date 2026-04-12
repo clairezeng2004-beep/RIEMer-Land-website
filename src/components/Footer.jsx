@@ -38,6 +38,16 @@ export default function Footer() {
                 <span>{content.footerLocation}</span>
               </div>
             </div>
+
+            <div className="footer__qrcode">
+              <h4 className="footer__nav-title">关注公众号</h4>
+              <img
+                src="/qrcode-wechat.jpg"
+                alt="RIEMer Land 微信公众号二维码"
+                className="footer__qrcode-img"
+              />
+              <span className="footer__qrcode-text">微信扫码关注</span>
+            </div>
           </div>
 
           <div className="footer__bottom">
