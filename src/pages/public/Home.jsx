@@ -4,6 +4,8 @@ import {
   Clock,
   MapPin,
   Calendar,
+  User,
+  FileText,
 } from 'lucide-react';
 import { articlesData, eventsData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -58,7 +60,21 @@ export default function Home() {
                 to={`/article/${article.id}`}
                 className="featured__card"
               >
-                <div className="featured__card-accent" />
+                {/* 封面图 */}
+                <div className="featured__cover">
+                  {article.coverImage ? (
+                    <img
+                      src={article.coverImage}
+                      alt={article.title}
+                      className="featured__cover-img"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="featured__cover-placeholder">
+                      <FileText size={28} />
+                    </div>
+                  )}
+                </div>
                 <div className="featured__card-body">
                   <div className="featured__card-top">
                     <span className="featured__category">{article.category}</span>
@@ -66,12 +82,24 @@ export default function Home() {
                   <h3 className="featured__title">{article.title}</h3>
                   <p className="featured__excerpt">{article.excerpt}</p>
                   <div className="featured__meta">
+                    {/* 作者头像 + 日期 */}
+                    <span className="featured__meta-author">
+                      {article.avatar ? (
+                        <img
+                          src={article.avatar}
+                          alt={article.author}
+                          className="featured__avatar"
+                        />
+                      ) : (
+                        <span className="featured__avatar featured__avatar--default">
+                          <User size={12} />
+                        </span>
+                      )}
+                      <span className="featured__author-name">{article.author}</span>
+                    </span>
                     <span className="featured__meta-item">
                       <Clock size={14} />
                       {article.date}
-                    </span>
-                    <span className="featured__read-more">
-                      阅读全文 <ArrowRight size={14} />
                     </span>
                   </div>
                 </div>

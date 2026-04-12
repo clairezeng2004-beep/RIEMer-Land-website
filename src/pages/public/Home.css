@@ -104,7 +104,6 @@
   text-decoration: none;
   color: inherit;
   transition: all var(--transition-normal);
-  aspect-ratio: 1 / 1;
 }
 
 .featured__card:hover {
@@ -115,6 +114,37 @@
 
 .featured__card:hover .featured__read-more {
   gap: 8px;
+}
+
+/* 封面图 */
+.featured__cover {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 2 / 1;
+  overflow: hidden;
+  background: var(--color-bg-alt, #f5f5f5);
+  flex-shrink: 0;
+}
+
+.featured__cover-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 0.4s ease;
+}
+
+.featured__card:hover .featured__cover-img {
+  transform: scale(1.05);
+}
+
+.featured__cover-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-text-muted);
+  opacity: 0.35;
 }
 
 .featured__card-accent {
@@ -181,6 +211,38 @@
   margin-top: auto;
 }
 
+.featured__meta-author {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.featured__avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.featured__avatar--default {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-bg-alt, #eee);
+  color: var(--color-text-muted);
+}
+
+.featured__author-name {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 80px;
+}
+
 .featured__meta-item {
   display: flex;
   align-items: center;
@@ -218,7 +280,6 @@
 /* ============ Responsive ============ */
 @media (max-width: 1200px) {
   .featured__grid { grid-template-columns: repeat(2, 1fr); }
-  .featured__card { aspect-ratio: auto; }
   .featured__title { min-height: auto; }
   .featured__excerpt { min-height: auto; }
 }
@@ -234,7 +295,6 @@
   .hero__subtitle { font-size: var(--text-base); }
   .hero-actions { padding: var(--space-xl) 0 var(--space-2xl); }
   .featured__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
-  .featured__card { aspect-ratio: auto; }
   .featured__card-body { padding: var(--space-lg); gap: var(--space-sm); }
   .featured__title { font-size: var(--text-base); min-height: auto; }
   .featured__excerpt { font-size: var(--text-sm); -webkit-line-clamp: 3; min-height: auto; }

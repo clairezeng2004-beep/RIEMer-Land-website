@@ -7,6 +7,7 @@ import {
   FileText,
   Tag,
   Calendar,
+  User,
 } from 'lucide-react';
 import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -103,8 +104,37 @@ export default function Articles() {
                 to={`/article/${article.id}`}
                 className="article-card card"
               >
-                <div className="article-card__accent" />
+                {/* 封面图 */}
+                <div className="article-card__cover">
+                  {article.coverImage ? (
+                    <img
+                      src={article.coverImage}
+                      alt={article.title}
+                      className="article-card__cover-img"
+                      loading="lazy"
+                    />
+                  ) : (
+                    <div className="article-card__cover-placeholder">
+                      <FileText size={28} />
+                    </div>
+                  )}
+                </div>
                 <div className="article-card__body">
+                  {/* 作者头像行 */}
+                  <div className="article-card__author">
+                    {article.avatar ? (
+                      <img
+                        src={article.avatar}
+                        alt={article.author}
+                        className="article-card__avatar"
+                      />
+                    ) : (
+                      <span className="article-card__avatar article-card__avatar--default">
+                        <User size={14} />
+                      </span>
+                    )}
+                    <span className="article-card__author-name">{article.author}</span>
+                  </div>
                   <h3 className="article-card__title">{article.title}</h3>
                   <p className="article-card__excerpt">{article.excerpt}</p>
                   <div className="article-card__tags">
