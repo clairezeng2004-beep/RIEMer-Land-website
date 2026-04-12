@@ -26,15 +26,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Quick Actions */}
-      <div className="hero-actions container">
-        <Link to="/articles" className="btn btn-primary">
-          浏览文章
-        </Link>
-        <Link to="/timeline" className="btn btn-ghost">
-          了解历史
-        </Link>
-      </div>
 
       {/* Stats Section */}
       <section className="stats section">
