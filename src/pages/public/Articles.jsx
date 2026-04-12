@@ -43,7 +43,7 @@ export default function Articles() {
       <section className="articles-hero">
         <div className="container">
           <div className="articles-hero__content">
-            <h1>文章索引</h1>
+            <h1>内容索引</h1>
             <p>
               汇聚 RIEMers 的真实经历与多元心得，在这里找到属于你的那份启发。
             </p>
