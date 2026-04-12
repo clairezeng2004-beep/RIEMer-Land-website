@@ -67,7 +67,7 @@
 .stats__value {
   font-size: var(--text-3xl);
   font-weight: 700;
-  color: #3D8B6E;
+  color: var(--color-primary-dark);
   margin-bottom: var(--space-xs);
 }
 
