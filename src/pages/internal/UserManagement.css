@@ -118,12 +118,93 @@
 .users-table__role {
   font-size: var(--text-sm);
   font-weight: 500;
-  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.users-table__role--owner {
+  color: #8B5CF6;
+  font-weight: 600;
 }
 
 .users-table__role--admin {
-  color: var(--color-primary);
+  color: #4FBFC4;
   font-weight: 600;
+}
+
+.users-table__role--member {
+  color: var(--color-text-muted);
+}
+
+.users-table__role-select-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.users-table__role-select {
+  appearance: none;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  padding: 4px 24px 4px 8px;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  background: var(--color-bg-card);
+  cursor: pointer;
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.users-table__role-select:hover {
+  border-color: var(--color-primary);
+}
+
+.users-table__role-select-icon {
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
+  color: var(--color-text-muted);
+}
+
+/* 角色说明面板 */
+.users-roles-info {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg) var(--space-xl);
+  margin-bottom: var(--space-2xl);
+}
+
+.users-roles-info h4 {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: var(--space-md);
+}
+
+.users-roles-info__grid {
+  display: flex;
+  gap: var(--space-xl);
+}
+
+.users-roles-info__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.users-roles-info__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 600;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  white-space: nowrap;
 }
 
 .users-table__date {
@@ -162,6 +243,10 @@
     flex-direction: column;
   }
   .users-stat { padding: var(--space-md) var(--space-lg); }
+  .users-roles-info__grid {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
 }
 
 @media (max-width: 480px) {

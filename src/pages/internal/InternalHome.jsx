@@ -30,6 +30,8 @@ function formatDate(dateStr) {
   return `${month}月${day}日`;
 }
 
+const ROLE_LABELS = { owner: '超级管理员', admin: '管理员', member: '成员' };
+
 export default function InternalHome() {
   const { user, isAuthenticated, isAdmin } = useAuth();
   const { notifications, unreadCount } = useNotifications();
@@ -143,7 +145,7 @@ export default function InternalHome() {
           </div>
           <div className="internal-home__stat-card">
             <div className="internal-home__stat-info">
-              <div className="internal-home__stat-value">{user?.role === 'admin' ? '管理员' : '成员'}</div>
+              <div className="internal-home__stat-value">{ROLE_LABELS[user?.role] || '成员'}</div>
               <div className="internal-home__stat-label">当前角色</div>
             </div>
           </div>

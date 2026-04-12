@@ -19,7 +19,7 @@ export default function Login() {
     return <Navigate to="/internal/documents" replace />;
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
@@ -30,7 +30,7 @@ export default function Login() {
     }
 
     if (isLogin) {
-      const result = login(email, password);
+      const result = await login(email, password);
       if (result.success) {
         navigate('/internal/documents');
       } else {
@@ -45,7 +45,7 @@ export default function Login() {
         setError('密码至少需要 6 个字符');
         return;
       }
-      const result = register(email, password, name);
+      const result = await register(email, password, name);
       if (result.success) {
         setSuccess(result.message);
         setEmail('');

@@ -29,6 +29,7 @@ export default function InternalSidebar() {
     { to: '/internal/gallery', icon: Camera, label: '成员相册' },
   ];
 
+  // isAdmin 在新的 AuthContext 中已经包含 owner 和 admin
   const adminItems = [
     { to: '/internal/users', icon: Users, label: '用户管理' },
     { to: '/internal/content', icon: Settings, label: '内容管理' },
