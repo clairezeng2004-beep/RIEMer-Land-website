@@ -123,11 +123,6 @@
   gap: 4px;
 }
 
-.users-table__role--owner {
-  color: #8B5CF6;
-  font-weight: 600;
-}
-
 .users-table__role--admin {
   color: #4FBFC4;
   font-weight: 600;

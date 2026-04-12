@@ -69,7 +69,7 @@ function inferFileType(fileName) {
 }
 
 export default function Documents() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
   const [documents, setDocuments] = useState(documentsData);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
@@ -142,6 +142,7 @@ export default function Documents() {
       fileUrl,
       description: newDoc.description,
       uploadedBy: user?.name || 'Unknown',
+      uploadedById: user?.id || null,
       date: new Date().toISOString().split('T')[0],
       size: selectedFile ? formatSize(selectedFile.size) : '—',
       viewCount: 0,
@@ -157,6 +158,15 @@ export default function Documents() {
     if (window.confirm('确定要删除这个文档吗？')) {
       setDocuments(documents.filter((d) => d.id !== id));
     }
+  };
+
+  // 权限判断：管理员或上传者可删除/修改
+  const canModify = (doc) => {
+    if (isAdmin) return true;
+    if (doc.uploadedById && doc.uploadedById === user?.id) return true;
+    // 兼容旧数据：对比上传者名称
+    if (doc.uploadedBy && doc.uploadedBy === user?.name) return true;
+    return false;
   };
 
   const openPreview = (doc) => {
@@ -382,13 +392,15 @@ export default function Documents() {
                 >
                   <Download size={14} />
                 </button>
-                <button
-                  className="doc-card__action-secondary doc-card__action-danger"
-                  onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
-                  title="删除"
-                >
-                  <Trash2 size={14} />
-                </button>
+                {canModify(doc) && (
+                  <button
+                    className="doc-card__action-secondary doc-card__action-danger"
+                    onClick={(e) => { e.stopPropagation(); handleDelete(doc.id); }}
+                    title="删除"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                )}
               </div>
             </div>
           ))}

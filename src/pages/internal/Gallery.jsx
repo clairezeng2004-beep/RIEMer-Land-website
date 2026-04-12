@@ -70,7 +70,7 @@ const initialAlbums = [
 ];
 
 export default function Gallery() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
   const [albums, setAlbums] = useState(initialAlbums);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -95,6 +95,8 @@ export default function Gallery() {
       description: newAlbum.description,
       coverIndex: 0,
       date: new Date().toISOString().split('T')[0],
+      createdById: user?.id || null,
+      createdBy: user?.name || 'Unknown',
       photos: [],
     };
     setAlbums([album, ...albums]);
@@ -121,6 +123,7 @@ export default function Gallery() {
         id: `upload-${Date.now()}-${i}`,
         url: f.url,
         caption: f.caption === defaultCaption ? '' : f.caption,
+        uploadedById: user?.id || null,
       };
     });
     setAlbums((prev) =>
@@ -159,6 +162,23 @@ export default function Gallery() {
     if (!window.confirm('确定要删除整个相册吗？所有照片将一并删除。')) return;
     setAlbums((prev) => prev.filter((a) => a.id !== albumId));
     if (selectedAlbum?.id === albumId) setSelectedAlbum(null);
+  };
+
+  // 权限判断：管理员或创建者/上传者可删除
+  const canModifyAlbum = (album) => {
+    if (isAdmin) return true;
+    if (album.createdById && album.createdById === user?.id) return true;
+    if (album.createdBy && album.createdBy === user?.name) return true;
+    return false;
+  };
+
+  const canModifyPhoto = (photo) => {
+    if (isAdmin) return true;
+    // 照片上传者可删除
+    if (photo.uploadedById && photo.uploadedById === user?.id) return true;
+    // 相册创建者也可删除相册内的照片
+    if (selectedAlbum?.createdById && selectedAlbum.createdById === user?.id) return true;
+    return false;
   };
 
   /* ---- Lightbox ---- */
@@ -294,16 +314,18 @@ export default function Gallery() {
                       </div>
                     </div>
                     {/* 删除按钮 */}
-                    <button
-                      className="album-card__delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteAlbum(album.id);
-                      }}
-                      title="删除相册"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canModifyAlbum(album) && (
+                      <button
+                        className="album-card__delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeleteAlbum(album.id);
+                        }}
+                        title="删除相册"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 );
               })}
@@ -441,16 +463,18 @@ export default function Gallery() {
                     >
                       <Download size={14} />
                     </button>
-                    <button
-                      className="photo-card__delete"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeletePhoto(photo.id);
-                      }}
-                      title="删除照片"
-                    >
-                      <Trash2 size={14} />
-                    </button>
+                    {canModifyPhoto(photo) && (
+                      <button
+                        className="photo-card__delete"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDeletePhoto(photo.id);
+                        }}
+                        title="删除照片"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
