@@ -5,7 +5,6 @@ import {
   Clock,
   MapPin,
   Calendar,
-  User,
   FileText,
 } from 'lucide-react';
 import { articlesData, eventsData, teamMembers } from '../../data/siteData';
@@ -89,21 +88,6 @@ export default function Home() {
                   <h3 className="featured__title">{article.title}</h3>
                   <p className="featured__excerpt">{article.excerpt}</p>
                   <div className="featured__meta">
-                    {/* 作者头像 + 日期 */}
-                    <span className="featured__meta-author">
-                      {article.avatar ? (
-                        <img
-                          src={article.avatar}
-                          alt={article.author}
-                          className="featured__avatar"
-                        />
-                      ) : (
-                        <span className="featured__avatar featured__avatar--default">
-                          <User size={12} />
-                        </span>
-                      )}
-                      <span className="featured__author-name">{article.author}</span>
-                    </span>
                     <span className="featured__meta-item">
                       <Clock size={14} />
                       {article.date}

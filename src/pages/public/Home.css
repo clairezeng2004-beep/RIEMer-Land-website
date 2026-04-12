@@ -211,37 +211,7 @@
   margin-top: auto;
 }
 
-.featured__meta-author {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
 
-.featured__avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex-shrink: 0;
-}
-
-.featured__avatar--default {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--color-bg-alt, #eee);
-  color: var(--color-text-muted);
-}
-
-.featured__author-name {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  font-weight: 500;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 80px;
-}
 
 .featured__meta-item {
   display: flex;
