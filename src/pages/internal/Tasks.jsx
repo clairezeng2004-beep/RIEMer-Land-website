@@ -55,6 +55,7 @@ export default function Tasks() {
     assignee: '',
     dueDate: '',
   });
+  const [changeReasons, setChangeReasons] = useState({});
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -88,9 +89,33 @@ export default function Tasks() {
   };
 
   const updateTaskStatus = (id, newStatus) => {
+    const reason = changeReasons[id] || '';
     setTasks(
-      tasks.map((t) => (t.id === id ? { ...t, status: newStatus } : t))
+      tasks.map((t) => {
+        if (t.id !== id) return t;
+        const record = {
+          from: t.status,
+          to: newStatus,
+          reason,
+          date: new Date().toISOString().split('T')[0],
+        };
+        return {
+          ...t,
+          status: newStatus,
+          statusHistory: [...(t.statusHistory || []), record],
+        };
+      })
     );
+    // 清空该任务的变更理由
+    setChangeReasons((prev) => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+  };
+
+  const updateChangeReason = (id, reason) => {
+    setChangeReasons((prev) => ({ ...prev, [id]: reason }));
   };
 
   const deleteTask = (id) => {
@@ -310,6 +335,13 @@ export default function Tasks() {
                         options={taskStatuses}
                         size="sm"
                       />
+                      <input
+                        type="text"
+                        className="tasks-table__reason-input"
+                        placeholder="变更理由…"
+                        value={changeReasons[task.id] || ''}
+                        onChange={(e) => updateChangeReason(task.id, e.target.value)}
+                      />
                       <button
                         onClick={() => deleteTask(task.id)}
                         className="tasks-table__delete"
@@ -318,6 +350,23 @@ export default function Tasks() {
                         <X size={14} />
                       </button>
                     </div>
+                    {task.statusHistory && task.statusHistory.length > 0 && (
+                      <div className="tasks-table__history">
+                        {task.statusHistory.map((h, idx) => (
+                          <div key={idx} className="tasks-table__history-item">
+                            <span className="tasks-table__history-change">
+                              {h.from} → {h.to}
+                            </span>
+                            {h.reason && (
+                              <span className="tasks-table__history-reason">
+                                {h.reason}
+                              </span>
+                            )}
+                            <span className="tasks-table__history-date">{h.date}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </td>
                 </tr>
               ))}
