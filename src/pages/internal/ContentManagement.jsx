@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { fetchAndParseArticle, cleanTitle, generateSummary, inferCategory, inferTags } from '../../services/articleService';
 import {
   Settings,
   Save,
@@ -18,12 +19,17 @@ import {
   Filter,
   Pencil,
   X,
+  Link2,
+  Loader2,
+  ExternalLink,
+  Tag,
+  Calendar,
 } from 'lucide-react';
 import './ContentManagement.css';
 
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin } = useAuth();
-  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions } = useSiteContent();
+  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle } = useSiteContent();
 
   // 本地编辑状态
   const [form, setForm] = useState({ ...content });
@@ -33,6 +39,13 @@ export default function ContentManagement() {
 
   // 编辑中的成员索引
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
+
+  // 文章管理状态
+  const [articleUrl, setArticleUrl] = useState('');
+  const [fetchingArticle, setFetchingArticle] = useState(false);
+  const [fetchError, setFetchError] = useState('');
+  const [editingArticle, setEditingArticle] = useState(null); // 正在编辑的文章（新建或修改）
+  const [editingArticleId, setEditingArticleId] = useState(null); // 正在编辑的已有文章 ID
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -402,23 +415,361 @@ export default function ContentManagement() {
             {/* 文章板块 */}
             {activeTab === 'articles' && (
               <div className="content-mgmt__section">
-                <h3 className="content-mgmt__section-title">文章板块</h3>
-                <p className="content-mgmt__section-desc">最新文章区域的标题</p>
+                <h3 className="content-mgmt__section-title">文章管理</h3>
+                <p className="content-mgmt__section-desc">通过粘贴公众号链接添加文章，自动提取标题、时间并生成智能摘要</p>
 
-                <div className="content-mgmt__field">
-                  <label>板块标题</label>
-                  <input
-                    type="text"
-                    value={form.articlesSectionTitle}
-                    onChange={(e) => setForm({ ...form, articlesSectionTitle: e.target.value })}
-                    className="content-mgmt__input"
-                    placeholder="如：最新文章"
-                  />
+                {/* 板块标题 */}
+                <div className="content-mgmt__subsection">
+                  <h4 className="content-mgmt__subsection-title">板块标题</h4>
+                  <div className="content-mgmt__field">
+                    <input
+                      type="text"
+                      value={form.articlesSectionTitle}
+                      onChange={(e) => setForm({ ...form, articlesSectionTitle: e.target.value })}
+                      className="content-mgmt__input"
+                      placeholder="如：最新文章"
+                    />
+                  </div>
                 </div>
+
+                {/* 添加新文章 */}
+                <div className="content-mgmt__subsection">
+                  <h4 className="content-mgmt__subsection-title">添加新文章</h4>
+
+                  {/* URL 输入 + 抓取 */}
+                  <div className="content-mgmt__url-bar">
+                    <div className="content-mgmt__url-input-wrap">
+                      <Link2 size={16} className="content-mgmt__url-icon" />
+                      <input
+                        type="text"
+                        value={articleUrl}
+                        onChange={(e) => {
+                          setArticleUrl(e.target.value);
+                          setFetchError('');
+                        }}
+                        className="content-mgmt__input content-mgmt__url-input"
+                        placeholder="粘贴微信公众号文章链接…"
+                        disabled={fetchingArticle}
+                      />
+                    </div>
+                    <button
+                      className="btn btn-primary content-mgmt__fetch-btn"
+                      disabled={!articleUrl.trim() || fetchingArticle}
+                      onClick={async () => {
+                        setFetchingArticle(true);
+                        setFetchError('');
+                        try {
+                          const result = await fetchAndParseArticle(articleUrl.trim());
+                          setEditingArticle({
+                            id: `user-${Date.now()}`,
+                            ...result,
+                          });
+                          setEditingArticleId(null);
+                        } catch (err) {
+                          setFetchError(err.message);
+                        } finally {
+                          setFetchingArticle(false);
+                        }
+                      }}
+                    >
+                      {fetchingArticle ? (
+                        <><Loader2 size={16} className="content-mgmt__spinner" /> 提取中…</>
+                      ) : (
+                        <>提取文章</>
+                      )}
+                    </button>
+                  </div>
+
+                  {fetchError && (
+                    <div className="content-mgmt__error">
+                      <AlertCircle size={14} />
+                      <span>{fetchError}</span>
+                    </div>
+                  )}
+
+                  {/* 手动添加按钮 */}
+                  {!editingArticle && (
+                    <button
+                      className="content-mgmt__add-btn"
+                      style={{ marginTop: 'var(--space-md)' }}
+                      onClick={() => {
+                        setEditingArticle({
+                          id: `user-${Date.now()}`,
+                          title: '',
+                          rawTitle: '',
+                          date: new Date().toISOString().split('T')[0],
+                          author: 'RIEMer Land',
+                          category: '经验分享',
+                          tags: [],
+                          excerpt: '',
+                          url: '',
+                          content: '',
+                        });
+                        setEditingArticleId(null);
+                      }}
+                    >
+                      <Plus size={16} /> 手动添加文章
+                    </button>
+                  )}
+
+                  {/* 编辑表单（新建 / 从链接提取后编辑） */}
+                  {editingArticle && !editingArticleId && (
+                    <div className="content-mgmt__article-form">
+                      <div className="content-mgmt__article-form-header">
+                        <h4>{editingArticle.url ? '提取结果（可编辑）' : '新建文章'}</h4>
+                        <button
+                          className="content-mgmt__edit-btn"
+                          onClick={() => setEditingArticle(null)}
+                          title="取消"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+
+                      {editingArticle.rawTitle && editingArticle.rawTitle !== editingArticle.title && (
+                        <div className="content-mgmt__hint" style={{ marginBottom: 'var(--space-md)' }}>
+                          <AlertCircle size={14} />
+                          <span>原标题「{editingArticle.rawTitle}」已自动删减前缀</span>
+                        </div>
+                      )}
+
+                      <div className="content-mgmt__field">
+                        <label>标题</label>
+                        <input
+                          type="text"
+                          value={editingArticle.title}
+                          onChange={(e) => setEditingArticle({ ...editingArticle, title: e.target.value })}
+                          className="content-mgmt__input"
+                          placeholder="文章标题"
+                        />
+                      </div>
+
+                      <div className="content-mgmt__inline-group">
+                        <div className="content-mgmt__field content-mgmt__field--flex">
+                          <label><Calendar size={14} /> 发布日期</label>
+                          <input
+                            type="date"
+                            value={editingArticle.date}
+                            onChange={(e) => setEditingArticle({ ...editingArticle, date: e.target.value })}
+                            className="content-mgmt__input"
+                          />
+                        </div>
+                        <div className="content-mgmt__field content-mgmt__field--flex">
+                          <label>分类</label>
+                          <input
+                            type="text"
+                            value={editingArticle.category}
+                            onChange={(e) => setEditingArticle({ ...editingArticle, category: e.target.value })}
+                            className="content-mgmt__input"
+                            placeholder="如：听 RIEMer 说系列"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="content-mgmt__field">
+                        <label><Tag size={14} /> 标签（逗号分隔）</label>
+                        <input
+                          type="text"
+                          value={editingArticle.tags.join('、')}
+                          onChange={(e) => setEditingArticle({
+                            ...editingArticle,
+                            tags: e.target.value.split(/[,，、]/).map(t => t.trim()).filter(Boolean),
+                          })}
+                          className="content-mgmt__input"
+                          placeholder="如：保研、经验分享、学术"
+                        />
+                      </div>
+
+                      <div className="content-mgmt__field">
+                        <label>摘要（首页卡片展示）</label>
+                        <textarea
+                          value={editingArticle.excerpt}
+                          onChange={(e) => setEditingArticle({ ...editingArticle, excerpt: e.target.value })}
+                          className="content-mgmt__input content-mgmt__textarea"
+                          rows={3}
+                          placeholder="AI 自动生成的智能摘要，也可手动修改"
+                        />
+                      </div>
+
+                      {editingArticle.url && (
+                        <div className="content-mgmt__field">
+                          <label><Link2 size={14} /> 原文链接</label>
+                          <input
+                            type="text"
+                            value={editingArticle.url}
+                            onChange={(e) => setEditingArticle({ ...editingArticle, url: e.target.value })}
+                            className="content-mgmt__input"
+                            placeholder="公众号文章链接"
+                          />
+                        </div>
+                      )}
+
+                      <div className="content-mgmt__article-form-actions">
+                        <button
+                          className="btn btn-primary"
+                          disabled={!editingArticle.title.trim()}
+                          onClick={() => {
+                            addArticle(editingArticle);
+                            setEditingArticle(null);
+                            setArticleUrl('');
+                          }}
+                        >
+                          <Plus size={16} /> 添加文章
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          onClick={() => setEditingArticle(null)}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* 已添加的文章列表 */}
+                {userArticles.length > 0 && (
+                  <div className="content-mgmt__subsection">
+                    <h4 className="content-mgmt__subsection-title">
+                      已添加文章（{userArticles.length}）
+                    </h4>
+                    {userArticles.map((article) => (
+                      <div key={article.id} className="content-mgmt__card">
+                        <div className="content-mgmt__card-header">
+                          <div className="content-mgmt__article-meta">
+                            <span className="badge badge-primary">{article.category}</span>
+                            <span className="content-mgmt__article-date">{article.date}</span>
+                          </div>
+                          <div className="content-mgmt__card-header-actions">
+                            {article.url && (
+                              <a
+                                href={article.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="content-mgmt__edit-btn"
+                                title="查看原文"
+                              >
+                                <ExternalLink size={14} />
+                              </a>
+                            )}
+                            <button
+                              className="content-mgmt__edit-btn"
+                              onClick={() => {
+                                if (editingArticleId === article.id) {
+                                  setEditingArticleId(null);
+                                  setEditingArticle(null);
+                                } else {
+                                  setEditingArticleId(article.id);
+                                  setEditingArticle({ ...article });
+                                }
+                              }}
+                              title={editingArticleId === article.id ? '收起' : '编辑'}
+                            >
+                              {editingArticleId === article.id ? <X size={14} /> : <Pencil size={14} />}
+                            </button>
+                            <button
+                              className="content-mgmt__remove-btn"
+                              onClick={() => {
+                                if (window.confirm(`确定删除「${article.title}」？`)) {
+                                  deleteArticle(article.id);
+                                  if (editingArticleId === article.id) {
+                                    setEditingArticleId(null);
+                                    setEditingArticle(null);
+                                  }
+                                }
+                              }}
+                              title="删除"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {editingArticleId === article.id && editingArticle ? (
+                          <>
+                            <div className="content-mgmt__field">
+                              <label>标题</label>
+                              <input
+                                type="text"
+                                value={editingArticle.title}
+                                onChange={(e) => setEditingArticle({ ...editingArticle, title: e.target.value })}
+                                className="content-mgmt__input"
+                              />
+                            </div>
+                            <div className="content-mgmt__inline-group">
+                              <div className="content-mgmt__field content-mgmt__field--flex">
+                                <label>日期</label>
+                                <input
+                                  type="date"
+                                  value={editingArticle.date}
+                                  onChange={(e) => setEditingArticle({ ...editingArticle, date: e.target.value })}
+                                  className="content-mgmt__input"
+                                />
+                              </div>
+                              <div className="content-mgmt__field content-mgmt__field--flex">
+                                <label>分类</label>
+                                <input
+                                  type="text"
+                                  value={editingArticle.category}
+                                  onChange={(e) => setEditingArticle({ ...editingArticle, category: e.target.value })}
+                                  className="content-mgmt__input"
+                                />
+                              </div>
+                            </div>
+                            <div className="content-mgmt__field">
+                              <label>标签</label>
+                              <input
+                                type="text"
+                                value={editingArticle.tags.join('、')}
+                                onChange={(e) => setEditingArticle({
+                                  ...editingArticle,
+                                  tags: e.target.value.split(/[,，、]/).map(t => t.trim()).filter(Boolean),
+                                })}
+                                className="content-mgmt__input"
+                              />
+                            </div>
+                            <div className="content-mgmt__field">
+                              <label>摘要</label>
+                              <textarea
+                                value={editingArticle.excerpt}
+                                onChange={(e) => setEditingArticle({ ...editingArticle, excerpt: e.target.value })}
+                                className="content-mgmt__input content-mgmt__textarea"
+                                rows={3}
+                              />
+                            </div>
+                            <button
+                              className="btn btn-primary"
+                              style={{ marginTop: 'var(--space-sm)' }}
+                              onClick={() => {
+                                updateArticle(article.id, editingArticle);
+                                setEditingArticleId(null);
+                                setEditingArticle(null);
+                              }}
+                            >
+                              <Save size={14} /> 保存修改
+                            </button>
+                          </>
+                        ) : (
+                          <div className="content-mgmt__article-summary">
+                            <h5 className="content-mgmt__article-title">{article.title}</h5>
+                            <p className="content-mgmt__article-excerpt">{article.excerpt}</p>
+                            {article.tags.length > 0 && (
+                              <div className="content-mgmt__article-tags">
+                                {article.tags.map((tag) => (
+                                  <span key={tag} className="content-mgmt__article-tag">{tag}</span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
 
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
-                  <span>文章内容通过「文章」页面管理，此处仅编辑板块标题。</span>
+                  <span>添加的文章会自动展示在首页和文章列表页，无需额外点击「保存更改」。</span>
                 </div>
               </div>
             )}

@@ -1,11 +1,20 @@
+import { useMemo } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, User, Tag, Clock } from 'lucide-react';
+import { ArrowLeft, Calendar, User, Tag, Clock, ExternalLink } from 'lucide-react';
 import { articlesData } from '../../data/siteData';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import './ArticleDetail.css';
 
 export default function ArticleDetail() {
   const { id } = useParams();
-  const article = articlesData.find((a) => a.id === id);
+  const { userArticles } = useSiteContent();
+
+  const allArticles = useMemo(
+    () => [...userArticles, ...articlesData],
+    [userArticles]
+  );
+
+  const article = allArticles.find((a) => a.id === id);
 
   if (!article) {
     return <Navigate to="/articles" replace />;
@@ -36,7 +45,7 @@ export default function ArticleDetail() {
     });
   };
 
-  const relatedArticles = articlesData
+  const relatedArticles = allArticles
     .filter((a) => a.id !== id && a.category === article.category)
     .slice(0, 2);
 
@@ -60,7 +69,7 @@ export default function ArticleDetail() {
                 <Calendar size={16} /> {article.date}
               </span>
               <span className="article-detail__meta-item">
-                <Clock size={16} /> 约 {Math.ceil(article.content.length / 500)} 分钟阅读
+                <Clock size={16} /> 约 {Math.ceil((article.content || '').length / 500)} 分钟阅读
               </span>
             </div>
             <div className="article-detail__tags">
@@ -70,10 +79,23 @@ export default function ArticleDetail() {
                 </span>
               ))}
             </div>
+            {article.url && (
+              <a
+                href={article.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="article-detail__original-link"
+              >
+                <ExternalLink size={14} />
+                阅读公众号原文
+              </a>
+            )}
           </header>
 
           <div className="article-detail__content">
-            {renderContent(article.content)}
+            {article.content ? renderContent(article.content) : (
+              <p className="article-detail__paragraph">{article.excerpt}</p>
+            )}
           </div>
         </article>
 

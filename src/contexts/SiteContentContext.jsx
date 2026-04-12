@@ -5,6 +5,7 @@ const SiteContentContext = createContext(null);
 
 const CONTENT_KEY = 'riemer_site_content';
 const FILTERS_KEY = 'riemer_filter_options';
+const ARTICLES_KEY = 'riemer_user_articles';
 
 // 可编辑的内容字段及其默认值
 const getDefaultContent = () => ({
@@ -69,6 +70,19 @@ export function SiteContentProvider({ children }) {
     return getDefaultFilters();
   });
 
+  // 用户添加的文章
+  const [userArticles, setUserArticles] = useState(() => {
+    const stored = localStorage.getItem(ARTICLES_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  });
+
   useEffect(() => {
     localStorage.setItem(CONTENT_KEY, JSON.stringify(content));
   }, [content]);
@@ -76,6 +90,10 @@ export function SiteContentProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(FILTERS_KEY, JSON.stringify(filterOptions));
   }, [filterOptions]);
+
+  useEffect(() => {
+    localStorage.setItem(ARTICLES_KEY, JSON.stringify(userArticles));
+  }, [userArticles]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));
@@ -97,10 +115,26 @@ export function SiteContentProvider({ children }) {
     localStorage.setItem(FILTERS_KEY, JSON.stringify(defaults));
   };
 
+  // 文章管理 CRUD
+  const addArticle = (article) => {
+    setUserArticles((prev) => [article, ...prev]);
+  };
+
+  const updateArticle = (id, updates) => {
+    setUserArticles((prev) =>
+      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+    );
+  };
+
+  const deleteArticle = (id) => {
+    setUserArticles((prev) => prev.filter((a) => a.id !== id));
+  };
+
   return (
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
       filterOptions, updateFilterOptions, resetFilterOptions,
+      userArticles, addArticle, updateArticle, deleteArticle,
     }}>
       {children}
     </SiteContentContext.Provider>

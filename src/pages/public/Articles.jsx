@@ -9,6 +9,7 @@ import {
   Calendar,
 } from 'lucide-react';
 import { articlesData } from '../../data/siteData';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import ArticleChat from '../../components/ArticleChat';
 import './Articles.css';
@@ -16,14 +17,21 @@ import './Articles.css';
 export default function Articles() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
+  const { userArticles } = useSiteContent();
+
+  // 合并所有文章，按日期降序
+  const allArticles = useMemo(
+    () => [...userArticles, ...articlesData].sort((a, b) => b.date.localeCompare(a.date)),
+    [userArticles]
+  );
 
   const categories = useMemo(() => {
-    const cats = [...new Set(articlesData.map((a) => a.category))];
+    const cats = [...new Set(allArticles.map((a) => a.category))];
     return ['全部', ...cats];
-  }, []);
+  }, [allArticles]);
 
   const filtered = useMemo(() => {
-    return articlesData.filter((article) => {
+    return allArticles.filter((article) => {
       const matchesSearch =
         !searchTerm ||
         pinyinMatch(article.title, searchTerm) ||

@@ -10,9 +10,13 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import './Home.css';
 
 export default function Home() {
-  const recentArticles = articlesData.slice(0, 4);
+  const { content, userArticles } = useSiteContent();
+
+  // 合并硬编码文章和用户添加的文章，按日期降序排列
+  const allArticles = [...userArticles, ...articlesData]
+    .sort((a, b) => b.date.localeCompare(a.date));
+  const recentArticles = allArticles.slice(0, 4);
   const recentEvents = eventsData.slice(0, 4);
-  const { content } = useSiteContent();
 
   return (
     <div className="home">
