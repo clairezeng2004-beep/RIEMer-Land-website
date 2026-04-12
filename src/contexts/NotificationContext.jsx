@@ -58,7 +58,7 @@ export function NotificationProvider({ children }) {
 
   // 未读消息数同步到网页标题
   useEffect(() => {
-    const baseTitle = 'RIEMer Land — 研究与交流社';
+    const baseTitle = 'RIEMer Land';
     document.title = unreadCount > 0 ? `(${unreadCount}) ${baseTitle}` : baseTitle;
   }, [unreadCount]);
 
