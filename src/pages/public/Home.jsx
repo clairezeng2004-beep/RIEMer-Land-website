@@ -23,7 +23,7 @@ export default function Home() {
   // 合并硬编码文章和用户添加的文章，按日期降序排列
   const allArticles = [...userArticles, ...articlesData]
     .sort((a, b) => b.date.localeCompare(a.date));
-  const recentArticles = allArticles.slice(0, 4);
+  const recentArticles = allArticles.slice(0, 6);
   const recentEvents = eventsData.slice(0, 4);
 
   return (
