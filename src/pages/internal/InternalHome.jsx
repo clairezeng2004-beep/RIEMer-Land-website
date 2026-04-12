@@ -2,6 +2,7 @@ import { useMemo, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import {
   ArrowRight,
   Camera,
@@ -39,6 +40,8 @@ const ROLE_LABELS = { admin: '管理员', member: '成员' };
 export default function InternalHome() {
   const { user, isAuthenticated, isAdmin, updateProfile } = useAuth();
   const { notifications, unreadCount } = useNotifications();
+  const { internalConfig } = useSiteContent();
+  const hc = internalConfig.home;
   const navigate = useNavigate();
   const avatarInputRef = useRef(null);
 
@@ -120,37 +123,37 @@ export default function InternalHome() {
 
   const modules = [
     {
-      name: '消息通知',
-      desc: '查看团队通知、系统提醒和重要消息',
+      name: hc.moduleNotifications,
+      desc: hc.moduleNotificationsDesc,
       path: '/internal/notifications',
       badge: unreadCount > 0 ? unreadCount : null,
     },
     {
-      name: '文档管理',
-      desc: '上传、查看和管理团队内部文档资料',
+      name: hc.moduleDocuments,
+      desc: hc.moduleDocumentsDesc,
       path: '/internal/documents',
     },
     {
-      name: '事项追踪',
-      desc: '跟踪待办事项、分配任务和查看进度',
+      name: hc.moduleTasks,
+      desc: hc.moduleTasksDesc,
       path: '/internal/tasks',
     },
     {
-      name: '成员相册',
-      desc: '浏览和上传活动照片，记录每次相聚的美好瞬间',
+      name: hc.moduleGallery,
+      desc: hc.moduleGalleryDesc,
       path: '/internal/gallery',
     },
     ...(isAdmin
       ? [
           {
-            name: '用户管理',
-            desc: '管理成员账号、授权与角色分配',
+            name: hc.moduleUsers,
+            desc: hc.moduleUsersDesc,
             path: '/internal/users',
             adminOnly: true,
           },
           {
-            name: '内容管理',
-            desc: '编辑网站首页、时间线等公开内容',
+            name: hc.moduleContent,
+            desc: hc.moduleContentDesc,
             path: '/internal/content',
             adminOnly: true,
           },
@@ -165,10 +168,10 @@ export default function InternalHome() {
         <div className="internal-home__welcome">
           <div className="internal-home__welcome-card">
             <h1 className="internal-home__greeting">
-              RIEMer Land
+              {hc.greeting}
             </h1>
             <p className="internal-home__welcome-sub">
-              {getGreeting()}，{displayName}。欢迎回到内部空间 ✨
+              {getGreeting()}，{displayName}。{hc.welcomeSuffix}
             </p>
             <div className="internal-home__welcome-meta">
               <span className="internal-home__welcome-meta-item">
@@ -301,7 +304,7 @@ export default function InternalHome() {
 
         {/* 功能模块 */}
         <h2 className="internal-home__section-title">
-          功能模块
+          {hc.sectionModules}
         </h2>
         <div className="internal-home__modules">
           {modules.map((mod) => {
@@ -334,7 +337,7 @@ export default function InternalHome() {
         {/* 最近消息 */}
         <div className="internal-home__recent">
           <h2 className="internal-home__section-title">
-            最近消息
+            {hc.sectionRecentMessages}
           </h2>
           <div className="internal-home__recent-list">
             {recentNotifications.length > 0 ? (
@@ -371,10 +374,10 @@ export default function InternalHome() {
         {/* 小提示 */}
         <div className="internal-home__tips">
           <div className="internal-home__tips-title">
-            💡 小贴士
+            {hc.tipTitle}
           </div>
           <div className="internal-home__tips-content">
-            你可以通过顶部导航栏的「内部空间」随时回到这里。有新的消息或待办事项时，导航栏会显示提醒标记。
+            {hc.tipContent}
           </div>
         </div>
       </div>

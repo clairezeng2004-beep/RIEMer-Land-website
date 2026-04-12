@@ -1,6 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
+import { useSiteContent } from '../contexts/SiteContentContext';
 import {
   Home,
   Bell,
@@ -15,30 +16,32 @@ import './InternalSidebar.css';
 export default function InternalSidebar() {
   const { isAdmin } = useAuth();
   const { unreadCount } = useNotifications();
+  const { internalConfig } = useSiteContent();
+  const sc = internalConfig.sidebar;
 
   const navItems = [
-    { to: '/internal', icon: Home, label: '首页', end: true },
+    { to: '/internal', icon: Home, label: sc.labelHome, end: true },
     {
       to: '/internal/notifications',
       icon: Bell,
-      label: '消息通知',
+      label: sc.labelNotifications,
       badge: unreadCount > 0 ? unreadCount : null,
     },
-    { to: '/internal/documents', icon: FileText, label: '文档管理' },
-    { to: '/internal/tasks', icon: CheckSquare, label: '事项追踪' },
-    { to: '/internal/gallery', icon: Camera, label: '成员相册' },
+    { to: '/internal/documents', icon: FileText, label: sc.labelDocuments },
+    { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
+    { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
   ];
 
   // 管理员专属菜单项
   const adminItems = [
-    { to: '/internal/users', icon: Users, label: '用户管理' },
-    { to: '/internal/content', icon: Settings, label: '内容管理' },
+    { to: '/internal/users', icon: Users, label: sc.labelUsers },
+    { to: '/internal/content', icon: Settings, label: sc.labelContent },
   ];
 
   return (
     <aside className="internal-sidebar">
       <div className="internal-sidebar__section">
-        <div className="internal-sidebar__section-label">导航</div>
+        <div className="internal-sidebar__section-label">{sc.sectionLabelNav}</div>
         {navItems.map((item) => (
           <NavLink
             key={item.to}
@@ -59,7 +62,7 @@ export default function InternalSidebar() {
 
       {isAdmin && (
         <div className="internal-sidebar__section">
-          <div className="internal-sidebar__section-label">管理</div>
+          <div className="internal-sidebar__section-label">{sc.sectionLabelAdmin}</div>
           {adminItems.map((item) => (
             <NavLink
               key={item.to}

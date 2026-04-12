@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import {
   Users,
   Shield,
@@ -29,6 +30,8 @@ export default function UserManagement() {
     revokeUser,
     changeUserRole,
   } = useAuth();
+  const { internalConfig } = useSiteContent();
+  const uc = internalConfig.users;
   const [users, setUsers] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -89,9 +92,9 @@ export default function UserManagement() {
       <div className="container">
         <div className="users-page__header">
           <h1>
-            <Users size={28} /> 用户管理
+            <Users size={28} /> {uc.pageTitle}
           </h1>
-          <p>管理成员账户、访问权限和角色分配</p>
+          <p>{uc.pageDesc}</p>
         </div>
 
         {/* Stats */}

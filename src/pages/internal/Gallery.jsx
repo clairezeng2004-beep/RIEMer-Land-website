@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import {
   Camera,
   Plus,
@@ -71,6 +72,8 @@ const initialAlbums = [
 
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
+  const { internalConfig } = useSiteContent();
+  const gc = internalConfig.gallery;
   const [albums, setAlbums] = useState(initialAlbums);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -228,16 +231,16 @@ export default function Gallery() {
           <div className="gallery-page__header">
             <div>
               <h1>
-                <Camera size={28} /> 成员相册
+                <Camera size={28} /> {gc.pageTitle}
               </h1>
-              <p>记录每一次相聚的美好瞬间</p>
+              <p>{gc.pageDesc}</p>
             </div>
             <button
               className="btn btn-primary"
               onClick={() => setShowCreateAlbum(!showCreateAlbum)}
             >
               {showCreateAlbum ? <X size={18} /> : <FolderPlus size={18} />}
-              {showCreateAlbum ? '取消' : '新建相册'}
+              {showCreateAlbum ? '取消' : gc.newAlbumBtn}
             </button>
           </div>
 

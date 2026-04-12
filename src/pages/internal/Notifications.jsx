@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import {
   Bell,
   BellOff,
@@ -32,6 +33,8 @@ export default function Notifications() {
     deleteNotification,
     emailReminderSent,
   } = useNotifications();
+  const { internalConfig } = useSiteContent();
+  const nc = internalConfig.notifications;
   const [filter, setFilter] = useState('全部'); // 全部 | 未读 | 已读
 
   if (!isAuthenticated) {
@@ -50,7 +53,7 @@ export default function Notifications() {
         <div className="notifications-page__header">
           <div>
             <h1>
-              <Bell size={28} /> 消息通知
+              <Bell size={28} /> {nc.pageTitle}
             </h1>
             <p>
               {unreadCount > 0
@@ -60,7 +63,7 @@ export default function Notifications() {
           </div>
           {unreadCount > 0 && (
             <button className="btn btn-ghost" onClick={markAllAsRead}>
-              <CheckCheck size={16} /> 全部已读
+              <CheckCheck size={16} /> {nc.markAllReadBtn}
             </button>
           )}
         </div>

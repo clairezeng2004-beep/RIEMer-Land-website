@@ -32,7 +32,8 @@ const statusColors = {
 
 export default function Tasks() {
   const { isAuthenticated, user } = useAuth();
-  const { filterOptions } = useSiteContent();
+  const { filterOptions, internalConfig } = useSiteContent();
+  const tc = internalConfig.tasks;
 
   // 从 context 读取筛选选项
   const taskCategories = filterOptions.taskCategories;
@@ -137,16 +138,16 @@ export default function Tasks() {
         <div className="tasks-page__header">
           <div>
             <h1>
-              <CheckSquare size={28} /> 事项追踪
+              <CheckSquare size={28} /> {tc.pageTitle}
             </h1>
-            <p>管理和追踪社团各项工作任务的进展</p>
+            <p>{tc.pageDesc}</p>
           </div>
           <button
             className="btn btn-primary"
             onClick={() => setShowForm(!showForm)}
           >
             {showForm ? <X size={18} /> : <Plus size={18} />}
-            {showForm ? '取消' : '新建事项'}
+            {showForm ? '取消' : tc.newTaskBtn}
           </button>
         </div>
 

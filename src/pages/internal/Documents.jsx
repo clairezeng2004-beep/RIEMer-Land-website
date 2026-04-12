@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import './Documents.css';
 
@@ -73,6 +74,8 @@ function inferFileType(fileName) {
 
 export default function Documents() {
   const { isAuthenticated, isAdmin, user } = useAuth();
+  const { internalConfig } = useSiteContent();
+  const dc = internalConfig.documents;
   const [documents, setDocuments] = useState(documentsData);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
@@ -262,16 +265,16 @@ export default function Documents() {
         <div className="documents-page__header">
           <div>
             <h1>
-              <FolderOpen size={28} /> 文档管理
+              <FolderOpen size={28} /> {dc.pageTitle}
             </h1>
-            <p>管理和浏览社团内部文档与资料</p>
+            <p>{dc.pageDesc}</p>
           </div>
           <button
             className="btn btn-primary"
             onClick={() => setShowUpload(!showUpload)}
           >
             {showUpload ? <X size={18} /> : <Plus size={18} />}
-            {showUpload ? '取消' : '上传文档'}
+            {showUpload ? '取消' : dc.uploadBtn}
           </button>
         </div>
 
