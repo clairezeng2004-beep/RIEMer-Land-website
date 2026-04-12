@@ -21,6 +21,7 @@ import {
   User,
   HardDrive,
   BarChart3,
+  ThumbsUp,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
@@ -169,6 +170,64 @@ export default function Documents() {
     // 兼容旧数据：对比上传者名称
     if (doc.uploadedBy && doc.uploadedBy === user?.name) return true;
     return false;
+  };
+
+  // 根据用户名生成稳定的头像背景色
+  const getAvatarColor = (name) => {
+    const colors = [
+      '#5B8C3E', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899',
+      '#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#6366F1',
+    ];
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = name.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    return colors[Math.abs(hash) % colors.length];
+  };
+
+  // 获取名字的首字符（中文取第一个字，英文取首字母大写）
+  const getInitial = (name) => {
+    if (!name) return '?';
+    return name.charAt(0).toUpperCase();
+  };
+
+  // 点赞/取消点赞
+  const handleLike = (docId, e) => {
+    if (e) e.stopPropagation();
+    if (!user) return;
+    setDocuments((prev) =>
+      prev.map((d) => {
+        if (d.id !== docId) return d;
+        const likes = d.likes || [];
+        const alreadyLiked = likes.some((l) => l.userId === user.id);
+        return {
+          ...d,
+          likes: alreadyLiked
+            ? likes.filter((l) => l.userId !== user.id)
+            : [...likes, { userId: user.id, userName: user.name || user.email }],
+        };
+      })
+    );
+    // 同步更新 previewDoc
+    if (previewDoc && previewDoc.id === docId) {
+      setPreviewDoc((prev) => {
+        if (!prev) return prev;
+        const likes = prev.likes || [];
+        const alreadyLiked = likes.some((l) => l.userId === user.id);
+        return {
+          ...prev,
+          likes: alreadyLiked
+            ? likes.filter((l) => l.userId !== user.id)
+            : [...likes, { userId: user.id, userName: user.name || user.email }],
+        };
+      });
+    }
+  };
+
+  // 检查当前用户是否已点赞
+  const hasLiked = (doc) => {
+    if (!user || !doc.likes) return false;
+    return doc.likes.some((l) => l.userId === user.id);
   };
 
   const openPreview = (doc) => {
@@ -370,6 +429,37 @@ export default function Documents() {
                 </div>
               </div>
 
+              {/* 点赞区域 */}
+              <div className="doc-card__likes" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className={`doc-card__like-btn ${hasLiked(doc) ? 'doc-card__like-btn--active' : ''}`}
+                  onClick={(e) => handleLike(doc.id, e)}
+                  title={hasLiked(doc) ? '取消点赞' : '点赞'}
+                >
+                  <ThumbsUp size={14} />
+                  <span>{(doc.likes || []).length}</span>
+                </button>
+                {(doc.likes || []).length > 0 && (
+                  <div className="doc-card__like-avatars">
+                    {(doc.likes || []).slice(0, 5).map((like) => (
+                      <div
+                        key={like.userId}
+                        className="doc-card__like-avatar"
+                        style={{ background: getAvatarColor(like.userName) }}
+                        title={like.userName}
+                      >
+                        {getInitial(like.userName)}
+                      </div>
+                    ))}
+                    {(doc.likes || []).length > 5 && (
+                      <div className="doc-card__like-avatar doc-card__like-avatar--more">
+                        +{(doc.likes || []).length - 5}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
               {/* 操作栏 - 点击阅读为主，下载弱化 */}
               <div className="doc-card__actions">
                 <button
@@ -504,6 +594,36 @@ export default function Documents() {
                       <Download size={16} /> 下载文件
                     </button>
                   )}
+                </div>
+              )}
+            </div>
+
+            {/* 预览弹窗底部点赞栏 */}
+            <div className="doc-preview__footer">
+              <button
+                className={`doc-preview__like-btn ${hasLiked(previewDoc) ? 'doc-preview__like-btn--active' : ''}`}
+                onClick={() => handleLike(previewDoc.id)}
+              >
+                <ThumbsUp size={16} />
+                <span>{hasLiked(previewDoc) ? '已赞' : '点赞'}</span>
+              </button>
+              {(previewDoc.likes || []).length > 0 && (
+                <div className="doc-preview__like-users">
+                  <div className="doc-preview__like-avatars">
+                    {(previewDoc.likes || []).map((like) => (
+                      <div
+                        key={like.userId}
+                        className="doc-preview__like-avatar"
+                        style={{ background: getAvatarColor(like.userName) }}
+                        title={like.userName}
+                      >
+                        {getInitial(like.userName)}
+                      </div>
+                    ))}
+                  </div>
+                  <span className="doc-preview__like-count">
+                    {(previewDoc.likes || []).length} 人觉得有用
+                  </span>
                 </div>
               )}
             </div>

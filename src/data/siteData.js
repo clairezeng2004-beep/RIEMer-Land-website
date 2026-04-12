@@ -592,6 +592,10 @@ export const documentsData = [
     description: '2025 年度 RIEMer Land 内容规划与活动安排。',
     size: '1.5 MB',
     viewCount: 12,
+    likes: [
+      { userId: 'member-1', userName: '陈思雨' },
+      { userId: 'member-2', userName: '林子墨' },
+    ],
   },
   {
     id: '2',
@@ -604,6 +608,9 @@ export const documentsData = [
     description: '访谈系列的策划流程、采访提纲模板和发布规范。',
     size: '800 KB',
     viewCount: 24,
+    likes: [
+      { userId: 'member-3', userName: '周悦然' },
+    ],
   },
   {
     id: '3',
@@ -616,6 +623,7 @@ export const documentsData = [
     description: '分享会从策划到执行的标准操作流程。',
     size: '1.1 MB',
     viewCount: 18,
+    likes: [],
   },
   {
     id: '4',
@@ -628,6 +636,11 @@ export const documentsData = [
     description: '面向全院同学征集课程测评的问卷模板与整理规范。',
     size: '600 KB',
     viewCount: 8,
+    likes: [
+      { userId: 'member-1', userName: '陈思雨' },
+      { userId: 'member-2', userName: '林子墨' },
+      { userId: 'member-3', userName: '周悦然' },
+    ],
   },
   {
     id: '5',
@@ -640,6 +653,7 @@ export const documentsData = [
     description: '新学期主理团队的招新宣传方案与面试流程。',
     size: '900 KB',
     viewCount: 15,
+    likes: [],
   },
 ];
 
