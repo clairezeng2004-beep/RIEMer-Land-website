@@ -35,6 +35,8 @@
   position: relative;
   padding-top: var(--space-xl);
   padding-bottom: var(--space-lg);
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 /* 左右箭头 */

@@ -45,6 +45,8 @@ export default function Timeline() {
     setIsDragging(true);
     dragState.current = { startX: e.pageX - el.offsetLeft, scrollLeft: el.scrollLeft };
     el.style.cursor = 'grabbing';
+    document.body.style.userSelect = 'none';
+    document.body.style.webkitUserSelect = 'none';
   };
 
   const handleMouseMove = (e) => {
@@ -59,6 +61,8 @@ export default function Timeline() {
   const handleMouseUp = () => {
     setIsDragging(false);
     if (trackRef.current) trackRef.current.style.cursor = 'grab';
+    document.body.style.userSelect = '';
+    document.body.style.webkitUserSelect = '';
   };
 
   // 滚轮横向滚动 — 仅在明确的水平滚动意图时才拦截
