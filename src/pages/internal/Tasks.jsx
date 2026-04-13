@@ -252,7 +252,7 @@ export default function Tasks() {
         <div className="tasks-filters">
           <div className="tasks-filters__group">
             <span className="tasks-filters__label">状态：</span>
-            {['全部', ...taskStatuses].map((s) => (
+            {['全部', ...taskStatuses.filter((s) => tasks.some((t) => t.status === s))].map((s) => (
               <button
                 key={s}
                 className={`tasks-filters__btn ${filterStatus === s ? 'tasks-filters__btn--active' : ''}`}
@@ -324,7 +324,7 @@ export default function Tasks() {
                 <th>分类</th>
                 <th>标题</th>
                 <th>负责人</th>
-                <th>协助者</th>
+                <th>协助人</th>
                 <th>操作</th>
               </tr>
             </thead>

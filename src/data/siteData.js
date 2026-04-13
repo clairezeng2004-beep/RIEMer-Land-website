@@ -738,7 +738,7 @@ export const documentsData = [
 export const taskCategories = ['线上分享', '课程测评', '公众号文章', '其他'];
 export const taskStatuses = ['规划中', '进行中', '已完成', '已取消'];
 
-// 成员数据（用于负责人 / 协助者选择）
+// 成员数据（用于负责人 / 协助人选择）
 export const teamMembers = [
   { id: 'member-1', name: '陈思雨', role: '主理人', avatar: avatarUrl('陈思雨'), profileUrl: '/timeline#team' },
   { id: 'member-2', name: '林子墨', role: '内容策划', avatar: avatarUrl('林子墨'), profileUrl: '/timeline#team' },
