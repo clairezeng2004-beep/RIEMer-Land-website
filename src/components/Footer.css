@@ -254,6 +254,8 @@
   .footer__grid > .footer__nav:nth-child(2) {
     flex-direction: column;
     align-items: center;
+    padding-top: 0;
+    border-bottom: none;
   }
 
   .footer__grid > .footer__nav:nth-child(2) .footer__nav-title {
