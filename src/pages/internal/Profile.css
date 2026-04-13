@@ -117,7 +117,8 @@
 .profile-page__display-signature {
   color: var(--color-text-light);
   font-size: var(--text-sm);
-  font-style: italic;
+  font-style: oblique 12deg;
+  font-family: 'Lora', 'LXGW WenKai', serif;
   line-height: 1.6;
 }
 
