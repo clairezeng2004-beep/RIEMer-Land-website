@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { fetchAndParseArticle, cleanTitle, generateSummary, inferCategory, inferTags } from '../../services/articleService';
@@ -27,6 +28,7 @@ import {
   Calendar,
   LayoutGrid,
   User,
+  Users,
   Clock,
   Video,
   Lock,
@@ -36,11 +38,12 @@ import {
   Star,
   ArrowUp,
   ArrowDown,
+  RefreshCw,
 } from 'lucide-react';
 import './ContentManagement.css';
 
 export default function ContentManagement() {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, isAdmin, getAllUsers } = useAuth();
   const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline } = useSiteContent();
   const { addNotification } = useNotifications();
 
@@ -64,6 +67,78 @@ export default function ContentManagement() {
   // 活动管理状态
   const [editingEvent, setEditingEvent] = useState(null); // 新建/编辑中的活动
   const [editingEventId, setEditingEventId] = useState(null); // 正在编辑的已有活动 ID
+
+  // 已授权成员数据（关于我们TAB展示）
+  const [authorizedMembers, setAuthorizedMembers] = useState([]);
+  const [loadingMembers, setLoadingMembers] = useState(false);
+
+  const loadAuthorizedMembers = useCallback(async () => {
+    setLoadingMembers(true);
+    try {
+      if (isSupabaseConfigured) {
+        // Supabase 模式：获取已授权成员 + member_profiles 入学年份
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, name, nickname, avatar, signature, authorized')
+          .eq('authorized', true);
+
+        const { data: memberProfiles } = await supabase
+          .from('member_profiles')
+          .select('user_id, enrollment_year');
+
+        if (profiles) {
+          const enrollmentMap = {};
+          (memberProfiles || []).forEach((mp) => {
+            enrollmentMap[mp.user_id] = mp.enrollment_year;
+          });
+
+          setAuthorizedMembers(
+            profiles.map((p) => ({
+              id: p.id,
+              name: p.name || '',
+              nickname: p.nickname || '',
+              avatar: p.avatar || null,
+              signature: p.signature || '',
+              enrollment_year: enrollmentMap[p.id] || '',
+            }))
+          );
+          return;
+        }
+      }
+      // 本地模式
+      const allUsers = await getAllUsers();
+      const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
+      const profilesRaw = localStorage.getItem(MEMBER_PROFILES_KEY);
+      const localProfiles = profilesRaw ? JSON.parse(profilesRaw) : [];
+      const enrollmentMap = {};
+      localProfiles.forEach((p) => {
+        enrollmentMap[p.user_id] = p.enrollment_year;
+      });
+
+      const authorized = allUsers.filter((u) => u.authorized);
+      setAuthorizedMembers(
+        authorized.map((u) => ({
+          id: u.id,
+          name: u.name || '',
+          nickname: u.nickname || '',
+          avatar: u.avatar || null,
+          signature: u.signature || '',
+          enrollment_year: enrollmentMap[u.id] || '',
+        }))
+      );
+    } catch (err) {
+      console.error('[ContentManagement] 加载成员失败:', err);
+    } finally {
+      setLoadingMembers(false);
+    }
+  }, [getAllUsers]);
+
+  // 当切换到 timeline tab 时自动加载成员
+  useEffect(() => {
+    if (activeTab === 'timeline') {
+      loadAuthorizedMembers();
+    }
+  }, [activeTab, loadAuthorizedMembers]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -1304,6 +1379,96 @@ export default function ContentManagement() {
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
                   <span>时间轴节点的修改会即时生效，无需额外点击「保存更改」。可通过上下箭头调整节点顺序。</span>
+                </div>
+
+                {/* 已授权成员信息（自动同步） */}
+                <div style={{ marginTop: 'var(--space-2xl)', borderTop: '1px solid var(--border)', paddingTop: 'var(--space-xl)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
+                    <h3 className="content-mgmt__section-title" style={{ margin: 0 }}>
+                      <Users size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />
+                      已授权成员（自动同步）
+                    </h3>
+                    <button
+                      className="content-mgmt__edit-btn"
+                      onClick={loadAuthorizedMembers}
+                      disabled={loadingMembers}
+                      title="刷新成员列表"
+                      style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '6px 12px', fontSize: '13px' }}
+                    >
+                      <RefreshCw size={14} className={loadingMembers ? 'content-mgmt__spinner' : ''} />
+                      刷新
+                    </button>
+                  </div>
+                  <p className="content-mgmt__section-desc">
+                    以下成员信息将展示在「关于我们」页面底部，数据自动同步自已授权成员的个人主页。成员可在「个人主页」中修改昵称、头像和签名。
+                  </p>
+
+                  {loadingMembers ? (
+                    <div className="content-mgmt__hint">
+                      <Loader2 size={16} className="content-mgmt__spinner" />
+                      <span>加载中...</span>
+                    </div>
+                  ) : authorizedMembers.length > 0 ? (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 'var(--space-md)' }}>
+                      {authorizedMembers.map((member) => (
+                        <div
+                          key={member.id}
+                          className="content-mgmt__card"
+                          style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-md)', padding: 'var(--space-md)' }}
+                        >
+                          <div style={{
+                            width: 48,
+                            height: 48,
+                            borderRadius: '50%',
+                            overflow: 'hidden',
+                            flexShrink: 0,
+                            background: 'var(--bg-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}>
+                            {member.avatar ? (
+                              <img
+                                src={member.avatar}
+                                alt={member.nickname || member.name}
+                                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                              />
+                            ) : (
+                              <User size={24} style={{ color: 'var(--text-tertiary)' }} />
+                            )}
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontWeight: 600, fontSize: '14px', color: 'var(--text-primary)' }}>
+                              {member.nickname || member.name || '未设置昵称'}
+                              {member.enrollment_year && (
+                                <span style={{ fontWeight: 400, fontSize: '12px', color: 'var(--text-tertiary)', marginLeft: 6 }}>
+                                  {member.enrollment_year}级
+                                </span>
+                              )}
+                            </div>
+                            <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginTop: 2 }}>
+                              姓名：{member.name || '—'}
+                            </div>
+                            {member.signature && (
+                              <div style={{ fontSize: '12px', color: 'var(--text-tertiary)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {member.signature}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="content-mgmt__hint">
+                      <Users size={16} />
+                      <span>暂无已授权成员。请在「用户管理」中授权成员后，此处将自动同步。</span>
+                    </div>
+                  )}
+
+                  <div className="content-mgmt__hint" style={{ marginTop: 'var(--space-md)' }}>
+                    <AlertCircle size={16} />
+                    <span>成员信息从用户的「个人主页」自动同步，无需手动编辑。如需修改展示内容，请通知成员在个人主页中更新。</span>
+                  </div>
                 </div>
               </div>
             )}
