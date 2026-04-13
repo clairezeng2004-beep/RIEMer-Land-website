@@ -148,9 +148,9 @@ const getDefaultInternalConfig = () => ({
     pageDesc: '管理和追踪社团各项工作任务的进展',
     newTaskBtn: '新建事项',
   },
-  // 成员相册页
+  // 活动相册页
   gallery: {
-    pageTitle: '成员相册',
+    pageTitle: '活动相册',
     pageDesc: '记录每一次相聚的美好瞬间',
     newAlbumBtn: '新建相册',
   },
