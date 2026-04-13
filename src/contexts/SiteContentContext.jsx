@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers } from '../data/siteData';
+import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData } from '../data/siteData';
 
 const SiteContentContext = createContext(null);
 
@@ -8,6 +8,7 @@ const FILTERS_KEY = 'riemer_filter_options';
 const ARTICLES_KEY = 'riemer_user_articles';
 const INTERNAL_CONFIG_KEY = 'riemer_internal_config';
 const SUGGESTIONS_KEY = 'riemer_site_suggestions';
+const EVENTS_KEY = 'riemer_site_events';
 
 // 网站建设建议初始模拟数据
 const getDefaultSuggestions = () => [
@@ -247,6 +248,19 @@ export function SiteContentProvider({ children }) {
     return getDefaultSuggestions();
   });
 
+  // 活动管理
+  const [events, setEvents] = useState(() => {
+    const stored = localStorage.getItem(EVENTS_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return [...defaultEventsData];
+      }
+    }
+    return [...defaultEventsData];
+  });
+
   useEffect(() => {
     localStorage.setItem(CONTENT_KEY, JSON.stringify(content));
   }, [content]);
@@ -266,6 +280,10 @@ export function SiteContentProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions));
   }, [suggestions]);
+
+  useEffect(() => {
+    localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
+  }, [events]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));
@@ -334,6 +352,21 @@ export function SiteContentProvider({ children }) {
     setSuggestions((prev) => prev.filter((s) => s.id !== id));
   };
 
+  // 活动管理 CRUD
+  const addEvent = (event) => {
+    setEvents((prev) => [event, ...prev]);
+  };
+
+  const updateEvent = (id, updates) => {
+    setEvents((prev) =>
+      prev.map((e) => (e.id === id ? { ...e, ...updates } : e))
+    );
+  };
+
+  const deleteEvent = (id) => {
+    setEvents((prev) => prev.filter((e) => e.id !== id));
+  };
+
   return (
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
@@ -341,6 +374,7 @@ export function SiteContentProvider({ children }) {
       userArticles, addArticle, updateArticle, deleteArticle,
       internalConfig, updateInternalConfig, resetInternalConfig,
       suggestions, addSuggestion, updateSuggestion, deleteSuggestion,
+      events, addEvent, updateEvent, deleteEvent,
     }}>
       {children}
     </SiteContentContext.Provider>

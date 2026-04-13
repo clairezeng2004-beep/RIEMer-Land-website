@@ -247,6 +247,203 @@
   padding-top: var(--space-lg);
 }
 
+/* ============ Event Card — Clickable & Replay ============ */
+.featured__card--clickable {
+  cursor: pointer;
+}
+
+.featured__card--clickable:hover {
+  border-color: var(--color-primary);
+}
+
+.featured__replay-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 0.1rem 0.5rem;
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  background: rgba(139, 92, 246, 0.1);
+  color: #8B5CF6;
+  margin-left: auto;
+}
+
+.featured__meta-item--replay {
+  color: #8B5CF6 !important;
+  font-weight: 500;
+}
+
+/* ============ Replay Password Modal ============ */
+.replay-modal__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-lg);
+  animation: replayFadeIn 0.2s ease;
+}
+
+@keyframes replayFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.replay-modal {
+  position: relative;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  padding: var(--space-2xl) var(--space-xl);
+  max-width: 420px;
+  width: 100%;
+  text-align: center;
+  animation: replaySlideUp 0.25s ease;
+}
+
+@keyframes replaySlideUp {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.replay-modal__close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s;
+}
+
+.replay-modal__close:hover {
+  color: var(--color-text);
+  background: var(--color-bg-alt, #f0f0f0);
+}
+
+.replay-modal__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.1);
+  color: #8B5CF6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-lg);
+}
+
+.replay-modal__title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  margin-bottom: var(--space-xs);
+}
+
+.replay-modal__event-name {
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  font-weight: 600;
+  margin-bottom: var(--space-sm);
+}
+
+.replay-modal__desc {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  margin-bottom: var(--space-xl);
+}
+
+.replay-modal__input-group {
+  margin-bottom: var(--space-lg);
+}
+
+.replay-modal__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.replay-modal__input-icon {
+  position: absolute;
+  left: 12px;
+  color: var(--color-text-muted);
+  pointer-events: none;
+}
+
+.replay-modal__input {
+  width: 100%;
+  padding: 10px 40px 10px 36px;
+  border: 1.5px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  font-size: var(--text-base);
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.2s;
+  outline: none;
+}
+
+.replay-modal__input:focus {
+  border-color: #8B5CF6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+}
+
+.replay-modal__input--error {
+  border-color: #ef4444;
+}
+
+.replay-modal__input--error:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1);
+}
+
+.replay-modal__eye-btn {
+  position: absolute;
+  right: 8px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.replay-modal__eye-btn:hover {
+  color: var(--color-text);
+}
+
+.replay-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: var(--space-xs);
+  color: #ef4444;
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.replay-modal__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.replay-modal__submit {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+}
+
 /* ============ Responsive ============ */
 @media (max-width: 1200px) {
   .featured__grid { grid-template-columns: repeat(2, 1fr); }

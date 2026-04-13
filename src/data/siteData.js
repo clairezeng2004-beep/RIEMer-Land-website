@@ -132,6 +132,9 @@ export const eventsData = [
     leaderId: 'member-4',
     excerpt:
       '第十期分享会聚焦快消行业，邀请学长学姐分享求职经验与职业选择心得，帮助同学们了解行业全貌。',
+    hasReplay: true,
+    replayUrl: 'https://meeting.tencent.com/dm/replay-demo-001',
+    replayPassword: 'riem2025',
   },
   {
     id: '2',
@@ -142,6 +145,9 @@ export const eventsData = [
     leaderId: 'member-4',
     excerpt:
       '第九期分享会邀请数学建模竞赛获奖选手，从选题、建模到论文撰写全流程分享备赛经验。',
+    hasReplay: true,
+    replayUrl: 'https://meeting.tencent.com/dm/replay-demo-002',
+    replayPassword: 'math2025',
   },
   {
     id: '3',
@@ -152,6 +158,9 @@ export const eventsData = [
     leaderId: 'member-2',
     excerpt:
       '你关心的八个问题都在这里！针对保研论文的常见疑问，为大家一一解答。',
+    hasReplay: false,
+    replayUrl: '',
+    replayPassword: '',
   },
   {
     id: '4',
@@ -162,6 +171,9 @@ export const eventsData = [
     leaderId: 'member-1',
     excerpt:
       'RIEMer Land 主理团队面向全院同学招新，期待更多热爱分享、乐于助人的 RIEMers 加入。',
+    hasReplay: false,
+    replayUrl: '',
+    replayPassword: '',
   },
 ];
 

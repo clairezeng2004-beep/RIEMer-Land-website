@@ -704,3 +704,20 @@
     border-right: none;
   }
 }
+
+/* ============ Toggle / Checkbox for Replay ============ */
+.content-mgmt__toggle-label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
+  cursor: pointer;
+  font-weight: 500;
+  user-select: none;
+}
+
+.content-mgmt__checkbox {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+}

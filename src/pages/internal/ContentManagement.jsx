@@ -29,12 +29,16 @@ import {
   MessageSquarePlus,
   User,
   Clock,
+  Video,
+  Lock,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import './ContentManagement.css';
 
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin } = useAuth();
-  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, suggestions, addSuggestion, updateSuggestion, deleteSuggestion } = useSiteContent();
+  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, suggestions, addSuggestion, updateSuggestion, deleteSuggestion, events, addEvent, updateEvent, deleteEvent } = useSiteContent();
   const { addNotification } = useNotifications();
 
   // 本地编辑状态
@@ -57,6 +61,10 @@ export default function ContentManagement() {
   // 建议管理状态
   const [editingSuggestion, setEditingSuggestion] = useState(null); // 新建建议
   const [editingSuggestionId, setEditingSuggestionId] = useState(null); // 正在编辑的建议 ID
+
+  // 活动管理状态
+  const [editingEvent, setEditingEvent] = useState(null); // 新建/编辑中的活动
+  const [editingEventId, setEditingEventId] = useState(null); // 正在编辑的已有活动 ID
 
   // 头像 URL 生成
   const sugAvatarUrl = (name) =>
@@ -111,6 +119,7 @@ export default function ContentManagement() {
     { id: 'stats', label: '数据统计', icon: <BarChart3 size={16} /> },
     { id: 'filters', label: '筛选选项', icon: <Filter size={16} /> },
     { id: 'articles', label: '文章板块', icon: <FileText size={16} /> },
+    { id: 'events', label: '活动管理', icon: <Video size={16} /> },
     { id: 'footer', label: '页脚信息', icon: <MapPin size={16} /> },
     { id: 'internal', label: '内部空间', icon: <LayoutGrid size={16} /> },
     { id: 'suggestions', label: '建设建议', icon: <MessageSquarePlus size={16} /> },
@@ -804,6 +813,366 @@ export default function ContentManagement() {
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
                   <span>添加的文章会自动展示在首页和文章列表页，无需额外点击「保存更改」。</span>
+                </div>
+              </div>
+            )}
+
+            {/* 活动管理 */}
+            {activeTab === 'events' && (
+              <div className="content-mgmt__section">
+                <h3 className="content-mgmt__section-title">活动管理</h3>
+                <p className="content-mgmt__section-desc">管理首页展示的活动信息，可为活动添加回放链接（需密码访问）</p>
+
+                {/* 添加新活动 */}
+                {!editingEvent && (
+                  <button
+                    className="content-mgmt__add-btn"
+                    style={{ marginBottom: 'var(--space-xl)' }}
+                    onClick={() => {
+                      setEditingEvent({
+                        id: `event-${Date.now()}`,
+                        title: '',
+                        date: new Date().toISOString().split('T')[0],
+                        category: '分享会',
+                        location: '线上',
+                        leaderId: '',
+                        excerpt: '',
+                        hasReplay: false,
+                        replayUrl: '',
+                        replayPassword: '',
+                      });
+                      setEditingEventId(null);
+                    }}
+                  >
+                    <Plus size={16} /> 添加活动
+                  </button>
+                )}
+
+                {/* 新建活动表单 */}
+                {editingEvent && !editingEventId && (
+                  <div className="content-mgmt__article-form" style={{ marginBottom: 'var(--space-xl)' }}>
+                    <div className="content-mgmt__article-form-header">
+                      <h4>新建活动</h4>
+                      <button
+                        className="content-mgmt__edit-btn"
+                        onClick={() => setEditingEvent(null)}
+                        title="取消"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+
+                    <div className="content-mgmt__field">
+                      <label>活动标题</label>
+                      <input
+                        type="text"
+                        value={editingEvent.title}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                        className="content-mgmt__input"
+                        placeholder="如：快消行业经验分享"
+                      />
+                    </div>
+
+                    <div className="content-mgmt__inline-group">
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label><Calendar size={14} /> 活动日期</label>
+                        <input
+                          type="date"
+                          value={editingEvent.date}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
+                          className="content-mgmt__input"
+                        />
+                      </div>
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>活动分类</label>
+                        <select
+                          value={editingEvent.category}
+                          onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                          className="content-mgmt__input"
+                        >
+                          <option value="分享会">分享会</option>
+                          <option value="经验分享">经验分享</option>
+                          <option value="团队招新">团队招新</option>
+                          <option value="校园活动">校园活动</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="content-mgmt__field">
+                      <label>活动地点</label>
+                      <input
+                        type="text"
+                        value={editingEvent.location}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                        className="content-mgmt__input"
+                        placeholder="如：线上 / 西南财经大学"
+                      />
+                    </div>
+
+                    <div className="content-mgmt__field">
+                      <label>活动简介</label>
+                      <textarea
+                        value={editingEvent.excerpt}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, excerpt: e.target.value })}
+                        className="content-mgmt__input content-mgmt__textarea"
+                        rows={3}
+                        placeholder="活动的简要描述，将展示在首页卡片中"
+                      />
+                    </div>
+
+                    {/* 回放设置 */}
+                    <div className="content-mgmt__subsection">
+                      <h4 className="content-mgmt__subsection-title">
+                        <Video size={14} /> 活动回放设置
+                      </h4>
+                      <div className="content-mgmt__field">
+                        <label className="content-mgmt__toggle-label">
+                          <input
+                            type="checkbox"
+                            checked={editingEvent.hasReplay}
+                            onChange={(e) => setEditingEvent({ ...editingEvent, hasReplay: e.target.checked })}
+                            className="content-mgmt__checkbox"
+                          />
+                          <span>开启活动回放</span>
+                        </label>
+                      </div>
+
+                      {editingEvent.hasReplay && (
+                        <>
+                          <div className="content-mgmt__field">
+                            <label><Link2 size={14} /> 回放链接</label>
+                            <input
+                              type="text"
+                              value={editingEvent.replayUrl}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, replayUrl: e.target.value })}
+                              className="content-mgmt__input"
+                              placeholder="粘贴回放视频链接…"
+                            />
+                          </div>
+                          <div className="content-mgmt__field">
+                            <label><Lock size={14} /> 回放密码（用户需输入密码才能查看回放）</label>
+                            <input
+                              type="text"
+                              value={editingEvent.replayPassword}
+                              onChange={(e) => setEditingEvent({ ...editingEvent, replayPassword: e.target.value })}
+                              className="content-mgmt__input"
+                              placeholder="设置回放访问密码"
+                            />
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="content-mgmt__article-form-actions">
+                      <button
+                        className="btn btn-primary content-mgmt__confirm-btn"
+                        disabled={!editingEvent.title.trim()}
+                        onClick={() => {
+                          addEvent(editingEvent);
+                          setEditingEvent(null);
+                        }}
+                      >
+                        <CheckCircle size={18} /> 确认添加活动
+                      </button>
+                      <button
+                        className="btn btn-ghost"
+                        onClick={() => setEditingEvent(null)}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* 已添加的活动列表 */}
+                {events.length > 0 && (
+                  <div className="content-mgmt__subsection">
+                    <h4 className="content-mgmt__subsection-title">
+                      活动列表（{events.length}）
+                    </h4>
+                    {events.map((event) => (
+                      <div key={event.id} className="content-mgmt__card">
+                        <div className="content-mgmt__card-header">
+                          <div className="content-mgmt__article-meta">
+                            <span className="badge badge-primary">{event.category}</span>
+                            <span className="content-mgmt__article-date">{event.date}</span>
+                            {event.hasReplay && (
+                              <span className="badge" style={{ background: 'rgba(139,92,246,0.12)', color: '#8B5CF6', fontSize: 'var(--text-xs)', padding: '0.1rem 0.5rem', borderRadius: 'var(--radius-full)' }}>
+                                <Video size={12} style={{ marginRight: 2, verticalAlign: -1 }} /> 有回放
+                              </span>
+                            )}
+                          </div>
+                          <div className="content-mgmt__card-header-actions">
+                            <button
+                              className="content-mgmt__edit-btn"
+                              onClick={() => {
+                                if (editingEventId === event.id) {
+                                  setEditingEventId(null);
+                                  setEditingEvent(null);
+                                } else {
+                                  setEditingEventId(event.id);
+                                  setEditingEvent({ ...event });
+                                }
+                              }}
+                              title={editingEventId === event.id ? '收起' : '编辑'}
+                            >
+                              {editingEventId === event.id ? <X size={14} /> : <Pencil size={14} />}
+                            </button>
+                            <button
+                              className="content-mgmt__remove-btn"
+                              onClick={() => {
+                                if (window.confirm(`确定删除「${event.title}」？`)) {
+                                  deleteEvent(event.id);
+                                  if (editingEventId === event.id) {
+                                    setEditingEventId(null);
+                                    setEditingEvent(null);
+                                  }
+                                }
+                              }}
+                              title="删除"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+
+                        {editingEventId === event.id && editingEvent ? (
+                          <>
+                            <div className="content-mgmt__field">
+                              <label>活动标题</label>
+                              <input
+                                type="text"
+                                value={editingEvent.title}
+                                onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                                className="content-mgmt__input"
+                              />
+                            </div>
+                            <div className="content-mgmt__inline-group">
+                              <div className="content-mgmt__field content-mgmt__field--flex">
+                                <label>日期</label>
+                                <input
+                                  type="date"
+                                  value={editingEvent.date}
+                                  onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
+                                  className="content-mgmt__input"
+                                />
+                              </div>
+                              <div className="content-mgmt__field content-mgmt__field--flex">
+                                <label>分类</label>
+                                <select
+                                  value={editingEvent.category}
+                                  onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                                  className="content-mgmt__input"
+                                >
+                                  <option value="分享会">分享会</option>
+                                  <option value="经验分享">经验分享</option>
+                                  <option value="团队招新">团队招新</option>
+                                  <option value="校园活动">校园活动</option>
+                                </select>
+                              </div>
+                            </div>
+                            <div className="content-mgmt__field">
+                              <label>活动地点</label>
+                              <input
+                                type="text"
+                                value={editingEvent.location}
+                                onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                                className="content-mgmt__input"
+                              />
+                            </div>
+                            <div className="content-mgmt__field">
+                              <label>活动简介</label>
+                              <textarea
+                                value={editingEvent.excerpt}
+                                onChange={(e) => setEditingEvent({ ...editingEvent, excerpt: e.target.value })}
+                                className="content-mgmt__input content-mgmt__textarea"
+                                rows={3}
+                              />
+                            </div>
+
+                            {/* 编辑回放设置 */}
+                            <div className="content-mgmt__subsection" style={{ marginTop: 'var(--space-md)' }}>
+                              <h4 className="content-mgmt__subsection-title">
+                                <Video size={14} /> 活动回放设置
+                              </h4>
+                              <div className="content-mgmt__field">
+                                <label className="content-mgmt__toggle-label">
+                                  <input
+                                    type="checkbox"
+                                    checked={editingEvent.hasReplay}
+                                    onChange={(e) => setEditingEvent({ ...editingEvent, hasReplay: e.target.checked })}
+                                    className="content-mgmt__checkbox"
+                                  />
+                                  <span>开启活动回放</span>
+                                </label>
+                              </div>
+
+                              {editingEvent.hasReplay && (
+                                <>
+                                  <div className="content-mgmt__field">
+                                    <label><Link2 size={14} /> 回放链接</label>
+                                    <input
+                                      type="text"
+                                      value={editingEvent.replayUrl}
+                                      onChange={(e) => setEditingEvent({ ...editingEvent, replayUrl: e.target.value })}
+                                      className="content-mgmt__input"
+                                      placeholder="粘贴回放视频链接…"
+                                    />
+                                  </div>
+                                  <div className="content-mgmt__field">
+                                    <label><Lock size={14} /> 回放密码</label>
+                                    <input
+                                      type="text"
+                                      value={editingEvent.replayPassword}
+                                      onChange={(e) => setEditingEvent({ ...editingEvent, replayPassword: e.target.value })}
+                                      className="content-mgmt__input"
+                                      placeholder="设置回放访问密码"
+                                    />
+                                  </div>
+                                </>
+                              )}
+                            </div>
+
+                            <button
+                              className="btn btn-primary content-mgmt__confirm-btn"
+                              onClick={() => {
+                                updateEvent(event.id, editingEvent);
+                                setEditingEventId(null);
+                                setEditingEvent(null);
+                              }}
+                            >
+                              <CheckCircle size={18} /> 确认保存修改
+                            </button>
+                          </>
+                        ) : (
+                          <div className="content-mgmt__article-summary">
+                            <h5 className="content-mgmt__article-title">{event.title}</h5>
+                            <p className="content-mgmt__article-excerpt">{event.excerpt}</p>
+                            <div style={{ display: 'flex', gap: 'var(--space-sm)', marginTop: 'var(--space-xs)', flexWrap: 'wrap' }}>
+                              <span style={{ fontSize: 'var(--text-xs)', color: 'var(--color-text-muted)' }}>📍 {event.location}</span>
+                              {event.hasReplay && (
+                                <span style={{ fontSize: 'var(--text-xs)', color: '#8B5CF6', fontWeight: 500 }}>
+                                  🔗 回放链接已设置 · 密码: {event.replayPassword}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {events.length === 0 && (
+                  <div className="content-mgmt__hint">
+                    <AlertCircle size={16} />
+                    <span>暂无活动，点击上方按钮添加第一个活动。</span>
+                  </div>
+                )}
+
+                <div className="content-mgmt__hint">
+                  <AlertCircle size={16} />
+                  <span>添加的活动会自动展示在首页「最新活动」区域，有回放的活动用户点击后需输入密码才能访问回放链接。</span>
                 </div>
               </div>
             )}
