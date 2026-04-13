@@ -10,6 +10,7 @@ import Timeline from './pages/public/Timeline';
 import Articles from './pages/public/Articles';
 import ArticleDetail from './pages/public/ArticleDetail';
 import Login from './pages/internal/Login';
+import ResetPassword from './pages/internal/ResetPassword';
 import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
 import ProcessTemplates from './pages/internal/ProcessTemplates';
@@ -43,6 +44,7 @@ function App() {
 
                 {/* Auth */}
                 <Route path="/login" element={<Login />} />
+                <Route path="/reset-password" element={<ResetPassword />} />
 
                 {/* Internal Routes (Protected) — 带侧边栏布局 */}
                 <Route path="/internal" element={<InternalLayout />}>

@@ -176,7 +176,6 @@
   gap: 8px;
   cursor: pointer;
   user-select: none;
-  margin-top: calc(-1 * var(--space-sm));
 }
 
 .login-card__remember-checkbox {
@@ -190,6 +189,65 @@
 .login-card__remember-text {
   font-size: var(--text-sm);
   color: var(--color-text-light);
+}
+
+.login-card__options {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: calc(-1 * var(--space-sm));
+}
+
+.login-card__forgot-link {
+  background: none;
+  border: none;
+  color: var(--color-primary);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 0;
+  transition: opacity var(--transition-fast);
+}
+
+.login-card__forgot-link:hover {
+  opacity: 0.8;
+  text-decoration: underline;
+}
+
+.login-card__back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 0;
+  margin-bottom: var(--space-lg);
+  transition: color var(--transition-fast);
+}
+
+.login-card__back-btn:hover {
+  color: var(--color-primary);
+}
+
+.login-card__change-pwd-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  padding: 0;
+  margin-top: calc(-1 * var(--space-xs));
+  transition: color var(--transition-fast);
+}
+
+.login-card__change-pwd-link:hover {
+  color: var(--color-primary);
 }
 
 .login-card__submit {

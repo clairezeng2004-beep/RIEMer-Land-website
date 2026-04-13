@@ -327,6 +327,91 @@ export function AuthProvider({ children }) {
     localStorage.removeItem(AUTH_KEY);
   }, []);
 
+  // ---- 忘记密码 / 重置密码 ----
+  const resetPassword = useCallback(async (email, newPassword) => {
+    if (!isSupabaseConfigured) {
+      // 本地模式：直接用邮箱查找用户，设置新密码
+      if (!email) return { success: false, message: '请输入邮箱地址' };
+      if (!newPassword || newPassword.length < 6) {
+        return { success: false, message: '新密码至少需要 6 个字符' };
+      }
+      const users = getLocalUsers();
+      const idx = users.findIndex((u) => u.email === email);
+      if (idx < 0) return { success: false, message: '未找到该邮箱对应的账号' };
+      users[idx].password = newPassword;
+      saveLocalUsers(users);
+      // 如果之前保存了凭据，清除旧的
+      localStorage.removeItem('riemer_saved_credentials');
+      return { success: true, message: '密码重置成功！请使用新密码登录。' };
+    }
+
+    // Supabase 模式：发送重置密码邮件
+    if (!email) return { success: false, message: '请输入邮箱地址' };
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: '密码重置邮件已发送，请查看您的邮箱。' };
+  }, []);
+
+  // ---- 修改密码（已登录用户） ----
+  const changePassword = useCallback(async (currentPassword, newPassword) => {
+    if (!user) return { success: false, message: '未登录' };
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: '新密码至少需要 6 个字符' };
+    }
+
+    if (!isSupabaseConfigured) {
+      // 本地模式：验证当前密码后修改
+      const users = getLocalUsers();
+      const idx = users.findIndex((u) => u.id === user.id);
+      if (idx < 0) return { success: false, message: '用户不存在' };
+      if (users[idx].password !== currentPassword) {
+        return { success: false, message: '当前密码不正确' };
+      }
+      if (currentPassword === newPassword) {
+        return { success: false, message: '新密码不能与当前密码相同' };
+      }
+      users[idx].password = newPassword;
+      saveLocalUsers(users);
+      // 清除保存的凭据
+      localStorage.removeItem('riemer_saved_credentials');
+      return { success: true, message: '密码修改成功！' };
+    }
+
+    // Supabase 模式：先验证当前密码，再更新密码
+    // 验证当前密码：尝试用当前密码重新登录
+    const { error: verifyError } = await supabase.auth.signInWithPassword({
+      email: user.email,
+      password: currentPassword,
+    });
+    if (verifyError) {
+      return { success: false, message: '当前密码不正确' };
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: '密码修改成功！' };
+  }, [user]);
+
+  // ---- 更新 Supabase 密码（从重置链接回调） ----
+  const updatePasswordFromReset = useCallback(async (newPassword) => {
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: '新密码至少需要 6 个字符' };
+    }
+    if (!isSupabaseConfigured) {
+      return { success: false, message: '本地模式不支持此操作' };
+    }
+    const { error } = await supabase.auth.updateUser({ password: newPassword });
+    if (error) {
+      return { success: false, message: error.message };
+    }
+    return { success: true, message: '密码重置成功！即将跳转到登录页面。' };
+  }, []);
+
   // ---- 获取所有用户 ----
   const getAllUsers = useCallback(async () => {
     if (!isSupabaseConfigured) {
@@ -451,6 +536,9 @@ export function AuthProvider({ children }) {
         register,
         logout,
         updateProfile,
+        resetPassword,
+        changePassword,
+        updatePasswordFromReset,
         isAuthenticated,
         isAdmin,
         isMember,
