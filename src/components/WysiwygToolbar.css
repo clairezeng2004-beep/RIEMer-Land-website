@@ -4,27 +4,34 @@
   bottom: 28px;
   right: 28px;
   z-index: 1000;
-  width: 52px;
-  height: 52px;
-  border-radius: 50%;
+  border-radius: 28px;
   border: none;
   background: var(--color-primary);
   color: white;
   display: flex;
   align-items: center;
-  justify-content: center;
+  gap: 8px;
+  padding: 0 20px 0 16px;
+  height: 52px;
   cursor: pointer;
   box-shadow: 0 4px 20px rgba(91, 140, 62, 0.4);
   transition: all 0.25s ease;
+  white-space: nowrap;
 }
 
 .wysiwyg-fab:hover {
-  transform: scale(1.1);
+  transform: scale(1.04);
   box-shadow: 0 6px 28px rgba(91, 140, 62, 0.55);
 }
 
 .wysiwyg-fab:active {
   transform: scale(1.0);
+}
+
+.wysiwyg-fab__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 /* ============ WYSIWYG Toast ============ */
@@ -173,5 +180,14 @@
   .wysiwyg-fab {
     bottom: 16px;
     right: 16px;
+    width: 48px;
+    height: 48px;
+    padding: 0;
+    border-radius: 50%;
+    justify-content: center;
+  }
+
+  .wysiwyg-fab__label {
+    display: none;
   }
 }

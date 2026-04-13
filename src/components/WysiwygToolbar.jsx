@@ -53,9 +53,10 @@ export default function WysiwygToolbar() {
         <button
           className="wysiwyg-fab"
           onClick={enterEdit}
-          title="进入所见即所得编辑模式"
+          title="进入管理者编辑模式"
         >
           <Pencil size={20} />
+          <span className="wysiwyg-fab__label">进入管理者编辑模式</span>
         </button>
         {saved && (
           <div className="wysiwyg-toast">
