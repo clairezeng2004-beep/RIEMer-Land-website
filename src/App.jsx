@@ -25,8 +25,8 @@ function App() {
   return (
     <AuthProvider>
       <SiteContentProvider>
-        <NotificationProvider>
-          <Router>
+        <Router>
+          <NotificationProvider>
             <ScrollToTop />
             <Navbar />
             <main>
@@ -55,8 +55,8 @@ function App() {
               </Routes>
             </main>
             <Footer />
-          </Router>
-        </NotificationProvider>
+          </NotificationProvider>
+        </Router>
       </SiteContentProvider>
     </AuthProvider>
   );

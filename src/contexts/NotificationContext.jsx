@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { useLocation } from 'react-router-dom';
 import { notificationsData } from '../data/siteData';
 
 const NotificationContext = createContext(null);
@@ -17,6 +18,7 @@ function getWeekStart(date = new Date()) {
 }
 
 export function NotificationProvider({ children }) {
+  const location = useLocation();
   const [notifications, setNotifications] = useState(() => {
     const stored = localStorage.getItem(NOTIFICATIONS_KEY);
     if (stored) {
@@ -58,9 +60,10 @@ export function NotificationProvider({ children }) {
 
   // 未读消息数同步到网页标题
   useEffect(() => {
-    const baseTitle = 'RIEMer Land';
+    const isInternal = location.pathname.startsWith('/internal');
+    const baseTitle = isInternal ? '内部空间' : 'RIEMer Land';
     document.title = unreadCount > 0 ? `(${unreadCount}条未读消息) ${baseTitle}` : baseTitle;
-  }, [unreadCount]);
+  }, [unreadCount, location.pathname]);
 
   const markAsRead = useCallback((id) => {
     setNotifications((prev) =>
