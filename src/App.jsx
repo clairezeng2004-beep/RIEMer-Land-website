@@ -12,6 +12,8 @@ import ArticleDetail from './pages/public/ArticleDetail';
 import Login from './pages/internal/Login';
 import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
+import ProcessTemplates from './pages/internal/ProcessTemplates';
+import MemberSharing from './pages/internal/MemberSharing';
 import Tasks from './pages/internal/Tasks';
 import UserManagement from './pages/internal/UserManagement';
 import ContentManagement from './pages/internal/ContentManagement';
@@ -44,6 +46,9 @@ function App() {
                 {/* Internal Routes (Protected) — 带侧边栏布局 */}
                 <Route path="/internal" element={<InternalLayout />}>
                   <Route index element={<Navigate to="notifications" replace />} />
+                  <Route path="process-templates" element={<ProcessTemplates />} />
+                  <Route path="member-sharing" element={<MemberSharing />} />
+                  {/* 兼容旧链接 */}
                   <Route path="documents" element={<Documents />} />
                   <Route path="articles" element={<InternalArticles />} />
                   <Route path="article/:id" element={<InternalArticleDetail />} />

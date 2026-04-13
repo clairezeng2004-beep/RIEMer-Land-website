@@ -77,21 +77,24 @@ function inferFileType(fileName) {
   return 'pdf';
 }
 
-export default function Documents() {
+export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const dc = internalConfig.documents;
+  const sectionKey = configSection || 'documents';
+  const dc = internalConfig[sectionKey] || internalConfig.documents;
 
   const updateDocs = useCallback(
-    (key, val) => updateInternalConfig({ documents: { [key]: val } }),
-    [updateInternalConfig]
+    (key, val) => updateInternalConfig({ [sectionKey]: { [key]: val } }),
+    [updateInternalConfig, sectionKey]
   );
-  const [documents, setDocuments] = useState(documentsData);
+  const [documents, setDocuments] = useState(() =>
+    filterTypes ? documentsData.filter((d) => filterTypes.includes(d.type)) : documentsData
+  );
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
-  const [newDoc, setNewDoc] = useState({ title: '', type: 'course', description: '' });
+  const [newDoc, setNewDoc] = useState({ title: '', type: filterTypes ? filterTypes[0] : 'course', description: '' });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -102,7 +105,9 @@ export default function Documents() {
     return <Navigate to="/login" replace />;
   }
 
-  const types = ['全部', ...Object.keys(typeLabels)];
+  const types = filterTypes
+    ? ['全部', ...filterTypes]
+    : ['全部', ...Object.keys(typeLabels)];
 
   const filtered = documents.filter((doc) => {
     const matchesSearch =
@@ -285,16 +290,16 @@ export default function Documents() {
           <div>
             <h1>
               <FolderOpen size={28} /> <EditableText
-                value={dc.pageTitle}
+                value={customTitle || dc.pageTitle}
                 onChange={(v) => updateDocs('pageTitle', v)}
-                configKey="documents.pageTitle"
+                configKey={`${sectionKey}.pageTitle`}
                 as="span"
               />
             </h1>
             <p><EditableText
-              value={dc.pageDesc}
+              value={customDesc || dc.pageDesc}
               onChange={(v) => updateDocs('pageDesc', v)}
-              configKey="documents.pageDesc"
+              configKey={`${sectionKey}.pageDesc`}
               as="span"
             /></p>
           </div>
@@ -375,10 +380,12 @@ export default function Documents() {
                   <CustomSelect
                     value={newDoc.type}
                     onChange={(val) => setNewDoc({ ...newDoc, type: val })}
-                    options={Object.entries(typeLabels).map(([key, label]) => ({
-                      value: key,
-                      label,
-                    }))}
+                    options={Object.entries(typeLabels)
+                      .filter(([key]) => !filterTypes || filterTypes.includes(key))
+                      .map(([key, label]) => ({
+                        value: key,
+                        label,
+                      }))}
                   />
                 </div>
               </div>

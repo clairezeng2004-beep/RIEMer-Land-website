@@ -14,6 +14,8 @@ import {
   BookOpen,
   BarChart3,
   MessageSquarePlus,
+  FolderOpen,
+  Share2,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -36,8 +38,9 @@ export default function InternalSidebar() {
       label: sc.labelNotifications,
       badge: unreadCount > 0 ? unreadCount : null,
     },
-    { to: '/internal/documents', icon: FileText, configKey: 'labelDocuments', label: sc.labelDocuments },
-    { to: '/internal/articles', icon: BookOpen, label: '文章浏览' },
+    { to: '/internal/process-templates', icon: FolderOpen, label: '流程模板文件' },
+    { to: '/internal/member-sharing', icon: Share2, label: '成员内部分享' },
+    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章' },
     { to: '/internal/tasks', icon: CheckSquare, configKey: 'labelTasks', label: sc.labelTasks },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
     { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
