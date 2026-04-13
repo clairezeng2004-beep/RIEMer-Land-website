@@ -104,9 +104,9 @@ const getDefaultContent = () => ({
 const getDefaultInternalConfig = () => ({
   // 侧边栏
   sidebar: {
-    sectionLabelNav: '导航',
+    sectionLabelNav: '',
     sectionLabelAdmin: '管理',
-    labelHome: '首页',
+    labelHome: '快捷导航',
     labelNotifications: '消息通知',
     labelDocuments: '文档管理',
     labelTasks: '事项追踪',

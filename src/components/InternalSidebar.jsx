@@ -41,7 +41,6 @@ export default function InternalSidebar() {
   return (
     <aside className="internal-sidebar">
       <div className="internal-sidebar__section">
-        <div className="internal-sidebar__section-label">{sc.sectionLabelNav}</div>
         {navItems.map((item) => (
           <NavLink
             key={item.to}
