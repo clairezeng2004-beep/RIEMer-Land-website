@@ -1,7 +1,9 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   BarChart3,
   Users,
@@ -69,7 +71,14 @@ function isInPeriod(dateStr, period) {
 
 export default function MemberContributions() {
   const { isAuthenticated } = useAuth();
-  const { userArticles, filterOptions } = useSiteContent();
+  const { userArticles, filterOptions, internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
+  const cc = internalConfig.contributions || {};
+
+  const updateContribs = useCallback(
+    (key, val) => updateInternalConfig({ contributions: { [key]: val } }),
+    [updateInternalConfig]
+  );
 
   const members = filterOptions.teamMembers || teamMembers;
   const periods = useMemo(() => getHalfYearPeriods(), []);
@@ -221,9 +230,19 @@ export default function MemberContributions() {
         <div className="mc-page__header">
           <div>
             <h1>
-              <BarChart3 size={28} /> 成员贡献
+              <BarChart3 size={28} /> <EditableText
+                value={cc.pageTitle || '成员贡献'}
+                onChange={(v) => updateContribs('pageTitle', v)}
+                configKey="contributions.pageTitle"
+                as="span"
+              />
             </h1>
-            <p>自动统计每位成员的贡献数据，以半年度为单位或查看历史全部数据</p>
+            <p><EditableText
+              value={cc.pageDesc || '自动统计每位成员的贡献数据，以半年度为单位或查看历史全部数据'}
+              onChange={(v) => updateContribs('pageDesc', v)}
+              configKey="contributions.pageDesc"
+              as="span"
+            /></p>
           </div>
         </div>
 
@@ -266,35 +285,65 @@ export default function MemberContributions() {
             <div className="mc-summary__icon mc-summary__icon--share"><Mic size={28} /></div>
             <div className="mc-summary__info">
               <span className="mc-summary__value">{teamTotal.shareEvents}</span>
-              <span className="mc-summary__label">线上分享会</span>
+              <EditableText
+                value={cc.labelShareEvents || '线上分享会'}
+                onChange={(v) => updateContribs('labelShareEvents', v)}
+                configKey="contributions.labelShareEvents"
+                as="span"
+                className="mc-summary__label"
+              />
             </div>
           </div>
           <div className="mc-summary__card">
             <div className="mc-summary__icon mc-summary__icon--article"><FileText size={28} /></div>
             <div className="mc-summary__info">
               <span className="mc-summary__value">{teamTotal.articleCount}</span>
-              <span className="mc-summary__label">公众号文章</span>
+              <EditableText
+                value={cc.labelArticleCount || '公众号文章'}
+                onChange={(v) => updateContribs('labelArticleCount', v)}
+                configKey="contributions.labelArticleCount"
+                as="span"
+                className="mc-summary__label"
+              />
             </div>
           </div>
           <div className="mc-summary__card">
             <div className="mc-summary__icon mc-summary__icon--help"><Handshake size={28} /></div>
             <div className="mc-summary__info">
               <span className="mc-summary__value">{teamTotal.helpCount}</span>
-              <span className="mc-summary__label">协作帮助</span>
+              <EditableText
+                value={cc.labelHelpCount || '协作帮助'}
+                onChange={(v) => updateContribs('labelHelpCount', v)}
+                configKey="contributions.labelHelpCount"
+                as="span"
+                className="mc-summary__label"
+              />
             </div>
           </div>
           <div className="mc-summary__card">
             <div className="mc-summary__icon mc-summary__icon--upload"><Upload size={28} /></div>
             <div className="mc-summary__info">
               <span className="mc-summary__value">{teamTotal.uploadCount}</span>
-              <span className="mc-summary__label">资料上传</span>
+              <EditableText
+                value={cc.labelUploadCount || '资料上传'}
+                onChange={(v) => updateContribs('labelUploadCount', v)}
+                configKey="contributions.labelUploadCount"
+                as="span"
+                className="mc-summary__label"
+              />
             </div>
           </div>
           <div className="mc-summary__card">
             <div className="mc-summary__icon mc-summary__icon--total"><TrendingUp size={28} /></div>
             <div className="mc-summary__info">
               <span className="mc-summary__value">{teamTotal.total}</span>
-              <span className="mc-summary__label">贡献总计</span>
+              <EditableText
+                value={cc.labelTotal || '贡献总计'}
+                onChange={(v) => updateContribs('labelTotal', v)}
+                configKey="contributions.labelTotal"
+                as="span"
+                className="mc-summary__label"
+              />
             </div>
           </div>
         </div>
@@ -415,14 +464,44 @@ export default function MemberContributions() {
         {/* 说明 */}
         <div className="mc-note">
           <p>
-            <strong>数据说明</strong>
+            <strong><EditableText
+              value={cc.noteTitle || '数据说明'}
+              onChange={(v) => updateContribs('noteTitle', v)}
+              configKey="contributions.noteTitle"
+              as="span"
+            /></strong>
           </p>
           <ul>
-            <li><strong>线上分享会</strong>：统计事项追踪中分类为「线上分享」且该成员为负责人的事项数量</li>
-            <li><strong>公众号文章</strong>：统计文章浏览中该成员为负责人（leaderId）的文章数量</li>
-            <li><strong>协作帮助</strong>：统计事项追踪中该成员作为协助人参与的事项数量</li>
-            <li><strong>资料上传</strong>：统计文档管理中该成员上传的文档数量</li>
-            <li><strong>其他</strong>：手动输入的自定义贡献项，保存在本地</li>
+            <li><strong>{cc.labelShareEvents || '线上分享会'}</strong>：<EditableText
+              value={cc.noteShareEvents || '统计事项追踪中分类为「线上分享」且该成员为负责人的事项数量'}
+              onChange={(v) => updateContribs('noteShareEvents', v)}
+              configKey="contributions.noteShareEvents"
+              as="span"
+            /></li>
+            <li><strong>{cc.labelArticleCount || '公众号文章'}</strong>：<EditableText
+              value={cc.noteArticleCount || '统计文章浏览中该成员为负责人（leaderId）的文章数量'}
+              onChange={(v) => updateContribs('noteArticleCount', v)}
+              configKey="contributions.noteArticleCount"
+              as="span"
+            /></li>
+            <li><strong>{cc.labelHelpCount || '协作帮助'}</strong>：<EditableText
+              value={cc.noteHelpCount || '统计事项追踪中该成员作为协助人参与的事项数量'}
+              onChange={(v) => updateContribs('noteHelpCount', v)}
+              configKey="contributions.noteHelpCount"
+              as="span"
+            /></li>
+            <li><strong>{cc.labelUploadCount || '资料上传'}</strong>：<EditableText
+              value={cc.noteUploadCount || '统计文档管理中该成员上传的文档数量'}
+              onChange={(v) => updateContribs('noteUploadCount', v)}
+              configKey="contributions.noteUploadCount"
+              as="span"
+            /></li>
+            <li><strong>其他</strong>：<EditableText
+              value={cc.noteCustom || '手动输入的自定义贡献项，保存在本地'}
+              onChange={(v) => updateContribs('noteCustom', v)}
+              configKey="contributions.noteCustom"
+              as="span"
+            /></li>
           </ul>
         </div>
       </div>

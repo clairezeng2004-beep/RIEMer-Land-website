@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   Plus,
   Trash2,
@@ -18,8 +20,11 @@ import './Suggestions.css';
 
 export default function Suggestions() {
   const { isAuthenticated } = useAuth();
-  const { suggestions, addSuggestion, updateSuggestion, deleteSuggestion } = useSiteContent();
+  const { suggestions, addSuggestion, updateSuggestion, deleteSuggestion, internalConfig, updateInternalConfig } = useSiteContent();
   const { addNotification } = useNotifications();
+  const { editing } = useWysiwyg();
+  const sc = internalConfig.suggestions || {};
+  const updateSugs = useCallback((key, val) => updateInternalConfig({ suggestions: { [key]: val } }), [updateInternalConfig]);
 
   const [editingSuggestion, setEditingSuggestion] = useState(null);
   const [editingSuggestionId, setEditingSuggestionId] = useState(null);
@@ -41,8 +46,8 @@ export default function Suggestions() {
           <MessageSquarePlus size={24} />
         </div>
         <div>
-          <h2 className="suggestions-page__title">建设建议</h2>
-          <p className="suggestions-page__desc">收集和追踪网站改进与组织建设相关建议的进度</p>
+          <EditableText as="h2" className="suggestions-page__title" value={sc.pageTitle || '建设建议'} configKey="suggestions.pageTitle" onChange={v => updateSugs('pageTitle', v)} />
+          <EditableText as="p" className="suggestions-page__desc" value={sc.pageDesc || '收集和追踪网站改进与组织建设相关建议的进度'} configKey="suggestions.pageDesc" onChange={v => updateSugs('pageDesc', v)} />
         </div>
       </div>
 
@@ -67,7 +72,7 @@ export default function Suggestions() {
               setEditingSuggestionId(null);
             }}
           >
-            <Plus size={16} /> 添加建议
+            <Plus size={16} /> <EditableText as="span" value={sc.addBtn || '添加建议'} configKey="suggestions.addBtn" onChange={v => updateSugs('addBtn', v)} />
           </button>
         )}
 

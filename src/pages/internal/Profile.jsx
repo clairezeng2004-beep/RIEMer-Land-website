@@ -1,6 +1,9 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured, getReachable } from '../../lib/supabase';
+import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import { User, Camera, Save, Loader2 } from 'lucide-react';
 import './Profile.css';
 
@@ -11,6 +14,10 @@ const isSupabaseUsable = () => isSupabaseConfigured && supabase && getReachable(
 
 export default function Profile() {
   const { user, updateProfile, supabaseOk } = useAuth();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  useWysiwyg();
+  const pc = internalConfig.profile || {};
+  const updatePC = useCallback((key, val) => updateInternalConfig({ profile: { [key]: val } }), [updateInternalConfig]);
   const fileInputRef = useRef(null);
 
   const [name, setName] = useState(user?.name || '');
@@ -171,8 +178,8 @@ export default function Profile() {
     <div className="profile-page">
       <div className="container">
         <div className="profile-page__header">
-          <h1>个人主页</h1>
-          <p>设置你的昵称、头像和个性签名</p>
+          <EditableText as="h1" value={pc.pageTitle || '个人主页'} configKey="profile.pageTitle" onChange={v => updatePC('pageTitle', v)} />
+          <EditableText as="p" value={pc.pageDesc || '设置你的昵称、头像和个性签名'} configKey="profile.pageDesc" onChange={v => updatePC('pageDesc', v)} />
         </div>
 
         <div className="profile-page__card card">

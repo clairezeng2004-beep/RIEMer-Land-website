@@ -2,6 +2,8 @@ import { useMemo, useState, useCallback } from 'react';
 import { Link, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
 import {
@@ -20,7 +22,10 @@ import './InternalArticles.css';
 
 export default function InternalArticles() {
   const { isAuthenticated, user } = useAuth();
-  const { userArticles, addArticle } = useSiteContent();
+  const { userArticles, addArticle, internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
+  const ia = internalConfig.internalArticles || {};
+  const updateIA = useCallback((key, val) => updateInternalConfig({ internalArticles: { [key]: val } }), [updateInternalConfig]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
 
@@ -178,9 +183,9 @@ export default function InternalArticles() {
         <div className="ia-list__header">
           <div>
             <h1>
-              <FileText size={28} /> 公众号历史文章
+              <FileText size={28} /> <EditableText as="span" value={ia.pageTitle || '公众号历史文章'} configKey="internalArticles.pageTitle" onChange={v => updateIA('pageTitle', v)} />
             </h1>
-            <p>浏览公众号历史推送内容，回顾与归档</p>
+            <EditableText as="p" value={ia.pageDesc || '浏览公众号历史推送内容，回顾与归档'} configKey="internalArticles.pageDesc" onChange={v => updateIA('pageDesc', v)} />
           </div>
           <button className="btn btn-primary" onClick={openModal}>
             <Plus size={16} /> 新建归档

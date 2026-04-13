@@ -164,6 +164,43 @@ const getDefaultInternalConfig = () => ({
     pageTitle: '用户管理',
     pageDesc: '管理成员账户、访问权限和角色分配',
   },
+  // 成员贡献页
+  contributions: {
+    pageTitle: '成员贡献',
+    pageDesc: '自动统计每位成员的贡献数据，以半年度为单位或查看历史全部数据',
+    labelShareEvents: '线上分享会',
+    labelArticleCount: '公众号文章',
+    labelHelpCount: '协作帮助',
+    labelUploadCount: '资料上传',
+    labelTotal: '贡献总计',
+    noteTitle: '数据说明',
+    noteShareEvents: '统计事项追踪中分类为「线上分享」且该成员为负责人的事项数量',
+    noteArticleCount: '统计文章浏览中该成员为负责人（leaderId）的文章数量',
+    noteHelpCount: '统计事项追踪中该成员作为协助人参与的事项数量',
+    noteUploadCount: '统计文档管理中该成员上传的文档数量',
+    noteCustom: '手动输入的自定义贡献项，保存在本地',
+  },
+  // 建设建议页
+  suggestions: {
+    pageTitle: '建设建议',
+    pageDesc: '收集和追踪网站改进与组织建设相关建议的进度',
+    addBtn: '添加建议',
+  },
+  // 成员信息页
+  memberProfiles: {
+    pageTitle: '成员信息',
+    pageDesc: '了解每位成员的基本信息、去向与兴趣，促进彼此交流',
+  },
+  // 公众号历史文章页
+  internalArticles: {
+    pageTitle: '公众号历史文章',
+    pageDesc: '浏览公众号历史推送内容，回顾与归档',
+  },
+  // 个人主页
+  profile: {
+    pageTitle: '个人主页',
+    pageDesc: '设置你的昵称、头像和个性签名',
+  },
 });
 
 // 筛选选项默认值

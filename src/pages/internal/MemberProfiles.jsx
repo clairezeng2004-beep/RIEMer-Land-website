@@ -1,6 +1,9 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   Users,
   Pencil,
@@ -48,6 +51,10 @@ function saveLocalProfiles(profiles) {
 // ============================================
 export default function MemberProfiles() {
   const { user, isAuthenticated, isAdmin, getAllUsers } = useAuth();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
+  const mp = internalConfig.memberProfiles || {};
+  const updateMP = useCallback((key, val) => updateInternalConfig({ memberProfiles: { [key]: val } }), [updateInternalConfig]);
   const [profiles, setProfiles] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
@@ -252,9 +259,9 @@ export default function MemberProfiles() {
         <div className="member-profiles-page__header">
           <div>
             <h1>
-              <Users size={28} /> 成员信息
+              <Users size={28} /> <EditableText as="span" value={mp.pageTitle || '成员信息'} configKey="memberProfiles.pageTitle" onChange={v => updateMP('pageTitle', v)} />
             </h1>
-            <p>了解每位成员的基本信息、去向与兴趣，促进彼此交流</p>
+            <EditableText as="p" value={mp.pageDesc || '了解每位成员的基本信息、去向与兴趣，促进彼此交流'} configKey="memberProfiles.pageDesc" onChange={v => updateMP('pageDesc', v)} />
           </div>
           <div className="member-profiles-page__stats">
             <span className="member-profiles-page__stat">
