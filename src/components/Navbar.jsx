@@ -104,7 +104,7 @@ export default function Navbar() {
               </div>
             </>
           ) : (
-            <Link to="/login" className="navbar__member-entry">内部空间</Link>
+            <Link to="/login" className="navbar__member-entry">主理团队内部空间</Link>
           )}
         </div>
 
