@@ -1,4 +1,3 @@
-import { useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -7,18 +6,12 @@ import {
   Calendar,
   FileText,
 } from 'lucide-react';
-import { articlesData, eventsData, teamMembers } from '../../data/siteData';
+import { articlesData, eventsData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import './Home.css';
 
 export default function Home() {
   const { content, userArticles } = useSiteContent();
-
-  // 负责人映射
-  const memberMap = useMemo(
-    () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
-    []
-  );
 
   // 合并硬编码文章和用户添加的文章，按日期降序排列
   const allArticles = [...userArticles, ...articlesData]
@@ -112,9 +105,7 @@ export default function Home() {
             <h2 className="section-title">最新活动</h2>
           </div>
           <div className="featured__grid">
-            {recentEvents.map((event) => {
-              const leader = event.leaderId ? memberMap[event.leaderId] : null;
-              return (
+            {recentEvents.map((event) => (
                 <div key={event.id} className="featured__card">
                   <div className="featured__card-accent" />
                   <div className="featured__card-body">
@@ -128,21 +119,11 @@ export default function Home() {
                         <Calendar size={14} />
                         {event.date}
                       </span>
-                      {leader && (
-                        <Link
-                          to={leader.profileUrl}
-                          className="featured__leader"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <img src={leader.avatar} alt={leader.name} className="featured__leader-avatar" />
-                          <span>{leader.name}</span>
-                        </Link>
-                      )}
+
                     </div>
                   </div>
                 </div>
-              );
-            })}
+              ))}
           </div>
         </div>
       </section>

@@ -9,12 +9,6 @@ export default function ArticleDetail() {
   const { id } = useParams();
   const { userArticles } = useSiteContent();
 
-  // 负责人映射
-  const memberMap = useMemo(
-    () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
-    []
-  );
-
   const allArticles = useMemo(
     () => [...userArticles, ...articlesData],
     [userArticles]
@@ -25,8 +19,6 @@ export default function ArticleDetail() {
   if (!article) {
     return <Navigate to="/articles" replace />;
   }
-
-  const leader = article.leaderId ? memberMap[article.leaderId] : null;
 
   // Simple markdown-like rendering
   const renderContent = (content) => {
@@ -71,21 +63,12 @@ export default function ArticleDetail() {
             <h1 className="article-detail__title">{article.title}</h1>
             <div className="article-detail__meta">
               <span className="article-detail__meta-item">
-                <User size={16} /> {article.author}
-              </span>
-              <span className="article-detail__meta-item">
                 <Calendar size={16} /> {article.date}
               </span>
               <span className="article-detail__meta-item">
                 <Clock size={16} /> 约 {Math.ceil((article.content || '').length / 500)} 分钟阅读
               </span>
             </div>
-            {leader && (
-              <Link to={leader.profileUrl} className="article-detail__leader">
-                <img src={leader.avatar} alt={leader.name} className="article-detail__leader-avatar" />
-                <span>负责人：{leader.name}</span>
-              </Link>
-            )}
             <div className="article-detail__tags">
               {article.tags.map((tag) => (
                 <span key={tag} className="article-detail__tag">
