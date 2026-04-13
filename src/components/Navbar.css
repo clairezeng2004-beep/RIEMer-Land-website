@@ -176,6 +176,25 @@
   font-weight: 500;
 }
 
+.navbar__user-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  border-radius: var(--radius-md);
+  padding: 4px 8px;
+  transition: all var(--transition-fast);
+  cursor: pointer;
+}
+
+.navbar__user-link:hover {
+  background: rgba(91, 140, 62, 0.06);
+}
+
+.navbar__user-link:hover .navbar__user-name {
+  color: var(--color-primary);
+}
+
 /* ---- 通用链接样式（用于手机端菜单和下拉菜单） ---- */
 .navbar__link {
   padding: 0.5rem 1rem;
