@@ -14,7 +14,7 @@ export default function ArticleChat() {
     {
       role: 'assistant',
       content:
-        '你好！我是内容助手 🌿\n我可以帮你找到感兴趣的内容，试试描述你想了解的内容吧，比如：\n\n• 有没有关于保研的经验？\n• 我想看课程测评\n• 求职相关的分享',
+        '你好！我是查询助手 🌿\n我可以帮你找到感兴趣的内容，试试描述你想了解的内容吧，比如：\n\n• 有没有关于保研的经验？\n• 我想看课程测评\n• 求职相关的分享',
       articles: [],
     },
   ]);
@@ -170,7 +170,7 @@ export default function ArticleChat() {
         <div className="article-chat__header">
           <div className="article-chat__header-info">
             <span className="article-chat__header-dot" />
-            <h4>内容助手</h4>
+            <h4>查询助手</h4>
           </div>
           <button
             className="article-chat__close"

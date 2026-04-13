@@ -152,7 +152,7 @@ export default function Articles() {
         </div>
       </section>
 
-      {/* 内容助手对话窗口 */}
+      {/* 查询助手对话窗口 */}
       <ArticleChat />
     </div>
   );
