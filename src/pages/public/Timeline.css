@@ -20,7 +20,7 @@
 }
 
 .timeline-hero__content h1 {
-  margin: var(--space-md) 0;
+  margin: var(--space-md) 0 var(--space-sm);
   font-size: var(--text-4xl);
 }
 
@@ -382,6 +382,7 @@
 @media (max-width: 768px) {
   .timeline-hero { padding: 48px 0 40px; }
   .timeline-hero__content h1 { font-size: var(--text-2xl); }
+  .timeline-hero__content p { font-size: var(--text-base); }
 
   .timeline__arrow { display: none; }
 
@@ -408,6 +409,7 @@
 @media (max-width: 480px) {
   .timeline-hero { padding: 28px 0 30px; }
   .timeline-hero__content h1 { font-size: var(--text-xl); }
+  .timeline-hero__content p { font-size: var(--text-sm); line-height: 1.6; }
 
   .timeline__track {
     padding: 160px 1rem 160px;
