@@ -813,3 +813,88 @@
 .content-mgmt__panel--readonly .content-mgmt__article-form-actions {
   display: none;
 }
+
+/* ============================================
+   成员信息表格
+   ============================================ */
+.content-mgmt__member-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg, #fff);
+  -webkit-overflow-scrolling: touch;
+}
+
+.content-mgmt__member-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm, 13px);
+  white-space: nowrap;
+}
+
+.content-mgmt__member-th {
+  position: relative;
+  padding: 10px 14px;
+  text-align: left;
+  font-weight: 600;
+  font-size: 12px;
+  color: var(--color-text-muted, #6b7280);
+  background: var(--color-bg-secondary, #f9fafb);
+  border-bottom: 2px solid var(--color-border-light, #e5e7eb);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.content-mgmt__member-th--sticky {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--color-bg-secondary, #f9fafb);
+  min-width: 44px;
+  text-align: center;
+}
+
+.content-mgmt__member-row {
+  transition: background 0.15s ease;
+}
+
+.content-mgmt__member-row:hover {
+  background: var(--color-bg-hover, #f3f4f6);
+}
+
+.content-mgmt__member-row:not(:last-child) .content-mgmt__member-td {
+  border-bottom: 1px solid var(--color-border-light, #f0f0f0);
+}
+
+.content-mgmt__member-td {
+  padding: 10px 14px;
+  color: var(--color-text, #374151);
+  font-size: 13px;
+  max-width: 240px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.content-mgmt__member-td--sticky {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--color-bg, #fff);
+  text-align: center;
+}
+
+.content-mgmt__member-row:hover .content-mgmt__member-td--sticky {
+  background: var(--color-bg-hover, #f3f4f6);
+}
+
+.content-mgmt__member-td--index {
+  font-size: 12px;
+  color: var(--color-text-muted, #9ca3af);
+  font-weight: 500;
+}
+
+.content-mgmt__member-td--name {
+  font-weight: 600;
+  color: var(--color-text, #111827);
+}
