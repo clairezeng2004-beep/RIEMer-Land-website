@@ -18,7 +18,7 @@ import {
   Presentation,
   ChevronLeft,
   UploadCloud,
-  Calendar,
+  Clock,
   User,
   HardDrive,
   BarChart3,
@@ -423,9 +423,6 @@ export default function Documents() {
                   >
                     {typeLabels[doc.type]}
                   </span>
-                  <span className="doc-card__date">
-                    <Calendar size={12} /> {doc.date}
-                  </span>
                 </div>
 
                 <h4 className="doc-card__title">{doc.title}</h4>
@@ -437,6 +434,13 @@ export default function Documents() {
                   </span>
                   <span className="doc-card__stats">
                     <Eye size={12} /> {doc.viewCount || 0}
+                  </span>
+                </div>
+
+                <div className="doc-card__meta">
+                  <span className="doc-card__meta-item">
+                    <Clock size={14} />
+                    {doc.date}
                   </span>
                 </div>
               </div>
@@ -562,7 +566,7 @@ export default function Documents() {
                   <h3>{previewDoc.title}</h3>
                   <p className="doc-preview__no-preview-desc">{previewDoc.description}</p>
                   <div className="doc-preview__no-preview-info">
-                    <span><Calendar size={14} /> 上传日期: {previewDoc.date}</span>
+                    <span><Clock size={14} /> 上传日期: {previewDoc.date}</span>
                     <span><User size={14} /> 贡献者：{previewDoc.uploadedBy}</span>
                     <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
                     <span><BarChart3 size={14} /> 浏览次数: {previewDoc.viewCount || 0}</span>

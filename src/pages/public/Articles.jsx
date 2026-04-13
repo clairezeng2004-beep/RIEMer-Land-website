@@ -6,7 +6,7 @@ import {
   ArrowRight,
   FileText,
   Tag,
-  Calendar,
+  Clock,
 } from 'lucide-react';
 import { articlesData, teamMembers } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -130,7 +130,7 @@ export default function Articles() {
                   </div>
                   <div className="article-card__bottom">
                     <span className="article-card__meta">
-                      <Calendar size={14} />
+                      <Clock size={14} />
                       <span>{article.date}</span>
                     </span>
                     <span className="article-card__link">

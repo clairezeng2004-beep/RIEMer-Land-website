@@ -4,7 +4,6 @@ import {
   ArrowRight,
   Clock,
   MapPin,
-  Calendar,
   FileText,
   Video,
   Lock,
@@ -171,7 +170,7 @@ export default function Home() {
                     <p className="featured__excerpt">{event.excerpt}</p>
                     <div className="featured__meta">
                       <span className="featured__meta-item">
-                        <Calendar size={14} />
+                        <Clock size={14} />
                         {event.date}
                       </span>
                       {event.hasReplay && (
