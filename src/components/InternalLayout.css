@@ -17,6 +17,13 @@
   margin-left: 220px;
 }
 
+/* 内部空间的 .container 减小左侧间距，让内容更贴近侧边栏 */
+.internal-layout__content .container {
+  max-width: none;
+  padding-left: clamp(1rem, 2vw, 1.5rem);
+  padding-right: clamp(1rem, 3vw, 2.5rem);
+}
+
 /* 响应式：手机端侧边栏隐藏时去掉左边距 */
 @media (max-width: 768px) {
   .internal-layout__content {
