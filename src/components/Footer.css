@@ -239,18 +239,18 @@
   }
 
   .footer__grid > .footer__nav:nth-child(2) .footer__nav-title {
-    width: 100%;
+    display: none;
   }
 
   .footer__about-texts {
     display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 4px var(--space-md);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
   }
 
   .footer__about-texts .footer__nav-text {
-    display: inline;
+    display: block;
   }
 
   .footer__contact-item {
