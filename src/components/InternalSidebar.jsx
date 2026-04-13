@@ -5,7 +5,6 @@ import { useSiteContent } from '../contexts/SiteContentContext';
 import { useWysiwyg } from '../contexts/WysiwygContext';
 import EditableText from './EditableText';
 import {
-  Home,
   Bell,
   FileText,
   CheckSquare,
@@ -30,7 +29,6 @@ export default function InternalSidebar() {
   );
 
   const navItems = [
-    { to: '/internal', icon: Home, configKey: 'labelHome', label: sc.labelHome, end: true },
     {
       to: '/internal/notifications',
       icon: Bell,

@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -17,7 +17,6 @@ import UserManagement from './pages/internal/UserManagement';
 import ContentManagement from './pages/internal/ContentManagement';
 import Notifications from './pages/internal/Notifications';
 import Gallery from './pages/internal/Gallery';
-import InternalHome from './pages/internal/InternalHome';
 import InternalArticles from './pages/internal/InternalArticles';
 import InternalArticleDetail from './pages/internal/InternalArticleDetail';
 import MemberContributions from './pages/internal/MemberContributions';
@@ -44,7 +43,7 @@ function App() {
 
                 {/* Internal Routes (Protected) — 带侧边栏布局 */}
                 <Route path="/internal" element={<InternalLayout />}>
-                  <Route index element={<InternalHome />} />
+                  <Route index element={<Navigate to="notifications" replace />} />
                   <Route path="documents" element={<Documents />} />
                   <Route path="articles" element={<InternalArticles />} />
                   <Route path="article/:id" element={<InternalArticleDetail />} />
