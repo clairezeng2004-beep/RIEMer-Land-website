@@ -259,18 +259,18 @@
   .footer__contact-item {
     justify-content: center;
     white-space: normal;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
   }
 
-  /* 手机端：复制成功提示改为行内显示，不绝对定位，防止超出屏幕 */
+  /* 手机端：复制成功提示紧跟按钮右侧，不换行 */
   .footer__copy-toast {
     position: static;
     transform: none;
-    margin-left: 0;
-    display: block;
-    width: 100%;
-    text-align: center;
-    margin-top: var(--space-xs, 4px);
+    margin-left: var(--space-xs, 4px);
+    display: inline;
+    width: auto;
+    text-align: left;
+    margin-top: 0;
   }
 
   .footer__qrcode-img {
