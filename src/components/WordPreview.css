@@ -1,0 +1,237 @@
+/* ============================================
+   WordPreview — Word 文档在线预览样式
+   ============================================ */
+
+/* 加载状态 */
+.word-preview__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 20px;
+  color: var(--muted-text);
+}
+
+.word-preview__spinner {
+  animation: wp-spin 1s linear infinite;
+}
+
+@keyframes wp-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 错误状态 */
+.word-preview__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 80px 20px;
+  color: #ef4444;
+}
+
+.word-preview__error p {
+  font-size: 14px;
+  color: var(--muted-text);
+}
+
+/* 容器 */
+.word-preview {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  position: relative;
+}
+
+/* 标题栏 */
+.word-preview__title-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  background: var(--bg-secondary, #f8f9fa);
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  flex-shrink: 0;
+}
+
+.word-preview__badge {
+  margin-left: auto;
+  padding: 2px 10px;
+  border-radius: 10px;
+  background: #dbeafe;
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* 内容渲染区 */
+.word-preview__content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px 48px;
+  background: #fff;
+  font-family: 'Georgia', 'Noto Serif SC', serif;
+  font-size: 15px;
+  line-height: 1.8;
+  color: #1f2937;
+  max-width: 100%;
+  position: relative;
+}
+
+/* Word 内容的排版修饰 */
+.word-preview__content h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: #111827;
+  margin: 24px 0 16px;
+  line-height: 1.4;
+  border-bottom: 2px solid var(--primary, #5B8C3E);
+  padding-bottom: 8px;
+}
+
+.word-preview__content h1.doc-title {
+  font-size: 28px;
+  text-align: center;
+  border-bottom: none;
+  padding-bottom: 0;
+  margin-bottom: 8px;
+}
+
+.word-preview__content h2 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #1f2937;
+  margin: 20px 0 12px;
+  line-height: 1.4;
+}
+
+.word-preview__content h2.doc-subtitle {
+  text-align: center;
+  color: #6b7280;
+  font-weight: 400;
+  font-size: 16px;
+  margin-top: 0;
+  margin-bottom: 24px;
+}
+
+.word-preview__content h3 {
+  font-size: 17px;
+  font-weight: 600;
+  color: #374151;
+  margin: 16px 0 10px;
+}
+
+.word-preview__content p {
+  margin: 8px 0;
+  text-align: justify;
+}
+
+.word-preview__content ul,
+.word-preview__content ol {
+  margin: 8px 0;
+  padding-left: 24px;
+}
+
+.word-preview__content li {
+  margin: 4px 0;
+}
+
+.word-preview__content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 16px 0;
+  font-size: 14px;
+}
+
+.word-preview__content th,
+.word-preview__content td {
+  border: 1px solid #d1d5db;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.word-preview__content th {
+  background: #f3f4f6;
+  font-weight: 600;
+}
+
+.word-preview__content tr:nth-child(even) td {
+  background: #f9fafb;
+}
+
+.word-preview__content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin: 12px 0;
+}
+
+.word-preview__content a {
+  color: var(--primary, #5B8C3E);
+  text-decoration: underline;
+}
+
+.word-preview__content blockquote {
+  border-left: 3px solid var(--primary, #5B8C3E);
+  margin: 12px 0;
+  padding: 8px 16px;
+  background: #f0fdf4;
+  color: #374151;
+  font-style: italic;
+}
+
+.word-preview__content strong {
+  font-weight: 700;
+}
+
+.word-preview__content em {
+  font-style: italic;
+}
+
+/* 划词高亮覆盖 — 确保在 Word 预览中也好看 */
+.word-preview__content .ta-highlight {
+  background: rgba(91, 140, 62, 0.2);
+  border-bottom: 2px solid rgba(91, 140, 62, 0.6);
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background 0.2s;
+}
+
+.word-preview__content .ta-highlight:hover {
+  background: rgba(91, 140, 62, 0.35);
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .word-preview__content {
+    padding: 24px 20px;
+    font-size: 14px;
+  }
+
+  .word-preview__content h1 {
+    font-size: 20px;
+  }
+
+  .word-preview__content h1.doc-title {
+    font-size: 22px;
+  }
+
+  .word-preview__content h2 {
+    font-size: 17px;
+  }
+
+  .word-preview__content table {
+    font-size: 12px;
+  }
+
+  .word-preview__content th,
+  .word-preview__content td {
+    padding: 6px 8px;
+  }
+}

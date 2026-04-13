@@ -29,6 +29,7 @@ import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import TextAnnotation from '../../components/TextAnnotation';
+import WordPreview from '../../components/WordPreview';
 import './Documents.css';
 
 const typeLabels = {
@@ -261,7 +262,7 @@ export default function Documents() {
   };
 
   const canPreview = (doc) => {
-    return doc.fileUrl && ['pdf', 'image'].includes(doc.fileType);
+    return doc.fileUrl && ['pdf', 'image', 'docx'].includes(doc.fileType);
   };
 
   const FileIcon = ({ fileType, size = 24 }) => {
@@ -579,6 +580,13 @@ export default function Documents() {
                       disabled
                     />
                   </>
+                ) : previewDoc.fileType === 'docx' ? (
+                  /* Word 文档：mammoth 转 HTML，支持划词评论 */
+                  <WordPreview
+                    fileUrl={previewDoc.fileUrl}
+                    docId={previewDoc.id}
+                    title={previewDoc.title}
+                  />
                 ) : null
               ) : (
                 <div className="doc-preview__no-preview">
