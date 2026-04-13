@@ -275,6 +275,11 @@
     padding: var(--space-md) 0;
   }
 
+  .articles-filters__search {
+    max-width: 80%;
+    margin: 0 auto;
+  }
+
   .articles-list__grid {
     grid-template-columns: 1fr;
     gap: var(--space-md);
