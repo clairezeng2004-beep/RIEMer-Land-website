@@ -48,7 +48,7 @@ export default function Footer() {
               <span className="footer__nav-text">朋辈互助 · 多元可能</span>
             </div>
 
-            <div className="footer__nav">
+            <div className="footer__nav footer__nav--contact">
               <h4 className="footer__nav-title">联系方式</h4>
               <div className="footer__contact-item">
                 <Mail size={16} />
@@ -67,7 +67,6 @@ export default function Footer() {
                 <MapPin size={16} />
                 <span>{content.footerLocation}</span>
               </div>
-              <div className="footer__contact-spacer" aria-hidden="true" />
             </div>
 
             <div className="footer__qrcode">

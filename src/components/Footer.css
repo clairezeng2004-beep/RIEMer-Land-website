@@ -13,8 +13,18 @@
 .footer__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: var(--space-2xl) var(--space-xl);
+  grid-template-rows: auto 1fr 1fr 1fr;
+  gap: 0 var(--space-xl);
   align-items: stretch;
+}
+
+/* 每列占满4行，用 subgrid 继承行对齐 */
+.footer__nav,
+.footer__qrcode {
+  display: grid;
+  grid-row: 1 / -1;
+  grid-template-rows: subgrid;
+  align-items: center;
 }
 
 .footer__contact-item {
@@ -28,10 +38,7 @@
 }
 
 .footer__qrcode {
-  display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: space-between;
 }
 
 .footer__qrcode-img {
@@ -64,6 +71,8 @@
   background: rgba(0, 0, 0, 0.6);
   cursor: pointer;
   animation: footerOverlayIn 0.2s ease-out;
+  grid-column: 1 / -1;
+  grid-row: 1 / -1;
 }
 
 .footer__qrcode-overlay img {
@@ -78,16 +87,12 @@
   to   { opacity: 1; }
 }
 
-.footer__nav {
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
 .footer__nav-title {
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
+  align-self: start;
+  padding-bottom: var(--space-lg);
 }
 
 .footer__nav-link {
@@ -111,11 +116,6 @@
   display: block;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
-}
-
-/* 联系方式占位符，使两项与左侧三项的首尾对齐 */
-.footer__contact-spacer {
-  flex: 1;
 }
 
 /* 邮箱复制按钮 */
@@ -187,20 +187,26 @@
     text-align: center;
   }
 
-  .footer__grid > .footer__nav {
+  .footer__grid > .footer__nav,
+  .footer__grid > .footer__qrcode {
+    grid-row: auto;
+    grid-template-rows: none;
+    display: flex;
+    flex-direction: column;
     padding: var(--space-md) 0;
     border-bottom: 1px solid var(--color-border-light);
     justify-content: flex-start;
     gap: var(--space-sm);
   }
 
-  .footer__grid > .footer__nav:last-child {
+  .footer__grid > .footer__qrcode {
     border-bottom: none;
     padding-bottom: var(--space-sm);
   }
 
   .footer__nav-title {
     margin-bottom: var(--space-sm);
+    padding-bottom: 0;
   }
 
   /* 导航链接改为水平一行 */
@@ -225,15 +231,6 @@
   .footer__contact-item {
     justify-content: center;
     white-space: normal;
-  }
-
-  .footer__contact-spacer {
-    display: none;
-  }
-
-  .footer__qrcode {
-    padding: var(--space-md) 0;
-    border-bottom: none;
   }
 
   .footer__qrcode-img {
