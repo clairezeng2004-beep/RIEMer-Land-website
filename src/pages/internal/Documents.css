@@ -452,6 +452,21 @@
   font-size: 9px;
 }
 
+/* 点赞人全名文字显示 */
+.doc-card__like-names {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.doc-card__like-name {
+  white-space: nowrap;
+}
+
 .doc-card__action-icon {
   width: 28px;
   height: 28px;
@@ -796,6 +811,21 @@
 .doc-preview__like-avatar:hover {
   transform: scale(1.15);
   z-index: 1;
+}
+
+/* 预览弹窗点赞人全名文字显示 */
+.doc-preview__like-names {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  line-height: 1.5;
+}
+
+.doc-preview__like-name {
+  white-space: nowrap;
 }
 
 .doc-preview__like-count {

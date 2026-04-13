@@ -662,7 +662,7 @@ export const documentsData = [
   {
     id: '1',
     title: '2025 年度运营计划',
-    type: 'plan',
+    type: 'process',
     fileType: 'pdf',
     fileUrl: null,
     uploadedBy: 'Admin',
@@ -678,7 +678,7 @@ export const documentsData = [
   {
     id: '2',
     title: '「听 RIEMer 说」访谈指南',
-    type: 'guide',
+    type: 'process',
     fileType: 'pdf',
     fileUrl: null,
     uploadedBy: 'Admin',
@@ -693,7 +693,7 @@ export const documentsData = [
   {
     id: '3',
     title: 'RIEMer\'s Space 分享会 SOP',
-    type: 'guide',
+    type: 'process',
     fileType: 'pdf',
     fileUrl: null,
     uploadedBy: 'Admin',
@@ -706,7 +706,7 @@ export const documentsData = [
   {
     id: '4',
     title: '课程测评收集模板',
-    type: 'regulation',
+    type: 'course',
     fileType: 'docx',
     fileUrl: null,
     uploadedBy: 'Admin',
@@ -723,7 +723,7 @@ export const documentsData = [
   {
     id: '5',
     title: '主理团队招新方案',
-    type: 'plan',
+    type: 'regulation',
     fileType: 'pdf',
     fileUrl: null,
     uploadedBy: 'Admin',

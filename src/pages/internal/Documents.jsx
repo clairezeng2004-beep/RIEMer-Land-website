@@ -31,19 +31,19 @@ import { pinyinMatch } from '../../utils/pinyinSearch';
 import './Documents.css';
 
 const typeLabels = {
-  plan: '工作计划',
+  course: '课程及考试资料',
+  history: '历史会议',
+  process: '流程手册及模版文件',
   regulation: '规章制度',
-  minutes: '会议纪要',
-  guide: '培训手册',
-  finance: '财务报告',
+  experience: '成员经验分享',
 };
 
 const typeColors = {
-  plan: '#5EAD8C',
-  regulation: '#4FBFC4',
-  minutes: '#D4A44C',
-  guide: '#8B5CF6',
-  finance: '#EC4899',
+  course: '#5EAD8C',
+  history: '#4FBFC4',
+  process: '#D4A44C',
+  regulation: '#8B5CF6',
+  experience: '#EC4899',
 };
 
 const fileTypeIcons = {
@@ -81,7 +81,7 @@ export default function Documents() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
-  const [newDoc, setNewDoc] = useState({ title: '', type: 'plan', description: '' });
+  const [newDoc, setNewDoc] = useState({ title: '', type: 'course', description: '' });
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -163,7 +163,7 @@ export default function Documents() {
       type: 'info',
       read: true, // 自动已读，不打扰成员
     });
-    setNewDoc({ title: '', type: 'plan', description: '' });
+    setNewDoc({ title: '', type: 'course', description: '' });
     setSelectedFile(null);
     setShowUpload(false);
   };
@@ -433,7 +433,7 @@ export default function Documents() {
 
                 <div className="doc-card__footer">
                   <span className="doc-card__author">
-                    <User size={12} /> {doc.uploadedBy}
+                    <User size={12} /> 贡献者：{doc.uploadedBy}
                   </span>
                   <span className="doc-card__stats">
                     <Eye size={12} /> {doc.viewCount || 0}
@@ -453,26 +453,12 @@ export default function Documents() {
                     <span>{(doc.likes || []).length}</span>
                   </button>
                   {(doc.likes || []).length > 0 && (
-                    <div className="doc-card__like-avatars">
-                      {(doc.likes || []).slice(0, 5).map((like) => (
-                        <div
-                          key={like.userId}
-                          className="doc-card__like-avatar"
-                          style={{ background: like.userAvatar ? 'transparent' : getAvatarColor(like.userName) }}
-                          title={like.userName}
-                        >
-                          {like.userAvatar ? (
-                            <img src={like.userAvatar} alt={like.userName} />
-                          ) : (
-                            getInitial(like.userName)
-                          )}
-                        </div>
+                    <div className="doc-card__like-names">
+                      {(doc.likes || []).map((like, idx) => (
+                        <span key={like.userId} className="doc-card__like-name">
+                          {like.userName}{idx < (doc.likes || []).length - 1 ? '、' : ''}
+                        </span>
                       ))}
-                      {(doc.likes || []).length > 5 && (
-                        <div className="doc-card__like-avatar doc-card__like-avatar--more">
-                          +{(doc.likes || []).length - 5}
-                        </div>
-                      )}
                     </div>
                   )}
                 </div>
@@ -528,7 +514,7 @@ export default function Documents() {
               <div className="doc-preview__title-area">
                 <h3>{previewDoc.title}</h3>
                 <span className="doc-preview__meta">
-                  {previewDoc.uploadedBy} · {previewDoc.date} · {previewDoc.size}
+                  贡献者：{previewDoc.uploadedBy} · {previewDoc.date} · {previewDoc.size}
                 </span>
               </div>
               <div className="doc-preview__header-actions">
@@ -577,7 +563,7 @@ export default function Documents() {
                   <p className="doc-preview__no-preview-desc">{previewDoc.description}</p>
                   <div className="doc-preview__no-preview-info">
                     <span><Calendar size={14} /> 上传日期: {previewDoc.date}</span>
-                    <span><User size={14} /> 上传者: {previewDoc.uploadedBy}</span>
+                    <span><User size={14} /> 贡献者：{previewDoc.uploadedBy}</span>
                     <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
                     <span><BarChart3 size={14} /> 浏览次数: {previewDoc.viewCount || 0}</span>
                   </div>
@@ -618,20 +604,11 @@ export default function Documents() {
               </button>
               {(previewDoc.likes || []).length > 0 && (
                 <div className="doc-preview__like-users">
-                  <div className="doc-preview__like-avatars">
-                    {(previewDoc.likes || []).map((like) => (
-                      <div
-                        key={like.userId}
-                        className="doc-preview__like-avatar"
-                        style={{ background: like.userAvatar ? 'transparent' : getAvatarColor(like.userName) }}
-                        title={like.userName}
-                      >
-                        {like.userAvatar ? (
-                          <img src={like.userAvatar} alt={like.userName} />
-                        ) : (
-                          getInitial(like.userName)
-                        )}
-                      </div>
+                  <div className="doc-preview__like-names">
+                    {(previewDoc.likes || []).map((like, idx) => (
+                      <span key={like.userId} className="doc-preview__like-name">
+                        {like.userName}{idx < (previewDoc.likes || []).length - 1 ? '、' : ''}
+                      </span>
                     ))}
                   </div>
                   <span className="doc-preview__like-count">
