@@ -14,7 +14,7 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   grid-template-rows: auto auto auto auto;
-  row-gap: var(--space-xs);
+  row-gap: 2px;
   column-gap: var(--space-xl);
 }
 
@@ -93,6 +93,7 @@
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
+  padding-bottom: var(--space-sm);
 }
 
 .footer__nav-link {
