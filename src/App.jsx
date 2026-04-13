@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import ScrollToTop from './components/ScrollToTop';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/public/Home';
@@ -24,6 +25,7 @@ function App() {
       <SiteContentProvider>
         <NotificationProvider>
           <Router>
+            <ScrollToTop />
             <Navbar />
             <main>
               <Routes>
