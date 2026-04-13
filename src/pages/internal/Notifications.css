@@ -212,8 +212,10 @@
 
 .notification-item__actions {
   display: flex;
+  justify-content: flex-end;
   gap: var(--space-xs);
   flex-shrink: 0;
+  min-width: 64px;
   opacity: 0;
   transition: opacity var(--transition-fast);
 }
