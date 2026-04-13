@@ -17,13 +17,13 @@ export default function InternalLayout() {
     window.scrollTo(0, 0);
   }, [location.pathname]);
 
-  // loading 超时保护：10 秒后强制认为未登录
+  // loading 超时保护：5 秒后强制认为未登录（兜底，正常情况下 initSession 会更快结束）
   useEffect(() => {
     if (!loading) return;
     const timer = setTimeout(() => {
-      console.warn('[InternalLayout] Loading 超时（10s），跳转登录页');
+      console.warn('[InternalLayout] Loading 超时（5s），跳转登录页');
       setLoadingTimeout(true);
-    }, 10000);
+    }, 5000);
     return () => clearTimeout(timer);
   }, [loading]);
 

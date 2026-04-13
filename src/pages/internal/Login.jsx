@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import {
   Mail, Lock, User, LogIn, UserPlus, Eye, EyeOff,
   AlertCircle, CheckCircle, KeyRound, ArrowLeft,
@@ -31,7 +32,7 @@ export default function Login() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
-  const { login, register, resetPassword, changePassword, isAuthenticated } = useAuth();
+  const { login, register, resetPassword, changePassword, isAuthenticated, supabaseOk } = useAuth();
   const navigate = useNavigate();
 
   // 页面加载时恢复已保存的凭据
@@ -257,6 +258,17 @@ export default function Login() {
           >
             <ArrowLeft size={16} /> 返回登录
           </button>
+        )}
+
+        {/* 连接状态提示 */}
+        {isSupabaseConfigured && supabaseOk === false && (
+          <div className="login-card__message login-card__message--warning" style={{
+            background: 'rgba(245, 158, 11, 0.08)',
+            border: '1px solid rgba(245, 158, 11, 0.3)',
+            color: '#92400e',
+          }}>
+            <AlertCircle size={16} /> 云端服务暂时不可用，已自动切换到离线模式
+          </div>
         )}
 
         {error && (
@@ -554,7 +566,7 @@ export default function Login() {
         {/* 底部提示 */}
         {view === 'login' && (
           <div className="login-card__hint">
-            <p>演示账号：admin@riemerland.org / admin123</p>
+            <p>{supabaseOk === false ? '离线模式 · 演示账号：' : '演示账号：'}admin@riemerland.org / admin123</p>
           </div>
         )}
 

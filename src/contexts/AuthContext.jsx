@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, checkSupabaseHealth, getReachable, onReachableChange } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
@@ -64,6 +64,8 @@ const saveLocalUsers = (users) => {
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
+  // Supabase 是否可达：null=检测中, true=可达, false=不可达（降级本地模式）
+  const [supabaseOk, setSupabaseOk] = useState(isSupabaseConfigured ? null : false);
 
   // ---- 本地模式：从 localStorage 恢复登录态的辅助函数 ----
   const restoreLocalAuth = useCallback(() => {
@@ -127,13 +129,27 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Supabase 模式：监听 auth state 变化
-    const SESSION_TIMEOUT_MS = 8000; // 8 秒超时
+    // Supabase 模式：先做健康检查，不通则降级本地模式
+    const SESSION_TIMEOUT_MS = 6000; // 6 秒超时（缩短）
 
     const initSession = async () => {
-      // 超时保护：如果 getSession / fetchProfile 超时，强制结束 loading
+      // 1. 先快速检测 Supabase 是否可达（3 秒超时）
+      const reachable = await checkSupabaseHealth();
+      if (!reachable) {
+        console.warn('[Auth] Supabase 不可达，自动降级到本地模式');
+        setSupabaseOk(false);
+        // 降级：从 localStorage 恢复登录态
+        restoreLocalAuth();
+        setLoading(false);
+        return;
+      }
+      setSupabaseOk(true);
+
+      // 2. Supabase 可达，正常获取 session
       const timeout = setTimeout(() => {
-        console.warn('[Auth] Session 初始化超时（8s），强制结束 loading');
+        console.warn('[Auth] Session 初始化超时（6s），降级本地模式');
+        setSupabaseOk(false);
+        restoreLocalAuth();
         setLoading(false);
       }, SESSION_TIMEOUT_MS);
 
@@ -144,6 +160,9 @@ export function AuthProvider({ children }) {
         }
       } catch (err) {
         console.error('[Auth] Failed to get session:', err);
+        // 网络错误 → 降级
+        setSupabaseOk(false);
+        restoreLocalAuth();
       } finally {
         clearTimeout(timeout);
         setLoading(false);
@@ -155,6 +174,8 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Auth] onAuthStateChange:', event);
+        // 如果 Supabase 已标记不可达，跳过
+        if (getReachable() === false) return;
         if (session?.user) {
           // 如果 login 函数已经设置了 user，跳过重复查询
           // 只在 SIGNED_IN 以外的事件（如 TOKEN_REFRESHED）或初始加载时查询
@@ -244,7 +265,10 @@ export function AuthProvider({ children }) {
 
   // ---- 登录 ----
   const login = useCallback(async (email, password) => {
-    if (!isSupabaseConfigured) {
+    // 如果 Supabase 未配置，或已确认不可达，走本地模式
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+
+    if (useLocal) {
       // 本地模式
       const users = getLocalUsers();
       const found = users.find((u) => u.email === email && u.password === password);
@@ -267,7 +291,7 @@ export function AuthProvider({ children }) {
     }
 
     // Supabase 模式
-    const LOGIN_TIMEOUT_MS = 15000; // 15 秒登录超时
+    const LOGIN_TIMEOUT_MS = 8000; // 8 秒登录超时（缩短）
 
     try {
       const loginPromise = (async () => {
@@ -330,14 +354,39 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.error('[Auth] Supabase 登录异常:', err);
       const isTimeout = err.message?.includes('超时') || err.name === 'AbortError';
+      if (isTimeout) {
+        // Supabase 超时 → 标记不可达，降级到本地模式重试
+        console.warn('[Auth] Supabase 登录超时，降级到本地模式重试');
+        setSupabaseOk(false);
+        const users = getLocalUsers();
+        const found = users.find((u) => u.email === email && u.password === password);
+        if (found && found.authorized) {
+          setUser(found);
+          localStorage.setItem(
+            AUTH_KEY,
+            JSON.stringify({
+              id: found.id,
+              name: found.name,
+              email: found.email,
+              role: found.role,
+              deviceId: getDeviceId(),
+              loginAt: new Date().toISOString(),
+              persistent: true,
+            })
+          );
+          return { success: true, message: '已使用离线模式登录' };
+        }
+        return {
+          success: false,
+          message: '服务连接超时，已切换到离线模式。请使用本地账号登录（演示账号：admin@riemerland.org / admin123）',
+        };
+      }
       return {
         success: false,
-        message: isTimeout
-          ? '登录请求超时，服务响应较慢，请稍后重试'
-          : `登录服务异常：${err.message}`,
+        message: `登录服务异常：${err.message}`,
       };
     }
-  }, []);
+  }, [supabaseOk]);
 
   // ---- 注册 ----
   const register = useCallback(async (email, password, name) => {
@@ -616,6 +665,7 @@ export function AuthProvider({ children }) {
         isAdmin,
         isMember,
         hasMinRole,
+        supabaseOk,
         getAllUsers,
         authorizeUser,
         revokeUser,
