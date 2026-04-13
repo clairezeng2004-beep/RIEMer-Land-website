@@ -14,7 +14,6 @@ export default function Footer() {
     try {
       await navigator.clipboard.writeText(content.footerEmail);
       setEmailCopied(true);
-      setTimeout(() => setEmailCopied(false), 2000);
     } catch {
       // fallback
       const textarea = document.createElement('textarea');
@@ -24,7 +23,6 @@ export default function Footer() {
       document.execCommand('copy');
       document.body.removeChild(textarea);
       setEmailCopied(true);
-      setTimeout(() => setEmailCopied(false), 2000);
     }
   };
 
