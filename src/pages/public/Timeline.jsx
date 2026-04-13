@@ -1,8 +1,12 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Star, ChevronLeft, ChevronRight, User } from 'lucide-react';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, getReachable } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import './Timeline.css';
+
+// localStorage keys
+const USERS_DB_KEY = 'riemer_users';
+const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
 
 export default function Timeline() {
   const { timeline: timelineData } = useSiteContent();
@@ -13,80 +17,111 @@ export default function Timeline() {
   const dragState = useRef({ startX: 0, scrollLeft: 0 });
   const [members, setMembers] = useState([]);
 
-  // 加载成员数据
-  useEffect(() => {
-    const loadMembers = async () => {
-      if (isSupabaseConfigured && supabase) {
-        try {
-          // 从 Supabase 获取所有已授权成员
-          const { data: profiles, error: profilesError } = await supabase
-            .from('profiles')
-            .select('id, name, nickname, avatar, signature, authorized')
-            .eq('authorized', true);
+  // ---- 从本地 localStorage 加载成员 ----
+  const loadLocalMembers = useCallback(() => {
+    try {
+      const usersRaw = localStorage.getItem(USERS_DB_KEY);
+      const users = usersRaw ? JSON.parse(usersRaw) : [];
+      const profilesRaw = localStorage.getItem(MEMBER_PROFILES_KEY);
+      const localProfiles = profilesRaw ? JSON.parse(profilesRaw) : [];
 
-          if (profilesError) {
-            console.warn('[Timeline] profiles 查询失败:', profilesError.message);
-          }
+      const enrollmentMap = {};
+      localProfiles.forEach((p) => {
+        enrollmentMap[p.user_id] = p.enrollment_year;
+      });
 
-          const { data: memberProfiles, error: mpError } = await supabase
-            .from('member_profiles')
-            .select('user_id, enrollment_year');
+      const authorizedUsers = users.filter((u) => u.authorized);
+      const formatted = authorizedUsers.map((u) => ({
+        id: u.id,
+        nickname: u.nickname || u.name || '匿名成员',
+        avatar: u.avatar || null,
+        signature: u.signature || '',
+        enrollment_year: enrollmentMap[u.id] || '',
+      }));
+      setMembers(formatted);
+    } catch {
+      setMembers([]);
+    }
+  }, []);
 
-          if (mpError) {
-            console.warn('[Timeline] member_profiles 查询失败:', mpError.message);
-          }
+  // ---- 加载成员数据（Supabase 优先，本地兜底） ----
+  const loadMembers = useCallback(async () => {
+    // 只有 Supabase 已配置且可达时才查远端
+    const useSupabase = isSupabaseConfigured && supabase && getReachable() !== false;
 
-          if (profiles && profiles.length > 0) {
-            const enrollmentMap = {};
-            (memberProfiles || []).forEach((mp) => {
-              enrollmentMap[mp.user_id] = mp.enrollment_year;
-            });
-
-            const formatted = profiles.map((p) => ({
-              id: p.id,
-              nickname: p.nickname || p.name || '匿名成员',
-              avatar: p.avatar || null,
-              signature: p.signature || '',
-              enrollment_year: enrollmentMap[p.id] || '',
-            }));
-            setMembers(formatted);
-            return;
-          }
-        } catch (err) {
-          console.warn('[Timeline] Supabase 加载成员失败，回退本地:', err);
-        }
-      }
-
-      // 本地模式
-      const USERS_DB_KEY = 'riemer_users';
-      const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
+    if (useSupabase) {
       try {
-        const usersRaw = localStorage.getItem(USERS_DB_KEY);
-        const users = usersRaw ? JSON.parse(usersRaw) : [];
-        const profilesRaw = localStorage.getItem(MEMBER_PROFILES_KEY);
-        const localProfiles = profilesRaw ? JSON.parse(profilesRaw) : [];
+        const { data: profiles, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id, name, nickname, avatar, signature, authorized')
+          .eq('authorized', true);
 
-        const enrollmentMap = {};
-        localProfiles.forEach((p) => {
-          enrollmentMap[p.user_id] = p.enrollment_year;
-        });
+        if (profilesError) {
+          console.warn('[Timeline] profiles 查询失败:', profilesError.message);
+        }
 
-        const authorizedUsers = users.filter((u) => u.authorized);
-        const formatted = authorizedUsers.map((u) => ({
-          id: u.id,
-          nickname: u.nickname || u.name || '匿名成员',
-          avatar: u.avatar || null,
-          signature: u.signature || '',
-          enrollment_year: enrollmentMap[u.id] || '',
-        }));
-        setMembers(formatted);
-      } catch {
-        setMembers([]);
+        const { data: memberProfiles, error: mpError } = await supabase
+          .from('member_profiles')
+          .select('user_id, enrollment_year');
+
+        if (mpError) {
+          console.warn('[Timeline] member_profiles 查询失败:', mpError.message);
+        }
+
+        if (profiles && profiles.length > 0) {
+          const enrollmentMap = {};
+          (memberProfiles || []).forEach((mp) => {
+            enrollmentMap[mp.user_id] = mp.enrollment_year;
+          });
+
+          const formatted = profiles.map((p) => ({
+            id: p.id,
+            nickname: p.nickname || p.name || '匿名成员',
+            avatar: p.avatar || null,
+            signature: p.signature || '',
+            enrollment_year: enrollmentMap[p.id] || '',
+          }));
+          setMembers(formatted);
+          return;
+        }
+        // Supabase 返回空数组 → 回退本地
+      } catch (err) {
+        console.warn('[Timeline] Supabase 加载成员失败，回退本地:', err);
+      }
+    }
+
+    // 本地模式
+    loadLocalMembers();
+  }, [loadLocalMembers]);
+
+  // ---- 初始加载 ----
+  useEffect(() => {
+    loadMembers();
+  }, [loadMembers]);
+
+  // ---- 监听 localStorage 变化（其他标签页更新了用户数据） ----
+  useEffect(() => {
+    const handleStorageChange = (e) => {
+      if (e.key === USERS_DB_KEY || e.key === MEMBER_PROFILES_KEY) {
+        loadMembers();
       }
     };
 
-    loadMembers();
-  }, []);
+    // 用户切回此标签页时重新加载（覆盖跨设备 Supabase 同步场景）
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        loadMembers();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [loadMembers]);
 
   const checkScroll = useCallback(() => {
     const el = trackRef.current;
