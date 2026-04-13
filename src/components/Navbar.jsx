@@ -75,7 +75,7 @@ export default function Navbar() {
                   location.pathname.startsWith('/internal') ? 'navbar__link--active' : ''
                 }`}
               >
-                内部空间
+                主理团队内部空间
                 {unreadCount > 0 && (
                   <span className="navbar__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
                 )}
@@ -145,7 +145,7 @@ export default function Navbar() {
                 location.pathname.startsWith('/internal') ? 'navbar__link--active' : ''
               }`}
             >
-              内部空间
+              主理团队内部空间
               {unreadCount > 0 && (
                 <span className="navbar__badge">{unreadCount > 9 ? '9+' : unreadCount}</span>
               )}
@@ -163,7 +163,7 @@ export default function Navbar() {
               </div>
             ) : (
               <Link to="/login" className="navbar__link navbar__mobile-entry">
-                内部空间
+                主理团队内部空间
               </Link>
             )}
           </div>
