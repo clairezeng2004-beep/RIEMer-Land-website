@@ -195,7 +195,7 @@ export default function Login() {
       case 'login':
         return { title: '欢迎回来', desc: '登录以访问内部空间' };
       case 'register':
-        return { title: '加入我们', desc: '注册成为 RIEMer Land 成员' };
+        return { title: '加入我们', desc: '成为 RIEMer Land 内部成员' };
       case 'forgot':
         return { title: '忘记密码', desc: '输入邮箱和新密码来重置您的密码' };
       case 'changePassword':
