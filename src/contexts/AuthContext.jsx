@@ -290,6 +290,28 @@ export function AuthProvider({ children }) {
       return { success: true };
     }
 
+    // ---- 本地用户数据库回退登录（辅助函数） ----
+    const tryLocalFallback = (email, password) => {
+      const users = getLocalUsers();
+      const found = users.find((u) => u.email === email && u.password === password);
+      if (!found) return null;
+      if (!found.authorized) return { success: false, message: '您的账号尚未被授权，请联系管理员' };
+      setUser(found);
+      localStorage.setItem(
+        AUTH_KEY,
+        JSON.stringify({
+          id: found.id,
+          name: found.name,
+          email: found.email,
+          role: found.role,
+          deviceId: getDeviceId(),
+          loginAt: new Date().toISOString(),
+          persistent: true,
+        })
+      );
+      return { success: true };
+    };
+
     // Supabase 模式
     const LOGIN_TIMEOUT_MS = 8000; // 8 秒登录超时（缩短）
 
@@ -303,7 +325,14 @@ export function AuthProvider({ children }) {
           if (error.message === 'Email not confirmed') {
             return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
           }
-          return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
+          // Supabase 认证失败（如用户不存在），回退到本地用户数据库尝试
+          if (error.message === 'Invalid login credentials') {
+            console.warn('[Auth] Supabase 认证失败，尝试本地用户数据库回退');
+            const localResult = tryLocalFallback(email, password);
+            if (localResult) return localResult;
+            return { success: false, message: '邮箱或密码错误' };
+          }
+          return { success: false, message: error.message };
         }
 
         // signInWithPassword 返回的 data 已经包含 session，不需要再调 getSession
@@ -345,7 +374,7 @@ export function AuthProvider({ children }) {
         return { success: true };
       })();
 
-      // 超时竞争：loginPromise vs 15 秒超时
+      // 超时竞争：loginPromise vs 8 秒超时
       const timeoutPromise = new Promise((_, reject) =>
         setTimeout(() => reject(new Error('登录请求超时，请检查网络连接后重试')), LOGIN_TIMEOUT_MS)
       );
@@ -353,92 +382,89 @@ export function AuthProvider({ children }) {
       return await Promise.race([loginPromise, timeoutPromise]);
     } catch (err) {
       console.error('[Auth] Supabase 登录异常:', err);
-      const isTimeout = err.message?.includes('超时') || err.name === 'AbortError';
-      if (isTimeout) {
-        // Supabase 超时 → 标记不可达，降级到本地模式重试
-        console.warn('[Auth] Supabase 登录超时，降级到本地模式重试');
-        setSupabaseOk(false);
-        const users = getLocalUsers();
-        const found = users.find((u) => u.email === email && u.password === password);
-        if (found && found.authorized) {
-          setUser(found);
-          localStorage.setItem(
-            AUTH_KEY,
-            JSON.stringify({
-              id: found.id,
-              name: found.name,
-              email: found.email,
-              role: found.role,
-              deviceId: getDeviceId(),
-              loginAt: new Date().toISOString(),
-              persistent: true,
-            })
-          );
-          return { success: true, message: '已使用离线模式登录' };
-        }
-        return {
-          success: false,
-          message: '服务连接超时，已切换到离线模式。请使用本地账号登录（演示账号：admin@riemerland.org / admin123）',
-        };
+      // 任何异常（超时、网络错误等）都回退到本地模式
+      console.warn('[Auth] Supabase 登录异常，降级到本地模式重试');
+      setSupabaseOk(false);
+      const localResult = tryLocalFallback(email, password);
+      if (localResult) {
+        if (localResult.success) localResult.message = '已使用离线模式登录';
+        return localResult;
       }
+      const isTimeout = err.message?.includes('超时') || err.name === 'AbortError';
       return {
         success: false,
-        message: `登录服务异常：${err.message}`,
+        message: isTimeout
+          ? '服务连接超时，已切换到离线模式。请使用本地账号登录（演示账号：admin@riemerland.org / admin123）'
+          : `登录服务异常：${err.message}`,
       };
     }
   }, [supabaseOk]);
 
-  // ---- 注册 ----
-  const register = useCallback(async (email, password, name) => {
-    if (!isSupabaseConfigured) {
-      // 本地模式
-      const users = getLocalUsers();
-      if (users.find((u) => u.email === email)) {
-        return { success: false, message: '该邮箱已被注册' };
-      }
-      const newUser = {
-        id: Date.now().toString(),
-        email,
-        password,
-        name,
-        nickname: '',
-        avatar: null,
-        role: 'member',
-        authorized: false,
-        createdAt: new Date().toISOString(),
-      };
-      users.push(newUser);
-      saveLocalUsers(users);
-      return { success: true, message: '注册成功！请等待管理员授权后方可登录内部系统。' };
+  // ---- 本地注册辅助函数 ----
+  const registerLocal = (email, password, name) => {
+    const users = getLocalUsers();
+    if (users.find((u) => u.email === email)) {
+      return { success: false, message: '该邮箱已被注册' };
     }
-
-    // Supabase 模式
-    const { data, error } = await supabase.auth.signUp({
+    const newUser = {
+      id: Date.now().toString(),
       email,
       password,
-      options: { data: { name } },
-    });
-    if (error) {
-      if (error.message.includes('already registered')) {
-        return { success: false, message: '该邮箱已被注册' };
-      }
-      return { success: false, message: error.message };
-    }
-    // 创建 profile 记录
-    if (data.user) {
-      await supabase.from('profiles').insert({
-        id: data.user.id,
-        email,
-        name,
-        nickname: '',
-        avatar: null,
-        role: 'member',
-        authorized: false,
-        created_at: new Date().toISOString(),
-      });
-    }
+      name,
+      nickname: '',
+      avatar: null,
+      role: 'member',
+      authorized: false,
+      createdAt: new Date().toISOString(),
+    };
+    users.push(newUser);
+    saveLocalUsers(users);
     return { success: true, message: '注册成功！请等待管理员授权后方可登录内部系统。' };
-  }, []);
+  };
+
+  // ---- 注册 ----
+  const register = useCallback(async (email, password, name) => {
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (useLocal) {
+      return registerLocal(email, password, name);
+    }
+
+    // Supabase 模式 — 同时也写入本地用户数据库作为备份
+    try {
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: { data: { name } },
+      });
+      if (error) {
+        if (error.message.includes('already registered')) {
+          return { success: false, message: '该邮箱已被注册' };
+        }
+        // Supabase 注册失败，回退到本地注册
+        console.warn('[Auth] Supabase 注册失败，回退本地注册:', error.message);
+        return registerLocal(email, password, name);
+      }
+      // 创建 profile 记录
+      if (data.user) {
+        await supabase.from('profiles').insert({
+          id: data.user.id,
+          email,
+          name,
+          nickname: '',
+          avatar: null,
+          role: 'member',
+          authorized: false,
+          created_at: new Date().toISOString(),
+        });
+      }
+      // 同时写入本地用户数据库备份
+      registerLocal(email, password, name);
+      return { success: true, message: '注册成功！请等待管理员授权后方可登录内部系统。' };
+    } catch (err) {
+      console.warn('[Auth] Supabase 注册异常，回退本地注册:', err.message);
+      return registerLocal(email, password, name);
+    }
+  }, [supabaseOk]);
 
   // ---- 登出 ----
   const logout = useCallback(async () => {
@@ -451,7 +477,8 @@ export function AuthProvider({ children }) {
 
   // ---- 忘记密码 / 重置密码 ----
   const resetPassword = useCallback(async (email, newPassword) => {
-    if (!isSupabaseConfigured) {
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (useLocal) {
       // 本地模式：直接用邮箱查找用户，设置新密码
       if (!email) return { success: false, message: '请输入邮箱地址' };
       if (!newPassword || newPassword.length < 6) {
@@ -476,7 +503,7 @@ export function AuthProvider({ children }) {
       return { success: false, message: error.message };
     }
     return { success: true, message: '密码重置邮件已发送，请查看您的邮箱。' };
-  }, []);
+  }, [supabaseOk]);
 
   // ---- 修改密码（已登录用户） ----
   const changePassword = useCallback(async (currentPassword, newPassword) => {
@@ -485,7 +512,8 @@ export function AuthProvider({ children }) {
       return { success: false, message: '新密码至少需要 6 个字符' };
     }
 
-    if (!isSupabaseConfigured) {
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (useLocal) {
       // 本地模式：验证当前密码后修改
       const users = getLocalUsers();
       const idx = users.findIndex((u) => u.id === user.id);
@@ -517,7 +545,7 @@ export function AuthProvider({ children }) {
       return { success: false, message: error.message };
     }
     return { success: true, message: '密码修改成功！' };
-  }, [user]);
+  }, [user, supabaseOk]);
 
   // ---- 更新 Supabase 密码（从重置链接回调） ----
   const updatePasswordFromReset = useCallback(async (newPassword) => {
@@ -536,107 +564,139 @@ export function AuthProvider({ children }) {
 
   // ---- 获取所有用户 ----
   const getAllUsers = useCallback(async () => {
-    if (!isSupabaseConfigured) {
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (useLocal) {
       return getLocalUsers();
     }
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .order('created_at', { ascending: true });
-    return error ? [] : data;
-  }, []);
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .order('created_at', { ascending: true });
+      if (error || !data || data.length === 0) {
+        // Supabase 查询失败或无数据，回退本地
+        console.warn('[Auth] Supabase profiles 查询失败或为空，回退本地用户列表');
+        return getLocalUsers();
+      }
+      return data;
+    } catch {
+      return getLocalUsers();
+    }
+  }, [supabaseOk]);
 
   // ---- 授权用户 ----
   const authorizeUser = useCallback(async (userId) => {
-    if (!isSupabaseConfigured) {
-      const users = getLocalUsers();
-      const idx = users.findIndex((u) => u.id === userId);
-      if (idx >= 0) {
-        users[idx].authorized = true;
-        saveLocalUsers(users);
-      }
-      return;
+    // 始终同步更新本地用户数据库
+    const users = getLocalUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx >= 0) {
+      users[idx].authorized = true;
+      saveLocalUsers(users);
     }
-    await supabase.from('profiles').update({ authorized: true }).eq('id', userId);
-  }, []);
+
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      try {
+        await supabase.from('profiles').update({ authorized: true }).eq('id', userId);
+      } catch (err) {
+        console.warn('[Auth] Supabase 授权更新失败:', err.message);
+      }
+    }
+  }, [supabaseOk]);
 
   // ---- 撤销授权 ----
   const revokeUser = useCallback(async (userId) => {
-    if (!isSupabaseConfigured) {
-      const users = getLocalUsers();
-      const idx = users.findIndex((u) => u.id === userId);
-      if (idx >= 0) {
-        users[idx].authorized = false;
-        saveLocalUsers(users);
-        if (user?.id === userId) {
-          logout();
-        }
-      }
-      return;
+    // 始终同步更新本地用户数据库
+    const users = getLocalUsers();
+    const localIdx = users.findIndex((u) => u.id === userId);
+    if (localIdx >= 0) {
+      users[localIdx].authorized = false;
+      saveLocalUsers(users);
     }
-    await supabase.from('profiles').update({ authorized: false }).eq('id', userId);
+
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      try {
+        await supabase.from('profiles').update({ authorized: false }).eq('id', userId);
+      } catch (err) {
+        console.warn('[Auth] Supabase 撤销授权失败:', err.message);
+      }
+    }
     if (user?.id === userId) {
       await logout();
     }
-  }, [user, logout]);
+  }, [user, logout, supabaseOk]);
 
   // ---- 更改用户角色 ----
   const changeUserRole = useCallback(async (userId, newRole) => {
     if (!ROLES.includes(newRole)) return;
 
-    if (!isSupabaseConfigured) {
-      const users = getLocalUsers();
-      const idx = users.findIndex((u) => u.id === userId);
-      if (idx >= 0) {
-        users[idx].role = newRole;
-        saveLocalUsers(users);
-      }
-      return;
+    // 始终同步更新本地用户数据库
+    const users = getLocalUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx >= 0) {
+      users[idx].role = newRole;
+      saveLocalUsers(users);
     }
-    await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
-  }, []);
+
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      try {
+        await supabase.from('profiles').update({ role: newRole }).eq('id', userId);
+      } catch (err) {
+        console.warn('[Auth] Supabase 角色更新失败:', err.message);
+      }
+    }
+  }, [supabaseOk]);
 
   // ---- 更新用户个人资料（昵称、头像等） ----
   const updateProfile = useCallback(async (updates) => {
     if (!user) return { success: false, message: '未登录' };
 
-    if (!isSupabaseConfigured) {
-      const users = getLocalUsers();
-      const idx = users.findIndex((u) => u.id === user.id);
-      if (idx >= 0) {
-        if (updates.nickname !== undefined) users[idx].nickname = updates.nickname;
-        if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
-        saveLocalUsers(users);
-        setUser({ ...users[idx] });
-        // 同步 AUTH_KEY
-        localStorage.setItem(
-          AUTH_KEY,
-          JSON.stringify({
-            id: users[idx].id,
-            name: users[idx].name,
-            email: users[idx].email,
-            role: users[idx].role,
-            deviceId: getDeviceId(),
-            loginAt: new Date().toISOString(),
-            persistent: true,
-          })
-        );
-      }
-      return { success: true };
+    // 始终更新本地用户数据库
+    const users = getLocalUsers();
+    const idx = users.findIndex((u) => u.id === user.id);
+    if (idx >= 0) {
+      if (updates.nickname !== undefined) users[idx].nickname = updates.nickname;
+      if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
+      saveLocalUsers(users);
+      setUser({ ...users[idx] });
+      // 同步 AUTH_KEY
+      localStorage.setItem(
+        AUTH_KEY,
+        JSON.stringify({
+          id: users[idx].id,
+          name: users[idx].name,
+          email: users[idx].email,
+          role: users[idx].role,
+          deviceId: getDeviceId(),
+          loginAt: new Date().toISOString(),
+          persistent: true,
+        })
+      );
     }
 
-    // Supabase 模式
-    const updateData = {};
-    if (updates.nickname !== undefined) updateData.nickname = updates.nickname;
-    if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
-    const { error } = await supabase
-      .from('profiles')
-      .update(updateData)
-      .eq('id', user.id);
-    if (error) return { success: false, message: error.message };
-    setUser((prev) => ({ ...prev, ...updateData }));
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      // Supabase 模式：同时更新远端
+      try {
+        const updateData = {};
+        if (updates.nickname !== undefined) updateData.nickname = updates.nickname;
+        if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
+        const { error } = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', user.id);
+        if (error) {
+          console.warn('[Auth] Supabase profile 更新失败:', error.message);
+        }
+      } catch (err) {
+        console.warn('[Auth] Supabase profile 更新异常:', err.message);
+      }
+    }
+
     return { success: true };
-  }, [user]);
+  }, [user, supabaseOk]);
 
   // ---- 权限判断工具 ----
   const userRole = user?.role || 'member';
