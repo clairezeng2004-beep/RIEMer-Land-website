@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Mail, Lock, User, LogIn, UserPlus, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import './Login.css';
+
+const SAVED_CREDENTIALS_KEY = 'riemer_saved_credentials';
 
 export default function Login() {
   const [isLogin, setIsLogin] = useState(true);
@@ -10,10 +12,28 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+  const [rememberPassword, setRememberPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const { login, register, isAuthenticated } = useAuth();
   const navigate = useNavigate();
+
+  // 页面加载时恢复已保存的凭据
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(SAVED_CREDENTIALS_KEY);
+      if (saved) {
+        const { email: savedEmail, password: savedPassword } = JSON.parse(saved);
+        if (savedEmail && savedPassword) {
+          setEmail(savedEmail);
+          setPassword(savedPassword);
+          setRememberPassword(true);
+        }
+      }
+    } catch {
+      localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+    }
+  }, []);
 
   if (isAuthenticated) {
     return <Navigate to="/internal/documents" replace />;
@@ -32,6 +52,15 @@ export default function Login() {
     if (isLogin) {
       const result = await login(email, password);
       if (result.success) {
+        // 登录成功后，根据勾选状态保存或清除凭据
+        if (rememberPassword) {
+          localStorage.setItem(
+            SAVED_CREDENTIALS_KEY,
+            JSON.stringify({ email, password })
+          );
+        } else {
+          localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+        }
         navigate('/internal/documents');
       } else {
         setError(result.message);
@@ -147,6 +176,18 @@ export default function Login() {
               </button>
             </div>
           </div>
+
+          {isLogin && (
+            <label className="login-card__remember">
+              <input
+                type="checkbox"
+                checked={rememberPassword}
+                onChange={(e) => setRememberPassword(e.target.checked)}
+                className="login-card__remember-checkbox"
+              />
+              <span className="login-card__remember-text">记住密码</span>
+            </label>
+          )}
 
           <button type="submit" className="btn btn-primary btn-lg login-card__submit">
             {isLogin ? (

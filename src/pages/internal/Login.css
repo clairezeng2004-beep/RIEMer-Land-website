@@ -170,6 +170,28 @@
   cursor: pointer;
 }
 
+.login-card__remember {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  margin-top: calc(-1 * var(--space-sm));
+}
+
+.login-card__remember-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.login-card__remember-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+}
+
 .login-card__submit {
   width: 100%;
   justify-content: center;
