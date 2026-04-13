@@ -74,6 +74,35 @@
   color: var(--color-primary);
 }
 
+/* 纯文字（不可点击），不触发 hover 变色 */
+.footer__nav-text {
+  display: block;
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+/* 邮箱复制按钮 */
+.footer__copy-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  opacity: 0.4;
+  padding: 2px;
+  border-radius: 4px;
+  transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.footer__copy-btn:hover {
+  opacity: 0.8;
+  color: var(--color-primary);
+  background: var(--color-bg-muted, rgba(0, 0, 0, 0.04));
+}
+
 .footer__bottom {
   margin-top: var(--space-2xl);
   padding-top: var(--space-lg);
