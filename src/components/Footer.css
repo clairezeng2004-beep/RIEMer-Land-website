@@ -32,6 +32,8 @@
   align-items: center;
   gap: var(--space-sm);
   font-size: var(--text-sm);
+  line-height: 1.4;
+  padding: 1px 0;
   color: var(--color-text-muted);
   white-space: nowrap;
   position: relative;
@@ -100,6 +102,8 @@
   display: block;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  line-height: 1.4;
+  padding: 1px 0;
   transition: color var(--transition-fast);
   text-decoration: none;
 }
@@ -117,6 +121,8 @@
   display: block;
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+  line-height: 1.4;
+  padding: 1px 0;
 }
 
 /* "关于我们"文字容器 - 桌面端竖排、跨 subgrid 行 */
