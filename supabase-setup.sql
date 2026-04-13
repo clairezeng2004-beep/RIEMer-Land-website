@@ -166,6 +166,71 @@ SELECT id, created_at FROM profiles WHERE authorized = true
 ON CONFLICT (user_id) DO NOTHING;
 
 -- ============================================
+-- 11. 创建 notifications 表（跨设备通知同步）
+-- ============================================
+CREATE TABLE IF NOT EXISTS notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL DEFAULT '',
+  type TEXT NOT NULL DEFAULT 'system' CHECK (type IN ('reminder', 'info', 'system')),
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  target_role TEXT DEFAULT NULL,  -- NULL=所有人, 'admin'=仅管理员
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 12. 启用 notifications 的 RLS
+ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
+
+-- 所有已认证用户可以查看通知
+CREATE POLICY "所有认证用户可查看通知"
+  ON notifications FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 允许插入通知（注册触发器和应用代码都需要）
+CREATE POLICY "允许插入通知"
+  ON notifications FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- 匿名用户也可以插入通知（注册时用户尚未认证）
+CREATE POLICY "允许匿名插入通知"
+  ON notifications FOR INSERT
+  TO anon
+  WITH CHECK (true);
+
+-- 管理员可以删除通知
+CREATE POLICY "管理员可删除通知"
+  ON notifications FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- 13. 创建 notification_reads 表（记录每个用户的已读状态）
+CREATE TABLE IF NOT EXISTS notification_reads (
+  notification_id UUID NOT NULL REFERENCES notifications(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (notification_id, user_id)
+);
+
+ALTER TABLE notification_reads ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "用户可查看自己的已读状态"
+  ON notification_reads FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+CREATE POLICY "用户可标记自己的已读"
+  ON notification_reads FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- 14. 新用户注册后的授权通知由应用代码（AuthContext.jsx register 函数）负责插入，
+--     无需数据库触发器，避免重复通知。
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，
