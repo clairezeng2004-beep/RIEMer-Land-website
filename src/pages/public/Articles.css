@@ -337,7 +337,7 @@
 @media (max-width: 480px) {
   .articles-hero { padding: 28px 0 30px; }
   .articles-hero__content h1 { font-size: var(--text-xl); }
-  .articles-hero__content p { font-size: var(--text-sm); line-height: 1.6; }
+  .articles-hero__content p { font-size: var(--text-base); line-height: 1.6; }
 
   .articles-list__grid {
     grid-template-columns: 1fr;

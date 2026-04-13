@@ -434,7 +434,7 @@
 @media (max-width: 480px) {
   .timeline-hero { padding: 28px 0 12px; }
   .timeline-hero__content h1 { font-size: var(--text-xl); }
-  .timeline-hero__content p { font-size: var(--text-sm); line-height: 1.6; }
+  .timeline-hero__content p { font-size: var(--text-base); line-height: 1.6; }
 
   .timeline.section {
     padding-top: var(--space-sm);
