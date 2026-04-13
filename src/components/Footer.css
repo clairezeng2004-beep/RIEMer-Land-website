@@ -22,7 +22,7 @@
 .footer__qrcode {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 8px;
 }
 
 .footer__contact-item {
@@ -90,7 +90,7 @@
   font-size: var(--text-base);
   font-weight: 600;
   color: var(--color-text);
-  padding-bottom: var(--space-sm);
+  padding-bottom: var(--space-md);
 }
 
 .footer__nav-link {
@@ -124,14 +124,14 @@
 .footer__about-texts {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 /* 导航链接容器 */
 .footer__nav-links-row {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
 }
 
 /* 邮箱复制按钮 */
