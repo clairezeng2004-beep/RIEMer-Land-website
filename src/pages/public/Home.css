@@ -120,7 +120,7 @@
 .featured__cover {
   position: relative;
   width: 100%;
-  aspect-ratio: 2 / 1;
+  aspect-ratio: 3 / 2;
   overflow: hidden;
   background: var(--color-bg-alt, #f5f5f5);
   flex-shrink: 0;
