@@ -255,38 +255,38 @@ export default function MemberContributions() {
         {/* 团队总览卡片 */}
         <div className="mc-summary">
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--share"><Mic size={20} /></div>
+            <div className="mc-summary__icon mc-summary__icon--share"><Mic size={28} /></div>
             <div className="mc-summary__info">
-              <div className="mc-summary__value">{teamTotal.shareEvents}</div>
-              <div className="mc-summary__label">线上分享会</div>
+              <span className="mc-summary__value">{teamTotal.shareEvents}</span>
+              <span className="mc-summary__label">线上分享会</span>
             </div>
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--article"><FileText size={20} /></div>
+            <div className="mc-summary__icon mc-summary__icon--article"><FileText size={28} /></div>
             <div className="mc-summary__info">
-              <div className="mc-summary__value">{teamTotal.articleCount}</div>
-              <div className="mc-summary__label">公众号文章</div>
+              <span className="mc-summary__value">{teamTotal.articleCount}</span>
+              <span className="mc-summary__label">公众号文章</span>
             </div>
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--help"><Handshake size={20} /></div>
+            <div className="mc-summary__icon mc-summary__icon--help"><Handshake size={28} /></div>
             <div className="mc-summary__info">
-              <div className="mc-summary__value">{teamTotal.helpCount}</div>
-              <div className="mc-summary__label">协作帮助</div>
+              <span className="mc-summary__value">{teamTotal.helpCount}</span>
+              <span className="mc-summary__label">协作帮助</span>
             </div>
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--upload"><Upload size={20} /></div>
+            <div className="mc-summary__icon mc-summary__icon--upload"><Upload size={28} /></div>
             <div className="mc-summary__info">
-              <div className="mc-summary__value">{teamTotal.uploadCount}</div>
-              <div className="mc-summary__label">资料上传</div>
+              <span className="mc-summary__value">{teamTotal.uploadCount}</span>
+              <span className="mc-summary__label">资料上传</span>
             </div>
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--total"><TrendingUp size={20} /></div>
+            <div className="mc-summary__icon mc-summary__icon--total"><TrendingUp size={28} /></div>
             <div className="mc-summary__info">
-              <div className="mc-summary__value">{teamTotal.total}</div>
-              <div className="mc-summary__label">贡献总计</div>
+              <span className="mc-summary__value">{teamTotal.total}</span>
+              <span className="mc-summary__label">贡献总计</span>
             </div>
           </div>
         </div>
@@ -407,7 +407,7 @@ export default function MemberContributions() {
         {/* 说明 */}
         <div className="mc-note">
           <p>
-            <strong>📊 数据说明</strong>
+            <strong>数据说明</strong>
           </p>
           <ul>
             <li><strong>线上分享会</strong>：统计事项追踪中分类为「线上分享」且该成员为负责人的事项数量</li>
