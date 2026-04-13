@@ -302,7 +302,7 @@ export default function MemberContributions() {
                 <th><FileText size={14} /> 公众号文章</th>
                 <th><Handshake size={14} /> 协作帮助</th>
                 <th><Upload size={14} /> 资料上传</th>
-                <th>其他</th>
+                <th className="mc-table__th--custom">其他</th>
                 <th className="mc-table__th--total"><Trophy size={14} /> 总计</th>
               </tr>
             </thead>

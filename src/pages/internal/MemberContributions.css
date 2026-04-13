@@ -373,8 +373,13 @@
 }
 
 /* 其他贡献 */
+.mc-table__th--custom {
+  text-align: left !important;
+}
+
 .mc-table__td--custom {
   min-width: 180px;
+  text-align: left;
 }
 
 .mc-custom {
