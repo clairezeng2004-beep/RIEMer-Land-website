@@ -397,7 +397,7 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  .timeline-hero { padding: 48px 0 20px; }
+  .timeline-hero { padding: 48px 0 32px; }
   .timeline-hero__content h1 { font-size: var(--text-2xl); }
   .timeline-hero__content p { font-size: var(--text-base); }
 
@@ -432,9 +432,9 @@
 }
 
 @media (max-width: 480px) {
-  .timeline-hero { padding: 28px 0 12px; }
+  .timeline-hero { padding: 28px 0 24px; }
   .timeline-hero__content h1 { font-size: var(--text-xl); }
-  .timeline-hero__content p { font-size: var(--text-base); line-height: 1.6; }
+  .timeline-hero__content p { font-size: var(--text-base); line-height: 1.6; margin-bottom: var(--space-md); }
 
   .timeline.section {
     padding-top: var(--space-sm);
