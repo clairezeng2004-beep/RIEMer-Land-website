@@ -397,25 +397,10 @@ export default function ContentManagement() {
                               placeholder="成员姓名"
                             />
                           </div>
-                          <div className="content-mgmt__field">
-                            <label>角色</label>
-                            <input
-                              type="text"
-                              value={member.role}
-                              onChange={(e) => {
-                                const arr = [...filtersForm.teamMembers];
-                                arr[i] = { ...arr[i], role: e.target.value };
-                                setFiltersForm({ ...filtersForm, teamMembers: arr });
-                              }}
-                              className="content-mgmt__input"
-                              placeholder="如：内容策划"
-                            />
-                          </div>
                         </>
                       ) : (
                         <div className="content-mgmt__member-summary">
                           <span className="content-mgmt__member-name">{member.name || '未命名'}</span>
-                          <span className="content-mgmt__member-role">{member.role || '未设置角色'}</span>
                         </div>
                       )}
                     </div>

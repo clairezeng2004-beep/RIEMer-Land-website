@@ -285,14 +285,6 @@
   color: var(--color-text);
 }
 
-.content-mgmt__member-role {
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  padding: 2px 8px;
-  background: var(--color-bg-alt);
-  border-radius: var(--radius-full);
-}
-
 /* Article Management: URL bar */
 .content-mgmt__url-bar {
   display: flex;
