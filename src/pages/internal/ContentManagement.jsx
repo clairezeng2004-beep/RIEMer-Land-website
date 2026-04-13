@@ -33,12 +33,16 @@ import {
   Lock,
   Eye,
   EyeOff,
+  GitBranch,
+  Star,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import './ContentManagement.css';
 
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin } = useAuth();
-  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, suggestions, addSuggestion, updateSuggestion, deleteSuggestion, events, addEvent, updateEvent, deleteEvent } = useSiteContent();
+  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, suggestions, addSuggestion, updateSuggestion, deleteSuggestion, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline } = useSiteContent();
   const { addNotification } = useNotifications();
 
   // 本地编辑状态
@@ -89,6 +93,7 @@ export default function ContentManagement() {
       resetContent();
       resetFilterOptions();
       resetInternalConfig();
+      resetTimeline();
       setForm({ ...content });
       setFiltersForm({ ...filterOptions });
       // 需要从 context 获取重置后的值
@@ -116,6 +121,7 @@ export default function ContentManagement() {
     { id: 'filters', label: '筛选选项', icon: <Filter size={16} /> },
     { id: 'articles', label: '文章板块', icon: <FileText size={16} /> },
     { id: 'events', label: '活动管理', icon: <Video size={16} /> },
+    { id: 'timeline', label: '关于我们', icon: <GitBranch size={16} /> },
     { id: 'footer', label: '页脚信息', icon: <MapPin size={16} /> },
     { id: 'internal', label: '内部空间', icon: <LayoutGrid size={16} /> },
     { id: 'suggestions', label: '建设建议', icon: <MessageSquarePlus size={16} /> },
@@ -1163,6 +1169,153 @@ export default function ContentManagement() {
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
                   <span>添加的活动会自动展示在首页「最新活动」区域，有回放的活动用户点击后需输入密码才能访问回放链接。</span>
+                </div>
+              </div>
+            )}
+
+            {/* 关于我们（时间轴管理） */}
+            {activeTab === 'timeline' && (
+              <div className="content-mgmt__section">
+                <h3 className="content-mgmt__section-title">关于我们 · 时间轴管理</h3>
+                <p className="content-mgmt__section-desc">编辑「关于我们」页面的时间轴节点，支持修改时间、文字、高亮状态，以及添加或删除节点</p>
+
+                {/* 添加新节点 */}
+                <button
+                  className="content-mgmt__add-btn"
+                  style={{ marginBottom: 'var(--space-xl)' }}
+                  onClick={() => {
+                    addTimelineNode({
+                      year: new Date().getFullYear().toString(),
+                      month: (new Date().getMonth() + 1).toString(),
+                      title: '',
+                      description: '',
+                      highlight: false,
+                    });
+                  }}
+                >
+                  <Plus size={16} /> 添加时间轴节点
+                </button>
+
+                {/* 节点列表 */}
+                {timeline.map((node, index) => (
+                  <div key={index} className="content-mgmt__card">
+                    <div className="content-mgmt__card-header">
+                      <span className="content-mgmt__card-index">
+                        {node.highlight && <Star size={12} style={{ fill: 'currentColor', marginRight: 4 }} />}
+                        #{index + 1} · {node.year}.{node.month.padStart(2, '0')}
+                      </span>
+                      <div className="content-mgmt__card-header-actions">
+                        {/* 上移 */}
+                        {index > 0 && (
+                          <button
+                            className="content-mgmt__edit-btn"
+                            onClick={() => {
+                              const arr = [...timeline];
+                              [arr[index - 1], arr[index]] = [arr[index], arr[index - 1]];
+                              updateTimeline(arr);
+                            }}
+                            title="上移"
+                          >
+                            <ArrowUp size={14} />
+                          </button>
+                        )}
+                        {/* 下移 */}
+                        {index < timeline.length - 1 && (
+                          <button
+                            className="content-mgmt__edit-btn"
+                            onClick={() => {
+                              const arr = [...timeline];
+                              [arr[index], arr[index + 1]] = [arr[index + 1], arr[index]];
+                              updateTimeline(arr);
+                            }}
+                            title="下移"
+                          >
+                            <ArrowDown size={14} />
+                          </button>
+                        )}
+                        <button
+                          className="content-mgmt__remove-btn"
+                          onClick={() => {
+                            if (window.confirm(`确定删除节点「${node.title || '未命名'}」？`)) {
+                              deleteTimelineNode(index);
+                            }
+                          }}
+                          title="删除"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="content-mgmt__inline-group">
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>年份</label>
+                        <input
+                          type="text"
+                          value={node.year}
+                          onChange={(e) => updateTimelineNode(index, { year: e.target.value })}
+                          className="content-mgmt__input"
+                          placeholder="如：2025"
+                        />
+                      </div>
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>月份</label>
+                        <input
+                          type="text"
+                          value={node.month}
+                          onChange={(e) => updateTimelineNode(index, { month: e.target.value })}
+                          className="content-mgmt__input"
+                          placeholder="如：3"
+                        />
+                      </div>
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>
+                          <input
+                            type="checkbox"
+                            checked={node.highlight || false}
+                            onChange={(e) => updateTimelineNode(index, { highlight: e.target.checked })}
+                            className="content-mgmt__checkbox"
+                            style={{ marginRight: 6 }}
+                          />
+                          高亮节点
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="content-mgmt__field">
+                      <label>标题</label>
+                      <input
+                        type="text"
+                        value={node.title}
+                        onChange={(e) => updateTimelineNode(index, { title: e.target.value })}
+                        className="content-mgmt__input"
+                        placeholder="事件标题"
+                      />
+                    </div>
+
+                    <div className="content-mgmt__field" style={{ marginBottom: 0 }}>
+                      <label>描述</label>
+                      <textarea
+                        value={node.description}
+                        onChange={(e) => updateTimelineNode(index, { description: e.target.value })}
+                        className="content-mgmt__input content-mgmt__textarea"
+                        rows={2}
+                        placeholder="事件描述"
+                      />
+                    </div>
+                  </div>
+                ))}
+
+                {timeline.length === 0 && (
+                  <div className="content-mgmt__hint">
+                    <AlertCircle size={16} />
+                    <span>暂无时间轴节点，点击上方按钮添加第一个节点。</span>
+                  </div>
+                )}
+
+                <div className="content-mgmt__hint">
+                  <AlertCircle size={16} />
+                  <span>时间轴节点的修改会即时生效，无需额外点击「保存更改」。可通过上下箭头调整节点顺序。</span>
                 </div>
               </div>
             )}

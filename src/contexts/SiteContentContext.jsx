@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData } from '../data/siteData';
+import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
 
 const SiteContentContext = createContext(null);
 
@@ -9,6 +9,7 @@ const ARTICLES_KEY = 'riemer_user_articles';
 const INTERNAL_CONFIG_KEY = 'riemer_internal_config';
 const SUGGESTIONS_KEY = 'riemer_site_suggestions';
 const EVENTS_KEY = 'riemer_site_events';
+const TIMELINE_KEY = 'riemer_site_timeline';
 
 // 网站建设建议初始模拟数据
 const getDefaultSuggestions = () => [
@@ -261,6 +262,19 @@ export function SiteContentProvider({ children }) {
     return [...defaultEventsData];
   });
 
+  // 时间轴管理
+  const [timeline, setTimeline] = useState(() => {
+    const stored = localStorage.getItem(TIMELINE_KEY);
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return [...defaultTimelineData];
+      }
+    }
+    return [...defaultTimelineData];
+  });
+
   useEffect(() => {
     localStorage.setItem(CONTENT_KEY, JSON.stringify(content));
   }, [content]);
@@ -284,6 +298,10 @@ export function SiteContentProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(EVENTS_KEY, JSON.stringify(events));
   }, [events]);
+
+  useEffect(() => {
+    localStorage.setItem(TIMELINE_KEY, JSON.stringify(timeline));
+  }, [timeline]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));
@@ -367,6 +385,31 @@ export function SiteContentProvider({ children }) {
     setEvents((prev) => prev.filter((e) => e.id !== id));
   };
 
+  // 时间轴管理
+  const updateTimeline = (newTimeline) => {
+    setTimeline(newTimeline);
+  };
+
+  const addTimelineNode = (node) => {
+    setTimeline((prev) => [...prev, node]);
+  };
+
+  const updateTimelineNode = (index, updates) => {
+    setTimeline((prev) =>
+      prev.map((item, i) => (i === index ? { ...item, ...updates } : item))
+    );
+  };
+
+  const deleteTimelineNode = (index) => {
+    setTimeline((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const resetTimeline = () => {
+    const defaults = [...defaultTimelineData];
+    setTimeline(defaults);
+    localStorage.setItem(TIMELINE_KEY, JSON.stringify(defaults));
+  };
+
   return (
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
@@ -375,6 +418,7 @@ export function SiteContentProvider({ children }) {
       internalConfig, updateInternalConfig, resetInternalConfig,
       suggestions, addSuggestion, updateSuggestion, deleteSuggestion,
       events, addEvent, updateEvent, deleteEvent,
+      timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline,
     }}>
       {children}
     </SiteContentContext.Provider>

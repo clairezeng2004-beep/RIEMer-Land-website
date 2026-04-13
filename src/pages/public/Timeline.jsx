@@ -1,9 +1,11 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Star, ChevronLeft, ChevronRight, User, Camera } from 'lucide-react';
-import { timelineData, membersData } from '../../data/siteData';
+import { membersData } from '../../data/siteData';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import './Timeline.css';
 
 export default function Timeline() {
+  const { timeline: timelineData } = useSiteContent();
   const trackRef = useRef(null);
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(true);
