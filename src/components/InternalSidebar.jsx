@@ -10,6 +10,7 @@ import {
   Users,
   Settings,
   BookOpen,
+  BarChart3,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -30,6 +31,7 @@ export default function InternalSidebar() {
     { to: '/internal/articles', icon: BookOpen, label: '文章浏览' },
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
+    { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
   ];
 
   // 管理菜单项（所有成员可见，仅管理员可编辑）
