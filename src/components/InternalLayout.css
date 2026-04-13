@@ -24,9 +24,95 @@
   padding-right: clamp(1rem, 3vw, 2.5rem);
 }
 
-/* 响应式：手机端侧边栏隐藏时去掉左边距 */
+/* ---- 手机端水平导航条（桌面端隐藏） ---- */
+.internal-mobile-nav {
+  display: none;
+}
+
+/* 响应式：手机端侧边栏隐藏时去掉左边距，显示水平导航 */
 @media (max-width: 768px) {
+  .internal-layout {
+    flex-direction: column;
+  }
+
   .internal-layout__content {
     margin-left: 0;
+  }
+
+  .internal-mobile-nav {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    position: sticky;
+    top: 72px;
+    z-index: 50;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-bottom: 1px solid var(--color-border-light);
+    padding: 8px 12px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+
+  .internal-mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .internal-mobile-nav__item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 6px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: var(--color-text-light);
+    text-decoration: none;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+    position: relative;
+    background: var(--color-bg);
+    border: 1px solid transparent;
+  }
+
+  .internal-mobile-nav__item:hover {
+    color: var(--color-primary);
+    background: rgba(91, 140, 62, 0.06);
+  }
+
+  .internal-mobile-nav__item--active {
+    color: var(--color-primary);
+    background: rgba(91, 140, 62, 0.1);
+    border-color: rgba(91, 140, 62, 0.2);
+    font-weight: 600;
+  }
+
+  .internal-mobile-nav__item svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+  }
+
+  .internal-mobile-nav__item--active svg {
+    opacity: 1;
+  }
+
+  .internal-mobile-nav__badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: var(--radius-full);
+    background: var(--color-danger);
+    color: white;
+    font-size: 0.6rem;
+    font-weight: 700;
+    line-height: 1;
+    margin-left: 2px;
   }
 }

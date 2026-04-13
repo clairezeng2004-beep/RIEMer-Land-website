@@ -1,11 +1,71 @@
-import { useEffect, useState } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router-dom';
+import { useEffect, useState, useRef } from 'react';
+import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useNotifications } from '../contexts/NotificationContext';
+import { useSiteContent } from '../contexts/SiteContentContext';
 import { WysiwygProvider } from '../contexts/WysiwygContext';
 import InternalSidebar from './InternalSidebar';
 import WysiwygToolbar from './WysiwygToolbar';
 import ErrorBoundary from './ErrorBoundary';
+import {
+  Bell, FolderOpen, Share2, BookOpen, CheckSquare,
+  Camera, BarChart3, MessageSquarePlus, UserCircle, Contact,
+  Users, Settings,
+} from 'lucide-react';
 import './InternalLayout.css';
+
+/* 手机端水平导航条 */
+function MobileInternalNav() {
+  const { unreadCount } = useNotifications();
+  const { internalConfig } = useSiteContent();
+  const sc = internalConfig.sidebar;
+  const scrollRef = useRef(null);
+  const location = useLocation();
+
+  const navItems = [
+    { to: '/internal/notifications', icon: Bell, label: sc.labelNotifications, badge: unreadCount > 0 ? unreadCount : null },
+    { to: '/internal/process-templates', icon: FolderOpen, label: '流程模板文件' },
+    { to: '/internal/member-sharing', icon: Share2, label: '成员内部分享' },
+    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章' },
+    { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
+    { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
+    { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, label: '建设建议' },
+    { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
+    { to: '/internal/member-profiles', icon: Contact, label: '成员信息' },
+    { to: '/internal/users', icon: Users, label: sc.labelUsers },
+    { to: '/internal/content', icon: Settings, label: sc.labelContent },
+  ];
+
+  // 路由变化时将当前激活项滚动到可见区域
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const active = scrollRef.current.querySelector('.internal-mobile-nav__item--active');
+    if (active) {
+      active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    }
+  }, [location.pathname]);
+
+  return (
+    <nav className="internal-mobile-nav" ref={scrollRef}>
+      {navItems.map((item) => (
+        <NavLink
+          key={item.to}
+          to={item.to}
+          className={({ isActive }) =>
+            `internal-mobile-nav__item ${isActive ? 'internal-mobile-nav__item--active' : ''}`
+          }
+        >
+          <item.icon size={16} />
+          <span>{item.label}</span>
+          {item.badge && (
+            <span className="internal-mobile-nav__badge">{item.badge}</span>
+          )}
+        </NavLink>
+      ))}
+    </nav>
+  );
+}
 
 export default function InternalLayout() {
   const { isAuthenticated, loading } = useAuth();
@@ -60,6 +120,7 @@ export default function InternalLayout() {
     <WysiwygProvider>
       <div className="internal-layout">
         <InternalSidebar />
+        <MobileInternalNav />
         <div className="internal-layout__content">
           <ErrorBoundary key={location.pathname}>
             <Outlet />
