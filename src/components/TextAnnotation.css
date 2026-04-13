@@ -1,0 +1,626 @@
+/* ============================================
+   TextAnnotation — 划词评论组件
+   ============================================ */
+
+/* ---- 文本高亮 ---- */
+mark.ta-highlight {
+  background: rgba(91, 140, 62, 0.18);
+  border-bottom: 2px solid var(--color-primary);
+  padding: 1px 0;
+  cursor: pointer;
+  border-radius: 2px;
+  transition: background var(--transition-fast);
+}
+
+mark.ta-highlight:hover {
+  background: rgba(91, 140, 62, 0.3);
+}
+
+/* ---- 浮动工具栏 ---- */
+.ta-toolbar {
+  position: absolute;
+  z-index: 800;
+  animation: ta-toolbar-in 0.15s ease;
+}
+
+@keyframes ta-toolbar-in {
+  from { opacity: 0; transform: translate(-50%, -100%) translateY(4px); }
+  to { opacity: 1; transform: translate(-50%, -100%) translateY(0); }
+}
+
+.ta-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.12);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-primary);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.ta-toolbar__btn:hover {
+  border-color: var(--color-primary);
+  box-shadow: 0 4px 24px rgba(91, 140, 62, 0.18);
+}
+
+.ta-toolbar__input-area {
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.14);
+  padding: 10px 12px;
+  min-width: 280px;
+  max-width: 360px;
+}
+
+.ta-toolbar__selected-text {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  margin-bottom: 8px;
+  line-height: 1.5;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-style: italic;
+}
+
+.ta-toolbar__input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ta-toolbar__input-row input {
+  flex: 1;
+  padding: 7px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.ta-toolbar__input-row input:focus {
+  border-color: var(--color-primary);
+}
+
+.ta-toolbar__send {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.ta-toolbar__send:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.ta-toolbar__send:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- 评论面板入口按钮 ---- */
+.ta-toggle {
+  position: fixed;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--color-border);
+  border-radius: 50%;
+  background: var(--color-bg-card);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  transition: all var(--transition-fast);
+}
+
+.ta-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-lg);
+}
+
+.ta-toggle--active {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.08);
+}
+
+.ta-toggle__count {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--color-primary);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+/* ---- 评论侧面板 ---- */
+.ta-panel {
+  position: fixed;
+  right: 0;
+  top: 72px;
+  bottom: 0;
+  width: 360px;
+  z-index: 750;
+  background: var(--color-bg-card);
+  border-left: 1px solid var(--color-border-light);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transform: translateX(100%);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.ta-panel--open {
+  transform: translateX(0);
+}
+
+.ta-panel__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.ta-panel__header h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.ta-panel__close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ta-panel__close:hover {
+  background: var(--color-bg-alt, #f5f5f5);
+  color: var(--color-text);
+}
+
+/* 新评论输入区 */
+.ta-panel__new-comment {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.ta-panel__new-input-row {
+  display: flex;
+  gap: 6px;
+}
+
+.ta-panel__new-input-row input {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.ta-panel__new-input-row input:focus {
+  border-color: var(--color-primary);
+}
+
+.ta-panel__new-input-row button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.ta-panel__new-input-row button:hover:not(:disabled) {
+  background: var(--color-primary-dark);
+}
+
+.ta-panel__new-input-row button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* 评论列表 */
+.ta-panel__list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+}
+
+.ta-panel__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 48px 24px;
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.ta-panel__empty svg {
+  opacity: 0.2;
+  margin-bottom: 12px;
+}
+
+.ta-panel__empty p {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--color-text-light);
+  margin-bottom: 4px;
+}
+
+.ta-panel__empty span {
+  font-size: var(--text-xs);
+  line-height: 1.6;
+}
+
+/* 已解决折叠 */
+.ta-panel__resolved-section {
+  border-top: 1px solid var(--color-border-light);
+  margin-top: 4px;
+}
+
+.ta-panel__resolved-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 10px 16px;
+  border: none;
+  background: transparent;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ta-panel__resolved-toggle:hover {
+  background: rgba(0, 0, 0, 0.02);
+  color: var(--color-text-light);
+}
+
+/* ---- 单条评论 ---- */
+.ta-comment {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--color-border-light);
+  transition: background var(--transition-fast);
+}
+
+.ta-comment:hover {
+  background: rgba(91, 140, 62, 0.02);
+}
+
+.ta-comment--active {
+  background: rgba(91, 140, 62, 0.05);
+  border-left: 3px solid var(--color-primary);
+}
+
+.ta-comment--resolved {
+  opacity: 0.65;
+}
+
+/* 引用文本 */
+.ta-comment__quote {
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.06);
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  margin-bottom: 8px;
+  line-height: 1.5;
+  border-left: 2px solid var(--color-primary);
+}
+
+.ta-comment__quote-mark {
+  font-weight: 700;
+  opacity: 0.6;
+}
+
+.ta-comment__quote-text {
+  word-break: break-word;
+}
+
+/* 评论头部 */
+.ta-comment__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.ta-comment__author {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ta-comment__time {
+  font-size: 0.68rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+/* 评论内容 */
+.ta-comment__content {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  word-break: break-word;
+  margin-bottom: 8px;
+  padding-left: 34px;
+}
+
+/* 操作按钮 */
+.ta-comment__actions {
+  display: flex;
+  gap: 4px;
+  padding-left: 34px;
+}
+
+.ta-comment__action {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 3px 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.68rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.ta-comment__action:hover {
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.06);
+}
+
+.ta-comment__action--resolved {
+  color: var(--color-primary);
+}
+
+.ta-comment__action--danger:hover {
+  color: var(--color-danger);
+  background: rgba(192, 57, 43, 0.06);
+}
+
+/* ---- 回复 ---- */
+.ta-comment__replies {
+  margin-top: 8px;
+  padding-left: 34px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ta-reply {
+  padding: 8px 10px;
+  background: var(--color-bg);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border-light);
+}
+
+.ta-reply__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.ta-reply__author {
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.ta-reply__time {
+  font-size: 0.63rem;
+  color: var(--color-text-muted);
+  margin-left: auto;
+}
+
+.ta-reply__delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+  opacity: 0;
+  flex-shrink: 0;
+}
+
+.ta-reply:hover .ta-reply__delete {
+  opacity: 1;
+}
+
+.ta-reply__delete:hover {
+  color: var(--color-danger);
+  background: rgba(192, 57, 43, 0.08);
+}
+
+.ta-reply__content {
+  font-size: var(--text-xs);
+  color: var(--color-text-light);
+  line-height: 1.5;
+  word-break: break-word;
+  padding-left: 28px;
+}
+
+/* 回复输入 */
+.ta-reply-input {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  padding-left: 34px;
+}
+
+.ta-reply-input input {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-xs);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  transition: border-color var(--transition-fast);
+}
+
+.ta-reply-input input:focus {
+  border-color: var(--color-primary);
+}
+
+.ta-reply-input button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.ta-reply-input button:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ---- 头像 ---- */
+.ta-avatar-img {
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.ta-avatar-placeholder {
+  border-radius: 50%;
+  color: white;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  letter-spacing: 0.02em;
+}
+
+/* ---- 遮罩层 ---- */
+.ta-overlay {
+  display: none;
+}
+
+/* ---- 响应式 ---- */
+@media (max-width: 768px) {
+  .ta-panel {
+    width: 100%;
+    border-left: none;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    top: auto;
+    bottom: 0;
+    max-height: 70vh;
+    transform: translateY(100%);
+  }
+
+  .ta-panel--open {
+    transform: translateY(0);
+  }
+
+  .ta-toggle {
+    right: 16px;
+    bottom: 16px;
+    top: auto;
+    transform: none;
+  }
+
+  .ta-overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 740;
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(2px);
+  }
+
+  .ta-toolbar__input-area {
+    min-width: 240px;
+    max-width: 300px;
+  }
+}
+
+@media (max-width: 480px) {
+  .ta-toolbar__input-area {
+    min-width: 200px;
+    max-width: 260px;
+  }
+}

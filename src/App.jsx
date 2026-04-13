@@ -18,6 +18,8 @@ import ContentManagement from './pages/internal/ContentManagement';
 import Notifications from './pages/internal/Notifications';
 import Gallery from './pages/internal/Gallery';
 import InternalHome from './pages/internal/InternalHome';
+import InternalArticles from './pages/internal/InternalArticles';
+import InternalArticleDetail from './pages/internal/InternalArticleDetail';
 
 function App() {
   return (
@@ -42,6 +44,8 @@ function App() {
                 <Route path="/internal" element={<InternalLayout />}>
                   <Route index element={<InternalHome />} />
                   <Route path="documents" element={<Documents />} />
+                  <Route path="articles" element={<InternalArticles />} />
+                  <Route path="article/:id" element={<InternalArticleDetail />} />
                   <Route path="tasks" element={<Tasks />} />
                   <Route path="gallery" element={<Gallery />} />
                   <Route path="users" element={<UserManagement />} />

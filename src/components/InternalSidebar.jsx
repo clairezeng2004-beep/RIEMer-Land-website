@@ -9,6 +9,7 @@ import {
   Camera,
   Users,
   Settings,
+  BookOpen,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -26,6 +27,7 @@ export default function InternalSidebar() {
       badge: unreadCount > 0 ? unreadCount : null,
     },
     { to: '/internal/documents', icon: FileText, label: sc.labelDocuments },
+    { to: '/internal/articles', icon: BookOpen, label: '文章浏览' },
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
   ];

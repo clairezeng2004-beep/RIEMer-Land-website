@@ -28,6 +28,7 @@ import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
+import TextAnnotation from '../../components/TextAnnotation';
 import './Documents.css';
 
 const typeLabels = {
@@ -86,6 +87,7 @@ export default function Documents() {
   const [previewDoc, setPreviewDoc] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
+  const docContentRef = useRef(null);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -543,22 +545,40 @@ export default function Documents() {
             </div>
 
             {/* 预览内容区 */}
-            <div className="doc-preview__content">
+            <div className="doc-preview__content" ref={docContentRef}>
               {canPreview(previewDoc) ? (
                 previewDoc.fileType === 'pdf' ? (
-                  <iframe
-                    src={previewDoc.fileUrl}
-                    className="doc-preview__pdf"
-                    title={previewDoc.title}
-                  />
-                ) : previewDoc.fileType === 'image' ? (
-                  <div className="doc-preview__image-wrapper">
-                    <img
+                  <>
+                    <iframe
                       src={previewDoc.fileUrl}
-                      alt={previewDoc.title}
-                      className="doc-preview__image"
+                      className="doc-preview__pdf"
+                      title={previewDoc.title}
                     />
-                  </div>
+                    {/* PDF 内无法划词，提供整体评论 */}
+                    <TextAnnotation
+                      targetType="document"
+                      targetId={previewDoc.id}
+                      contentRef={docContentRef}
+                      disabled
+                    />
+                  </>
+                ) : previewDoc.fileType === 'image' ? (
+                  <>
+                    <div className="doc-preview__image-wrapper">
+                      <img
+                        src={previewDoc.fileUrl}
+                        alt={previewDoc.title}
+                        className="doc-preview__image"
+                      />
+                    </div>
+                    {/* 图片无法划词，提供整体评论 */}
+                    <TextAnnotation
+                      targetType="document"
+                      targetId={previewDoc.id}
+                      contentRef={docContentRef}
+                      disabled
+                    />
+                  </>
                 ) : null
               ) : (
                 <div className="doc-preview__no-preview">
@@ -593,6 +613,13 @@ export default function Documents() {
                       <Download size={16} /> 下载文件
                     </button>
                   )}
+                  {/* 不可预览文档的评论 */}
+                  <TextAnnotation
+                    targetType="document"
+                    targetId={previewDoc.id}
+                    contentRef={docContentRef}
+                    disabled
+                  />
                 </div>
               )}
             </div>
