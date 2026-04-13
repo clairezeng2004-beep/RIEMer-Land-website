@@ -66,7 +66,7 @@ export default function Navbar() {
         {/* 最右侧：成员入口 / 用户信息 */}
         <div className="navbar__right">
           {loading ? (
-            <span className="navbar__right-placeholder" />
+            <Link to="/login" className="navbar__member-entry">主理团队内部空间</Link>
           ) : isAuthenticated ? (
             <>
               <Link
