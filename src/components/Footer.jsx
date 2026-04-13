@@ -8,6 +8,7 @@ import './Footer.css';
 export default function Footer() {
   const { content } = useSiteContent();
   const [emailCopied, setEmailCopied] = useState(false);
+  const [qrExpanded, setQrExpanded] = useState(false);
 
   const handleCopyEmail = async () => {
     try {
@@ -75,9 +76,23 @@ export default function Footer() {
                 src="/qrcode-wechat.jpg"
                 alt="RIEMer Land 微信公众号二维码"
                 className="footer__qrcode-img"
+                onClick={() => setQrExpanded(true)}
               />
               <span className="footer__qrcode-text">微信扫码关注</span>
             </div>
+
+            {qrExpanded && (
+              <div
+                className="footer__qrcode-overlay"
+                onClick={() => setQrExpanded(false)}
+              >
+                <img
+                  src="/qrcode-wechat.jpg"
+                  alt="RIEMer Land 微信公众号二维码（放大）"
+                  onClick={(e) => e.stopPropagation()}
+                />
+              </div>
+            )}
           </div>
 
           <div className="footer__bottom">
