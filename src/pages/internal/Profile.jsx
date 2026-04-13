@@ -1,13 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, getReachable } from '../../lib/supabase';
 import { User, Camera, Save, Loader2 } from 'lucide-react';
 import './Profile.css';
 
 const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
 
+/** 判断 Supabase 是否真正可用（已配置 + 可达） */
+const isSupabaseUsable = () => isSupabaseConfigured && supabase && getReachable() !== false;
+
 export default function Profile() {
-  const { user, updateProfile } = useAuth();
+  const { user, updateProfile, supabaseOk } = useAuth();
   const fileInputRef = useRef(null);
 
   const [name, setName] = useState(user?.name || '');
@@ -19,30 +22,57 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
 
-  // 加载入学年份
+  // 当 user 对象更新时（如刷新后恢复登录态），同步表单字段
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setNickname(user.nickname || '');
+      setSignature(user.signature || '');
+      setAvatarPreview(user.avatar || null);
+    }
+  }, [user]);
+
+  // 从本地 localStorage 加载入学年份
+  const loadLocalEnrollmentYear = (userId) => {
+    try {
+      const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
+      const profiles = stored ? JSON.parse(stored) : [];
+      const mp = profiles.find((p) => p.user_id === userId);
+      if (mp?.enrollment_year) {
+        setEnrollmentYear(mp.enrollment_year);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  // 加载入学年份（Supabase 优先，本地兜底）
   useEffect(() => {
     if (!user) return;
     const loadEnrollmentYear = async () => {
-      if (isSupabaseConfigured) {
-        const { data } = await supabase
-          .from('member_profiles')
-          .select('enrollment_year')
-          .eq('user_id', user.id)
-          .single();
-        if (data?.enrollment_year) {
-          setEnrollmentYear(data.enrollment_year);
-        }
-      } else {
-        const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
-        const profiles = stored ? JSON.parse(stored) : [];
-        const mp = profiles.find((p) => p.user_id === user.id);
-        if (mp?.enrollment_year) {
-          setEnrollmentYear(mp.enrollment_year);
+      const useSupabase = isSupabaseUsable() && supabaseOk !== false;
+
+      if (useSupabase) {
+        try {
+          const { data, error } = await supabase
+            .from('member_profiles')
+            .select('enrollment_year')
+            .eq('user_id', user.id)
+            .single();
+          if (!error && data?.enrollment_year) {
+            setEnrollmentYear(data.enrollment_year);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Profile] Supabase 加载入学年份失败，回退本地:', err);
         }
       }
+
+      // 本地模式 / Supabase 查不到数据 → 从 localStorage 读
+      loadLocalEnrollmentYear(user.id);
     };
     loadEnrollmentYear();
-  }, [user]);
+  }, [user, supabaseOk]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -77,32 +107,19 @@ export default function Profile() {
         signature: signature.trim(),
       };
 
-      // 如果选择了新头像，将 base64 存储（本地模式）
+      // 如果选择了新头像，将 base64 存储
       if (avatarFile) {
         updates.avatar = avatarPreview;
       }
 
+      // updateProfile 会同时更新本地 + Supabase（如果可用）
       const result = await updateProfile(updates);
 
-      // 同步入学年份到 member_profiles
+      // ---- 入学年份：始终先保存到本地，再尝试同步 Supabase ----
       const yearVal = enrollmentYear.trim();
-      if (isSupabaseConfigured) {
-        const { data: existing } = await supabase
-          .from('member_profiles')
-          .select('user_id')
-          .eq('user_id', user.id)
-          .single();
-        if (existing) {
-          await supabase
-            .from('member_profiles')
-            .update({ enrollment_year: yearVal })
-            .eq('user_id', user.id);
-        } else {
-          await supabase
-            .from('member_profiles')
-            .insert({ user_id: user.id, enrollment_year: yearVal, joined_at: new Date().toISOString() });
-        }
-      } else {
+
+      // 1. 本地 localStorage 保存（保证刷新后不丢失）
+      try {
         const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
         const profiles = stored ? JSON.parse(stored) : [];
         const idx = profiles.findIndex((p) => p.user_id === user.id);
@@ -112,6 +129,32 @@ export default function Profile() {
           profiles.push({ user_id: user.id, enrollment_year: yearVal, joined_at: new Date().toISOString() });
         }
         localStorage.setItem(MEMBER_PROFILES_KEY, JSON.stringify(profiles));
+      } catch (err) {
+        console.warn('[Profile] 本地入学年份保存失败:', err);
+      }
+
+      // 2. Supabase 同步（如果可用）
+      const useSupabase = isSupabaseUsable() && supabaseOk !== false;
+      if (useSupabase) {
+        try {
+          const { data: existing } = await supabase
+            .from('member_profiles')
+            .select('user_id')
+            .eq('user_id', user.id)
+            .single();
+          if (existing) {
+            await supabase
+              .from('member_profiles')
+              .update({ enrollment_year: yearVal })
+              .eq('user_id', user.id);
+          } else {
+            await supabase
+              .from('member_profiles')
+              .insert({ user_id: user.id, enrollment_year: yearVal, joined_at: new Date().toISOString() });
+          }
+        } catch (err) {
+          console.warn('[Profile] Supabase 入学年份同步失败（本地已保存）:', err);
+        }
       }
 
       if (result.success) {
