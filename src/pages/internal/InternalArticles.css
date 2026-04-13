@@ -96,8 +96,8 @@
 /* 文章网格 */
 .ia-list__grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: clamp(0.75rem, 2vw, 1.5rem);
+  grid-template-columns: repeat(3, 1fr);
+  gap: clamp(0.75rem, 2vw, 1.25rem);
 }
 
 .ia-card {
@@ -219,6 +219,10 @@
 }
 
 /* 响应式 */
+@media (max-width: 1024px) {
+  .ia-list__grid { grid-template-columns: repeat(2, 1fr); }
+}
+
 @media (max-width: 768px) {
   .ia-list-page { padding-top: 100px; }
   .ia-list__grid { grid-template-columns: 1fr; }
