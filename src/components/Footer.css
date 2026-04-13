@@ -219,15 +219,17 @@
   /* 导航链接改为水平一行 */
   .footer__grid > .footer__nav:first-child {
     display: flex;
+    flex-direction: row;
     flex-wrap: wrap;
     align-items: center;
     justify-content: center;
-    gap: var(--space-sm);
+    gap: var(--space-xs) var(--space-md);
   }
 
   .footer__grid > .footer__nav:first-child .footer__nav-title {
     width: 100%;
-    margin-bottom: var(--space-xs);
+    text-align: center;
+    margin-bottom: 0;
   }
 
   .footer__grid > .footer__nav:first-child .footer__nav-link {
