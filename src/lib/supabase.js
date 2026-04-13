@@ -79,7 +79,7 @@ export async function checkSupabaseHealth() {
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    const ok = res.ok || res.status === 400; // 400 也表示服务在线
+    const ok = res.ok || res.status === 400 || res.status === 401; // 400/401 也表示服务在线
     setReachable(ok);
     return ok;
   } catch {

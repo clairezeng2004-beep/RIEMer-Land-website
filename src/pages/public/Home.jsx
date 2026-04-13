@@ -13,6 +13,7 @@ import {
   ExternalLink,
   AlertCircle,
 } from 'lucide-react';
+import CoverImage from '../../components/CoverImage';
 import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import './Home.css';
