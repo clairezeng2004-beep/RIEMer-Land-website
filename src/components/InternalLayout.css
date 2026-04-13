@@ -17,10 +17,10 @@
   margin-left: 220px;
 }
 
-/* 内部空间的 .container 减小左侧间距，让内容更贴近侧边栏 */
+/* 内部空间的 .container 左侧留出适当间距 */
 .internal-layout__content .container {
   max-width: none;
-  padding-left: clamp(1rem, 2vw, 1.5rem);
+  padding-left: clamp(1.5rem, 3vw, 2.5rem);
   padding-right: clamp(1rem, 3vw, 2.5rem);
 }
 
