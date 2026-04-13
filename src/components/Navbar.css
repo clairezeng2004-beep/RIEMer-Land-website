@@ -21,6 +21,7 @@
   width: 100%;
   margin: 0 auto;
   padding: 0 clamp(1.5rem, 5vw, 4rem);
+  padding-left: clamp(0.75rem, 2vw, 1.5rem);
   display: flex;
   align-items: center;
   height: 72px;
