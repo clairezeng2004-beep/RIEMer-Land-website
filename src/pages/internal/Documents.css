@@ -304,15 +304,15 @@
 }
 
 .doc-card__title {
-  font-size: var(--text-lg);
-  line-height: 1.5;
+  font-size: var(--text-md);
+  line-height: 1.4;
   font-weight: 600;
   transition: color var(--transition-fast);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(var(--text-lg) * 1.5 * 2);
+  min-height: calc(var(--text-md) * 1.4 * 2);
 }
 
 .doc-card__desc {
