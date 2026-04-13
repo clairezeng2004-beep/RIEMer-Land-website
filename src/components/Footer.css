@@ -238,7 +238,7 @@
   }
 
   .footer__grid > .footer__nav:first-child .footer__nav-link {
-    display: inline;
+    display: block;
     margin-bottom: 0;
   }
 
@@ -248,6 +248,12 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-xs);
+  }
+
+  .footer__nav-links-row .footer__nav-link {
+    display: block;
+    width: 100%;
+    text-align: center;
   }
 
   /* "关于我们"区块：三行文字合并为一行 */
