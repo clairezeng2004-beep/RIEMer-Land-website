@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -1656,14 +1656,10 @@ export default function ContentManagement() {
                               </td>
                             </tr>
                           ) : (
-                            <tr key={sug.id} className="sug-table__row">
+                            <React.Fragment key={sug.id}>
+                            <tr className={`sug-table__row${sug.status === '暂时不做' && sug.skipReason ? ' sug-table__row--has-note' : ''}`}>
                               <td className="sug-table__td sug-table__td--content">
                                 <span>{sug.content}</span>
-                                {sug.status === '暂时不做' && sug.skipReason && (
-                                  <span className="sug-table__skip-reason">
-                                    <AlertCircle size={12} /> {sug.skipReason}
-                                  </span>
-                                )}
                               </td>
                               <td className="sug-table__td">
                                 <span className="sug-table__person">
@@ -1722,6 +1718,16 @@ export default function ContentManagement() {
                                 </button>
                               </td>
                             </tr>
+                            {sug.status === '暂时不做' && sug.skipReason && (
+                              <tr className="sug-table__row sug-table__row--note">
+                                <td colSpan={7} className="sug-table__td sug-table__td--note">
+                                  <span className="sug-table__skip-reason">
+                                    <AlertCircle size={12} /> {sug.skipReason}
+                                  </span>
+                                </td>
+                              </tr>
+                            )}
+                            </React.Fragment>
                           )
                         ))}
                       </tbody>

@@ -706,12 +706,20 @@
   color: var(--color-text-muted);
 }
 
-/* Skip reason tooltip */
+/* Skip reason — full-width note row */
+.sug-table__row--has-note > .sug-table__td {
+  border-bottom: none;
+}
+
+.sug-table__td--note {
+  padding-top: 0;
+  padding-bottom: 12px;
+}
+
 .sug-table__skip-reason {
-  display: flex;
-  align-items: flex-start;
+  display: inline-flex;
+  align-items: center;
   gap: 4px;
-  margin-top: 6px;
   padding: 4px 8px;
   border-radius: var(--radius-sm);
   background: rgba(243, 156, 18, 0.06);
@@ -719,6 +727,7 @@
   font-size: var(--text-xs);
   color: #b07d0a;
   line-height: 1.4;
+  white-space: nowrap;
 }
 
 .sug-table__skip-reason svg {
