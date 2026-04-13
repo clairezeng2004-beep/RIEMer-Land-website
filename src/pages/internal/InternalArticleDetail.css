@@ -174,7 +174,7 @@
 }
 
 @media (max-width: 480px) {
-  .ia-detail-page { padding-top: 80px; }
+  .ia-detail-page { padding-top: 88px; }
   .ia-detail__title { font-size: var(--text-xl); }
   .ia-detail__h2 { font-size: var(--text-lg); }
   .ia-detail__h3 { font-size: var(--text-base); }

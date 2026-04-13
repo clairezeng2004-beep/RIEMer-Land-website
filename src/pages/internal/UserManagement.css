@@ -239,7 +239,7 @@
 }
 
 @media (max-width: 768px) {
-  .users-page { padding-top: 100px; }
+  .users-page { padding-top: 108px; }
   .users-stats {
     flex-direction: column;
   }
@@ -251,7 +251,7 @@
 }
 
 @media (max-width: 480px) {
-  .users-page { padding-top: 80px; }
+  .users-page { padding-top: 88px; }
 }
 
 /* ============ 只读模式横幅 ============ */

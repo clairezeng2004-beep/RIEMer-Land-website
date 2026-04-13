@@ -453,7 +453,7 @@
 }
 
 @media (max-width: 768px) {
-  .tasks-page { padding-top: 100px; }
+  .tasks-page { padding-top: 108px; }
   .tasks-page__header { flex-direction: column; gap: var(--space-md); }
   .tasks-stats { grid-template-columns: repeat(2, 1fr); }
   .tasks-form__row,
@@ -462,6 +462,6 @@
 }
 
 @media (max-width: 480px) {
-  .tasks-page { padding-top: 80px; }
+  .tasks-page { padding-top: 88px; }
   .tasks-stats { grid-template-columns: 1fr; }
 }

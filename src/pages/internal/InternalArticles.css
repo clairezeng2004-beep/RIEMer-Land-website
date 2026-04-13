@@ -239,12 +239,12 @@
 }
 
 @media (max-width: 768px) {
-  .ia-list-page { padding-top: 100px; }
+  .ia-list-page { padding-top: 108px; }
   .ia-list__grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 480px) {
-  .ia-list-page { padding-top: 80px; }
+  .ia-list-page { padding-top: 88px; }
 }
 
 /* ============================================

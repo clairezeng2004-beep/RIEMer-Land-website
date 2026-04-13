@@ -168,7 +168,7 @@
 }
 
 @media (max-width: 480px) {
-  .article-detail-page { padding-top: 80px; }
+  .article-detail-page { padding-top: 88px; }
   .article-detail__title { font-size: var(--text-xl); }
   .article-detail__h2 { font-size: var(--text-lg); }
   .article-detail__h3 { font-size: var(--text-base); }

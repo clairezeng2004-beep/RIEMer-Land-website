@@ -312,14 +312,14 @@
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
   .navbar__container {
-    height: 56px;
+    height: 64px;
     padding: 0 clamp(0.75rem, 3vw, 1.5rem);
     gap: var(--space-sm);
     justify-content: space-between;
   }
 
   .navbar__logo-img {
-    height: 36px;
+    height: 40px;
   }
 
   .navbar__logo-text {
@@ -347,7 +347,7 @@
 
   .navbar__links {
     position: fixed;
-    top: 56px;
+    top: 64px;
     right: 0;
     width: 50vw;
     max-width: 240px;
@@ -361,7 +361,7 @@
     gap: 2px;
     box-shadow: -4px 4px 20px rgba(0, 0, 0, 0.08);
     border-radius: 0 0 0 var(--radius-lg);
-    max-height: calc(100vh - 56px);
+    max-height: calc(100vh - 64px);
     overflow-y: auto;
     transform: translateX(100%);
     opacity: 0;
@@ -434,12 +434,12 @@
 
 @media (max-width: 480px) {
   .navbar__container {
-    height: 48px;
+    height: 56px;
     padding: 0 0.75rem;
   }
 
   .navbar__logo-img {
-    height: 30px;
+    height: 34px;
   }
 
   .navbar__logo-text {
@@ -451,7 +451,7 @@
   }
 
   .navbar__links {
-    top: 48px;
-    max-height: calc(100vh - 48px);
+    top: 56px;
+    max-height: calc(100vh - 56px);
   }
 }
