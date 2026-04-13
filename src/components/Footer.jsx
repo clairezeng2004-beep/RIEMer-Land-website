@@ -62,11 +62,11 @@ export default function Footer() {
                 </button>
                 {emailCopied && <span className="footer__copy-toast">复制成功</span>}
               </div>
-              <div className="footer__contact-spacer" aria-hidden="true" />
               <div className="footer__contact-item">
                 <MapPin size={16} />
                 <span>{content.footerLocation}</span>
               </div>
+              <div className="footer__contact-spacer" aria-hidden="true" />
             </div>
 
             <div className="footer__qrcode">
