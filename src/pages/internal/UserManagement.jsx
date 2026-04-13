@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import CustomSelect from '../../components/CustomSelect';
 import {
   Users,
   Shield,

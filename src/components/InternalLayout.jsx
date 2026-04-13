@@ -27,7 +27,7 @@ export default function InternalLayout() {
       <div className="internal-layout">
         <InternalSidebar />
         <div className="internal-layout__content">
-          <ErrorBoundary>
+          <ErrorBoundary key={location.pathname}>
             <Outlet />
           </ErrorBoundary>
         </div>
