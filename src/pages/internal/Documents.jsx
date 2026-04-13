@@ -27,6 +27,8 @@ import {
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
@@ -77,8 +79,14 @@ function inferFileType(fileName) {
 
 export default function Documents() {
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const { internalConfig } = useSiteContent();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
   const dc = internalConfig.documents;
+
+  const updateDocs = useCallback(
+    (key, val) => updateInternalConfig({ documents: { [key]: val } }),
+    [updateInternalConfig]
+  );
   const [documents, setDocuments] = useState(documentsData);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
@@ -276,16 +284,31 @@ export default function Documents() {
         <div className="documents-page__header">
           <div>
             <h1>
-              <FolderOpen size={28} /> {dc.pageTitle}
+              <FolderOpen size={28} /> <EditableText
+                value={dc.pageTitle}
+                onChange={(v) => updateDocs('pageTitle', v)}
+                configKey="documents.pageTitle"
+                as="span"
+              />
             </h1>
-            <p>{dc.pageDesc}</p>
+            <p><EditableText
+              value={dc.pageDesc}
+              onChange={(v) => updateDocs('pageDesc', v)}
+              configKey="documents.pageDesc"
+              as="span"
+            /></p>
           </div>
           <button
             className="btn btn-primary"
             onClick={() => setShowUpload(!showUpload)}
           >
             {showUpload ? <X size={18} /> : <Plus size={18} />}
-            {showUpload ? '取消' : dc.uploadBtn}
+            {showUpload ? '取消' : <EditableText
+              value={dc.uploadBtn}
+              onChange={(v) => updateDocs('uploadBtn', v)}
+              configKey="documents.uploadBtn"
+              as="span"
+            />}
           </button>
         </div>
 

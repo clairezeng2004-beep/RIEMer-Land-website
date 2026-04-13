@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   Bell,
   BellOff,
@@ -33,8 +35,14 @@ export default function Notifications() {
     deleteNotification,
     emailReminderSent,
   } = useNotifications();
-  const { internalConfig } = useSiteContent();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
   const nc = internalConfig.notifications;
+
+  const updateNotifs = useCallback(
+    (key, val) => updateInternalConfig({ notifications: { [key]: val } }),
+    [updateInternalConfig]
+  );
   const [filter, setFilter] = useState('全部'); // 全部 | 未读 | 已读
 
   if (!isAuthenticated) {
@@ -53,7 +61,12 @@ export default function Notifications() {
         <div className="notifications-page__header">
           <div>
             <h1>
-              <Bell size={28} /> {nc.pageTitle}
+              <Bell size={28} /> <EditableText
+                value={nc.pageTitle}
+                onChange={(v) => updateNotifs('pageTitle', v)}
+                configKey="notifications.pageTitle"
+                as="span"
+              />
             </h1>
             <p>
               {unreadCount > 0

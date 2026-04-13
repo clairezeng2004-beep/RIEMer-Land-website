@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   Users,
   Shield,
@@ -31,8 +33,14 @@ export default function UserManagement() {
     revokeUser,
     changeUserRole,
   } = useAuth();
-  const { internalConfig } = useSiteContent();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
   const uc = internalConfig.users;
+
+  const updateUsers = useCallback(
+    (key, val) => updateInternalConfig({ users: { [key]: val } }),
+    [updateInternalConfig]
+  );
   const [users, setUsers] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -89,9 +97,19 @@ export default function UserManagement() {
       <div className="container">
         <div className="users-page__header">
           <h1>
-            <Users size={28} /> {uc.pageTitle}
+            <Users size={28} /> <EditableText
+              value={uc.pageTitle}
+              onChange={(v) => updateUsers('pageTitle', v)}
+              configKey="users.pageTitle"
+              as="span"
+            />
           </h1>
-          <p>{uc.pageDesc}</p>
+          <p><EditableText
+            value={uc.pageDesc}
+            onChange={(v) => updateUsers('pageDesc', v)}
+            configKey="users.pageDesc"
+            as="span"
+          /></p>
         </div>
 
         {!isAdmin && (

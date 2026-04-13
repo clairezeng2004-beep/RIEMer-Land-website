@@ -1,7 +1,9 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   Camera,
   Plus,
@@ -72,8 +74,14 @@ const initialAlbums = [
 
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const { internalConfig } = useSiteContent();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
   const gc = internalConfig.gallery;
+
+  const updateGallery = useCallback(
+    (key, val) => updateInternalConfig({ gallery: { [key]: val } }),
+    [updateInternalConfig]
+  );
   const [albums, setAlbums] = useState(initialAlbums);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -231,16 +239,31 @@ export default function Gallery() {
           <div className="gallery-page__header">
             <div>
               <h1>
-                <Camera size={28} /> {gc.pageTitle}
+                <Camera size={28} /> <EditableText
+                  value={gc.pageTitle}
+                  onChange={(v) => updateGallery('pageTitle', v)}
+                  configKey="gallery.pageTitle"
+                  as="span"
+                />
               </h1>
-              <p>{gc.pageDesc}</p>
+              <p><EditableText
+                value={gc.pageDesc}
+                onChange={(v) => updateGallery('pageDesc', v)}
+                configKey="gallery.pageDesc"
+                as="span"
+              /></p>
             </div>
             <button
               className="btn btn-primary"
               onClick={() => setShowCreateAlbum(!showCreateAlbum)}
             >
               {showCreateAlbum ? <X size={18} /> : <FolderPlus size={18} />}
-              {showCreateAlbum ? '取消' : gc.newAlbumBtn}
+              {showCreateAlbum ? '取消' : <EditableText
+                value={gc.newAlbumBtn}
+                onChange={(v) => updateGallery('newAlbumBtn', v)}
+                configKey="gallery.newAlbumBtn"
+                as="span"
+              />}
             </button>
           </div>
 

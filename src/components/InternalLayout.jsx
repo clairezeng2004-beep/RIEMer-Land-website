@@ -1,7 +1,9 @@
 import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { WysiwygProvider } from '../contexts/WysiwygContext';
 import InternalSidebar from './InternalSidebar';
+import WysiwygToolbar from './WysiwygToolbar';
 import ErrorBoundary from './ErrorBoundary';
 import './InternalLayout.css';
 
@@ -21,13 +23,16 @@ export default function InternalLayout() {
   }
 
   return (
-    <div className="internal-layout">
-      <InternalSidebar />
-      <div className="internal-layout__content">
-        <ErrorBoundary>
-          <Outlet />
-        </ErrorBoundary>
+    <WysiwygProvider>
+      <div className="internal-layout">
+        <InternalSidebar />
+        <div className="internal-layout__content">
+          <ErrorBoundary>
+            <Outlet />
+          </ErrorBoundary>
+        </div>
+        <WysiwygToolbar />
       </div>
-    </div>
+    </WysiwygProvider>
   );
 }

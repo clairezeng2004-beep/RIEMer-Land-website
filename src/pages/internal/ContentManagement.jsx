@@ -1369,226 +1369,39 @@ export default function ContentManagement() {
             {activeTab === 'internal' && (
               <div className="content-mgmt__section">
                 <h3 className="content-mgmt__section-title">内部空间配置</h3>
-                <p className="content-mgmt__section-desc">自定义内部空间各页面的按钮文字和描述内容</p>
+                <p className="content-mgmt__section-desc">内部空间已支持「所见即所得」编辑模式，直接在页面上点击文字即可修改</p>
 
-                {/* 侧边栏 */}
-                <div className="content-mgmt__subsection">
-                  <h4 className="content-mgmt__subsection-title">侧边栏导航</h4>
-                  <div className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>导航分组标签</label>
-                      <input
-                        type="text"
-                        value={internalForm.sidebar.sectionLabelNav}
-                        onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, sectionLabelNav: e.target.value } })}
-                        className="content-mgmt__input"
-                        placeholder="导航"
-                      />
+                <div className="content-mgmt__wysiwyg-guide">
+                  <div className="content-mgmt__wysiwyg-guide-icon">✏️</div>
+                  <h4>所见即所得编辑</h4>
+                  <p>
+                    前往任意内部空间页面（如首页、文档管理、事项追踪等），
+                    点击页面右下角的 <strong>「进入编辑」</strong> 按钮，即可直接在页面上点击文字进行编辑。
+                    编辑完成后点击 <strong>「保存」</strong> 即可生效。
+                  </p>
+                  <div className="content-mgmt__wysiwyg-steps">
+                    <div className="content-mgmt__wysiwyg-step">
+                      <span className="content-mgmt__wysiwyg-step-num">1</span>
+                      <span>前往内部空间任意页面</span>
                     </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>管理分组标签</label>
-                      <input
-                        type="text"
-                        value={internalForm.sidebar.sectionLabelAdmin}
-                        onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, sectionLabelAdmin: e.target.value } })}
-                        className="content-mgmt__input"
-                        placeholder="管理"
-                      />
+                    <div className="content-mgmt__wysiwyg-step">
+                      <span className="content-mgmt__wysiwyg-step-num">2</span>
+                      <span>点击右下角「进入编辑」按钮</span>
                     </div>
-                  </div>
-                  <div className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>首页</label>
-                      <input type="text" value={internalForm.sidebar.labelHome} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelHome: e.target.value } })} className="content-mgmt__input" />
+                    <div className="content-mgmt__wysiwyg-step">
+                      <span className="content-mgmt__wysiwyg-step-num">3</span>
+                      <span>点击页面上高亮的文字直接修改</span>
                     </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>消息通知</label>
-                      <input type="text" value={internalForm.sidebar.labelNotifications} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelNotifications: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-                  <div className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>文档管理</label>
-                      <input type="text" value={internalForm.sidebar.labelDocuments} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelDocuments: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>事项追踪</label>
-                      <input type="text" value={internalForm.sidebar.labelTasks} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelTasks: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-                  <div className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>成员相册</label>
-                      <input type="text" value={internalForm.sidebar.labelGallery} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelGallery: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>用户管理</label>
-                      <input type="text" value={internalForm.sidebar.labelUsers} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelUsers: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-                  <div className="content-mgmt__field">
-                    <label>内容管理</label>
-                    <input type="text" value={internalForm.sidebar.labelContent} onChange={(e) => setInternalForm({ ...internalForm, sidebar: { ...internalForm.sidebar, labelContent: e.target.value } })} className="content-mgmt__input" />
-                  </div>
-                </div>
-
-                {/* 内部首页 */}
-                <div className="content-mgmt__subsection">
-                  <h4 className="content-mgmt__subsection-title">内部首页</h4>
-                  <div className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>欢迎区标题</label>
-                      <input type="text" value={internalForm.home.greeting} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, greeting: e.target.value } })} className="content-mgmt__input" placeholder="RIEMer Land" />
-                    </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>欢迎后缀</label>
-                      <input type="text" value={internalForm.home.welcomeSuffix} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, welcomeSuffix: e.target.value } })} className="content-mgmt__input" placeholder="欢迎回到内部空间 ✨" />
-                    </div>
-                  </div>
-                  <div className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>功能模块标题</label>
-                      <input type="text" value={internalForm.home.sectionModules} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, sectionModules: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>最近消息标题</label>
-                      <input type="text" value={internalForm.home.sectionRecentMessages} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, sectionRecentMessages: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-                  <div className="content-mgmt__field">
-                    <label>小贴士标题</label>
-                    <input type="text" value={internalForm.home.tipTitle} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, tipTitle: e.target.value } })} className="content-mgmt__input" />
-                  </div>
-                  <div className="content-mgmt__field">
-                    <label>小贴士内容</label>
-                    <textarea value={internalForm.home.tipContent} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, tipContent: e.target.value } })} className="content-mgmt__input content-mgmt__textarea" rows={2} />
-                  </div>
-
-                  <h4 className="content-mgmt__subsection-title" style={{ marginTop: 'var(--space-lg)' }}>功能模块卡片文字</h4>
-                  {[
-                    { key: 'moduleNotifications', descKey: 'moduleNotificationsDesc', label: '消息通知' },
-                    { key: 'moduleDocuments', descKey: 'moduleDocumentsDesc', label: '文档管理' },
-                    { key: 'moduleTasks', descKey: 'moduleTasksDesc', label: '事项追踪' },
-                    { key: 'moduleGallery', descKey: 'moduleGalleryDesc', label: '成员相册' },
-                    { key: 'moduleUsers', descKey: 'moduleUsersDesc', label: '用户管理' },
-                    { key: 'moduleContent', descKey: 'moduleContentDesc', label: '内容管理' },
-                  ].map((item) => (
-                    <div key={item.key} className="content-mgmt__inline-group">
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>{item.label} 名称</label>
-                        <input type="text" value={internalForm.home[item.key]} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, [item.key]: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>{item.label} 描述</label>
-                        <input type="text" value={internalForm.home[item.descKey]} onChange={(e) => setInternalForm({ ...internalForm, home: { ...internalForm.home, [item.descKey]: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-
-                {/* 各页面标题和按钮 */}
-                <div className="content-mgmt__subsection">
-                  <h4 className="content-mgmt__subsection-title">各页面标题与按钮</h4>
-
-                  {/* 文档管理 */}
-                  <div className="content-mgmt__card">
-                    <div className="content-mgmt__card-header">
-                      <span className="content-mgmt__card-index">文档管理页</span>
-                    </div>
-                    <div className="content-mgmt__inline-group">
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>页面标题</label>
-                        <input type="text" value={internalForm.documents.pageTitle} onChange={(e) => setInternalForm({ ...internalForm, documents: { ...internalForm.documents, pageTitle: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>上传按钮</label>
-                        <input type="text" value={internalForm.documents.uploadBtn} onChange={(e) => setInternalForm({ ...internalForm, documents: { ...internalForm.documents, uploadBtn: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                    </div>
-                    <div className="content-mgmt__field" style={{ marginBottom: 0 }}>
-                      <label>页面描述</label>
-                      <input type="text" value={internalForm.documents.pageDesc} onChange={(e) => setInternalForm({ ...internalForm, documents: { ...internalForm.documents, pageDesc: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-
-                  {/* 事项追踪 */}
-                  <div className="content-mgmt__card">
-                    <div className="content-mgmt__card-header">
-                      <span className="content-mgmt__card-index">事项追踪页</span>
-                    </div>
-                    <div className="content-mgmt__inline-group">
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>页面标题</label>
-                        <input type="text" value={internalForm.tasks.pageTitle} onChange={(e) => setInternalForm({ ...internalForm, tasks: { ...internalForm.tasks, pageTitle: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>新建按钮</label>
-                        <input type="text" value={internalForm.tasks.newTaskBtn} onChange={(e) => setInternalForm({ ...internalForm, tasks: { ...internalForm.tasks, newTaskBtn: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                    </div>
-                    <div className="content-mgmt__field" style={{ marginBottom: 0 }}>
-                      <label>页面描述</label>
-                      <input type="text" value={internalForm.tasks.pageDesc} onChange={(e) => setInternalForm({ ...internalForm, tasks: { ...internalForm.tasks, pageDesc: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-
-                  {/* 成员相册 */}
-                  <div className="content-mgmt__card">
-                    <div className="content-mgmt__card-header">
-                      <span className="content-mgmt__card-index">成员相册页</span>
-                    </div>
-                    <div className="content-mgmt__inline-group">
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>页面标题</label>
-                        <input type="text" value={internalForm.gallery.pageTitle} onChange={(e) => setInternalForm({ ...internalForm, gallery: { ...internalForm.gallery, pageTitle: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>新建按钮</label>
-                        <input type="text" value={internalForm.gallery.newAlbumBtn} onChange={(e) => setInternalForm({ ...internalForm, gallery: { ...internalForm.gallery, newAlbumBtn: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                    </div>
-                    <div className="content-mgmt__field" style={{ marginBottom: 0 }}>
-                      <label>页面描述</label>
-                      <input type="text" value={internalForm.gallery.pageDesc} onChange={(e) => setInternalForm({ ...internalForm, gallery: { ...internalForm.gallery, pageDesc: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                  </div>
-
-                  {/* 消息通知 */}
-                  <div className="content-mgmt__card">
-                    <div className="content-mgmt__card-header">
-                      <span className="content-mgmt__card-index">消息通知页</span>
-                    </div>
-                    <div className="content-mgmt__inline-group">
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>页面标题</label>
-                        <input type="text" value={internalForm.notifications.pageTitle} onChange={(e) => setInternalForm({ ...internalForm, notifications: { ...internalForm.notifications, pageTitle: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                      <div className="content-mgmt__field content-mgmt__field--flex">
-                        <label>全部已读按钮</label>
-                        <input type="text" value={internalForm.notifications.markAllReadBtn} onChange={(e) => setInternalForm({ ...internalForm, notifications: { ...internalForm.notifications, markAllReadBtn: e.target.value } })} className="content-mgmt__input" />
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* 用户管理 */}
-                  <div className="content-mgmt__card">
-                    <div className="content-mgmt__card-header">
-                      <span className="content-mgmt__card-index">用户管理页</span>
-                    </div>
-                    <div className="content-mgmt__field">
-                      <label>页面标题</label>
-                      <input type="text" value={internalForm.users.pageTitle} onChange={(e) => setInternalForm({ ...internalForm, users: { ...internalForm.users, pageTitle: e.target.value } })} className="content-mgmt__input" />
-                    </div>
-                    <div className="content-mgmt__field" style={{ marginBottom: 0 }}>
-                      <label>页面描述</label>
-                      <input type="text" value={internalForm.users.pageDesc} onChange={(e) => setInternalForm({ ...internalForm, users: { ...internalForm.users, pageDesc: e.target.value } })} className="content-mgmt__input" />
+                    <div className="content-mgmt__wysiwyg-step">
+                      <span className="content-mgmt__wysiwyg-step-num">4</span>
+                      <span>点击「保存」完成编辑</span>
                     </div>
                   </div>
                 </div>
 
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
-                  <span>修改后请点击顶部「保存更改」按钮，内部空间的文字将即时生效。</span>
+                  <span>所见即所得模式可编辑的内容包括：侧边栏导航标签、各页面标题/描述/按钮文字、首页欢迎区文字、功能模块卡片名称和描述等。</span>
                 </div>
               </div>
             )}

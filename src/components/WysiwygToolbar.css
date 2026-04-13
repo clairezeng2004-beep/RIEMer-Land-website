@@ -1,0 +1,177 @@
+/* ============ WYSIWYG Floating Action Button ============ */
+.wysiwyg-fab {
+  position: fixed;
+  bottom: 28px;
+  right: 28px;
+  z-index: 1000;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 4px 20px rgba(91, 140, 62, 0.4);
+  transition: all 0.25s ease;
+}
+
+.wysiwyg-fab:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 28px rgba(91, 140, 62, 0.55);
+}
+
+.wysiwyg-fab:active {
+  transform: scale(1.0);
+}
+
+/* ============ WYSIWYG Toast ============ */
+.wysiwyg-toast {
+  position: fixed;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1001;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: var(--color-bg-card);
+  border: 1px solid rgba(39, 174, 96, 0.3);
+  border-radius: var(--radius-lg);
+  color: var(--color-success);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  animation: wysiwygToastIn 0.3s ease;
+}
+
+@keyframes wysiwygToastIn {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+/* ============ WYSIWYG Toolbar (editing mode) ============ */
+.wysiwyg-toolbar {
+  position: fixed;
+  bottom: 0;
+  left: 220px;
+  right: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 28px;
+  background: var(--color-bg-card);
+  border-top: 2px solid var(--color-primary);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
+  animation: wysiwygToolbarIn 0.3s ease;
+}
+
+@keyframes wysiwygToolbarIn {
+  from {
+    opacity: 0;
+    transform: translateY(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.wysiwyg-toolbar__left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--color-primary);
+}
+
+.wysiwyg-toolbar__label {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+.wysiwyg-toolbar__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: var(--radius-full);
+  background: rgba(243, 156, 18, 0.12);
+  color: #d4920a;
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+
+.wysiwyg-toolbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wysiwyg-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.wysiwyg-toolbar__btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border-light);
+}
+
+.wysiwyg-toolbar__btn--ghost:hover {
+  color: var(--color-text);
+  border-color: var(--color-border);
+  background: var(--color-bg-alt);
+}
+
+.wysiwyg-toolbar__btn--primary {
+  background: var(--color-primary);
+  color: white;
+  box-shadow: 0 2px 8px rgba(91, 140, 62, 0.3);
+}
+
+.wysiwyg-toolbar__btn--primary:hover {
+  background: var(--color-primary-dark, #4a7c34);
+  box-shadow: 0 4px 14px rgba(91, 140, 62, 0.4);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .wysiwyg-toolbar {
+    left: 0;
+    padding: 10px 16px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .wysiwyg-toolbar__label {
+    display: none;
+  }
+
+  .wysiwyg-toolbar__btn span {
+    display: none;
+  }
+
+  .wysiwyg-fab {
+    bottom: 16px;
+    right: 16px;
+  }
+}

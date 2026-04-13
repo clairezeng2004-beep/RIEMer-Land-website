@@ -1,8 +1,10 @@
-import { useMemo, useState, useRef } from 'react';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   ArrowRight,
   Camera,
@@ -40,7 +42,13 @@ const ROLE_LABELS = { admin: '管理员', member: '成员' };
 export default function InternalHome() {
   const { user, isAuthenticated, updateProfile } = useAuth();
   const { notifications, unreadCount } = useNotifications();
-  const { internalConfig } = useSiteContent();
+  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
+
+  const updateHome = useCallback(
+    (key, val) => updateInternalConfig({ home: { [key]: val } }),
+    [updateInternalConfig]
+  );
   // 确保所有 home 配置字段都有回退默认值
   const hcDefaults = {
     greeting: 'RIEMer Land',
@@ -145,34 +153,46 @@ export default function InternalHome() {
   const modules = [
     {
       name: hc.moduleNotifications,
+      nameKey: 'moduleNotifications',
       desc: hc.moduleNotificationsDesc,
+      descKey: 'moduleNotificationsDesc',
       path: '/internal/notifications',
       badge: unreadCount > 0 ? unreadCount : null,
     },
     {
       name: hc.moduleDocuments,
+      nameKey: 'moduleDocuments',
       desc: hc.moduleDocumentsDesc,
+      descKey: 'moduleDocumentsDesc',
       path: '/internal/documents',
     },
     {
       name: hc.moduleTasks,
+      nameKey: 'moduleTasks',
       desc: hc.moduleTasksDesc,
+      descKey: 'moduleTasksDesc',
       path: '/internal/tasks',
     },
     {
       name: hc.moduleGallery,
+      nameKey: 'moduleGallery',
       desc: hc.moduleGalleryDesc,
+      descKey: 'moduleGalleryDesc',
       path: '/internal/gallery',
     },
     {
       name: hc.moduleUsers,
+      nameKey: 'moduleUsers',
       desc: hc.moduleUsersDesc,
+      descKey: 'moduleUsersDesc',
       path: '/internal/users',
       adminOnly: true,
     },
     {
       name: hc.moduleContent,
+      nameKey: 'moduleContent',
       desc: hc.moduleContentDesc,
+      descKey: 'moduleContentDesc',
       path: '/internal/content',
       adminOnly: true,
     },
@@ -185,10 +205,20 @@ export default function InternalHome() {
         <div className="internal-home__welcome">
           <div className="internal-home__welcome-card">
             <h1 className="internal-home__greeting">
-              {hc.greeting}
+              <EditableText
+                value={hc.greeting}
+                onChange={(v) => updateHome('greeting', v)}
+                configKey="home.greeting"
+                as="span"
+              />
             </h1>
             <p className="internal-home__welcome-sub">
-              {getGreeting()}，{displayName}。{hc.welcomeSuffix}
+              {getGreeting()}，{displayName}。<EditableText
+                value={hc.welcomeSuffix}
+                onChange={(v) => updateHome('welcomeSuffix', v)}
+                configKey="home.welcomeSuffix"
+                as="span"
+              />
             </p>
             <div className="internal-home__welcome-meta">
               <span className="internal-home__welcome-meta-item">
@@ -321,7 +351,12 @@ export default function InternalHome() {
 
         {/* 功能模块 */}
         <h2 className="internal-home__section-title">
-          {hc.sectionModules}
+          <EditableText
+            value={hc.sectionModules}
+            onChange={(v) => updateHome('sectionModules', v)}
+            configKey="home.sectionModules"
+            as="span"
+          />
         </h2>
         <div className="internal-home__modules">
           {modules.map((mod) => {
@@ -330,10 +365,16 @@ export default function InternalHome() {
                 key={mod.path}
                 to={mod.path}
                 className="internal-home__module-card"
+                onClick={(e) => editing && e.preventDefault()}
               >
                 <div className="internal-home__module-content">
                   <div className="internal-home__module-name">
-                    {mod.name}
+                    <EditableText
+                      value={mod.name}
+                      onChange={(v) => updateHome(mod.nameKey, v)}
+                      configKey={`home.${mod.nameKey}`}
+                      as="span"
+                    />
                     {mod.badge && (
                       <span className="internal-home__module-badge">{mod.badge}</span>
                     )}
@@ -341,7 +382,13 @@ export default function InternalHome() {
                       <span className="internal-home__module-admin">管理员</span>
                     )}
                   </div>
-                  <div className="internal-home__module-desc">{mod.desc}</div>
+                  <EditableText
+                    value={mod.desc}
+                    onChange={(v) => updateHome(mod.descKey, v)}
+                    configKey={`home.${mod.descKey}`}
+                    as="div"
+                    className="internal-home__module-desc"
+                  />
                 </div>
                 <div className="internal-home__module-arrow">
                   <ArrowRight size={18} />
@@ -354,7 +401,12 @@ export default function InternalHome() {
         {/* 最近消息 */}
         <div className="internal-home__recent">
           <h2 className="internal-home__section-title">
-            {hc.sectionRecentMessages}
+            <EditableText
+              value={hc.sectionRecentMessages}
+              onChange={(v) => updateHome('sectionRecentMessages', v)}
+              configKey="home.sectionRecentMessages"
+              as="span"
+            />
           </h2>
           <div className="internal-home__recent-list">
             {recentNotifications.length > 0 ? (
@@ -391,10 +443,21 @@ export default function InternalHome() {
         {/* 小提示 */}
         <div className="internal-home__tips">
           <div className="internal-home__tips-title">
-            {hc.tipTitle}
+            <EditableText
+              value={hc.tipTitle}
+              onChange={(v) => updateHome('tipTitle', v)}
+              configKey="home.tipTitle"
+              as="span"
+            />
           </div>
           <div className="internal-home__tips-content">
-            {hc.tipContent}
+            <EditableText
+              value={hc.tipContent}
+              onChange={(v) => updateHome('tipContent', v)}
+              configKey="home.tipContent"
+              as="span"
+              multiline
+            />
           </div>
         </div>
       </div>

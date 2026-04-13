@@ -1,7 +1,9 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useWysiwyg } from '../../contexts/WysiwygContext';
+import EditableText from '../../components/EditableText';
 import {
   CheckSquare,
   Plus,
@@ -32,8 +34,14 @@ const statusColors = {
 
 export default function Tasks() {
   const { isAuthenticated, user } = useAuth();
-  const { filterOptions, updateFilterOptions, internalConfig } = useSiteContent();
+  const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
+  const { editing } = useWysiwyg();
   const tc = internalConfig.tasks;
+
+  const updateTasks = useCallback(
+    (key, val) => updateInternalConfig({ tasks: { [key]: val } }),
+    [updateInternalConfig]
+  );
 
   // 从 context 读取筛选选项
   const taskCategories = filterOptions.taskCategories;
@@ -159,16 +167,31 @@ export default function Tasks() {
         <div className="tasks-page__header">
           <div>
             <h1>
-              <CheckSquare size={28} /> {tc.pageTitle}
+              <CheckSquare size={28} /> <EditableText
+                value={tc.pageTitle}
+                onChange={(v) => updateTasks('pageTitle', v)}
+                configKey="tasks.pageTitle"
+                as="span"
+              />
             </h1>
-            <p>{tc.pageDesc}</p>
+            <p><EditableText
+              value={tc.pageDesc}
+              onChange={(v) => updateTasks('pageDesc', v)}
+              configKey="tasks.pageDesc"
+              as="span"
+            /></p>
           </div>
           <button
             className="btn btn-primary"
             onClick={() => setShowForm(!showForm)}
           >
             {showForm ? <X size={18} /> : <Plus size={18} />}
-            {showForm ? '取消' : tc.newTaskBtn}
+            {showForm ? '取消' : <EditableText
+              value={tc.newTaskBtn}
+              onChange={(v) => updateTasks('newTaskBtn', v)}
+              configKey="tasks.newTaskBtn"
+              as="span"
+            />}
           </button>
         </div>
 
