@@ -566,7 +566,7 @@ export default function Login() {
         {/* 底部提示 */}
         {view === 'login' && (
           <div className="login-card__hint">
-            <p>{supabaseOk === false ? '离线模式 · 演示账号：' : '演示账号：'}admin@riemerland.org / admin123</p>
+            <p>{supabaseOk === false ? '离线模式 · 请先注册账号' : '请使用已注册的账号登录'}</p>
           </div>
         )}
 

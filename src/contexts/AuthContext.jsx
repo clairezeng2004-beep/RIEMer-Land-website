@@ -36,23 +36,17 @@ const getDeviceId = () => {
 
 const getLocalUsers = () => {
   const stored = localStorage.getItem(USERS_DB_KEY);
-  if (stored) return JSON.parse(stored);
-  const defaultUsers = [
-    {
-      id: '1',
-      email: 'admin@riemerland.org',
-      password: 'admin123',
-      name: 'Admin',
-      nickname: '',
-      avatar: null,
-      signature: '',
-      role: 'admin',
-      authorized: true,
-      createdAt: new Date().toISOString(),
-    },
-  ];
-  localStorage.setItem(USERS_DB_KEY, JSON.stringify(defaultUsers));
-  return defaultUsers;
+  if (stored) {
+    // 移除旧的 admin 示例账号（如果存在）
+    const users = JSON.parse(stored);
+    const filtered = users.filter((u) => u.email !== 'admin@riemerland.org');
+    if (filtered.length !== users.length) {
+      localStorage.setItem(USERS_DB_KEY, JSON.stringify(filtered));
+    }
+    return filtered;
+  }
+  localStorage.setItem(USERS_DB_KEY, JSON.stringify([]));
+  return [];
 };
 
 const saveLocalUsers = (users) => {
@@ -396,7 +390,7 @@ export function AuthProvider({ children }) {
       return {
         success: false,
         message: isTimeout
-          ? '服务连接超时，已切换到离线模式。请使用本地账号登录（演示账号：admin@riemerland.org / admin123）'
+          ? '服务连接超时，已切换到离线模式。请使用本地账号登录'
           : `登录服务异常：${err.message}`,
       };
     }
