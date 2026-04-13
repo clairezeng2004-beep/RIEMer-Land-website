@@ -262,7 +262,7 @@ export default function Login() {
 
         {/* ==================== 登录表单 ==================== */}
         {view === 'login' && (
-          <form onSubmit={handleLogin} className="login-card__form">
+          <form onSubmit={handleLogin} className="login-card__form" autoComplete="off">
             <div className="login-card__field">
               <label className="login-card__label">
                 <Mail size={16} /> 邮箱
@@ -273,6 +273,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="请输入邮箱地址"
                 className="login-card__input"
+                autoComplete="username"
               />
             </div>
 
@@ -287,6 +288,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
                   className="login-card__input"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -333,7 +335,7 @@ export default function Login() {
 
         {/* ==================== 注册表单 ==================== */}
         {view === 'register' && (
-          <form onSubmit={handleRegister} className="login-card__form">
+          <form onSubmit={handleRegister} className="login-card__form" autoComplete="off">
             <div className="login-card__field">
               <label className="login-card__label">
                 <User size={16} /> 真名 <span className="login-card__required">*必填</span>
@@ -344,6 +346,7 @@ export default function Login() {
                 onChange={(e) => setName(e.target.value)}
                 placeholder="请输入您的真实姓名"
                 className="login-card__input"
+                autoComplete="name"
               />
             </div>
 
@@ -357,6 +360,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="请输入邮箱地址"
                 className="login-card__input"
+                autoComplete="username"
               />
             </div>
 
@@ -371,6 +375,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请设置密码（至少6位）"
                   className="login-card__input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -390,7 +395,7 @@ export default function Login() {
 
         {/* ==================== 忘记密码表单 ==================== */}
         {view === 'forgot' && (
-          <form onSubmit={handleResetPassword} className="login-card__form">
+          <form onSubmit={handleResetPassword} className="login-card__form" autoComplete="off">
             <div className="login-card__field">
               <label className="login-card__label">
                 <Mail size={16} /> 注册邮箱
@@ -401,6 +406,7 @@ export default function Login() {
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="请输入注册时使用的邮箱地址"
                 className="login-card__input"
+                autoComplete="username"
               />
             </div>
 
@@ -415,6 +421,7 @@ export default function Login() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="请设置新密码（至少6位）"
                   className="login-card__input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -437,6 +444,7 @@ export default function Login() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="请再次输入新密码"
                   className="login-card__input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -456,7 +464,7 @@ export default function Login() {
 
         {/* ==================== 修改密码表单 ==================== */}
         {view === 'changePassword' && (
-          <form onSubmit={handleChangePassword} className="login-card__form">
+          <form onSubmit={handleChangePassword} className="login-card__form" autoComplete="off">
             <div className="login-card__field">
               <label className="login-card__label">
                 <Lock size={16} /> 当前密码
@@ -468,6 +476,7 @@ export default function Login() {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="请输入当前密码"
                   className="login-card__input"
+                  autoComplete="current-password"
                 />
                 <button
                   type="button"
@@ -490,6 +499,7 @@ export default function Login() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="请设置新密码（至少6位）"
                   className="login-card__input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -512,6 +522,7 @@ export default function Login() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="请再次输入新密码"
                   className="login-card__input"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
