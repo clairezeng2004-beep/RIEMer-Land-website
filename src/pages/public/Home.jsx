@@ -106,11 +106,10 @@ export default function Home() {
                 {/* 封面图 */}
                 <div className="featured__cover">
                   {article.coverImage ? (
-                    <img
+                    <CoverImage
                       src={article.coverImage}
                       alt={article.title}
                       className="featured__cover-img"
-                      loading="lazy"
                     />
                   ) : (
                     <div className="featured__cover-placeholder">

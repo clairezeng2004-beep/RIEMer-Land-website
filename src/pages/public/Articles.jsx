@@ -106,11 +106,10 @@ export default function Articles() {
                 {/* 封面图 */}
                 <div className="article-card__cover">
                   {article.coverImage ? (
-                    <img
+                    <CoverImage
                       src={article.coverImage}
                       alt={article.title}
                       className="article-card__cover-img"
-                      loading="lazy"
                     />
                   ) : (
                     <div className="article-card__cover-placeholder">
