@@ -21,6 +21,14 @@ import './MemberContributions.css';
 
 const CUSTOM_CONTRIBUTIONS_KEY = 'riemer_custom_contributions';
 
+// 获取当前所在半年度的 key（如 "2026-H1" 或 "2025-H2"）
+function getCurrentHalfYearKey() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth(); // 0-11
+  return month < 6 ? `${year}-H1` : `${year}-H2`;
+}
+
 // 半年度时间区间
 function getHalfYearPeriods() {
   const now = new Date();
@@ -65,7 +73,7 @@ export default function MemberContributions() {
 
   const members = filterOptions.teamMembers || teamMembers;
   const periods = useMemo(() => getHalfYearPeriods(), []);
-  const [selectedPeriod, setSelectedPeriod] = useState('all'); // 'all' 或 period.key
+  const [selectedPeriod, setSelectedPeriod] = useState(() => getCurrentHalfYearKey()); // 默认当前半年度
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
 
   // 自定义贡献（"其他"栏位）
