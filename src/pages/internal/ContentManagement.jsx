@@ -76,10 +76,6 @@ export default function ContentManagement() {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isAdmin) {
-    return <Navigate to="/internal/documents" replace />;
-  }
-
   const handleSave = () => {
     updateContent(form);
     updateFilterOptions(filtersForm);
@@ -135,15 +131,24 @@ export default function ContentManagement() {
             </h1>
             <p>编辑网站首页展示的文字内容</p>
           </div>
-          <div className="content-mgmt__header-actions">
-            <button className="btn btn-ghost" onClick={handleReset}>
-              <RotateCcw size={16} /> 重置默认
-            </button>
-            <button className="btn btn-primary" onClick={handleSave}>
-              <Save size={16} /> 保存更改
-            </button>
-          </div>
+          {isAdmin && (
+            <div className="content-mgmt__header-actions">
+              <button className="btn btn-ghost" onClick={handleReset}>
+                <RotateCcw size={16} /> 重置默认
+              </button>
+              <button className="btn btn-primary" onClick={handleSave}>
+                <Save size={16} /> 保存更改
+              </button>
+            </div>
+          )}
         </div>
+
+        {!isAdmin && (
+          <div className="content-mgmt__readonly-banner">
+            <Eye size={16} />
+            <span>当前为只读模式，仅管理员可编辑内容</span>
+          </div>
+        )}
 
         {saved && (
           <div className="content-mgmt__toast">
@@ -168,7 +173,7 @@ export default function ContentManagement() {
           </div>
 
           {/* 右侧编辑区 */}
-          <div className="content-mgmt__panel">
+          <div className={`content-mgmt__panel ${!isAdmin ? 'content-mgmt__panel--readonly' : ''}`}>
 
             {/* Hero 区域 */}
             {activeTab === 'hero' && (

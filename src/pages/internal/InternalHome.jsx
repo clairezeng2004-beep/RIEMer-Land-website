@@ -38,7 +38,7 @@ function formatDate(dateStr) {
 const ROLE_LABELS = { admin: '管理员', member: '成员' };
 
 export default function InternalHome() {
-  const { user, isAuthenticated, isAdmin, updateProfile } = useAuth();
+  const { user, isAuthenticated, updateProfile } = useAuth();
   const { notifications, unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
   const hc = internalConfig.home;
@@ -143,22 +143,18 @@ export default function InternalHome() {
       desc: hc.moduleGalleryDesc,
       path: '/internal/gallery',
     },
-    ...(isAdmin
-      ? [
-          {
-            name: hc.moduleUsers,
-            desc: hc.moduleUsersDesc,
-            path: '/internal/users',
-            adminOnly: true,
-          },
-          {
-            name: hc.moduleContent,
-            desc: hc.moduleContentDesc,
-            path: '/internal/content',
-            adminOnly: true,
-          },
-        ]
-      : []),
+    {
+      name: hc.moduleUsers,
+      desc: hc.moduleUsersDesc,
+      path: '/internal/users',
+      adminOnly: true,
+    },
+    {
+      name: hc.moduleContent,
+      desc: hc.moduleContentDesc,
+      path: '/internal/content',
+      adminOnly: true,
+    },
   ];
 
   return (

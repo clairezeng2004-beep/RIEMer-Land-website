@@ -11,6 +11,7 @@ import {
   Calendar,
   UserCheck,
   UserX,
+  Eye,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -36,21 +37,17 @@ export default function UserManagement() {
   const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    if (isAuthenticated && isAdmin) {
+    if (isAuthenticated) {
       const loadUsers = async () => {
         const data = await getAllUsers();
         setUsers(data);
       };
       loadUsers();
     }
-  }, [isAuthenticated, isAdmin, refreshKey, getAllUsers]);
+  }, [isAuthenticated, refreshKey, getAllUsers]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
-  }
-
-  if (!isAdmin) {
-    return <Navigate to="/internal/documents" replace />;
   }
 
   const handleAuthorize = async (userId) => {
@@ -96,6 +93,13 @@ export default function UserManagement() {
           </h1>
           <p>{uc.pageDesc}</p>
         </div>
+
+        {!isAdmin && (
+          <div className="users-page__readonly-banner">
+            <Eye size={16} />
+            <span>当前为只读模式，仅管理员可管理用户</span>
+          </div>
+        )}
 
         {/* Stats */}
         <div className="users-stats">

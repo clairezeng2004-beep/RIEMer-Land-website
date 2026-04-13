@@ -1,5 +1,4 @@
 import { NavLink } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useSiteContent } from '../contexts/SiteContentContext';
 import {
@@ -14,7 +13,6 @@ import {
 import './InternalSidebar.css';
 
 export default function InternalSidebar() {
-  const { isAdmin } = useAuth();
   const { unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
   const sc = internalConfig.sidebar;
@@ -32,7 +30,7 @@ export default function InternalSidebar() {
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
   ];
 
-  // 管理员专属菜单项
+  // 管理菜单项（所有成员可见，仅管理员可编辑）
   const adminItems = [
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
@@ -59,23 +57,21 @@ export default function InternalSidebar() {
         ))}
       </div>
 
-      {isAdmin && (
-        <div className="internal-sidebar__section">
-          <div className="internal-sidebar__section-label">{sc.sectionLabelAdmin}</div>
-          {adminItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              className={({ isActive }) =>
-                `internal-sidebar__item ${isActive ? 'internal-sidebar__item--active' : ''}`
-              }
-            >
-              <item.icon size={18} className="internal-sidebar__icon" />
-              <span className="internal-sidebar__label">{item.label}</span>
-            </NavLink>
-          ))}
-        </div>
-      )}
+      <div className="internal-sidebar__section">
+        <div className="internal-sidebar__section-label">{sc.sectionLabelAdmin}</div>
+        {adminItems.map((item) => (
+          <NavLink
+            key={item.to}
+            to={item.to}
+            className={({ isActive }) =>
+              `internal-sidebar__item ${isActive ? 'internal-sidebar__item--active' : ''}`
+            }
+          >
+            <item.icon size={18} className="internal-sidebar__icon" />
+            <span className="internal-sidebar__label">{item.label}</span>
+          </NavLink>
+        ))}
+      </div>
     </aside>
   );
 }

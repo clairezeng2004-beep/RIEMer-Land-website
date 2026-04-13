@@ -247,3 +247,18 @@
 @media (max-width: 480px) {
   .users-page { padding-top: 80px; }
 }
+
+/* ============ 只读模式横幅 ============ */
+.users-page__readonly-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-lg);
+  background: rgba(79, 191, 196, 0.08);
+  border: 1px solid rgba(79, 191, 196, 0.2);
+  border-radius: var(--radius-md);
+  color: #4FBFC4;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-xl);
+}

@@ -713,3 +713,35 @@
   accent-color: var(--color-primary);
   cursor: pointer;
 }
+
+/* ============ 只读模式（非管理员） ============ */
+.content-mgmt__readonly-banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 10px var(--space-lg);
+  background: rgba(79, 191, 196, 0.08);
+  border: 1px solid rgba(79, 191, 196, 0.2);
+  border-radius: var(--radius-md);
+  color: #4FBFC4;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  margin-bottom: var(--space-xl);
+}
+
+.content-mgmt__panel--readonly input,
+.content-mgmt__panel--readonly textarea,
+.content-mgmt__panel--readonly select {
+  pointer-events: none;
+  opacity: 0.7;
+  background: var(--color-bg);
+}
+
+.content-mgmt__panel--readonly .content-mgmt__add-btn,
+.content-mgmt__panel--readonly .content-mgmt__remove-btn,
+.content-mgmt__panel--readonly .content-mgmt__edit-btn,
+.content-mgmt__panel--readonly .content-mgmt__fetch-btn,
+.content-mgmt__panel--readonly .content-mgmt__confirm-btn,
+.content-mgmt__panel--readonly .content-mgmt__article-form-actions {
+  display: none;
+}
