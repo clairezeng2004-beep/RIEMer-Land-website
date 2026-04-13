@@ -20,7 +20,7 @@
 }
 
 .timeline-hero__content h1 {
-  margin: var(--space-md) 0 var(--space-sm);
+  margin: var(--space-md) 0 var(--space-xl);
   font-size: var(--text-4xl);
 }
 
