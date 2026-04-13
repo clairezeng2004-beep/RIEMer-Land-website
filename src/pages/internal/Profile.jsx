@@ -221,7 +221,7 @@ export default function Profile() {
               <div className="profile-page__field">
                 <label className="profile-page__label">
                   注册姓名
-                  <span className="profile-page__label-hint">（同步注册时的真名，可修改）</span>
+                  <span className="profile-page__label-hint">（同步注册时的真名）</span>
                 </label>
                 <input
                   type="text"
