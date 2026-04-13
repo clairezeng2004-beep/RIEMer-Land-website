@@ -41,9 +41,11 @@ export default function Footer() {
 
             <div className="footer__nav">
               <h4 className="footer__nav-title">关于我们</h4>
-              <span className="footer__nav-text">RIEM 学生互助平台</span>
-              <span className="footer__nav-text">经验交流 · 心得共享</span>
-              <span className="footer__nav-text">朋辈互助 · 多元可能</span>
+              <div className="footer__about-texts">
+                <span className="footer__nav-text">RIEM 学生互助平台</span>
+                <span className="footer__nav-text">经验交流 · 心得共享</span>
+                <span className="footer__nav-text">朋辈互助 · 多元可能</span>
+              </div>
             </div>
 
             <div className="footer__nav footer__nav--contact">
