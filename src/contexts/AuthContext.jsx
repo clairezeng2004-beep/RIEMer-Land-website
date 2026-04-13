@@ -258,6 +258,17 @@ export function AuthProvider({ children }) {
       }
       return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
     }
+
+    // 确保 session 已经生效后再查询 profile
+    // signInWithPassword 返回后 session 应该已经设置好了，
+    // 但为了保险，我们显式等待 session 就绪
+    const { data: sessionData } = await supabase.auth.getSession();
+    console.log('[Auth] 登录后 session 状态:', {
+      hasSession: !!sessionData?.session,
+      userId: sessionData?.session?.user?.id,
+      accessToken: sessionData?.session?.access_token ? '存在' : '缺失',
+    });
+
     // 检查 authorized 状态
     const { data: profile, error: profileError } = await supabase
       .from('profiles')
@@ -268,18 +279,13 @@ export function AuthProvider({ children }) {
     console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
 
     if (profileError) {
-      console.error('[Auth] Profile 查询失败:', profileError);
-      // profile 不存在时不应阻止登录，fetchProfile 会补建
-      if (profileError.code === 'PGRST116') {
-        // 没有 profile 记录，让 fetchProfile 来处理
-        return { success: true };
-      }
-      await supabase.auth.signOut();
-      return { success: false, message: `登录异常：无法读取用户信息 (${profileError.message})` };
+      console.error('[Auth] Profile 查询失败，不阻止登录:', profileError);
+      // 查询失败（RLS 时序问题或记录不存在），不阻止登录
+      // 让 onAuthStateChange → fetchProfile 来正常处理
+      return { success: true };
     }
 
     if (!profile) {
-      // profile 为 null 但没有 error，属于异常情况
       return { success: true };
     }
 
@@ -287,7 +293,7 @@ export function AuthProvider({ children }) {
       await supabase.auth.signOut();
       return {
         success: false,
-        message: `您的账号尚未被授权，请联系管理员。(role: ${profile.role}, authorized: ${profile.authorized})`,
+        message: `您的账号尚未被授权，请联系管理员。(debug: role=${profile.role}, authorized=${profile.authorized})`,
       };
     }
     return { success: true };
