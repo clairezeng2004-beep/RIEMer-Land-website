@@ -232,6 +232,18 @@
   .footer__contact-item {
     justify-content: center;
     white-space: normal;
+    flex-wrap: wrap;
+  }
+
+  /* 手机端：复制成功提示改为行内显示，不绝对定位，防止超出屏幕 */
+  .footer__copy-toast {
+    position: static;
+    transform: none;
+    margin-left: 0;
+    display: block;
+    width: 100%;
+    text-align: center;
+    margin-top: var(--space-xs, 4px);
   }
 
   .footer__qrcode-img {
