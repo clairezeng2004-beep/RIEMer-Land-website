@@ -251,52 +251,53 @@ export function AuthProvider({ children }) {
     }
 
     // Supabase 模式
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) {
-      if (error.message === 'Email not confirmed') {
-        return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) {
+        if (error.message === 'Email not confirmed') {
+          return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
+        }
+        return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
       }
-      return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
-    }
 
-    // 确保 session 已经生效后再查询 profile
-    // signInWithPassword 返回后 session 应该已经设置好了，
-    // 但为了保险，我们显式等待 session 就绪
-    const { data: sessionData } = await supabase.auth.getSession();
-    console.log('[Auth] 登录后 session 状态:', {
-      hasSession: !!sessionData?.session,
-      userId: sessionData?.session?.user?.id,
-      accessToken: sessionData?.session?.access_token ? '存在' : '缺失',
-    });
+      // 确保 session 已经生效后再查询 profile
+      const { data: sessionData } = await supabase.auth.getSession();
+      console.log('[Auth] 登录后 session 状态:', {
+        hasSession: !!sessionData?.session,
+        userId: sessionData?.session?.user?.id,
+        accessToken: sessionData?.session?.access_token ? '存在' : '缺失',
+      });
 
-    // 检查 authorized 状态
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, email, role, authorized')
-      .eq('id', data.user.id)
-      .single();
+      // 检查 authorized 状态
+      const { data: profile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email, role, authorized')
+        .eq('id', data.user.id)
+        .single();
 
-    console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
+      console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
 
-    if (profileError) {
-      console.error('[Auth] Profile 查询失败，不阻止登录:', profileError);
-      // 查询失败（RLS 时序问题或记录不存在），不阻止登录
-      // 让 onAuthStateChange → fetchProfile 来正常处理
+      if (profileError) {
+        console.error('[Auth] Profile 查询失败，不阻止登录:', profileError);
+        return { success: true };
+      }
+
+      if (!profile) {
+        return { success: true };
+      }
+
+      if (!profile.authorized) {
+        await supabase.auth.signOut();
+        return {
+          success: false,
+          message: `您的账号尚未被授权，请联系管理员。(debug: role=${profile.role}, authorized=${profile.authorized})`,
+        };
+      }
       return { success: true };
+    } catch (err) {
+      console.error('[Auth] Supabase 登录异常:', err);
+      return { success: false, message: `登录服务异常：${err.message}` };
     }
-
-    if (!profile) {
-      return { success: true };
-    }
-
-    if (!profile.authorized) {
-      await supabase.auth.signOut();
-      return {
-        success: false,
-        message: `您的账号尚未被授权，请联系管理员。(debug: role=${profile.role}, authorized=${profile.authorized})`,
-      };
-    }
-    return { success: true };
   }, []);
 
   // ---- 注册 ----

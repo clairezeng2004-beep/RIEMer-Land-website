@@ -19,6 +19,7 @@ export default function Login() {
   const [rememberPassword, setRememberPassword] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   // 忘记密码相关
   const [newPassword, setNewPassword] = useState('');
@@ -87,19 +88,29 @@ export default function Login() {
       return;
     }
 
-    const result = await login(email, password);
-    if (result.success) {
-      if (rememberPassword) {
-        localStorage.setItem(
-          SAVED_CREDENTIALS_KEY,
-          JSON.stringify({ email, password })
-        );
+    setSubmitting(true);
+    try {
+      console.log('[Login] 开始登录...', { email });
+      const result = await login(email, password);
+      console.log('[Login] 登录结果:', result);
+      if (result.success) {
+        if (rememberPassword) {
+          localStorage.setItem(
+            SAVED_CREDENTIALS_KEY,
+            JSON.stringify({ email, password })
+          );
+        } else {
+          localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+        }
+        navigate('/internal/documents');
       } else {
-        localStorage.removeItem(SAVED_CREDENTIALS_KEY);
+        setError(result.message);
       }
-      navigate('/internal/documents');
-    } else {
-      setError(result.message);
+    } catch (err) {
+      console.error('[Login] 登录异常:', err);
+      setError(`登录出错：${err.message || '未知错误，请检查网络连接'}`);
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -319,8 +330,8 @@ export default function Login() {
               </button>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-lg login-card__submit">
-              <LogIn size={18} /> 登录
+            <button type="submit" className="btn btn-primary btn-lg login-card__submit" disabled={submitting}>
+              <LogIn size={18} /> {submitting ? '登录中...' : '登录'}
             </button>
 
             <button
