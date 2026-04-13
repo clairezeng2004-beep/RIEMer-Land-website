@@ -320,7 +320,6 @@ export default function MemberContributions() {
                       </div>
                       <div className="mc-member-info">
                         <span className="mc-member-name">{member.name}</span>
-                        <span className="mc-member-role">{member.role}</span>
                       </div>
                     </Link>
                   </td>
