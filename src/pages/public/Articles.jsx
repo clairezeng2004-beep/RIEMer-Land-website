@@ -12,6 +12,7 @@ import { articlesData, teamMembers } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import ArticleChat from '../../components/ArticleChat';
+import CoverImage from '../../components/CoverImage';
 import './Articles.css';
 
 export default function Articles() {
