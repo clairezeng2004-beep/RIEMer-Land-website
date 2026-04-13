@@ -128,7 +128,15 @@ export function AuthProvider({ children }) {
     }
 
     // Supabase 模式：监听 auth state 变化
+    const SESSION_TIMEOUT_MS = 8000; // 8 秒超时
+
     const initSession = async () => {
+      // 超时保护：如果 getSession / fetchProfile 超时，强制结束 loading
+      const timeout = setTimeout(() => {
+        console.warn('[Auth] Session 初始化超时（8s），强制结束 loading');
+        setLoading(false);
+      }, SESSION_TIMEOUT_MS);
+
       try {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
@@ -137,6 +145,7 @@ export function AuthProvider({ children }) {
       } catch (err) {
         console.error('[Auth] Failed to get session:', err);
       } finally {
+        clearTimeout(timeout);
         setLoading(false);
       }
     };
@@ -258,58 +267,75 @@ export function AuthProvider({ children }) {
     }
 
     // Supabase 模式
+    const LOGIN_TIMEOUT_MS = 15000; // 15 秒登录超时
+
     try {
-      console.time('[Auth] signInWithPassword');
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-      console.timeEnd('[Auth] signInWithPassword');
+      const loginPromise = (async () => {
+        console.time('[Auth] signInWithPassword');
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        console.timeEnd('[Auth] signInWithPassword');
 
-      if (error) {
-        if (error.message === 'Email not confirmed') {
-          return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
+        if (error) {
+          if (error.message === 'Email not confirmed') {
+            return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
+          }
+          return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
         }
-        return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
-      }
 
-      // signInWithPassword 返回的 data 已经包含 session，不需要再调 getSession
-      console.log('[Auth] 登录后 session 状态:', {
-        hasSession: !!data?.session,
-        userId: data?.user?.id,
-      });
+        // signInWithPassword 返回的 data 已经包含 session，不需要再调 getSession
+        console.log('[Auth] 登录后 session 状态:', {
+          hasSession: !!data?.session,
+          userId: data?.user?.id,
+        });
 
-      // 检查 authorized 状态
-      console.time('[Auth] profile 查询');
-      const { data: profile, error: profileError } = await supabase
-        .from('profiles')
-        .select('id, email, name, nickname, avatar, role, authorized')
-        .eq('id', data.user.id)
-        .single();
-      console.timeEnd('[Auth] profile 查询');
+        // 检查 authorized 状态
+        console.time('[Auth] profile 查询');
+        const { data: profile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email, name, nickname, avatar, role, authorized')
+          .eq('id', data.user.id)
+          .single();
+        console.timeEnd('[Auth] profile 查询');
 
-      console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
+        console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
 
-      if (profileError) {
-        console.error('[Auth] Profile 查询失败，不阻止登录:', profileError);
+        if (profileError) {
+          console.error('[Auth] Profile 查询失败，不阻止登录:', profileError);
+          return { success: true };
+        }
+
+        if (!profile) {
+          return { success: true };
+        }
+
+        if (!profile.authorized) {
+          await supabase.auth.signOut();
+          return {
+            success: false,
+            message: `您的账号尚未被授权，请联系管理员。(debug: role=${profile.role}, authorized=${profile.authorized})`,
+          };
+        }
+
+        // 直接设置用户状态，避免 onAuthStateChange 再次查询 profile
+        setUser(profile);
         return { success: true };
-      }
+      })();
 
-      if (!profile) {
-        return { success: true };
-      }
+      // 超时竞争：loginPromise vs 15 秒超时
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('登录请求超时，请检查网络连接后重试')), LOGIN_TIMEOUT_MS)
+      );
 
-      if (!profile.authorized) {
-        await supabase.auth.signOut();
-        return {
-          success: false,
-          message: `您的账号尚未被授权，请联系管理员。(debug: role=${profile.role}, authorized=${profile.authorized})`,
-        };
-      }
-
-      // 直接设置用户状态，避免 onAuthStateChange 再次查询 profile
-      setUser(profile);
-      return { success: true };
+      return await Promise.race([loginPromise, timeoutPromise]);
     } catch (err) {
       console.error('[Auth] Supabase 登录异常:', err);
-      return { success: false, message: `登录服务异常：${err.message}` };
+      const isTimeout = err.message?.includes('超时') || err.name === 'AbortError';
+      return {
+        success: false,
+        message: isTimeout
+          ? '登录请求超时，服务响应较慢，请稍后重试'
+          : `登录服务异常：${err.message}`,
+      };
     }
   }, []);
 

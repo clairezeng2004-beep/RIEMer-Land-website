@@ -17,8 +17,26 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
+// 全局请求超时：10 秒
+const FETCH_TIMEOUT_MS = 10000;
+
 export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: true,
+        persistSession: true,
+      },
+      global: {
+        fetch: (url, options = {}) => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeoutId));
+        },
+      },
+    })
   : null;
 
 export const isSupabaseConfigured = !!supabase;
