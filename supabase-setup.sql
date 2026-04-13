@@ -32,6 +32,12 @@ CREATE POLICY "所有认证用户可查看 profiles"
   TO authenticated
   USING (true);
 
+-- 匿名用户可查看已授权成员的公开信息（"关于我们"页面需要）
+CREATE POLICY "匿名用户可查看已授权成员公开信息"
+  ON profiles FOR SELECT
+  TO anon
+  USING (authorized = true);
+
 -- 用户可以更新自己的基本信息（但不能改角色和授权状态）
 CREATE POLICY "用户可更新自己的基本信息"
   ON profiles FOR UPDATE
@@ -113,6 +119,12 @@ ALTER TABLE member_profiles ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "所有认证用户可查看成员信息"
   ON member_profiles FOR SELECT
   TO authenticated
+  USING (true);
+
+-- 匿名用户可查看成员信息（"关于我们"页面需要）
+CREATE POLICY "匿名用户可查看成员信息"
+  ON member_profiles FOR SELECT
+  TO anon
   USING (true);
 
 -- 用户只能编辑自己的成员信息

@@ -19,16 +19,24 @@ export default function Timeline() {
       if (isSupabaseConfigured && supabase) {
         try {
           // 从 Supabase 获取所有已授权成员
-          const { data: profiles } = await supabase
+          const { data: profiles, error: profilesError } = await supabase
             .from('profiles')
             .select('id, name, nickname, avatar, signature, authorized')
             .eq('authorized', true);
 
-          const { data: memberProfiles } = await supabase
+          if (profilesError) {
+            console.warn('[Timeline] profiles 查询失败:', profilesError.message);
+          }
+
+          const { data: memberProfiles, error: mpError } = await supabase
             .from('member_profiles')
             .select('user_id, enrollment_year');
 
-          if (profiles) {
+          if (mpError) {
+            console.warn('[Timeline] member_profiles 查询失败:', mpError.message);
+          }
+
+          if (profiles && profiles.length > 0) {
             const enrollmentMap = {};
             (memberProfiles || []).forEach((mp) => {
               enrollmentMap[mp.user_id] = mp.enrollment_year;
