@@ -41,7 +41,28 @@ export default function InternalHome() {
   const { user, isAuthenticated, updateProfile } = useAuth();
   const { notifications, unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
-  const hc = internalConfig.home;
+  // 确保所有 home 配置字段都有回退默认值
+  const hcDefaults = {
+    greeting: 'RIEMer Land',
+    welcomeSuffix: '欢迎回到内部空间 ✨',
+    sectionModules: '功能模块',
+    sectionRecentMessages: '最近消息',
+    tipTitle: '💡 小贴士',
+    tipContent: '你可以通过顶部导航栏的「内部空间」随时回到这里。',
+    moduleNotifications: '消息通知',
+    moduleNotificationsDesc: '查看团队通知、系统提醒和重要消息',
+    moduleDocuments: '文档管理',
+    moduleDocumentsDesc: '上传、查看和管理团队内部文档资料',
+    moduleTasks: '事项追踪',
+    moduleTasksDesc: '跟踪待办事项、分配任务和查看进度',
+    moduleGallery: '成员相册',
+    moduleGalleryDesc: '浏览和上传活动照片，记录每次相聚的美好瞬间',
+    moduleUsers: '用户管理',
+    moduleUsersDesc: '管理成员账号、授权与角色分配',
+    moduleContent: '内容管理',
+    moduleContentDesc: '编辑网站首页、时间线等公开内容',
+  };
+  const hc = { ...hcDefaults, ...(internalConfig?.home || {}) };
   const navigate = useNavigate();
   const avatarInputRef = useRef(null);
 
@@ -102,14 +123,14 @@ export default function InternalHome() {
 
   // 统计数据
   const stats = useMemo(() => {
-    const todoTasks = initialTasks.filter((t) => t.status === '规划中' || t.status === '进行中').length;
-    const totalDocs = documentsData.length;
+    const todoTasks = (initialTasks || []).filter((t) => t.status === '规划中' || t.status === '进行中').length;
+    const totalDocs = (documentsData || []).length;
     return { unreadCount, todoTasks, totalDocs };
   }, [unreadCount]);
 
   // 最近通知（取前 4 条）
   const recentNotifications = useMemo(() => {
-    return notifications.slice(0, 4);
+    return (notifications || []).slice(0, 4);
   }, [notifications]);
 
   if (!isAuthenticated) {

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import InternalSidebar from './InternalSidebar';
+import ErrorBoundary from './ErrorBoundary';
 import './InternalLayout.css';
 
 export default function InternalLayout() {
@@ -23,7 +24,9 @@ export default function InternalLayout() {
     <div className="internal-layout">
       <InternalSidebar />
       <div className="internal-layout__content">
-        <Outlet />
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
       </div>
     </div>
   );
