@@ -50,7 +50,7 @@ export default function InternalArticles() {
             <h1>
               <FileText size={28} /> 公众号历史文章
             </h1>
-            <p>浏览文章内容，划选文字添加评论，与团队成员交流</p>
+            <p>浏览公众号历史推送内容，回顾与归档</p>
           </div>
         </div>
 
