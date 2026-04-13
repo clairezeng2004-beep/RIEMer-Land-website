@@ -1,8 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
-import { useSiteContent } from '../../contexts/SiteContentContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { User, Camera, Save, Loader2 } from 'lucide-react';
-import supabase, { isSupabaseConfigured } from '../../lib/supabase';
 import './Profile.css';
 
 const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
@@ -20,7 +19,7 @@ export default function Profile() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
 
-  // 加载入学年份（从 member_profiles）
+  // 加载入学年份
   useEffect(() => {
     if (!user) return;
     const loadEnrollmentYear = async () => {
@@ -85,17 +84,23 @@ export default function Profile() {
 
       const result = await updateProfile(updates);
 
-      // 同时保存入学年份到 member_profiles
+      // 同步入学年份到 member_profiles
       const yearVal = enrollmentYear.trim();
       if (isSupabaseConfigured) {
-        const { error } = await supabase
+        const { data: existing } = await supabase
           .from('member_profiles')
-          .upsert(
-            { user_id: user.id, enrollment_year: yearVal },
-            { onConflict: 'user_id' }
-          );
-        if (error) {
-          console.warn('[Profile] 保存入学年份失败:', error.message);
+          .select('user_id')
+          .eq('user_id', user.id)
+          .single();
+        if (existing) {
+          await supabase
+            .from('member_profiles')
+            .update({ enrollment_year: yearVal })
+            .eq('user_id', user.id);
+        } else {
+          await supabase
+            .from('member_profiles')
+            .insert({ user_id: user.id, enrollment_year: yearVal, joined_at: new Date().toISOString() });
         }
       } else {
         const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
@@ -104,7 +109,7 @@ export default function Profile() {
         if (idx >= 0) {
           profiles[idx].enrollment_year = yearVal;
         } else {
-          profiles.push({ user_id: user.id, enrollment_year: yearVal });
+          profiles.push({ user_id: user.id, enrollment_year: yearVal, joined_at: new Date().toISOString() });
         }
         localStorage.setItem(MEMBER_PROFILES_KEY, JSON.stringify(profiles));
       }
@@ -188,7 +193,7 @@ export default function Profile() {
               <div className="profile-page__field">
                 <label className="profile-page__label">
                   入学年份
-                  <span className="profile-page__label-hint">（如 2023，将在"关于我们"页展示）</span>
+                  <span className="profile-page__label-hint">（将在成员信息中展示）</span>
                 </label>
                 <input
                   type="text"
@@ -196,7 +201,7 @@ export default function Profile() {
                   value={enrollmentYear}
                   onChange={(e) => setEnrollmentYear(e.target.value)}
                   placeholder="如 2023"
-                  maxLength={4}
+                  maxLength={10}
                 />
               </div>
 
