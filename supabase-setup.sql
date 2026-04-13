@@ -85,6 +85,73 @@ CREATE TRIGGER on_auth_user_created
   EXECUTE FUNCTION public.handle_new_user();
 
 -- ============================================
+-- 6. 创建 member_profiles 表（成员信息表格）
+-- ============================================
+CREATE TABLE IF NOT EXISTS member_profiles (
+  user_id UUID PRIMARY KEY REFERENCES profiles(id) ON DELETE CASCADE,
+  enrollment_year TEXT DEFAULT '',
+  bio TEXT DEFAULT '',
+  further_education TEXT DEFAULT '',
+  career TEXT DEFAULT '',
+  willing_to_share TEXT DEFAULT '',
+  want_to_learn TEXT DEFAULT '',
+  hobbies TEXT DEFAULT '',
+  dream_city TEXT DEFAULT '',
+  other TEXT DEFAULT '',
+  joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 7. 启用 member_profiles 的 RLS
+ALTER TABLE member_profiles ENABLE ROW LEVEL SECURITY;
+
+-- 8. member_profiles RLS 策略
+
+-- 所有已认证用户可以查看所有成员信息
+CREATE POLICY "所有认证用户可查看成员信息"
+  ON member_profiles FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 用户只能编辑自己的成员信息
+CREATE POLICY "用户可更新自己的成员信息"
+  ON member_profiles FOR UPDATE
+  TO authenticated
+  USING (user_id = auth.uid())
+  WITH CHECK (user_id = auth.uid());
+
+-- 用户可以插入自己的成员信息
+CREATE POLICY "用户可插入自己的成员信息"
+  ON member_profiles FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
+
+-- 9. 新用户授权后自动创建 member_profiles 记录的触发器
+CREATE OR REPLACE FUNCTION public.handle_new_member_profile()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- 当用户被授权时，自动创建 member_profiles 记录
+  IF NEW.authorized = true AND (OLD.authorized IS NULL OR OLD.authorized = false) THEN
+    INSERT INTO public.member_profiles (user_id, joined_at)
+    VALUES (NEW.id, COALESCE(NEW.created_at, now()))
+    ON CONFLICT (user_id) DO NOTHING;
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_user_authorized ON profiles;
+CREATE TRIGGER on_user_authorized
+  AFTER UPDATE ON profiles
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_member_profile();
+
+-- 10. 为已有的已授权用户补建 member_profiles 记录
+INSERT INTO member_profiles (user_id, joined_at)
+SELECT id, created_at FROM profiles WHERE authorized = true
+ON CONFLICT (user_id) DO NOTHING;
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，

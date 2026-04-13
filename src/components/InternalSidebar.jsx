@@ -16,6 +16,7 @@ import {
   MessageSquarePlus,
   FolderOpen,
   Share2,
+  Contact,
 } from 'lucide-react';
 import './InternalSidebar.css';
 

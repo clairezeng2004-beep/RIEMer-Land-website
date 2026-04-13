@@ -22,6 +22,7 @@ import Gallery from './pages/internal/Gallery';
 import InternalArticles from './pages/internal/InternalArticles';
 import InternalArticleDetail from './pages/internal/InternalArticleDetail';
 import MemberContributions from './pages/internal/MemberContributions';
+import MemberProfiles from './pages/internal/MemberProfiles';
 import Suggestions from './pages/internal/Suggestions';
 
 function App() {
