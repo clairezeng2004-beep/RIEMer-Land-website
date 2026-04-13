@@ -380,9 +380,17 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  .timeline-hero { padding: 48px 0 40px; }
+  .timeline-hero { padding: 48px 0 20px; }
   .timeline-hero__content h1 { font-size: var(--text-2xl); }
   .timeline-hero__content p { font-size: var(--text-base); }
+
+  .timeline.section {
+    padding-top: var(--space-md);
+  }
+
+  .timeline__container {
+    padding-top: var(--space-md);
+  }
 
   .timeline__arrow { display: none; }
 
@@ -407,9 +415,17 @@
 }
 
 @media (max-width: 480px) {
-  .timeline-hero { padding: 28px 0 30px; }
+  .timeline-hero { padding: 28px 0 12px; }
   .timeline-hero__content h1 { font-size: var(--text-xl); }
   .timeline-hero__content p { font-size: var(--text-sm); line-height: 1.6; }
+
+  .timeline.section {
+    padding-top: var(--space-sm);
+  }
+
+  .timeline__container {
+    padding-top: var(--space-sm);
+  }
 
   .timeline__track {
     padding: 160px 1rem 160px;
