@@ -209,16 +209,18 @@
     padding: var(--space-md) 0;
     border-bottom: 1px solid var(--color-border-light);
     justify-content: flex-start;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
   }
 
   .footer__grid > .footer__qrcode {
     border-bottom: none;
     padding-bottom: var(--space-sm);
+    gap: var(--space-xs);
   }
 
   .footer__nav-title {
-    margin-bottom: var(--space-sm);
+    margin-bottom: 0;
+    padding-bottom: var(--space-xs);
   }
 
   /* 导航链接改为水平一行 */
@@ -287,7 +289,7 @@
     grid-row: auto;
     width: 100px;
     height: 100px;
-    margin-bottom: var(--space-xs, 4px);
+    margin-bottom: 0;
   }
 
   .footer__content {
