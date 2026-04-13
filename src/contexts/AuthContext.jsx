@@ -251,7 +251,10 @@ export function AuthProvider({ children }) {
     // Supabase 模式
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
-      return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误' : error.message };
+      if (error.message === 'Email not confirmed') {
+        return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
+      }
+      return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
     }
     // 检查 authorized 状态
     const { data: profile } = await supabase
