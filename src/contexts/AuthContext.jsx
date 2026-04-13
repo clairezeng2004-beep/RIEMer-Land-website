@@ -202,6 +202,8 @@ export function AuthProvider({ children }) {
         .eq('id', authUser.id)
         .single();
 
+      console.log('[Auth] fetchProfile 结果:', { authUserId: authUser.id, data, error });
+
       if (error && error.code === 'PGRST116') {
         // profile 不存在，创建默认 profile（新注册用户）
         const newProfile = {
@@ -257,14 +259,36 @@ export function AuthProvider({ children }) {
       return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
     }
     // 检查 authorized 状态
-    const { data: profile } = await supabase
+    const { data: profile, error: profileError } = await supabase
       .from('profiles')
-      .select('authorized')
+      .select('id, email, role, authorized')
       .eq('id', data.user.id)
       .single();
-    if (profile && !profile.authorized) {
+
+    console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
+
+    if (profileError) {
+      console.error('[Auth] Profile 查询失败:', profileError);
+      // profile 不存在时不应阻止登录，fetchProfile 会补建
+      if (profileError.code === 'PGRST116') {
+        // 没有 profile 记录，让 fetchProfile 来处理
+        return { success: true };
+      }
       await supabase.auth.signOut();
-      return { success: false, message: '您的账号尚未被授权，请联系管理员' };
+      return { success: false, message: `登录异常：无法读取用户信息 (${profileError.message})` };
+    }
+
+    if (!profile) {
+      // profile 为 null 但没有 error，属于异常情况
+      return { success: true };
+    }
+
+    if (!profile.authorized) {
+      await supabase.auth.signOut();
+      return {
+        success: false,
+        message: `您的账号尚未被授权，请联系管理员。(role: ${profile.role}, authorized: ${profile.authorized})`,
+      };
     }
     return { success: true };
   }, []);
