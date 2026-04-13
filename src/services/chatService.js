@@ -97,7 +97,7 @@ function localSearch(query) {
   }
 
   const lines = matches.map(
-    (m, i) => `${i + 1}. **${m.article.title}**（${m.article.category}）\n   ${m.article.excerpt}`
+    (m, i) => `${i + 1}. ${m.article.title}（${m.article.category}）\n   ${m.article.excerpt}`
   );
 
   return {
