@@ -276,8 +276,13 @@
   }
 
   .articles-filters__search {
-    max-width: 80%;
-    margin: 0 auto;
+    max-width: 100%;
+    margin: 0;
+  }
+
+  .articles-filters__input {
+    padding: 0.5rem 0.85rem 0.5rem 2.25rem;
+    font-size: var(--text-xs);
   }
 
   .articles-list__grid {
