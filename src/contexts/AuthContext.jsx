@@ -661,6 +661,7 @@ export function AuthProvider({ children }) {
     const users = getLocalUsers();
     const idx = users.findIndex((u) => u.id === user.id);
     if (idx >= 0) {
+      if (updates.name !== undefined) users[idx].name = updates.name;
       if (updates.nickname !== undefined) users[idx].nickname = updates.nickname;
       if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
       if (updates.signature !== undefined) users[idx].signature = updates.signature;
@@ -686,6 +687,7 @@ export function AuthProvider({ children }) {
       // Supabase 模式：同时更新远端
       try {
         const updateData = {};
+        if (updates.name !== undefined) updateData.name = updates.name;
         if (updates.nickname !== undefined) updateData.nickname = updates.nickname;
         if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
         if (updates.signature !== undefined) updateData.signature = updates.signature;

@@ -7,6 +7,7 @@ export default function Profile() {
   const { user, updateProfile } = useAuth();
   const fileInputRef = useRef(null);
 
+  const [name, setName] = useState(user?.name || '');
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [signature, setSignature] = useState(user?.signature || '');
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
@@ -42,6 +43,7 @@ export default function Profile() {
 
     try {
       const updates = {
+        name: name.trim(),
         nickname: nickname.trim(),
         signature: signature.trim(),
       };
@@ -116,13 +118,15 @@ export default function Profile() {
               <div className="profile-page__field">
                 <label className="profile-page__label">
                   注册姓名
-                  <span className="profile-page__label-hint">（不可修改）</span>
+                  <span className="profile-page__label-hint">（同步注册时的真名，可修改）</span>
                 </label>
                 <input
                   type="text"
-                  className="profile-page__input profile-page__input--disabled"
-                  value={user?.name || ''}
-                  disabled
+                  className="profile-page__input"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="请输入真实姓名"
+                  maxLength={30}
                 />
               </div>
 
