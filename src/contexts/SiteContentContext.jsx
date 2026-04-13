@@ -11,13 +11,13 @@ const SUGGESTIONS_KEY = 'riemer_site_suggestions';
 const EVENTS_KEY = 'riemer_site_events';
 const TIMELINE_KEY = 'riemer_site_timeline';
 
-// 网站建设建议初始模拟数据
+// 建设建议初始模拟数据（包含网站改进与组织建设两类）
 const getDefaultSuggestions = () => [
   {
     id: 'sug-1',
-    content: '首页 Hero 区域增加轮播背景图，展示校园风光',
+    content: '首页 Hero 区域增加轮播背景图，展示校园风光和活动精彩瞬间',
     proposer: '陈思雨',
-    status: '修复中',
+    status: '处理中',
     statusUpdatedAt: '2025-04-10',
     statusUpdatedBy: '林子墨',
     statusUpdatedByAvatar: null,
@@ -27,21 +27,21 @@ const getDefaultSuggestions = () => [
   },
   {
     id: 'sug-2',
-    content: '文章详情页添加目录导航（TOC），方便长文阅读',
+    content: '建议每学期初举办一次"破冰茶话会"，帮助新成员融入团队、了解组织文化',
     proposer: '周悦然',
-    status: '暂时不做',
+    status: '处理中',
     statusUpdatedAt: '2025-04-08',
     statusUpdatedBy: '陈思雨',
     statusUpdatedByAvatar: null,
     createdAt: '2025-03-25',
-    resolver: '',
-    skipReason: '当前文章篇幅较短，暂不需要目录导航功能',
+    resolver: '周悦然',
+    skipReason: '',
   },
   {
     id: 'sug-3',
     content: '移动端侧边栏增加汉堡菜单按钮，改善手机端导航体验',
     proposer: '张一帆',
-    status: '已修复',
+    status: '已完成',
     statusUpdatedAt: '2025-04-05',
     statusUpdatedBy: '王诗涵',
     statusUpdatedByAvatar: null,
@@ -51,9 +51,9 @@ const getDefaultSuggestions = () => [
   },
   {
     id: 'sug-4',
-    content: '「关于我们」页面增加团队成员个人主页链接',
+    content: '建立"学长学姐经验库"，收集往届成员的学业规划、实习求职和留学申请经验供新成员参考',
     proposer: '李明远',
-    status: '已修复',
+    status: '处理中',
     statusUpdatedAt: '2025-04-12',
     statusUpdatedBy: '林子墨',
     statusUpdatedByAvatar: null,
@@ -63,15 +63,15 @@ const getDefaultSuggestions = () => [
   },
   {
     id: 'sug-5',
-    content: '内部空间首页增加最近编辑的文章快捷入口',
+    content: '优化组织内部分工机制，明确各小组职责范围，减少任务重叠和沟通成本',
     proposer: '林子墨',
-    status: '修复中',
+    status: '暂时搁置',
     statusUpdatedAt: '2025-04-11',
     statusUpdatedBy: '张一帆',
     statusUpdatedByAvatar: null,
     createdAt: '2025-04-05',
-    resolver: '张一帆',
-    skipReason: '',
+    resolver: '',
+    skipReason: '需要等下学期换届后根据新团队架构再统一规划',
   },
 ];
 

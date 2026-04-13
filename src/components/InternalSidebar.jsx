@@ -14,6 +14,7 @@ import {
   Settings,
   BookOpen,
   BarChart3,
+  MessageSquarePlus,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -42,6 +43,7 @@ export default function InternalSidebar() {
     { to: '/internal/tasks', icon: CheckSquare, configKey: 'labelTasks', label: sc.labelTasks },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
     { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, label: '建设建议' },
   ];
 
   // 管理菜单项（所有成员可见，仅管理员可编辑）

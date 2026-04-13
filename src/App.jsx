@@ -21,6 +21,7 @@ import InternalHome from './pages/internal/InternalHome';
 import InternalArticles from './pages/internal/InternalArticles';
 import InternalArticleDetail from './pages/internal/InternalArticleDetail';
 import MemberContributions from './pages/internal/MemberContributions';
+import Suggestions from './pages/internal/Suggestions';
 
 function App() {
   return (
@@ -53,6 +54,7 @@ function App() {
                   <Route path="content" element={<ContentManagement />} />
                   <Route path="notifications" element={<Notifications />} />
                   <Route path="contributions" element={<MemberContributions />} />
+                  <Route path="suggestions" element={<Suggestions />} />
                 </Route>
               </Routes>
             </main>
