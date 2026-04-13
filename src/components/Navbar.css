@@ -311,6 +311,21 @@
 
 /* ==================== 响应式 ==================== */
 @media (max-width: 768px) {
+  .navbar__container {
+    height: 56px;
+    padding: 0 clamp(0.75rem, 3vw, 1.5rem);
+    gap: var(--space-sm);
+    justify-content: space-between;
+  }
+
+  .navbar__logo-img {
+    height: 36px;
+  }
+
+  .navbar__logo-text {
+    font-size: var(--text-base);
+  }
+
   /* 手机端：隐藏进度条导航和右侧区域 */
   .navbar__nav-bar {
     display: none;
@@ -320,18 +335,19 @@
     display: none;
   }
 
-  .navbar__container {
-    justify-content: space-between;
-  }
-
   .navbar__toggle {
     display: block;
-    margin-right: var(--space-sm);
+    margin-right: 0;
+  }
+
+  .navbar__toggle svg {
+    width: 22px;
+    height: 22px;
   }
 
   .navbar__links {
     position: fixed;
-    top: 72px;
+    top: 56px;
     right: 0;
     width: 50vw;
     max-width: 240px;
@@ -345,7 +361,7 @@
     gap: 2px;
     box-shadow: -4px 4px 20px rgba(0, 0, 0, 0.08);
     border-radius: 0 0 0 var(--radius-lg);
-    max-height: calc(100vh - 72px);
+    max-height: calc(100vh - 56px);
     overflow-y: auto;
     transform: translateX(100%);
     opacity: 0;
@@ -413,5 +429,29 @@
 
   .navbar__dropdown-menu--open {
     transform: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .navbar__container {
+    height: 48px;
+    padding: 0 0.75rem;
+  }
+
+  .navbar__logo-img {
+    height: 30px;
+  }
+
+  .navbar__logo-text {
+    font-size: var(--text-sm);
+  }
+
+  .navbar__logo {
+    gap: 6px;
+  }
+
+  .navbar__links {
+    top: 48px;
+    max-height: calc(100vh - 48px);
   }
 }
