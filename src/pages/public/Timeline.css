@@ -458,8 +458,8 @@
     padding: var(--space-sm) var(--space-md);
   }
 
-  .timeline__title { font-size: var(--text-xs); }
-  .timeline__desc { font-size: 0.7rem; }
+  .timeline__title { font-size: var(--text-sm); }
+  .timeline__desc { font-size: var(--text-xs); }
 
   .members__grid {
     grid-template-columns: 1fr;
