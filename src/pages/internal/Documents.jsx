@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import {
   FileText,
   Upload,
@@ -155,6 +156,13 @@ export default function Documents() {
       _file: selectedFile,
     };
     setDocuments([doc, ...documents]);
+    // 自动发送已读通知到通知中心
+    addNotification({
+      title: '新资料上传',
+      message: `${doc.uploadedBy} 上传了文档「${doc.title}」（${typeLabels[doc.type]}）`,
+      type: 'info',
+      read: true, // 自动已读，不打扰成员
+    });
     setNewDoc({ title: '', type: 'plan', description: '' });
     setSelectedFile(null);
     setShowUpload(false);

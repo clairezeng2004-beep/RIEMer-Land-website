@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { fetchAndParseArticle, cleanTitle, generateSummary, inferCategory, inferTags } from '../../services/articleService';
 import {
   Settings,
@@ -34,6 +35,7 @@ import './ContentManagement.css';
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin } = useAuth();
   const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, suggestions, addSuggestion, updateSuggestion, deleteSuggestion } = useSiteContent();
+  const { addNotification } = useNotifications();
 
   // 本地编辑状态
   const [form, setForm] = useState({ ...content });
@@ -1205,6 +1207,13 @@ export default function ContentManagement() {
                             statusUpdatedBy: editingSuggestion.proposer,
                             statusUpdatedByAvatar: sugAvatarUrl(editingSuggestion.proposer),
                           });
+                          // 新建建议时自动发送已读通知
+                          addNotification({
+                            title: '新建设建议',
+                            message: `${editingSuggestion.proposer} 提出了建议：${editingSuggestion.content.slice(0, 40)}${editingSuggestion.content.length > 40 ? '…' : ''}`,
+                            type: 'system',
+                            read: true,
+                          });
                           setEditingSuggestion(null);
                         }}
                       >
@@ -1290,11 +1299,21 @@ export default function ContentManagement() {
                                     <button
                                       className="btn btn-primary"
                                       onClick={() => {
+                                        const oldSug = suggestions.find(s => s.id === sug.id);
                                         updateSuggestion(sug.id, {
                                           ...editingSuggestion,
                                           statusUpdatedAt: new Date().toISOString().split('T')[0],
                                           statusUpdatedByAvatar: sugAvatarUrl(editingSuggestion.statusUpdatedBy),
                                         });
+                                        // 状态变更时自动发送已读通知
+                                        if (oldSug && oldSug.status !== editingSuggestion.status) {
+                                          addNotification({
+                                            title: '建设建议状态变更',
+                                            message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
+                                            type: 'system',
+                                            read: true,
+                                          });
+                                        }
                                         setEditingSuggestionId(null);
                                         setEditingSuggestion(null);
                                       }}
