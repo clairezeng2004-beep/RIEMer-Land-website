@@ -222,6 +222,52 @@ export function inferTags(title, content) {
   return tags.length > 0 ? tags : ['经验分享'];
 }
 
+/**
+ * 从文章内容自动生成大纲
+ * 提取 ## / ### 标题行，或者按段落首句提取要点
+ */
+export function generateOutline(content) {
+  if (!content) return [];
+
+  const lines = content.split('\n');
+  const outline = [];
+
+  // 1. 优先提取 Markdown 标题行
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (/^#{2,3}\s+/.test(trimmed)) {
+      outline.push(trimmed.replace(/^#{2,3}\s+/, '').trim());
+    }
+  }
+
+  if (outline.length > 0) return outline;
+
+  // 2. 如果没有 Markdown 标题，按段落分割，提取每段首句作为要点
+  const paragraphs = content
+    .split(/\n{2,}/)
+    .map((p) => p.trim())
+    .filter((p) => p.length >= 10);
+
+  for (const para of paragraphs) {
+    // 取段落首句（句号/问号/叹号之前）
+    const firstSentence = para.split(/[。！？\n]/)[0]?.trim();
+    if (firstSentence && firstSentence.length >= 4 && firstSentence.length <= 60) {
+      outline.push(firstSentence);
+    }
+  }
+
+  // 如果还是空，取前几个有意义的短句
+  if (outline.length === 0) {
+    const sentences = content
+      .split(/[。！？；\n]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 6 && s.length <= 60);
+    return sentences.slice(0, 5);
+  }
+
+  return outline.slice(0, 8);
+}
+
 // ========== 主入口：抓取并解析文章 ==========
 
 /**
@@ -252,15 +298,19 @@ export async function fetchAndParseArticle(url) {
 
   const parsed = parseWechatArticle(html);
 
+  const titleForInfer = parsed.title || parsed.rawTitle;
+  const contentText = parsed.content;
+
   return {
     rawTitle: parsed.rawTitle,
-    title: parsed.title || parsed.rawTitle,
+    title: titleForInfer,
     date: parsed.date || new Date().toISOString().split('T')[0],
     author: parsed.author,
-    category: inferCategory(parsed.title || parsed.rawTitle, parsed.content),
-    tags: inferTags(parsed.title || parsed.rawTitle, parsed.content),
-    excerpt: generateSummary(parsed.content),
+    category: inferCategory(titleForInfer, contentText),
+    tags: inferTags(titleForInfer, contentText),
+    excerpt: generateSummary(contentText),
+    outline: generateOutline(contentText),
     url,
-    content: parsed.content,
+    content: contentText,
   };
 }

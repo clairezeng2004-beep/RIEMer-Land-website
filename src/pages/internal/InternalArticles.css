@@ -9,6 +9,10 @@
 
 .ia-list__header {
   margin-bottom: var(--space-2xl);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
 }
 
 .ia-list__header h1 {
@@ -22,6 +26,11 @@
 .ia-list__header p {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+.ia-list__header .btn {
+  flex-shrink: 0;
+  margin-top: 4px;
 }
 
 /* 筛选区 */
@@ -232,4 +241,421 @@
 
 @media (max-width: 480px) {
   .ia-list-page { padding-top: 80px; }
+}
+
+/* ============================================
+   新建归档弹窗
+   ============================================ */
+.ia-modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  animation: ia-fade-in 0.2s ease;
+}
+
+@keyframes ia-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.ia-modal {
+  background: var(--color-bg-card, #fff);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  width: 100%;
+  max-width: 640px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  animation: ia-slide-up 0.25s ease;
+  overflow: hidden;
+}
+
+@keyframes ia-slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.ia-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-lg) var(--space-xl);
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.ia-modal__header h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
+.ia-modal__close {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.ia-modal__close:hover {
+  background: var(--color-bg-muted, #f5f5f5);
+  color: var(--color-text);
+}
+
+.ia-modal__body {
+  padding: var(--space-xl);
+  overflow-y: auto;
+  flex: 1;
+}
+
+.ia-modal__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  border-top: 1px solid var(--color-border-light);
+}
+
+/* Step: 输入链接 */
+.ia-modal__hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  margin-bottom: var(--space-lg);
+  line-height: 1.6;
+}
+
+.ia-modal__url-row {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: stretch;
+}
+
+.ia-modal__url-input-wrap {
+  position: relative;
+  flex: 1;
+}
+
+.ia-modal__url-icon {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-text-muted);
+}
+
+.ia-modal__url-input {
+  width: 100%;
+  padding: 0.65rem 1rem 0.65rem 2.4rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.ia-modal__url-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
+}
+
+.ia-modal__error {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  margin-top: var(--space-sm);
+  color: var(--color-danger, #e53e3e);
+  font-size: var(--text-sm);
+}
+
+/* Step: 加载 */
+.ia-modal__step-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4xl) 0;
+  gap: var(--space-md);
+  color: var(--color-text-muted);
+}
+
+.ia-modal__spinner {
+  animation: spin 1s linear infinite;
+  color: var(--color-primary);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Step: 确认 */
+.ia-modal__step-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+}
+
+.ia-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ia-modal__label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  cursor: default;
+}
+
+.ia-modal__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ia-modal__label-row--toggle {
+  cursor: pointer;
+  padding: var(--space-xs) 0;
+  border-radius: var(--radius-sm);
+  transition: color var(--transition-fast);
+}
+
+.ia-modal__label-row--toggle:hover {
+  color: var(--color-primary);
+}
+
+.ia-modal__count {
+  font-weight: 400;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  margin-left: var(--space-xs);
+}
+
+.ia-modal__text-input {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.ia-modal__text-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
+}
+
+.ia-modal__textarea {
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+  line-height: 1.6;
+  transition: all var(--transition-fast);
+}
+
+.ia-modal__textarea:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
+}
+
+/* 大纲编辑器 */
+.ia-modal__outline-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+  padding: var(--space-sm);
+  background: var(--color-bg-muted, #fafafa);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
+.ia-modal__outline-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.ia-modal__outline-num {
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  font-weight: 600;
+  min-width: 24px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.ia-modal__outline-input {
+  flex: 1;
+  padding: 0.4rem 0.65rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg-card, #fff);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.ia-modal__outline-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.08);
+}
+
+.ia-modal__outline-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.ia-modal__outline-remove:hover {
+  color: var(--color-danger, #e53e3e);
+  background: rgba(229, 62, 62, 0.08);
+}
+
+.ia-modal__outline-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding-top: var(--space-xs);
+  border-top: 1px dashed var(--color-border-light);
+  margin-top: var(--space-xs);
+}
+
+.ia-modal__empty-hint {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  text-align: center;
+  padding: var(--space-sm) 0;
+}
+
+/* 标签编辑器 */
+.ia-modal__tags-editor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  padding: var(--space-sm);
+  background: var(--color-bg-muted, #fafafa);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border-light);
+}
+
+.ia-modal__tags-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.ia-modal__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.2rem 0.65rem;
+  background: rgba(91, 140, 62, 0.1);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+
+.ia-modal__tag-remove {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--color-primary);
+  padding: 0;
+  display: flex;
+  align-items: center;
+  opacity: 0.6;
+  transition: opacity var(--transition-fast);
+}
+
+.ia-modal__tag-remove:hover {
+  opacity: 1;
+}
+
+.ia-modal__tag-add {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+}
+
+.ia-modal__tag-input {
+  flex: 1;
+  padding: 0.35rem 0.65rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg-card, #fff);
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.ia-modal__tag-input:focus {
+  border-color: var(--color-primary);
+}
+
+/* 元信息行 */
+.ia-modal__meta-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-lg);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  padding-top: var(--space-sm);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.ia-modal__meta-row span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .ia-modal {
+    max-width: 100%;
+    max-height: 90vh;
+    border-radius: var(--radius-lg, 12px);
+  }
+
+  .ia-modal__url-row {
+    flex-direction: column;
+  }
+
+  .ia-list__header {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .ia-list__header .btn {
+    align-self: flex-start;
+  }
 }
