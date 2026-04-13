@@ -227,6 +227,12 @@
   background: rgba(243, 156, 18, 0.08);
 }
 
+.users-table__status-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
 .users-table__actions {
   display: flex;
   gap: var(--space-xs);
