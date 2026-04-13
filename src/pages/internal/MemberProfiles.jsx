@@ -47,7 +47,7 @@ function saveLocalProfiles(profiles) {
 // MemberProfiles 组件
 // ============================================
 export default function MemberProfiles() {
-  const { user, isAuthenticated, getAllUsers } = useAuth();
+  const { user, isAuthenticated, isAdmin, getAllUsers } = useAuth();
   const [profiles, setProfiles] = useState([]);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
@@ -264,7 +264,10 @@ export default function MemberProfiles() {
         </div>
 
         <div className="member-profiles-page__hint">
-          💡 点击你那一行右侧的编辑按钮即可修改自己的信息。表格可左右滚动查看更多列。
+          💡 {isAdmin
+            ? '管理员模式：你可以编辑所有成员的信息。表格可左右滚动查看更多列。'
+            : '点击你那一行右侧的编辑按钮即可修改自己的信息。表格可左右滚动查看更多列。'
+          }
         </div>
 
         {/* 滚动控制 */}
@@ -346,11 +349,11 @@ export default function MemberProfiles() {
                       </td>
                     ))}
                     <td className="member-profiles-table__action-col">
-                      {isSelf && !isEditing && (
+                      {(isSelf || isAdmin) && !isEditing && (
                         <button
                           className="member-profiles-table__edit-btn"
                           onClick={() => startEdit(profile)}
-                          title="编辑我的信息"
+                          title={isSelf ? '编辑我的信息' : '编辑该成员信息（管理员）'}
                         >
                           <Pencil size={14} />
                         </button>

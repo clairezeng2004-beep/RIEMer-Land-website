@@ -134,6 +134,17 @@ CREATE POLICY "用户可更新自己的成员信息"
   USING (user_id = auth.uid())
   WITH CHECK (user_id = auth.uid());
 
+-- 管理员可以编辑所有成员信息
+CREATE POLICY "管理员可更新所有成员信息"
+  ON member_profiles FOR UPDATE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  )
+  WITH CHECK (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
 -- 用户可以插入自己的成员信息
 CREATE POLICY "用户可插入自己的成员信息"
   ON member_profiles FOR INSERT
