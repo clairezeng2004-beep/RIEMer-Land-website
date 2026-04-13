@@ -144,8 +144,15 @@ export function AuthProvider({ children }) {
     initSession();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      async (event, session) => {
+        console.log('[Auth] onAuthStateChange:', event);
         if (session?.user) {
+          // 如果 login 函数已经设置了 user，跳过重复查询
+          // 只在 SIGNED_IN 以外的事件（如 TOKEN_REFRESHED）或初始加载时查询
+          if (event === 'SIGNED_IN') {
+            // login() 里已经 setUser 了，不需要重复 fetchProfile
+            return;
+          }
           await fetchProfile(session.user);
         } else {
           setUser(null);
@@ -252,7 +259,10 @@ export function AuthProvider({ children }) {
 
     // Supabase 模式
     try {
+      console.time('[Auth] signInWithPassword');
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      console.timeEnd('[Auth] signInWithPassword');
+
       if (error) {
         if (error.message === 'Email not confirmed') {
           return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
@@ -260,20 +270,20 @@ export function AuthProvider({ children }) {
         return { success: false, message: error.message === 'Invalid login credentials' ? '邮箱或密码错误（若邮箱未确认也会出现此错误，请检查 Supabase 邮箱确认设置）' : error.message };
       }
 
-      // 确保 session 已经生效后再查询 profile
-      const { data: sessionData } = await supabase.auth.getSession();
+      // signInWithPassword 返回的 data 已经包含 session，不需要再调 getSession
       console.log('[Auth] 登录后 session 状态:', {
-        hasSession: !!sessionData?.session,
-        userId: sessionData?.session?.user?.id,
-        accessToken: sessionData?.session?.access_token ? '存在' : '缺失',
+        hasSession: !!data?.session,
+        userId: data?.user?.id,
       });
 
       // 检查 authorized 状态
+      console.time('[Auth] profile 查询');
       const { data: profile, error: profileError } = await supabase
         .from('profiles')
-        .select('id, email, role, authorized')
+        .select('id, email, name, nickname, avatar, role, authorized')
         .eq('id', data.user.id)
         .single();
+      console.timeEnd('[Auth] profile 查询');
 
       console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
 
@@ -293,6 +303,9 @@ export function AuthProvider({ children }) {
           message: `您的账号尚未被授权，请联系管理员。(debug: role=${profile.role}, authorized=${profile.authorized})`,
         };
       }
+
+      // 直接设置用户状态，避免 onAuthStateChange 再次查询 profile
+      setUser(profile);
       return { success: true };
     } catch (err) {
       console.error('[Auth] Supabase 登录异常:', err);
