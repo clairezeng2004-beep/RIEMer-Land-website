@@ -341,7 +341,7 @@ export function AuthProvider({ children }) {
         console.time('[Auth] profile 查询');
         const { data: profile, error: profileError } = await supabase
           .from('profiles')
-          .select('id, email, name, nickname, avatar, role, authorized')
+          .select('*')
           .eq('id', data.user.id)
           .single();
         console.timeEnd('[Auth] profile 查询');
@@ -687,7 +687,14 @@ export function AuthProvider({ children }) {
   const updateProfile = useCallback(async (updates) => {
     if (!user) return { success: false, message: '未登录' };
 
-    // 始终更新本地用户数据库
+    // 构造更新后的用户对象（前端状态）
+    const updatedUser = { ...user };
+    if (updates.name !== undefined) updatedUser.name = updates.name;
+    if (updates.nickname !== undefined) updatedUser.nickname = updates.nickname;
+    if (updates.avatar !== undefined) updatedUser.avatar = updates.avatar;
+    if (updates.signature !== undefined) updatedUser.signature = updates.signature;
+
+    // 始终更新本地用户数据库（如果用户存在于其中）
     const users = getLocalUsers();
     const idx = users.findIndex((u) => u.id === user.id);
     if (idx >= 0) {
@@ -696,21 +703,24 @@ export function AuthProvider({ children }) {
       if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
       if (updates.signature !== undefined) users[idx].signature = updates.signature;
       saveLocalUsers(users);
-      setUser({ ...users[idx] });
-      // 同步 AUTH_KEY
-      localStorage.setItem(
-        AUTH_KEY,
-        JSON.stringify({
-          id: users[idx].id,
-          name: users[idx].name,
-          email: users[idx].email,
-          role: users[idx].role,
-          deviceId: getDeviceId(),
-          loginAt: new Date().toISOString(),
-          persistent: true,
-        })
-      );
     }
+
+    // 始终更新前端 user 状态（不论是否在本地用户库中找到）
+    setUser(updatedUser);
+
+    // 同步 AUTH_KEY
+    localStorage.setItem(
+      AUTH_KEY,
+      JSON.stringify({
+        id: updatedUser.id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        deviceId: getDeviceId(),
+        loginAt: new Date().toISOString(),
+        persistent: true,
+      })
+    );
 
     const useLocal = !isSupabaseConfigured || supabaseOk === false;
     if (!useLocal) {

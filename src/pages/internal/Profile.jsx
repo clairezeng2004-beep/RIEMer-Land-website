@@ -58,7 +58,7 @@ export default function Profile() {
             .from('member_profiles')
             .select('enrollment_year')
             .eq('user_id', user.id)
-            .single();
+            .maybeSingle();
           if (!error && data?.enrollment_year) {
             setEnrollmentYear(data.enrollment_year);
             return;
@@ -137,21 +137,16 @@ export default function Profile() {
       const useSupabase = isSupabaseUsable() && supabaseOk !== false;
       if (useSupabase) {
         try {
-          const { data: existing } = await supabase
+          await supabase
             .from('member_profiles')
-            .select('user_id')
-            .eq('user_id', user.id)
-            .single();
-          if (existing) {
-            await supabase
-              .from('member_profiles')
-              .update({ enrollment_year: yearVal })
-              .eq('user_id', user.id);
-          } else {
-            await supabase
-              .from('member_profiles')
-              .insert({ user_id: user.id, enrollment_year: yearVal, joined_at: new Date().toISOString() });
-          }
+            .upsert(
+              {
+                user_id: user.id,
+                enrollment_year: yearVal,
+                joined_at: new Date().toISOString(),
+              },
+              { onConflict: 'user_id' }
+            );
         } catch (err) {
           console.warn('[Profile] Supabase 入学年份同步失败（本地已保存）:', err);
         }
