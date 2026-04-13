@@ -229,6 +229,7 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-xs);
+    border-bottom: none;
   }
 
   .footer__grid > .footer__nav:first-child .footer__nav-title {
@@ -243,6 +244,7 @@
   /* 导航链接行容器：水平排列居中 */
   .footer__nav-links-row {
     display: flex;
+    flex-direction: row;
     justify-content: center;
     gap: var(--space-md);
   }
