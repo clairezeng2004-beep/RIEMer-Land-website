@@ -585,8 +585,11 @@ export default function ContentManagement() {
                         </div>
                       </div>
 
-                      <div className="content-mgmt__field">
-                        <label><Tag size={14} /> 标签（逗号分隔）</label>
+                      <div className="content-mgmt__field content-mgmt__field--ai">
+                        <label>
+                          <Tag size={14} /> 标签（逗号分隔）
+                          {editingArticle.url && <span className="content-mgmt__ai-badge">✨ AI 生成 · 可修改</span>}
+                        </label>
                         <input
                           type="text"
                           value={editingArticle.tags.join('、')}
@@ -599,8 +602,11 @@ export default function ContentManagement() {
                         />
                       </div>
 
-                      <div className="content-mgmt__field">
-                        <label>摘要（首页卡片展示）</label>
+                      <div className="content-mgmt__field content-mgmt__field--ai">
+                        <label>
+                          摘要（首页卡片展示）
+                          {editingArticle.url && <span className="content-mgmt__ai-badge">✨ AI 生成 · 可修改</span>}
+                        </label>
                         <textarea
                           value={editingArticle.excerpt}
                           onChange={(e) => setEditingArticle({ ...editingArticle, excerpt: e.target.value })}
@@ -625,7 +631,7 @@ export default function ContentManagement() {
 
                       <div className="content-mgmt__article-form-actions">
                         <button
-                          className="btn btn-primary"
+                          className="btn btn-primary content-mgmt__confirm-btn"
                           disabled={!editingArticle.title.trim()}
                           onClick={() => {
                             addArticle(editingArticle);
@@ -633,7 +639,7 @@ export default function ContentManagement() {
                             setArticleUrl('');
                           }}
                         >
-                          <Plus size={16} /> 添加文章
+                          <CheckCircle size={18} /> 确认添加文章
                         </button>
                         <button
                           className="btn btn-ghost"
@@ -735,8 +741,11 @@ export default function ContentManagement() {
                                 />
                               </div>
                             </div>
-                            <div className="content-mgmt__field">
-                              <label>标签</label>
+                            <div className="content-mgmt__field content-mgmt__field--ai">
+                              <label>
+                                <Tag size={14} /> 标签
+                                <span className="content-mgmt__ai-badge">✨ AI 生成 · 可修改</span>
+                              </label>
                               <input
                                 type="text"
                                 value={editingArticle.tags.join('、')}
@@ -745,27 +754,31 @@ export default function ContentManagement() {
                                   tags: e.target.value.split(/[,，、]/).map(t => t.trim()).filter(Boolean),
                                 })}
                                 className="content-mgmt__input"
+                                placeholder="如：保研、经验分享、学术"
                               />
                             </div>
-                            <div className="content-mgmt__field">
-                              <label>摘要</label>
+                            <div className="content-mgmt__field content-mgmt__field--ai">
+                              <label>
+                                摘要
+                                <span className="content-mgmt__ai-badge">✨ AI 生成 · 可修改</span>
+                              </label>
                               <textarea
                                 value={editingArticle.excerpt}
                                 onChange={(e) => setEditingArticle({ ...editingArticle, excerpt: e.target.value })}
                                 className="content-mgmt__input content-mgmt__textarea"
                                 rows={3}
+                                placeholder="AI 自动生成的智能摘要，也可手动修改"
                               />
                             </div>
                             <button
-                              className="btn btn-primary"
-                              style={{ marginTop: 'var(--space-sm)' }}
+                              className="btn btn-primary content-mgmt__confirm-btn"
                               onClick={() => {
                                 updateArticle(article.id, editingArticle);
                                 setEditingArticleId(null);
                                 setEditingArticle(null);
                               }}
                             >
-                              <Save size={14} /> 保存修改
+                              <CheckCircle size={18} /> 确认保存修改
                             </button>
                           </>
                         ) : (
