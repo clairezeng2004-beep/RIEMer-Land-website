@@ -252,8 +252,8 @@
 /* ============ Documents Grid ============ */
 .documents-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: clamp(0.75rem, 2vw, 2rem);
+  grid-template-columns: repeat(4, 1fr);
+  gap: clamp(0.75rem, 1.5vw, 1.5rem);
 }
 
 /* ============ Document Card ============ */
@@ -846,6 +846,12 @@
 }
 
 /* ============ Responsive ============ */
+@media (max-width: 1200px) {
+  .documents-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 1024px) {
   .documents-grid {
     grid-template-columns: repeat(2, 1fr);

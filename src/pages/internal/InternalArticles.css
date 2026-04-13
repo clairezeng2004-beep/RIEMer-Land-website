@@ -105,7 +105,7 @@
 /* 文章网格 */
 .ia-list__grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: clamp(0.75rem, 2vw, 1.25rem);
 }
 
@@ -230,6 +230,10 @@
 }
 
 /* 响应式 */
+@media (max-width: 1200px) {
+  .ia-list__grid { grid-template-columns: repeat(3, 1fr); }
+}
+
 @media (max-width: 1024px) {
   .ia-list__grid { grid-template-columns: repeat(2, 1fr); }
 }
