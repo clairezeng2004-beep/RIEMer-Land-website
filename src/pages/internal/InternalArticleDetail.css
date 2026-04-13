@@ -166,7 +166,9 @@
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .ia-detail-page { padding-top: 28px; }
+  .ia-detail-page { padding-top: 16px; }
+  .ia-detail__back { margin-bottom: var(--space-md); }
+  .ia-detail__header { margin-bottom: var(--space-xl); padding-bottom: var(--space-lg); }
   .ia-detail__title { font-size: var(--text-2xl); }
   .ia-detail__meta { flex-direction: column; gap: var(--space-sm); }
   .ia-detail__related-grid { grid-template-columns: 1fr; }
@@ -174,8 +176,10 @@
 }
 
 @media (max-width: 480px) {
-  .ia-detail-page { padding-top: 88px; }
-  .ia-detail__title { font-size: var(--text-xl); }
+  .ia-detail-page { padding-top: 12px; }
+  .ia-detail__back { margin-bottom: var(--space-sm); }
+  .ia-detail__header { margin-bottom: var(--space-lg); padding-bottom: var(--space-md); }
+  .ia-detail__title { font-size: var(--text-xl); margin: var(--space-sm) 0; }
   .ia-detail__h2 { font-size: var(--text-lg); }
   .ia-detail__h3 { font-size: var(--text-base); }
 }
