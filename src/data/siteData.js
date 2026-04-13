@@ -735,7 +735,7 @@ export const documentsData = [
   },
 ];
 
-export const taskCategories = ['线上分享', '课程测评', '公众号文章'];
+export const taskCategories = ['线上分享', '课程测评', '公众号文章', '其他'];
 export const taskStatuses = ['规划中', '进行中', '已完成', '已取消'];
 
 // 成员数据（用于负责人 / 协助者选择）

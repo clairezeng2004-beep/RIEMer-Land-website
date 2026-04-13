@@ -32,13 +32,17 @@ const statusColors = {
 
 export default function Tasks() {
   const { isAuthenticated, user } = useAuth();
-  const { filterOptions, internalConfig } = useSiteContent();
+  const { filterOptions, updateFilterOptions, internalConfig } = useSiteContent();
   const tc = internalConfig.tasks;
 
   // 从 context 读取筛选选项
   const taskCategories = filterOptions.taskCategories;
   const taskStatuses = filterOptions.taskStatuses;
   const teamMembers = filterOptions.teamMembers;
+
+  // 添加新标签状态
+  const [showAddCategory, setShowAddCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState('');
   const memberMap = useMemo(
     () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
     [teamMembers]
@@ -122,6 +126,23 @@ export default function Tasks() {
     if (window.confirm('确定要删除这个事项吗？')) {
       setTasks(tasks.filter((t) => t.id !== id));
     }
+  };
+
+  // 添加新分类标签
+  const handleAddCategory = () => {
+    const trimmed = newCategoryName.trim();
+    if (!trimmed) return;
+    if (taskCategories.includes(trimmed)) {
+      setNewCategoryName('');
+      setShowAddCategory(false);
+      return;
+    }
+    updateFilterOptions({
+      ...filterOptions,
+      taskCategories: [...taskCategories, trimmed],
+    });
+    setNewCategoryName('');
+    setShowAddCategory(false);
   };
 
   // Stats
@@ -252,6 +273,45 @@ export default function Tasks() {
                 {c}
               </button>
             ))}
+            {showAddCategory ? (
+              <div className="tasks-filters__add-category">
+                <input
+                  type="text"
+                  className="tasks-filters__add-input"
+                  placeholder="新标签名称"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddCategory();
+                    if (e.key === 'Escape') { setShowAddCategory(false); setNewCategoryName(''); }
+                  }}
+                  autoFocus
+                />
+                <button
+                  className="tasks-filters__add-confirm"
+                  onClick={handleAddCategory}
+                  disabled={!newCategoryName.trim()}
+                  title="确认添加"
+                >
+                  <CheckCircle2 size={14} />
+                </button>
+                <button
+                  className="tasks-filters__add-cancel"
+                  onClick={() => { setShowAddCategory(false); setNewCategoryName(''); }}
+                  title="取消"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                className="tasks-filters__btn tasks-filters__btn--add"
+                onClick={() => setShowAddCategory(true)}
+                title="添加新标签"
+              >
+                <Plus size={14} /> 添加标签
+              </button>
+            )}
           </div>
         </div>
 
