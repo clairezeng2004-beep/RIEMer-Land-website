@@ -34,9 +34,11 @@ export default function Footer() {
           <div className="footer__grid">
             <div className="footer__nav">
               <h4 className="footer__nav-title">导航</h4>
-              <Link to="/" className="footer__nav-link">首页</Link>
-              <Link to="/articles" className="footer__nav-link">分享回顾</Link>
-              <Link to="/timeline" className="footer__nav-link">关于我们</Link>
+              <div className="footer__nav-links-row">
+                <Link to="/" className="footer__nav-link">首页</Link>
+                <Link to="/articles" className="footer__nav-link">分享回顾</Link>
+                <Link to="/timeline" className="footer__nav-link">关于我们</Link>
+              </div>
             </div>
 
             <div className="footer__nav">
