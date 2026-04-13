@@ -67,7 +67,7 @@ export default function Profile() {
     }
   };
 
-  const displayName = user?.nickname || user?.name || user?.email?.split('@')[0] || '用户';
+  const displayName = user?.nickname || '未设置昵称';
 
   return (
     <div className="profile-page">
