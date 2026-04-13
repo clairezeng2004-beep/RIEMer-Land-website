@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
-import { Star, ChevronLeft, ChevronRight, User, Camera } from 'lucide-react';
-import { membersData } from '../../data/siteData';
+import { Star, ChevronLeft, ChevronRight, User } from 'lucide-react';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import './Timeline.css';
 
@@ -11,6 +11,74 @@ export default function Timeline() {
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const dragState = useRef({ startX: 0, scrollLeft: 0 });
+  const [members, setMembers] = useState([]);
+
+  // 加载成员数据
+  useEffect(() => {
+    const loadMembers = async () => {
+      if (isSupabaseConfigured && supabase) {
+        try {
+          // 从 Supabase 获取所有已授权成员
+          const { data: profiles } = await supabase
+            .from('profiles')
+            .select('id, name, nickname, avatar, signature, authorized')
+            .eq('authorized', true);
+
+          const { data: memberProfiles } = await supabase
+            .from('member_profiles')
+            .select('user_id, enrollment_year');
+
+          if (profiles) {
+            const enrollmentMap = {};
+            (memberProfiles || []).forEach((mp) => {
+              enrollmentMap[mp.user_id] = mp.enrollment_year;
+            });
+
+            const formatted = profiles.map((p) => ({
+              id: p.id,
+              nickname: p.nickname || p.name || '匿名成员',
+              avatar: p.avatar || null,
+              signature: p.signature || '',
+              enrollment_year: enrollmentMap[p.id] || '',
+            }));
+            setMembers(formatted);
+            return;
+          }
+        } catch (err) {
+          console.warn('[Timeline] Supabase 加载成员失败，回退本地:', err);
+        }
+      }
+
+      // 本地模式
+      const USERS_DB_KEY = 'riemer_users';
+      const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
+      try {
+        const usersRaw = localStorage.getItem(USERS_DB_KEY);
+        const users = usersRaw ? JSON.parse(usersRaw) : [];
+        const profilesRaw = localStorage.getItem(MEMBER_PROFILES_KEY);
+        const localProfiles = profilesRaw ? JSON.parse(profilesRaw) : [];
+
+        const enrollmentMap = {};
+        localProfiles.forEach((p) => {
+          enrollmentMap[p.user_id] = p.enrollment_year;
+        });
+
+        const authorizedUsers = users.filter((u) => u.authorized);
+        const formatted = authorizedUsers.map((u) => ({
+          id: u.id,
+          nickname: u.nickname || u.name || '匿名成员',
+          avatar: u.avatar || null,
+          signature: u.signature || '',
+          enrollment_year: enrollmentMap[u.id] || '',
+        }));
+        setMembers(formatted);
+      } catch {
+        setMembers([]);
+      }
+    };
+
+    loadMembers();
+  }, []);
 
   const checkScroll = useCallback(() => {
     const el = trackRef.current;
@@ -173,28 +241,37 @@ export default function Timeline() {
       {/* Members Section */}
       <section className="members section">
         <div className="container">
-          <div className="members__grid">
-            {membersData.map((member) => (
-              <div key={member.id} className="member-card card">
-                <div className="member-card__avatar">
-                  {member.avatar ? (
-                    <img src={member.avatar} alt={member.name} />
-                  ) : (
-                    <div className="member-card__avatar-placeholder">
-                      <User size={32} />
-                    </div>
-                  )}
-                  <div className="member-card__avatar-upload">
-                    <Camera size={14} />
+          {members.length > 0 ? (
+            <div className="members__grid">
+              {members.map((member) => (
+                <div key={member.id} className="member-card card">
+                  <div className="member-card__avatar">
+                    {member.avatar ? (
+                      <img src={member.avatar} alt={member.nickname} />
+                    ) : (
+                      <div className="member-card__avatar-placeholder">
+                        <User size={32} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="member-card__info">
+                    <h3 className="member-card__name">{member.nickname}</h3>
+                    {member.enrollment_year && (
+                      <span className="member-card__year">{member.enrollment_year}级</span>
+                    )}
+                    {member.signature && (
+                      <p className="member-card__signature">{member.signature}</p>
+                    )}
                   </div>
                 </div>
-                <div className="member-card__info">
-                  <h3 className="member-card__name">{member.name}</h3>
-                  <p className="member-card__bio">{member.bio}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <div className="members__empty">
+              <User size={40} />
+              <p>暂无成员信息</p>
+            </div>
+          )}
         </div>
       </section>
     </div>

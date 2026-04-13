@@ -45,6 +45,7 @@ const getLocalUsers = () => {
       name: 'Admin',
       nickname: '',
       avatar: null,
+      signature: '',
       role: 'admin',
       authorized: true,
       createdAt: new Date().toISOString(),
@@ -249,6 +250,7 @@ export function AuthProvider({ children }) {
           name: authUser.user_metadata?.name || authUser.email.split('@')[0],
           nickname: '',
           avatar: null,
+          signature: '',
           role: 'member',
           authorized: false,
           created_at: new Date().toISOString(),
@@ -413,6 +415,7 @@ export function AuthProvider({ children }) {
       name,
       nickname: '',
       avatar: null,
+      signature: '',
       role: 'member',
       authorized: false,
       createdAt: new Date().toISOString(),
@@ -452,6 +455,7 @@ export function AuthProvider({ children }) {
           name,
           nickname: '',
           avatar: null,
+          signature: '',
           role: 'member',
           authorized: false,
           created_at: new Date().toISOString(),
@@ -659,6 +663,7 @@ export function AuthProvider({ children }) {
     if (idx >= 0) {
       if (updates.nickname !== undefined) users[idx].nickname = updates.nickname;
       if (updates.avatar !== undefined) users[idx].avatar = updates.avatar;
+      if (updates.signature !== undefined) users[idx].signature = updates.signature;
       saveLocalUsers(users);
       setUser({ ...users[idx] });
       // 同步 AUTH_KEY
@@ -683,6 +688,7 @@ export function AuthProvider({ children }) {
         const updateData = {};
         if (updates.nickname !== undefined) updateData.nickname = updates.nickname;
         if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
+        if (updates.signature !== undefined) updateData.signature = updates.signature;
         const { error } = await supabase
           .from('profiles')
           .update(updateData)

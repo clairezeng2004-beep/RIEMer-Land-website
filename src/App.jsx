@@ -24,6 +24,7 @@ import InternalArticles from './pages/internal/InternalArticles';
 import InternalArticleDetail from './pages/internal/InternalArticleDetail';
 import MemberContributions from './pages/internal/MemberContributions';
 import MemberProfiles from './pages/internal/MemberProfiles';
+import Profile from './pages/internal/Profile';
 import Suggestions from './pages/internal/Suggestions';
 
 function App() {
@@ -62,6 +63,7 @@ function App() {
                   <Route path="notifications" element={<Notifications />} />
                   <Route path="contributions" element={<MemberContributions />} />
                   <Route path="suggestions" element={<Suggestions />} />
+                  <Route path="profile" element={<Profile />} />
                 </Route>
               </Routes>
             </main>

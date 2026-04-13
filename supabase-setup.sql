@@ -15,6 +15,7 @@ CREATE TABLE IF NOT EXISTS profiles (
   name TEXT NOT NULL DEFAULT '',
   nickname TEXT NOT NULL DEFAULT '',
   avatar TEXT DEFAULT NULL,
+  signature TEXT NOT NULL DEFAULT '',
   role TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'member')),
   authorized BOOLEAN NOT NULL DEFAULT false,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -63,13 +64,14 @@ CREATE POLICY "允许插入 profile"
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO public.profiles (id, email, name, nickname, avatar, role, authorized)
+  INSERT INTO public.profiles (id, email, name, nickname, avatar, signature, role, authorized)
   VALUES (
     NEW.id,
     NEW.email,
     COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
     '',
     NULL,
+    '',
     'member',
     false
   );

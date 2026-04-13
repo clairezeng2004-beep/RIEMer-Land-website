@@ -335,25 +335,7 @@
 }
 
 .member-card__avatar-upload {
-  position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: var(--color-bg-card);
-  border: 2px solid var(--color-border-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--color-text-muted);
-  opacity: 0;
-  transition: all var(--transition-normal);
-  cursor: pointer;
-}
-
-.member-card:hover .member-card__avatar-upload {
-  opacity: 1;
+  display: none;
 }
 
 /* 信息 */
@@ -361,7 +343,7 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: var(--space-xs);
+  gap: 2px;
   min-width: 0;
 }
 
@@ -371,11 +353,46 @@
   color: var(--color-text);
 }
 
+.member-card__year {
+  display: inline-block;
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.08);
+  padding: 1px 8px;
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
+.member-card__signature {
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+  line-height: 1.6;
+  margin-top: 2px;
+  font-style: italic;
+}
+
 .member-card__bio {
   font-size: var(--text-sm);
   color: var(--color-text-light);
   line-height: 1.6;
   margin-top: var(--space-xs);
+}
+
+/* 空状态 */
+.members__empty {
+  text-align: center;
+  padding: var(--space-4xl);
+  color: var(--color-text-muted);
+}
+
+.members__empty svg {
+  opacity: 0.3;
+  margin-bottom: var(--space-md);
+}
+
+.members__empty p {
+  font-size: var(--text-base);
+  color: var(--color-text-light);
 }
 
 /* ============ Responsive ============ */
