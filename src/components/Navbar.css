@@ -389,6 +389,11 @@
   .navbar__mobile-user .btn-sm {
     font-size: var(--text-xs);
     padding: 0.2rem 0.5rem;
+    white-space: nowrap;
+  }
+
+  .navbar__mobile-user .btn-sm svg {
+    display: none;
   }
 
   .navbar__mobile-entry {
