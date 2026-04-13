@@ -230,6 +230,7 @@
     align-items: center;
     gap: var(--space-xs);
     border-bottom: none;
+    padding-bottom: 0;
   }
 
   .footer__grid > .footer__nav:first-child .footer__nav-title {
