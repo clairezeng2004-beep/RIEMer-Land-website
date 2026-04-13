@@ -48,6 +48,7 @@ export default function InternalSidebar() {
     { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
     { to: '/internal/suggestions', icon: MessageSquarePlus, label: '建设建议' },
     { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
+    { to: '/internal/member-profiles', icon: Contact, label: '成员信息' },
   ];
 
   // 管理菜单项（所有成员可见，仅管理员可编辑）

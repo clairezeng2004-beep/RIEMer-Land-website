@@ -64,6 +64,7 @@ function App() {
                   <Route path="contributions" element={<MemberContributions />} />
                   <Route path="suggestions" element={<Suggestions />} />
                   <Route path="profile" element={<Profile />} />
+                  <Route path="member-profiles" element={<MemberProfiles />} />
                 </Route>
               </Routes>
             </main>
