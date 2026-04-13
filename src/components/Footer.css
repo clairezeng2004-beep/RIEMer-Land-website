@@ -95,17 +95,28 @@
   border: none;
   cursor: pointer;
   color: var(--color-text-muted);
-  opacity: 0.4;
   padding: 2px;
   border-radius: 4px;
-  transition: opacity var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
+  transition: color var(--transition-fast), background var(--transition-fast);
   flex-shrink: 0;
 }
 
 .footer__copy-btn:hover {
-  opacity: 0.8;
   color: var(--color-primary);
   background: var(--color-bg-muted, rgba(0, 0, 0, 0.04));
+}
+
+/* 复制成功提示 */
+.footer__copy-toast {
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  white-space: nowrap;
+  animation: footerToastIn 0.25s ease-out;
+}
+
+@keyframes footerToastIn {
+  from { opacity: 0; transform: translateX(-4px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 .footer__bottom {
