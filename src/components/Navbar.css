@@ -28,7 +28,7 @@
   gap: var(--space-lg);
 }
 
-/* ---- Logo 最左侧 ---- */
+/* ---- Logo 最左侧（可点击回首页） ---- */
 .navbar__logo {
   display: flex;
   align-items: center;
@@ -36,6 +36,15 @@
   text-decoration: none;
   color: var(--color-text);
   flex-shrink: 0;
+  cursor: pointer;
+  padding: var(--space-xs) var(--space-sm);
+  margin: calc(-1 * var(--space-xs)) calc(-1 * var(--space-sm));
+  border-radius: var(--radius-md);
+  transition: opacity var(--transition-fast);
+}
+
+.navbar__logo:hover {
+  opacity: 0.75;
 }
 
 .navbar__logo-img {
