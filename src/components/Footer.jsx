@@ -61,6 +61,7 @@ export default function Footer() {
                   {emailCopied ? <Check size={12} /> : <Copy size={12} />}
                 </button>
               </div>
+              <div className="footer__contact-spacer" aria-hidden="true" />
               <div className="footer__contact-item">
                 <MapPin size={16} />
                 <span>{content.footerLocation}</span>

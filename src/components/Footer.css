@@ -81,6 +81,11 @@
   font-size: var(--text-sm);
 }
 
+/* 联系方式占位符，使两项与左侧三项的首尾对齐 */
+.footer__contact-spacer {
+  flex: 1;
+}
+
 /* 邮箱复制按钮 */
 .footer__copy-btn {
   display: inline-flex;
@@ -171,6 +176,10 @@
   .footer__contact-item {
     justify-content: center;
     white-space: normal;
+  }
+
+  .footer__contact-spacer {
+    display: none;
   }
 
   .footer__qrcode {
