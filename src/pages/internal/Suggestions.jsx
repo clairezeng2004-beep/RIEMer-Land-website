@@ -105,11 +105,7 @@ export default function Suggestions() {
     setIsListening(true);
   }, [isListening, SpeechRecognition]);
 
-  // 头像 URL 生成
-  const sugAvatarUrl = (name) =>
-    name
-      ? `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=5B8C3E&color=fff&size=80&font-size=0.4&rounded=true`
-      : null;
+  // （已移除姓氏头像生成）
 
   // +1 支持功能
   const currentUserName = user?.name || user?.nickname || '';
@@ -288,7 +284,7 @@ export default function Suggestions() {
                   addSuggestion({
                     ...editingSuggestion,
                     statusUpdatedBy: editingSuggestion.proposer,
-                    statusUpdatedByAvatar: sugAvatarUrl(editingSuggestion.proposer),
+                    statusUpdatedByAvatar: null,
                   });
                   addNotification({
                     title: '新建设建议',
@@ -398,7 +394,7 @@ export default function Suggestions() {
                                 updateSuggestion(sug.id, {
                                   ...editingSuggestion,
                                   statusUpdatedAt: new Date().toISOString().split('T')[0],
-                                  statusUpdatedByAvatar: sugAvatarUrl(editingSuggestion.statusUpdatedBy),
+                                  statusUpdatedByAvatar: null,
                                 });
                                 if (oldSug && oldSug.status !== editingSuggestion.status) {
                                   addNotification({
@@ -433,19 +429,18 @@ export default function Suggestions() {
                       <td className="sug-table__td sug-table__td--proposer">
                         <div className="sug-table__proposer-wrap">
                           <span className="sug-table__person">
-                            <img src={sugAvatarUrl(sug.proposer)} alt={sug.proposer} className="sug-table__avatar" />
                             {sug.proposer}
                           </span>
                           {(sug.supporters || []).length > 0 && (
                             <div className="sug-table__supporters">
                               {(sug.supporters || []).map((s, i) => (
-                                <img
+                                <span
                                   key={i}
-                                  src={sugAvatarUrl(s.name)}
-                                  alt={s.name}
-                                  className="sug-table__supporter-avatar"
+                                  className="sug-table__supporter-name"
                                   title={s.name}
-                                />
+                                >
+                                  {s.name}{i < (sug.supporters || []).length - 1 ? '、' : ''}
+                                </span>
                               ))}
                             </div>
                           )}
@@ -470,9 +465,6 @@ export default function Suggestions() {
                       <td className="sug-table__td sug-table__td--date">{sug.createdAt}</td>
                       <td className="sug-table__td sug-table__td--date">
                         <span className="sug-table__person">
-                          {sug.statusUpdatedByAvatar || sugAvatarUrl(sug.statusUpdatedBy) ? (
-                            <img src={sug.statusUpdatedByAvatar || sugAvatarUrl(sug.statusUpdatedBy)} alt={sug.statusUpdatedBy} className="sug-table__avatar" />
-                          ) : null}
                           <span>
                             <span className="sug-table__date-text">{sug.statusUpdatedAt}</span>
                             {sug.statusUpdatedBy && <span className="sug-table__updater">by {sug.statusUpdatedBy}</span>}
@@ -482,7 +474,6 @@ export default function Suggestions() {
                       <td className="sug-table__td">
                         {sug.resolver ? (
                           <span className="sug-table__person">
-                            <img src={sugAvatarUrl(sug.resolver)} alt={sug.resolver} className="sug-table__avatar" />
                             {sug.resolver}
                           </span>
                         ) : (

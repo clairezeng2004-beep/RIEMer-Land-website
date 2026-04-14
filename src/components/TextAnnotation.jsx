@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   MessageSquare, X, Send, Check, Trash2, CornerDownRight,
-  CheckCircle, Circle, ChevronDown, ChevronUp,
+  CheckCircle, Circle, ChevronDown, ChevronUp, User,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -10,18 +10,8 @@ import {
 } from '../services/commentService';
 import './TextAnnotation.css';
 
-// ---- 生成头像背景色 ----
-const AVATAR_COLORS = [
-  '#5B8C3E', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899',
-  '#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#6366F1',
-];
-function avatarColor(name) {
-  let hash = 0;
-  for (let i = 0; i < (name || '').length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
-}
+// ---- 头像背景色（统一主题色） ----
+const AVATAR_BG = '#5B8C3E';
 
 function timeAgo(dateStr) {
   const now = new Date();
@@ -252,11 +242,11 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
         style={{
           width: size,
           height: size,
-          background: avatarColor(name),
+          background: AVATAR_BG,
           fontSize: size * 0.45,
         }}
       >
-        {(name || '?').charAt(0).toUpperCase()}
+        <User size={size * 0.55} />
       </div>
     );
   };

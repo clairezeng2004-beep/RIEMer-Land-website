@@ -199,25 +199,6 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     return false;
   };
 
-  // 根据用户名生成稳定的头像背景色
-  const getAvatarColor = (name) => {
-    const colors = [
-      '#5B8C3E', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899',
-      '#3B82F6', '#EF4444', '#F59E0B', '#10B981', '#6366F1',
-    ];
-    let hash = 0;
-    for (let i = 0; i < name.length; i++) {
-      hash = name.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    return colors[Math.abs(hash) % colors.length];
-  };
-
-  // 获取名字的首字符（中文取第一个字，英文取首字母大写）
-  const getInitial = (name) => {
-    if (!name) return '?';
-    return name.charAt(0).toUpperCase();
-  };
-
   // 点赞/取消点赞
   const handleLike = (docId, e) => {
     if (e) e.stopPropagation();

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
-import { Menu, X, LogOut } from 'lucide-react';
+import { Menu, X, LogOut, User } from 'lucide-react';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -84,14 +84,8 @@ export default function Navbar() {
                     {user?.avatar ? (
                       <img src={user.avatar} alt="" />
                     ) : (
-                      <span style={{ background: (() => {
-                        const name = user?.nickname || '?';
-                        const colors = ['#5B8C3E','#4FBFC4','#D4A44C','#8B5CF6','#EC4899','#3B82F6','#EF4444','#F59E0B','#10B981','#6366F1'];
-                        let hash = 0;
-                        for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-                        return colors[Math.abs(hash) % colors.length];
-                      })() }}>
-                        {(user?.nickname || '?').charAt(0).toUpperCase()}
+                      <span style={{ background: 'var(--color-primary)' }}>
+                        <User size={16} />
                       </span>
                     )}
                   </div>

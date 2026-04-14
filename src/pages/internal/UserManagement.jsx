@@ -23,6 +23,7 @@ import {
   Loader2,
   ChevronDown,
   Clock,
+  User,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -274,7 +275,7 @@ export default function UserManagement() {
                 <div key={u.id} className="users-pending-panel__item">
                   <div className="users-pending-panel__user">
                     <div className="users-pending-panel__avatar">
-                      {u.name.charAt(0).toUpperCase()}
+                      <User size={16} />
                     </div>
                     <div className="users-pending-panel__info">
                       <span className="users-pending-panel__name">{u.name}</span>
@@ -429,7 +430,7 @@ export default function UserManagement() {
                     <td>
                       <div className="users-table__user">
                         <div className="users-table__avatar">
-                          {u.name.charAt(0).toUpperCase()}
+                          <User size={16} />
                         </div>
                         <span>{u.name}</span>
                       </div>
