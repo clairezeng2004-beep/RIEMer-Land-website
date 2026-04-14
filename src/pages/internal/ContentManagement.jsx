@@ -46,7 +46,7 @@ import './ContentManagement.css';
 
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin, getAllUsers, supabaseOk } = useAuth();
-  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline } = useSiteContent();
+  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline, syncTeamMembersFromDB } = useSiteContent();
   const { addNotification } = useNotifications();
 
   // 本地编辑状态
@@ -58,6 +58,7 @@ export default function ContentManagement() {
 
   // 编辑中的成员索引
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
+  const [syncingMembers, setSyncingMembers] = useState(false);
 
   // 文章管理状态
   const [articleUrl, setArticleUrl] = useState('');
@@ -459,7 +460,41 @@ export default function ContentManagement() {
 
                 {/* 团队成员 */}
                 <div className="content-mgmt__subsection">
-                  <h4 className="content-mgmt__subsection-title">团队成员</h4>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-sm)' }}>
+                    <h4 className="content-mgmt__subsection-title" style={{ margin: 0 }}>团队成员</h4>
+                    <button
+                      className="content-mgmt__add-btn"
+                      style={{ margin: 0, fontSize: '13px', padding: '4px 12px' }}
+                      disabled={syncingMembers}
+                      onClick={async () => {
+                        setSyncingMembers(true);
+                        try {
+                          const result = await syncTeamMembersFromDB(getAllUsers, supabaseOk);
+                          if (result.success) {
+                            // 同步 filtersForm 以更新当前编辑状态
+                            const stored = localStorage.getItem('riemer_filter_options');
+                            if (stored) {
+                              try {
+                                const parsed = JSON.parse(stored);
+                                setFiltersForm((prev) => ({ ...prev, teamMembers: parsed.teamMembers || prev.teamMembers }));
+                              } catch { /* ignore */ }
+                            }
+                            alert(`✅ 已从数据库同步 ${result.count} 位已授权成员`);
+                          } else {
+                            alert(`⚠️ 同步失败：${result.message}`);
+                          }
+                        } catch (err) {
+                          alert(`⚠️ 同步失败：${err.message}`);
+                        } finally {
+                          setSyncingMembers(false);
+                        }
+                      }}
+                      title="从已授权成员数据库自动同步团队成员列表"
+                    >
+                      <RefreshCw size={14} className={syncingMembers ? 'content-mgmt__spinner' : ''} />
+                      {syncingMembers ? '同步中…' : '从数据库同步'}
+                    </button>
+                  </div>
                   {filtersForm.teamMembers.map((member, i) => (
                     <div key={member.id || i} className="content-mgmt__card">
                       <div className="content-mgmt__card-header">

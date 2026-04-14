@@ -2,6 +2,15 @@
    成员贡献 — MemberContributions
    ======================================== */
 
+/* 同步按钮旋转动画 */
+.mc-spin {
+  animation: mc-spin-anim 1s linear infinite;
+}
+@keyframes mc-spin-anim {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
 .mc-page {
   min-height: 60vh;
   padding: var(--space-xl) 0;

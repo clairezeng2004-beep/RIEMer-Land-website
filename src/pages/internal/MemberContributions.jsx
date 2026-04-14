@@ -17,8 +17,9 @@ import {
   Trophy,
   TrendingUp,
   ChevronDown,
+  RefreshCw,
 } from 'lucide-react';
-import { initialTasks, documentsData, articlesData, teamMembers } from '../../data/siteData';
+import { initialTasks, documentsData, articlesData, teamMembers as defaultTeamMembers } from '../../data/siteData';
 import './MemberContributions.css';
 
 const CUSTOM_CONTRIBUTIONS_KEY = 'riemer_custom_contributions';
@@ -70,8 +71,8 @@ function isInPeriod(dateStr, period) {
 }
 
 export default function MemberContributions() {
-  const { isAuthenticated } = useAuth();
-  const { userArticles, filterOptions, internalConfig, updateInternalConfig } = useSiteContent();
+  const { isAuthenticated, getAllUsers, supabaseOk } = useAuth();
+  const { userArticles, filterOptions, internalConfig, updateInternalConfig, syncTeamMembersFromDB } = useSiteContent();
   const { editing } = useWysiwyg();
   const cc = internalConfig.contributions || {};
 
@@ -80,10 +81,30 @@ export default function MemberContributions() {
     [updateInternalConfig]
   );
 
-  const members = filterOptions.teamMembers || teamMembers;
+  // 使用 filterOptions.teamMembers，如果为空则回退到硬编码默认值
+  const members = (filterOptions.teamMembers && filterOptions.teamMembers.length > 0)
+    ? filterOptions.teamMembers
+    : defaultTeamMembers;
+  const [syncing, setSyncing] = useState(false);
   const periods = useMemo(() => getHalfYearPeriods(), []);
   const [selectedPeriod, setSelectedPeriod] = useState(() => getCurrentHalfYearKey()); // 默认当前半年度
   const [showPeriodDropdown, setShowPeriodDropdown] = useState(false);
+
+  // 首次加载时自动从数据库同步成员列表
+  useEffect(() => {
+    if (isAuthenticated && getAllUsers) {
+      syncTeamMembersFromDB(getAllUsers, supabaseOk).catch(() => {});
+    }
+  }, [isAuthenticated, getAllUsers, supabaseOk, syncTeamMembersFromDB]);
+
+  // 手动同步按钮
+  const handleSyncMembers = async () => {
+    setSyncing(true);
+    try {
+      await syncTeamMembersFromDB(getAllUsers, supabaseOk);
+    } catch { /* ignore */ }
+    setSyncing(false);
+  };
 
   // 自定义贡献（"其他"栏位）
   const [customContributions, setCustomContributions] = useState(() => {
@@ -244,6 +265,16 @@ export default function MemberContributions() {
               as="span"
             /></p>
           </div>
+          <button
+            className="btn btn-ghost"
+            onClick={handleSyncMembers}
+            disabled={syncing}
+            title="从数据库同步已授权成员"
+            style={{ display: 'flex', alignItems: 'center', gap: 6, whiteSpace: 'nowrap' }}
+          >
+            <RefreshCw size={16} className={syncing ? 'mc-spin' : ''} />
+            {syncing ? '同步中…' : '同步成员'}
+          </button>
         </div>
 
         {/* 时间段选择器 */}

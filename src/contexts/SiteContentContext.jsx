@@ -1,5 +1,6 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const SiteContentContext = createContext(null);
 
@@ -447,6 +448,60 @@ export function SiteContentProvider({ children }) {
     localStorage.setItem(TIMELINE_KEY, JSON.stringify(defaults));
   };
 
+  // ---- 从数据库同步团队成员到 filterOptions.teamMembers ----
+  const syncTeamMembersFromDB = useCallback(async (getAllUsers, supabaseOk) => {
+    try {
+      let dbMembers = [];
+
+      // 先尝试 Supabase
+      if (isSupabaseConfigured && supabaseOk === true && supabase) {
+        const { data: profiles, error } = await supabase
+          .from('profiles')
+          .select('id, name, authorized')
+          .eq('authorized', true)
+          .order('created_at', { ascending: true });
+
+        if (!error && profiles && profiles.length > 0) {
+          dbMembers = profiles.map((p, idx) => ({
+            id: p.id,
+            name: p.name || '未知用户',
+            role: '',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(p.name || '用户')}&background=5B8C3E&color=fff&size=80&font-size=0.4&rounded=true`,
+            profileUrl: '/timeline#team',
+          }));
+        }
+      }
+
+      // Supabase 不可用或没有数据时，尝试从 getAllUsers 获取
+      if (dbMembers.length === 0 && getAllUsers) {
+        const allUsers = await getAllUsers();
+        const authorized = allUsers.filter((u) => u.authorized);
+        if (authorized.length > 0) {
+          dbMembers = authorized.map((u) => ({
+            id: u.id,
+            name: u.name || '未知用户',
+            role: '',
+            avatar: `https://ui-avatars.com/api/?name=${encodeURIComponent(u.name || '用户')}&background=5B8C3E&color=fff&size=80&font-size=0.4&rounded=true`,
+            profileUrl: '/timeline#team',
+          }));
+        }
+      }
+
+      if (dbMembers.length > 0) {
+        setFilterOptions((prev) => ({
+          ...prev,
+          teamMembers: dbMembers,
+        }));
+        return { success: true, count: dbMembers.length };
+      }
+
+      return { success: false, message: '未找到已授权的成员数据' };
+    } catch (err) {
+      console.error('[SiteContent] syncTeamMembersFromDB 失败:', err);
+      return { success: false, message: err.message };
+    }
+  }, []);
+
   return (
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
@@ -456,6 +511,7 @@ export function SiteContentProvider({ children }) {
       suggestions, addSuggestion, updateSuggestion, deleteSuggestion,
       events, addEvent, updateEvent, deleteEvent,
       timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline,
+      syncTeamMembersFromDB,
     }}>
       {children}
     </SiteContentContext.Provider>
