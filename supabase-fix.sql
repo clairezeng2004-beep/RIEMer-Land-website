@@ -191,3 +191,64 @@ CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW
   EXECUTE FUNCTION public.handle_new_user();
+
+-- ========== 修复 9：创建 notifications 表（跨设备通知同步） ==========
+CREATE TABLE IF NOT EXISTS public.notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  message TEXT NOT NULL DEFAULT '',
+  type TEXT NOT NULL DEFAULT 'system' CHECK (type IN ('reminder', 'info', 'system')),
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  target_role TEXT DEFAULT NULL,  -- NULL=所有人, 'admin'=仅管理员
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.notifications ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "所有认证用户可查看通知" ON public.notifications;
+CREATE POLICY "所有认证用户可查看通知"
+  ON public.notifications FOR SELECT
+  TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "允许插入通知" ON public.notifications;
+CREATE POLICY "允许插入通知"
+  ON public.notifications FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "允许匿名插入通知" ON public.notifications;
+CREATE POLICY "允许匿名插入通知"
+  ON public.notifications FOR INSERT
+  TO anon
+  WITH CHECK (true);
+
+DROP POLICY IF EXISTS "管理员可删除通知" ON public.notifications;
+CREATE POLICY "管理员可删除通知"
+  ON public.notifications FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- ========== 修复 10：创建 notification_reads 表（已读状态） ==========
+CREATE TABLE IF NOT EXISTS public.notification_reads (
+  notification_id UUID NOT NULL REFERENCES public.notifications(id) ON DELETE CASCADE,
+  user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  read_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (notification_id, user_id)
+);
+
+ALTER TABLE public.notification_reads ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "用户可查看自己的已读状态" ON public.notification_reads;
+CREATE POLICY "用户可查看自己的已读状态"
+  ON public.notification_reads FOR SELECT
+  TO authenticated
+  USING (user_id = auth.uid());
+
+DROP POLICY IF EXISTS "用户可标记自己的已读" ON public.notification_reads;
+CREATE POLICY "用户可标记自己的已读"
+  ON public.notification_reads FOR INSERT
+  TO authenticated
+  WITH CHECK (user_id = auth.uid());
