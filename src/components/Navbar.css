@@ -49,9 +49,12 @@
 
 .navbar__logo-img {
   height: 52px;
-  width: auto;
+  width: 52px;
   display: block;
   object-fit: contain;
+  /* 防止图片加载前布局抖动 */
+  content-visibility: auto;
+  contain-intrinsic-size: 52px 52px;
 }
 
 .navbar__logo-text {
@@ -339,6 +342,8 @@
 
   .navbar__logo-img {
     height: 40px;
+    width: 40px;
+    contain-intrinsic-size: 40px 40px;
   }
 
   .navbar__logo-text {
@@ -459,6 +464,8 @@
 
   .navbar__logo-img {
     height: 34px;
+    width: 34px;
+    contain-intrinsic-size: 34px 34px;
   }
 
   .navbar__logo-text {
