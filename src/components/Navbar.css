@@ -373,8 +373,8 @@
     position: fixed;
     top: 64px;
     right: 0;
-    width: 50vw;
-    max-width: 240px;
+    width: 55vw;
+    max-width: 280px;
     bottom: auto;
     background: rgba(255, 255, 255, 0.97);
     backdrop-filter: blur(14px);
@@ -405,6 +405,7 @@
     padding: 0.7rem 0.75rem;
     font-size: var(--text-lg);
     border-radius: var(--radius-sm);
+    white-space: nowrap;
   }
 
   .navbar__mobile-auth {
