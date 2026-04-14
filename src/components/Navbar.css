@@ -402,8 +402,8 @@
   }
 
   .navbar__link {
-    padding: 0.7rem 0.75rem;
-    font-size: var(--text-lg);
+    padding: 0.6rem 0.75rem;
+    font-size: var(--text-base);
     border-radius: var(--radius-sm);
     white-space: nowrap;
   }
@@ -420,11 +420,11 @@
     align-items: center;
     gap: var(--space-sm);
     padding: 0.4rem 0.75rem;
-    font-size: var(--text-lg);
+    font-size: var(--text-base);
   }
 
   .navbar__mobile-user .navbar__user-name {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
   }
 
   .navbar__mobile-user .btn-sm {
