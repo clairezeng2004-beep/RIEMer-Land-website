@@ -262,6 +262,18 @@
     flex-direction: column;
     gap: var(--space-sm);
   }
+  .users-table__status-cell {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+  .users-table__actions {
+    width: 100%;
+  }
+  .users-table__actions .btn {
+    font-size: var(--text-xs);
+    padding: 3px 10px;
+  }
 }
 
 @media (max-width: 480px) {
