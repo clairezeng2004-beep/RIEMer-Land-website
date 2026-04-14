@@ -196,6 +196,7 @@
 .mc-table {
   width: 100%;
   border-collapse: collapse;
+  table-layout: fixed;
   font-size: var(--text-sm);
 }
 
@@ -219,16 +220,16 @@
 }
 
 .mc-table__th--rank {
-  width: 60px;
+  width: 50px;
 }
 
 .mc-table__th--member {
   text-align: left !important;
-  min-width: 160px;
+  width: 100px;
 }
 
 .mc-table__th--total {
-  width: 80px;
+  width: 70px;
 }
 
 .mc-table td {
@@ -290,9 +291,6 @@
 }
 
 .mc-member-link {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
   text-decoration: none;
   color: inherit;
 }

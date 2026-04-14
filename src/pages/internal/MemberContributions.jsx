@@ -17,7 +17,6 @@ import {
   Trophy,
   TrendingUp,
   ChevronDown,
-  User,
 } from 'lucide-react';
 import { initialTasks, documentsData, articlesData, teamMembers } from '../../data/siteData';
 import './MemberContributions.css';
@@ -373,12 +372,7 @@ export default function MemberContributions() {
                   <td className="mc-table__td--rank">{getRankDisplay(index)}</td>
                   <td className="mc-table__td--member">
                     <Link to={member.profileUrl} className="mc-member-link">
-                      <div className="mc-member-avatar">
-                        <User size={16} />
-                      </div>
-                      <div className="mc-member-info">
-                        <span className="mc-member-name">{member.name}</span>
-                      </div>
+                      <span className="mc-member-name">{member.name}</span>
                     </Link>
                   </td>
                   <td className="mc-table__td--num">
