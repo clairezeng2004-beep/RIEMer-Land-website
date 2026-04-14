@@ -367,7 +367,7 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .member-profiles-page {
-    padding-top: 108px;
+    padding-top: var(--space-3xl);
   }
 
   .member-profiles-page__header {

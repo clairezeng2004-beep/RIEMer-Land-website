@@ -242,7 +242,7 @@
 }
 
 @media (max-width: 768px) {
-  .users-page { padding-top: 108px; }
+  .users-page { padding-top: var(--space-3xl); }
   .users-stats {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
@@ -277,7 +277,7 @@
 }
 
 @media (max-width: 480px) {
-  .users-page { padding-top: 88px; }
+  .users-page { padding-top: var(--space-xl); }
   .users-stat {
     padding: var(--space-xs) var(--space-sm);
     border-radius: var(--radius-md);

@@ -285,7 +285,7 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  .notifications-page { padding-top: 108px; }
+  .notifications-page { padding-top: var(--space-3xl); }
   .notifications-page__header {
     flex-direction: column;
     gap: var(--space-md);
@@ -305,7 +305,7 @@
 }
 
 @media (max-width: 480px) {
-  .notifications-page { padding-top: 88px; }
+  .notifications-page { padding-top: var(--space-xl); }
   .notification-item { padding: var(--space-md); }
   .notification-item__icon { width: 36px; height: 36px; }
 }

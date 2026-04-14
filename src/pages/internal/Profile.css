@@ -257,7 +257,7 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .profile-page {
-    padding-top: 108px;
+    padding-top: var(--space-3xl);
   }
 
   .profile-page__card {

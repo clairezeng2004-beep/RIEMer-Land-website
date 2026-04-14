@@ -610,7 +610,7 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .gallery-page {
-    padding-top: 108px;
+    padding-top: var(--space-3xl);
   }
 
   .gallery-page__header {
