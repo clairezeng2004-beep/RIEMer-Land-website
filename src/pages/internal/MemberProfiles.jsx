@@ -222,7 +222,47 @@ export default function MemberProfiles() {
       }));
       setProfiles(formatted);
     } else {
+      // 本地降级模式：先显示本地数据
       await loadLocalFallback();
+
+      // 后台异步尝试从 Supabase 拉取最新数据（如果已配置但暂时不可达）
+      if (isSupabaseConfigured && supabase && supabaseOk !== true) {
+        try {
+          const { data, error } = await supabase
+            .from('member_profiles')
+            .select('*, profiles(name, created_at)')
+            .order('joined_at', { ascending: true });
+
+          if (!error && data && data.length > 0) {
+            console.log('[MemberProfiles] 后台 Supabase 拉取成功，更新数据:', data.length, '条');
+            const formatted = data.map((p) => ({
+              id: p.user_id,
+              user_id: p.user_id,
+              name: p.profiles?.name || '未知用户',
+              enrollment_year: p.enrollment_year || '',
+              joined_at: p.joined_at || p.profiles?.created_at || '',
+              joined_at_display: (() => {
+                const raw = p.joined_at || p.profiles?.created_at;
+                if (!raw) return '';
+                const d = new Date(raw);
+                return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+              })(),
+              bio: p.bio || '',
+              further_education: p.further_education || '',
+              career: p.career || '',
+              willing_to_share: p.willing_to_share || '',
+              want_to_learn: p.want_to_learn || '',
+              hobbies: p.hobbies || '',
+              dream_city: p.dream_city || '',
+              other: p.other || '',
+            }));
+            setProfiles(formatted);
+          }
+        } catch (bgErr) {
+          // 后台拉取失败，静默忽略（本地数据已展示）
+          console.warn('[MemberProfiles] 后台 Supabase 拉取失败:', bgErr.message);
+        }
+      }
     }
   }, [isAuthenticated, user, getAllUsers, supabaseOk, loadLocalFallback]);
 

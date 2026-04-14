@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { supabase, isSupabaseConfigured, checkSupabaseHealth, getReachable, onReachableChange } from '../lib/supabase';
+import { supabase, isSupabaseConfigured, checkSupabaseHealth, recheckSupabaseHealth, getReachable, onReachableChange } from '../lib/supabase';
 
 const AuthContext = createContext(null);
 
@@ -327,6 +327,36 @@ export function AuthProvider({ children }) {
     );
 
     return () => subscription?.unsubscribe();
+  }, []);
+
+  // ---- 页面可见时自动重检 Supabase 可达性（从离线模式恢复） ----
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return;
+      // 仅当当前处于离线模式（supabaseOk === false）时才重新检测
+      if (getReachable() === false) {
+        console.log('[Auth] 页面可见 + 当前离线模式，重新检测 Supabase...');
+        const ok = await recheckSupabaseHealth();
+        if (ok) {
+          console.log('[Auth] Supabase 恢复可达，切换回在线模式');
+          setSupabaseOk(true);
+          // 重新获取 profile
+          try {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session?.user) {
+              await fetchProfile(session.user);
+            }
+          } catch (err) {
+            console.warn('[Auth] 恢复在线模式后 fetchProfile 失败:', err.message);
+          }
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, []);
 
   // ---- 跨窗口 / 跨标签页同步登录状态 ----
@@ -1016,15 +1046,21 @@ export function AuthProvider({ children }) {
       return mergeLists(getLocalUsers(), currentUserProfile);
     }
 
-    // Supabase 模式
+    // Supabase 模式（supabaseOk === true 或 null 检测中都尝试）
     try {
-      console.log('[Auth] getAllUsers: 尝试 Supabase 查询...');
+      console.log('[Auth] getAllUsers: 尝试 Supabase 查询... (supabaseOk=' + supabaseOk + ')');
+
+      // 设置独立超时：8 秒（手机端网络可能慢）
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
 
       // 第一次尝试查询
       let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: true });
+
+      clearTimeout(timeoutId);
 
       // 如果查询失败（可能是 401/session 过期），尝试刷新 session 后重试
       if (error) {
@@ -1064,10 +1100,14 @@ export function AuthProvider({ children }) {
         data.filter(u => u.authorized).length, '已授权 /',
         data.filter(u => !u.authorized).length, '未授权'
       );
+      // Supabase 查询成功 → 确认可达（如果之前还在检测中）
+      if (supabaseOk !== true) setSupabaseOk(true);
       // 合并 Supabase 数据 + 当前用户
       return mergeLists(data, currentUserProfile);
     } catch (err) {
       console.warn('[Auth] getAllUsers 异常:', err.message);
+      // 如果是首次检测，标记为不可达
+      if (supabaseOk === null) setSupabaseOk(false);
       return mergeLists(getLocalUsers(), currentUserProfile);
     }
   }, [supabaseOk, user]);

@@ -62,29 +62,69 @@ export function getReachable() {
 }
 
 /**
- * 快速检测 Supabase 是否可达（3 秒超时）
+ * 快速检测 Supabase 是否可达（6 秒超时，失败后自动重试一次）
  * 使用 REST health endpoint 而非 auth API，更轻量
+ * 手机端网络可能较慢，给更多时间和重试机会
  */
 export async function checkSupabaseHealth() {
   if (!supabase || !supabaseUrl) {
     setReachable(false);
     return false;
   }
+
+  const tryOnce = async (timeoutMs) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(`${supabaseUrl}/rest/v1/`, {
+        method: 'HEAD',
+        headers: { apikey: supabaseAnonKey },
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+      return res.ok || res.status === 400 || res.status === 401; // 400/401 也表示服务在线
+    } catch {
+      clearTimeout(timeoutId);
+      return false;
+    }
+  };
+
+  // 第一次尝试：6 秒超时（手机端网络需要更多时间）
+  let ok = await tryOnce(6000);
+  if (!ok) {
+    // 重试一次：再给 4 秒（总共 ~10 秒内完成）
+    console.warn('[Supabase] 第一次健康检查失败，重试中...');
+    ok = await tryOnce(4000);
+  }
+
+  if (ok) {
+    setReachable(true);
+  } else {
+    console.warn('[Supabase] 健康检查失败（含重试），服务不可达');
+    setReachable(false);
+  }
+  return ok;
+}
+
+/**
+ * 后台重新检测 Supabase 可达性（用于从离线模式恢复）
+ * 不改变 state，仅返回结果
+ */
+export async function recheckSupabaseHealth() {
+  if (!supabase || !supabaseUrl) return false;
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
     const res = await fetch(`${supabaseUrl}/rest/v1/`, {
       method: 'HEAD',
       headers: { apikey: supabaseAnonKey },
       signal: controller.signal,
     });
     clearTimeout(timeoutId);
-    const ok = res.ok || res.status === 400 || res.status === 401; // 400/401 也表示服务在线
-    setReachable(ok);
+    const ok = res.ok || res.status === 400 || res.status === 401;
+    if (ok) setReachable(true);
     return ok;
   } catch {
-    console.warn('[Supabase] 健康检查失败，服务不可达');
-    setReachable(false);
     return false;
   }
 }
