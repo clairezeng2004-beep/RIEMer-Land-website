@@ -347,7 +347,7 @@
   }
 
   .navbar__logo-text {
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
   }
 
   /* 手机端：隐藏进度条导航和右侧区域 */
@@ -365,8 +365,8 @@
   }
 
   .navbar__toggle svg {
-    width: 24px;
-    height: 24px;
+    width: 26px;
+    height: 26px;
   }
 
   .navbar__links {
@@ -402,8 +402,8 @@
   }
 
   .navbar__link {
-    padding: 0.6rem 0.75rem;
-    font-size: var(--text-base);
+    padding: 0.7rem 0.75rem;
+    font-size: var(--text-lg);
     border-radius: var(--radius-sm);
   }
 
@@ -419,11 +419,11 @@
     align-items: center;
     gap: var(--space-sm);
     padding: 0.4rem 0.75rem;
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
   }
 
   .navbar__mobile-user .navbar__user-name {
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
   }
 
   .navbar__mobile-user .btn-sm {
@@ -469,7 +469,7 @@
   }
 
   .navbar__logo-text {
-    font-size: var(--text-base);
+    font-size: var(--text-lg);
   }
 
   .navbar__logo {
