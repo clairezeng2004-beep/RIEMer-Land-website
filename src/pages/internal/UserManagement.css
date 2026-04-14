@@ -231,15 +231,14 @@
   background: rgba(243, 156, 18, 0.08);
 }
 
-.users-table__status-cell {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-}
-
 .users-table__actions {
   display: flex;
   gap: var(--space-xs);
+}
+
+.users-table__no-action {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
 }
 
 @media (max-width: 768px) {
@@ -262,14 +261,6 @@
   .users-roles-info__grid {
     flex-direction: column;
     gap: var(--space-sm);
-  }
-  .users-table__status-cell {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-xs);
-  }
-  .users-table__actions {
-    width: 100%;
   }
   .users-table__actions .btn {
     font-size: var(--text-xs);

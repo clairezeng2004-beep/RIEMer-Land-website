@@ -288,6 +288,7 @@ export default function UserManagement() {
                 <th>角色</th>
                 <th>注册时间</th>
                 <th>状态</th>
+                {isAdmin && <th>操作</th>}
               </tr>
             </thead>
             <tbody>
@@ -333,19 +334,21 @@ export default function UserManagement() {
                     </span>
                   </td>
                   <td>
-                    <div className="users-table__status-cell">
-                      {u.authorized ? (
-                        <span className="users-table__status users-table__status--authorized">
-                          <Check size={14} /> 已授权
-                        </span>
-                      ) : (
-                        <span className="users-table__status users-table__status--pending">
-                          <X size={14} /> 待授权
-                        </span>
-                      )}
-                      {canManageAuth(u) && (
-                        <div className="users-table__actions">
-                          {u.authorized ? (
+                    {u.authorized ? (
+                      <span className="users-table__status users-table__status--authorized">
+                        <Check size={14} /> 已授权
+                      </span>
+                    ) : (
+                      <span className="users-table__status users-table__status--pending">
+                        <X size={14} /> 待授权
+                      </span>
+                    )}
+                  </td>
+                  {isAdmin && (
+                    <td>
+                      <div className="users-table__actions">
+                        {canManageAuth(u) ? (
+                          u.authorized ? (
                             <button
                               className="btn btn-ghost btn-sm"
                               onClick={() => handleRevoke(u.id)}
@@ -359,11 +362,13 @@ export default function UserManagement() {
                             >
                               <Shield size={14} /> 授权
                             </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </td>
+                          )
+                        ) : (
+                          <span className="users-table__no-action">—</span>
+                        )}
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>
