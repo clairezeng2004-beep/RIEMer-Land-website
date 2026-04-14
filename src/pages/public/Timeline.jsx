@@ -1,6 +1,6 @@
 import { useRef, useState, useEffect, useCallback } from 'react';
 import { Star, ChevronLeft, ChevronRight, User } from 'lucide-react';
-import { supabase, isSupabaseConfigured, getReachable } from '../../lib/supabase';
+import { supabase, isSupabaseConfigured, getReachable, checkSupabaseHealth } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { membersData } from '../../data/siteData';
 import './Timeline.css';
@@ -69,27 +69,35 @@ export default function Timeline() {
 
   // ---- 加载成员数据（Supabase 优先，本地兜底） ----
   const loadMembers = useCallback(async () => {
-    // 只有 Supabase 已配置且可达时才查远端
-    const useSupabase = isSupabaseConfigured && supabase && getReachable() !== false;
+    // 公开页面首次加载时 getReachable() 可能为 null（尚未检测），
+    // 先主动做一次健康检查，确保 Supabase 可达状态已知
+    if (isSupabaseConfigured && supabase && getReachable() === null) {
+      await checkSupabaseHealth();
+    }
+
+    const useSupabase = isSupabaseConfigured && supabase && getReachable() === true;
 
     if (useSupabase) {
       try {
-        const { data: profiles, error: profilesError } = await supabase
-          .from('profiles')
-          .select('id, name, nickname, avatar, signature, authorized')
-          .eq('authorized', true);
+        const [profilesRes, mpRes] = await Promise.all([
+          supabase
+            .from('profiles')
+            .select('id, name, nickname, avatar, signature, authorized')
+            .eq('authorized', true),
+          supabase
+            .from('member_profiles')
+            .select('user_id, enrollment_year'),
+        ]);
 
-        if (profilesError) {
-          console.warn('[Timeline] profiles 查询失败:', profilesError.message);
+        if (profilesRes.error) {
+          console.warn('[Timeline] profiles 查询失败:', profilesRes.error.message);
+        }
+        if (mpRes.error) {
+          console.warn('[Timeline] member_profiles 查询失败:', mpRes.error.message);
         }
 
-        const { data: memberProfiles, error: mpError } = await supabase
-          .from('member_profiles')
-          .select('user_id, enrollment_year');
-
-        if (mpError) {
-          console.warn('[Timeline] member_profiles 查询失败:', mpError.message);
-        }
+        const profiles = profilesRes.data;
+        const memberProfiles = mpRes.data;
 
         if (profiles && profiles.length > 0) {
           const enrollmentMap = {};
