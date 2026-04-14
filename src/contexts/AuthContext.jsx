@@ -1000,8 +1000,9 @@ export function AuthProvider({ children }) {
     }] : [];
 
     // supabaseOk: null=检测中, true=可达, false=不可达
-    // 只有明确为 true 时才走 Supabase 路径；null（检测中）和 false 都走本地
-    const useLocal = !isSupabaseConfigured || supabaseOk !== true;
+    // 明确为 false 或未配置 Supabase 时走本地模式
+    // null（检测中）时也尝试走 Supabase，避免因检测延迟导致只显示本地缓存数据
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
     if (useLocal) {
       console.log('[Auth] getAllUsers: 本地模式 (supabaseOk=' + supabaseOk + ')');
       return mergeLists(getLocalUsers(), currentUserProfile);

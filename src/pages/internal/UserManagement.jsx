@@ -38,6 +38,7 @@ export default function UserManagement() {
     user: currentUser,
     isAuthenticated,
     isAdmin,
+    supabaseOk,
     getAllUsers,
     authorizeUser,
     revokeUser,
@@ -135,7 +136,19 @@ export default function UserManagement() {
         getPreAuthorizedEmails().then(setPreAuthList);
       }
     }
-  }, [isAuthenticated, refreshKey, getAllUsers, isAdmin, getPreAuthorizedEmails]);
+  }, [isAuthenticated, refreshKey, supabaseOk, getAllUsers, isAdmin, getPreAuthorizedEmails]);
+
+  // 页面变为可见时自动刷新用户列表（手机端切回浏览器/切换 TAB 时触发）
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated) {
+        console.log('[UserManagement] 页面可见，刷新用户列表');
+        setRefreshKey((k) => k + 1);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [isAuthenticated]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
