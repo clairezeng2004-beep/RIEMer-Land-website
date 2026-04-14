@@ -17,8 +17,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// 全局请求超时：5 秒（缩短，让失败更快暴露）
-const FETCH_TIMEOUT_MS = 5000;
+// 全局请求超时：10 秒（给 token refresh 留足时间）
+const FETCH_TIMEOUT_MS = 10000;
 
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
