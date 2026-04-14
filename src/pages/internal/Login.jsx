@@ -32,7 +32,13 @@ export default function Login() {
   const [currentPassword, setCurrentPassword] = useState('');
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
-  const { login, register, resetPassword, changePassword, isAuthenticated, supabaseOk } = useAuth();
+  // 验证码重置密码相关
+  const [resetStep, setResetStep] = useState('email'); // email → code → password
+  const [resetCode, setResetCode] = useState('');
+  const [countdown, setCountdown] = useState(0);
+  const [devCode, setDevCode] = useState(''); // 开发模式下显示的验证码
+
+  const { login, register, resetPassword, changePassword, sendResetCode, verifyResetCode, isAuthenticated, supabaseOk } = useAuth();
   const navigate = useNavigate();
 
   // 页面加载时恢复已保存的凭据
@@ -51,6 +57,13 @@ export default function Login() {
       localStorage.removeItem(SAVED_CREDENTIALS_KEY);
     }
   }, []);
+
+  // 发送验证码倒计时
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setTimeout(() => setCountdown((c) => c - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [countdown]);
 
   if (isAuthenticated && view !== 'changePassword') {
     return <Navigate to="/internal/documents" replace />;
@@ -71,6 +84,9 @@ export default function Login() {
     if (newView === 'forgot') {
       setNewPassword('');
       setConfirmPassword('');
+      setResetStep('email');
+      setResetCode('');
+      setDevCode('');
     }
     if (newView === 'changePassword') {
       setCurrentPassword('');
@@ -140,15 +156,63 @@ export default function Login() {
     }
   };
 
-  // ---- 忘记密码提交 ----
-  const handleResetPassword = async (e) => {
-    e.preventDefault();
+  // ---- 忘记密码：发送验证码 ----
+  const handleSendCode = async (e) => {
+    e?.preventDefault();
     clearMessages();
 
     if (!email) {
       setError('请输入注册时使用的邮箱地址');
       return;
     }
+
+    setSubmitting(true);
+    try {
+      const result = await sendResetCode(email);
+      if (result.success) {
+        setSuccess(result.message);
+        setResetStep('code');
+        setCountdown(60);
+        if (result.devCode) {
+          setDevCode(result.devCode);
+        }
+      } else {
+        setError(result.message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ---- 忘记密码：验证验证码 ----
+  const handleVerifyCode = async (e) => {
+    e?.preventDefault();
+    clearMessages();
+
+    if (!resetCode || resetCode.length !== 6) {
+      setError('请输入 6 位验证码');
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const result = await verifyResetCode(email, resetCode);
+      if (result.success) {
+        setSuccess('验证码正确！请设置新密码');
+        setResetStep('password');
+      } else {
+        setError(result.message);
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ---- 忘记密码：设置新密码 ----
+  const handleResetPassword = async (e) => {
+    e.preventDefault();
+    clearMessages();
+
     if (!newPassword || newPassword.length < 6) {
       setError('新密码至少需要 6 个字符');
       return;
@@ -158,15 +222,20 @@ export default function Login() {
       return;
     }
 
-    const result = await resetPassword(email, newPassword);
-    if (result.success) {
-      setSuccess(result.message);
-      setNewPassword('');
-      setConfirmPassword('');
-      // 本地模式下 3 秒后自动跳回登录
-      setTimeout(() => switchView('login'), 3000);
-    } else {
-      setError(result.message);
+    setSubmitting(true);
+    try {
+      const result = await resetPassword(email, newPassword);
+      if (result.success) {
+        setSuccess(result.message);
+        setNewPassword('');
+        setConfirmPassword('');
+        // 3 秒后自动跳回登录
+        setTimeout(() => switchView('login'), 3000);
+      } else {
+        setError(result.message);
+      }
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -208,8 +277,14 @@ export default function Login() {
         return { title: '欢迎回来', desc: '登录以访问内部空间' };
       case 'register':
         return { title: '加入我们', desc: '仅 RIEMer Land 主理团队成员注册后可授权访问' };
-      case 'forgot':
-        return { title: '忘记密码', desc: '输入邮箱和新密码来重置您的密码' };
+      case 'forgot': {
+        const stepDesc = {
+          email: '输入邮箱地址，我们会发送验证码',
+          code: '请查看邮箱，输入收到的 6 位验证码',
+          password: '验证通过！请设置新密码',
+        };
+        return { title: '忘记密码', desc: stepDesc[resetStep] || '' };
+      }
       case 'changePassword':
         return { title: '修改密码', desc: '请输入当前密码和新密码' };
       default:
@@ -416,73 +491,141 @@ export default function Login() {
           </form>
         )}
 
-        {/* ==================== 忘记密码表单 ==================== */}
+        {/* ==================== 忘记密码表单（分步验证码） ==================== */}
         {view === 'forgot' && (
-          <form onSubmit={handleResetPassword} className="login-card__form" autoComplete="off">
-            <div className="login-card__field">
-              <label className="login-card__label">
-                <Mail size={16} /> 注册邮箱
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="请输入注册时使用的邮箱地址"
-                className="login-card__input"
-                autoComplete="username"
-              />
-            </div>
+          <>
+            {/* 步骤 1：输入邮箱，发送验证码 */}
+            {resetStep === 'email' && (
+              <form onSubmit={handleSendCode} className="login-card__form" autoComplete="off">
+                <div className="login-card__field">
+                  <label className="login-card__label">
+                    <Mail size={16} /> 注册邮箱
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="请输入注册时使用的邮箱地址"
+                    className="login-card__input"
+                    autoComplete="username"
+                  />
+                </div>
 
-            <div className="login-card__field">
-              <label className="login-card__label">
-                <Lock size={16} /> 新密码
-              </label>
-              <div className="login-card__password-wrapper">
-                <input
-                  type={showNewPassword ? 'text' : 'password'}
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  placeholder="请设置新密码（至少6位）"
-                  className="login-card__input"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  className="login-card__password-toggle"
-                  onClick={() => setShowNewPassword(!showNewPassword)}
-                >
-                  {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                <button type="submit" className="btn btn-primary btn-lg login-card__submit" disabled={submitting}>
+                  <Mail size={18} /> {submitting ? '发送中...' : '发送验证码'}
                 </button>
-              </div>
-            </div>
+              </form>
+            )}
 
-            <div className="login-card__field">
-              <label className="login-card__label">
-                <Lock size={16} /> 确认新密码
-              </label>
-              <div className="login-card__password-wrapper">
-                <input
-                  type={showConfirmPassword ? 'text' : 'password'}
-                  value={confirmPassword}
-                  onChange={(e) => setConfirmPassword(e.target.value)}
-                  placeholder="请再次输入新密码"
-                  className="login-card__input"
-                  autoComplete="new-password"
-                />
-                <button
-                  type="button"
-                  className="login-card__password-toggle"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                >
-                  {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+            {/* 步骤 2：输入验证码 */}
+            {resetStep === 'code' && (
+              <form onSubmit={handleVerifyCode} className="login-card__form" autoComplete="off">
+                <div className="login-card__field">
+                  <label className="login-card__label">
+                    <Mail size={16} /> 邮箱
+                  </label>
+                  <input
+                    type="email"
+                    value={email}
+                    className="login-card__input"
+                    disabled
+                  />
+                </div>
+
+                <div className="login-card__field">
+                  <label className="login-card__label">
+                    <KeyRound size={16} /> 验证码
+                  </label>
+                  <input
+                    type="text"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    placeholder="请输入 6 位数字验证码"
+                    className="login-card__input"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    style={{ letterSpacing: '4px', fontSize: '18px', textAlign: 'center' }}
+                  />
+                </div>
+
+                {devCode && (
+                  <div className="login-card__message login-card__message--success" style={{ fontSize: '12px' }}>
+                    <CheckCircle size={14} /> 开发模式验证码：<strong>{devCode}</strong>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button type="submit" className="btn btn-primary btn-lg login-card__submit" disabled={submitting} style={{ flex: 1 }}>
+                    <KeyRound size={18} /> {submitting ? '验证中...' : '验证'}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn btn-lg login-card__submit"
+                    style={{ flex: 'none', width: 'auto', padding: '0 16px', background: 'var(--color-bg-hover)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border-light)' }}
+                    disabled={countdown > 0 || submitting}
+                    onClick={handleSendCode}
+                  >
+                    {countdown > 0 ? `${countdown}s` : '重发'}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* 步骤 3：设置新密码 */}
+            {resetStep === 'password' && (
+              <form onSubmit={handleResetPassword} className="login-card__form" autoComplete="off">
+                <div className="login-card__field">
+                  <label className="login-card__label">
+                    <Lock size={16} /> 新密码
+                  </label>
+                  <div className="login-card__password-wrapper">
+                    <input
+                      type={showNewPassword ? 'text' : 'password'}
+                      value={newPassword}
+                      onChange={(e) => setNewPassword(e.target.value)}
+                      placeholder="请设置新密码（至少6位）"
+                      className="login-card__input"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="login-card__password-toggle"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                    >
+                      {showNewPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="login-card__field">
+                  <label className="login-card__label">
+                    <Lock size={16} /> 确认新密码
+                  </label>
+                  <div className="login-card__password-wrapper">
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      value={confirmPassword}
+                      onChange={(e) => setConfirmPassword(e.target.value)}
+                      placeholder="请再次输入新密码"
+                      className="login-card__input"
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="login-card__password-toggle"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <button type="submit" className="btn btn-primary btn-lg login-card__submit" disabled={submitting}>
+                  <KeyRound size={18} /> {submitting ? '重置中...' : '确认重置'}
                 </button>
-              </div>
-            </div>
-
-            <button type="submit" className="btn btn-primary btn-lg login-card__submit">
-              <KeyRound size={18} /> 重置密码
-            </button>
-          </form>
+              </form>
+            )}
+          </>
         )}
 
         {/* ==================== 修改密码表单 ==================== */}
@@ -578,7 +721,7 @@ export default function Login() {
 
         {view === 'forgot' && (
           <div className="login-card__hint">
-            <p>输入注册邮箱和新密码即可重置</p>
+            <p>{resetStep === 'email' ? '我们会向你的邮箱发送一个 6 位验证码' : resetStep === 'code' ? '验证码 5 分钟内有效' : '设置新密码后即可登录'}</p>
           </div>
         )}
       </div>

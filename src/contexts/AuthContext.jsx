@@ -656,34 +656,87 @@ export function AuthProvider({ children }) {
     clearProfileCache();
   }, []);
 
-  // ---- 忘记密码 / 重置密码 ----
+  // ---- 发送密码重置验证码（通过 Resend） ----
+  const sendResetCode = useCallback(async (email) => {
+    if (!email || !email.trim()) return { success: false, message: '请输入邮箱地址' };
+
+    try {
+      const res = await fetch('/api/send-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'send', email: email.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.error || '发送失败' };
+      }
+      // 开发模式下 API 会返回 devCode，用于调试
+      return { success: true, message: data.message, devCode: data.devCode || null };
+    } catch (err) {
+      return { success: false, message: '网络错误：' + err.message };
+    }
+  }, []);
+
+  // ---- 验证密码重置验证码 ----
+  const verifyResetCode = useCallback(async (email, code) => {
+    if (!email || !code) return { success: false, message: '请输入邮箱和验证码' };
+
+    try {
+      const res = await fetch('/api/send-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'verify', email: email.trim(), code: code.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, message: data.error || '验证失败' };
+      }
+      return { success: true, message: data.message };
+    } catch (err) {
+      return { success: false, message: '网络错误：' + err.message };
+    }
+  }, []);
+
+  // ---- 忘记密码 / 重置密码（验证码方式） ----
   const resetPassword = useCallback(async (email, newPassword) => {
     const useLocal = !isSupabaseConfigured || supabaseOk === false;
-    if (useLocal) {
-      // 本地模式：直接用邮箱查找用户，设置新密码
-      if (!email) return { success: false, message: '请输入邮箱地址' };
-      if (!newPassword || newPassword.length < 6) {
-        return { success: false, message: '新密码至少需要 6 个字符' };
-      }
-      const users = getLocalUsers();
-      const idx = users.findIndex((u) => u.email === email);
-      if (idx < 0) return { success: false, message: '未找到该邮箱对应的账号' };
-      users[idx].password = newPassword;
-      saveLocalUsers(users);
-      // 如果之前保存了凭据，清除旧的
-      localStorage.removeItem('riemer_saved_credentials');
-      return { success: true, message: '密码重置成功！请使用新密码登录。' };
+
+    if (!email) return { success: false, message: '请输入邮箱地址' };
+    if (!newPassword || newPassword.length < 6) {
+      return { success: false, message: '新密码至少需要 6 个字符' };
     }
 
-    // Supabase 模式：发送重置密码邮件
-    if (!email) return { success: false, message: '请输入邮箱地址' };
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) {
-      return { success: false, message: error.message };
+    // 先尝试通过服务端 API 重置（Supabase Admin API）
+    try {
+      const res = await fetch('/api/send-reset-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'reset', email: email.trim(), newPassword }),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        if (data.target === 'supabase') {
+          // Supabase 已重置成功
+          localStorage.removeItem('riemer_saved_credentials');
+          return { success: true, message: data.message || '密码重置成功！请使用新密码登录。' };
+        }
+        // target === 'local' → 继续本地重置
+      } else if (!res.ok) {
+        return { success: false, message: data.error || '重置失败' };
+      }
+    } catch (err) {
+      console.warn('[Auth] 服务端重置请求失败，尝试本地重置:', err.message);
     }
-    return { success: true, message: '密码重置邮件已发送，请查看您的邮箱。' };
+
+    // 本地模式兜底
+    const users = getLocalUsers();
+    const idx = users.findIndex((u) => u.email.toLowerCase() === email.trim().toLowerCase());
+    if (idx < 0) return { success: false, message: '未找到该邮箱对应的账号' };
+    users[idx].password = newPassword;
+    saveLocalUsers(users);
+    localStorage.removeItem('riemer_saved_credentials');
+    return { success: true, message: '密码重置成功！请使用新密码登录。' };
   }, [supabaseOk]);
 
   // ---- 修改密码（已登录用户） ----
@@ -1066,6 +1119,8 @@ export function AuthProvider({ children }) {
         resetPassword,
         changePassword,
         updatePasswordFromReset,
+        sendResetCode,
+        verifyResetCode,
         isAuthenticated,
         isAdmin,
         isMember,
