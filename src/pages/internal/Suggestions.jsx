@@ -28,7 +28,7 @@ const WEBSITE_STATUSES = ['处理中', '已完成', '暂时搁置'];
 const ORG_STATUSES = ['已完成', '暂时不做'];
 
 export default function Suggestions() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, getAllUsers } = useAuth();
   const { suggestions, addSuggestion, updateSuggestion, deleteSuggestion, internalConfig, updateInternalConfig } = useSiteContent();
   const { addNotification } = useNotifications();
   const { editing } = useWysiwyg();
@@ -39,6 +39,27 @@ export default function Suggestions() {
   const [editingSuggestionId, setEditingSuggestionId] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+
+  // 已授权用户列表（用于负责人下拉选择）
+  const [authorizedUsers, setAuthorizedUsers] = useState([]);
+  React.useEffect(() => {
+    let cancelled = false;
+    const loadUsers = async () => {
+      try {
+        const allUsers = await getAllUsers();
+        if (!cancelled) {
+          const authorized = allUsers
+            .filter((u) => u.authorized)
+            .map((u) => ({ value: u.name, label: u.nickname ? `${u.name}（${u.nickname}）` : u.name }));
+          setAuthorizedUsers(authorized);
+        }
+      } catch (err) {
+        console.warn('[Suggestions] 加载用户列表失败:', err);
+      }
+    };
+    loadUsers();
+    return () => { cancelled = true; };
+  }, [getAllUsers]);
 
   // 按类别分组（无 category 的旧数据默认归入网站建设）
   const websiteSugs = useMemo(() => suggestions.filter(s => !s.category || s.category === 'website'), [suggestions]);
@@ -301,12 +322,12 @@ export default function Suggestions() {
               </div>
               <div className="suggestions-page__field suggestions-page__field--flex">
                 <label>负责人</label>
-                <input
-                  type="text"
+                <CustomSelect
                   value={editingSuggestion.resolver}
-                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })}
-                  className="suggestions-page__input"
-                  placeholder="负责跟进此建议的成员"
+                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, resolver: val })}
+                  options={authorizedUsers}
+                  placeholder="选择负责人"
+                  allowClear
                 />
               </div>
             </div>
@@ -420,7 +441,13 @@ export default function Suggestions() {
                             <div className="suggestions-page__inline-group">
                               <div className="suggestions-page__field suggestions-page__field--flex">
                                 <label>负责人</label>
-                                <input type="text" value={editingSuggestion.resolver} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })} className="suggestions-page__input" />
+                                <CustomSelect
+                                  value={editingSuggestion.resolver}
+                                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, resolver: val })}
+                                  options={authorizedUsers}
+                                  placeholder="选择负责人"
+                                  allowClear
+                                />
                               </div>
                               <div className="suggestions-page__field suggestions-page__field--flex">
                                 <label>状态更新人（显示头像）</label>
@@ -626,7 +653,13 @@ export default function Suggestions() {
                             <div className="suggestions-page__inline-group">
                               <div className="suggestions-page__field suggestions-page__field--flex">
                                 <label>负责人</label>
-                                <input type="text" value={editingSuggestion.resolver} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })} className="suggestions-page__input" />
+                                <CustomSelect
+                                  value={editingSuggestion.resolver}
+                                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, resolver: val })}
+                                  options={authorizedUsers}
+                                  placeholder="选择负责人"
+                                  allowClear
+                                />
                               </div>
                               <div className="suggestions-page__field suggestions-page__field--flex">
                                 <label>状态更新人（显示头像）</label>
