@@ -422,7 +422,8 @@ export default function Login() {
               </label>
               <div className="login-card__email-wrap">
                 <input
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   value={email}
                   onChange={handleEmailChange}
                   onKeyDown={handleEmailKeyDown}
@@ -431,6 +432,7 @@ export default function Login() {
                   placeholder="请输入邮箱地址"
                   className="login-card__input"
                   autoComplete="off"
+                  name="login-email-nonauto"
                 />
                 {showEmailSuggestions && emailSuggestions.length > 0 && (
                   <ul className="login-card__email-suggestions">
@@ -460,7 +462,7 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
                   className="login-card__input"
-                  autoComplete="current-password"
+                  autoComplete="new-password"
                 />
                 <button
                   type="button"
@@ -528,7 +530,8 @@ export default function Login() {
               </label>
               <div className="login-card__email-wrap">
                 <input
-                  type="email"
+                  type="text"
+                  inputMode="email"
                   value={email}
                   onChange={handleEmailChange}
                   onKeyDown={handleEmailKeyDown}
@@ -537,6 +540,7 @@ export default function Login() {
                   placeholder="请输入邮箱地址"
                   className="login-card__input"
                   autoComplete="off"
+                  name="register-email-nonauto"
                 />
                 {showEmailSuggestions && emailSuggestions.length > 0 && (
                   <ul className="login-card__email-suggestions">
@@ -596,7 +600,8 @@ export default function Login() {
                   </label>
                   <div className="login-card__email-wrap">
                     <input
-                      type="email"
+                      type="text"
+                      inputMode="email"
                       value={email}
                       onChange={handleEmailChange}
                       onKeyDown={handleEmailKeyDown}
@@ -605,6 +610,7 @@ export default function Login() {
                       placeholder="请输入注册时使用的邮箱地址"
                       className="login-card__input"
                       autoComplete="off"
+                      name="reset-email-nonauto"
                     />
                     {showEmailSuggestions && emailSuggestions.length > 0 && (
                       <ul className="login-card__email-suggestions">
@@ -637,7 +643,7 @@ export default function Login() {
                     <Mail size={16} /> 邮箱
                   </label>
                   <input
-                    type="email"
+                    type="text"
                     value={email}
                     className="login-card__input"
                     disabled
