@@ -183,7 +183,7 @@ export default function InternalArticles() {
         <div className="ia-list__header">
           <div>
             <h1>
-              <FileText size={28} /> <EditableText as="span" value={ia.pageTitle || '公众号历史文章'} configKey="internalArticles.pageTitle" onChange={v => updateIA('pageTitle', v)} />
+              <FileText size={28} /> <EditableText as="span" value={ia.pageTitle || '公众号历史文章归档'} configKey="internalArticles.pageTitle" onChange={v => updateIA('pageTitle', v)} />
             </h1>
             <EditableText as="p" value={ia.pageDesc || '浏览公众号历史推送内容，回顾与归档'} configKey="internalArticles.pageDesc" onChange={v => updateIA('pageDesc', v)} />
           </div>

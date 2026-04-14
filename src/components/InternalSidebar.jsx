@@ -41,7 +41,7 @@ export default function InternalSidebar() {
       badge: unreadCount > 0 ? unreadCount : null,
     },
     { to: '/internal/process-templates', icon: FolderOpen, label: '流程模板文件' },
-    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章' },
+    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章归档' },
     { to: '/internal/member-sharing', icon: Share2, label: '成员内部分享' },
     { to: '/internal/tasks', icon: CheckSquare, configKey: 'labelTasks', label: sc.labelTasks },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },

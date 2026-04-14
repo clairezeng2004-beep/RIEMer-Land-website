@@ -26,7 +26,7 @@ function MobileInternalNav() {
     { to: '/internal/notifications', icon: Bell, label: sc.labelNotifications, badge: unreadCount > 0 ? unreadCount : null },
     { to: '/internal/process-templates', icon: FolderOpen, label: '流程模板文件' },
     { to: '/internal/member-sharing', icon: Share2, label: '成员内部分享' },
-    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章' },
+    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章归档' },
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
     { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },

@@ -193,7 +193,7 @@ const getDefaultInternalConfig = () => ({
   },
   // 公众号历史文章页
   internalArticles: {
-    pageTitle: '公众号历史文章',
+    pageTitle: '公众号历史文章归档',
     pageDesc: '浏览公众号历史推送内容，回顾与归档',
   },
   // 个人主页
