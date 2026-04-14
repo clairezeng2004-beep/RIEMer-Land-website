@@ -25,6 +25,13 @@
   gap: 8px;
 }
 
+/* 联系方式内容容器：与左侧两栏 (.footer__nav-links-row / .footer__about-texts) 结构对称 */
+.footer__contact-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .footer__contact-item {
   display: flex;
   align-items: center;

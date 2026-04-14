@@ -52,22 +52,24 @@ export default function Footer() {
 
             <div className="footer__nav footer__nav--contact">
               <h4 className="footer__nav-title">联系方式</h4>
-              <div className="footer__contact-item">
-                <Mail size={16} />
-                <span>{content.footerEmail}</span>
-                <button
-                  className="footer__copy-btn"
-                  onClick={handleCopyEmail}
-                  title="复制邮箱"
-                  aria-label="复制邮箱"
-                >
-                  {emailCopied ? <Check size={12} /> : <Copy size={12} />}
-                </button>
-                {emailCopied && <span className="footer__copy-toast">复制成功</span>}
-              </div>
-              <div className="footer__contact-item">
-                <MapPin size={16} />
-                <span>{content.footerLocation}</span>
+              <div className="footer__contact-list">
+                <div className="footer__contact-item">
+                  <Mail size={16} />
+                  <span>{content.footerEmail}</span>
+                  <button
+                    className="footer__copy-btn"
+                    onClick={handleCopyEmail}
+                    title="复制邮箱"
+                    aria-label="复制邮箱"
+                  >
+                    {emailCopied ? <Check size={12} /> : <Copy size={12} />}
+                  </button>
+                  {emailCopied && <span className="footer__copy-toast">复制成功</span>}
+                </div>
+                <div className="footer__contact-item">
+                  <MapPin size={16} />
+                  <span>{content.footerLocation}</span>
+                </div>
               </div>
             </div>
 
