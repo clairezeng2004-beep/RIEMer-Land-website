@@ -327,7 +327,7 @@ export default function MemberProfiles() {
         <div className="member-profiles-page__header">
           <div>
             <h1>
-              <Users size={28} /> <EditableText as="span" value={mp.pageTitle || '成员通讯录'} configKey="memberProfiles.pageTitle" onChange={v => updateMP('pageTitle', v)} />
+              <Users size={28} /> <EditableText as="span" value={(mp.pageTitle && mp.pageTitle !== '成员信息') ? mp.pageTitle : '成员通讯录'} configKey="memberProfiles.pageTitle" onChange={v => updateMP('pageTitle', v)} />
             </h1>
             <EditableText as="p" value={mp.pageDesc || '了解每位成员的基本信息、去向与兴趣，促进彼此交流'} configKey="memberProfiles.pageDesc" onChange={v => updateMP('pageDesc', v)} />
           </div>
