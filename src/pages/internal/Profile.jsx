@@ -235,7 +235,7 @@ export default function Profile() {
     }
   };
 
-  const displayName = user?.nickname || '未设置昵称';
+  const displayName = nickname || user?.nickname || '未设置昵称';
 
   return (
     <div className="profile-page">
