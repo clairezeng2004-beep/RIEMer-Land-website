@@ -798,25 +798,50 @@ export function AuthProvider({ children }) {
 
   // ---- 获取所有用户 ----
   const getAllUsers = useCallback(async () => {
+    // 合并本地用户和当前登录用户的 profile cache，确保不丢失任何数据源
+    const mergeWithCurrentUser = (list) => {
+      if (!user) return list;
+      // 如果当前登录用户不在列表中（Supabase 用户不在 localStorage），补充进去
+      const exists = list.some((u) => u.id === user.id || (u.email && user.email && u.email.toLowerCase() === u.email.toLowerCase()));
+      if (!exists) {
+        return [...list, {
+          id: user.id,
+          email: user.email,
+          name: user.name || user.nickname || '',
+          nickname: user.nickname || '',
+          avatar: user.avatar || null,
+          signature: user.signature || '',
+          role: user.role || 'member',
+          authorized: user.authorized !== undefined ? user.authorized : true,
+          created_at: user.created_at || user.createdAt || new Date().toISOString(),
+        }];
+      }
+      return list;
+    };
+
     const useLocal = !isSupabaseConfigured || supabaseOk === false;
     if (useLocal) {
-      return getLocalUsers();
+      return mergeWithCurrentUser(getLocalUsers());
     }
     try {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: true });
-      if (error || !data || data.length === 0) {
-        // Supabase 查询失败或无数据，回退本地
-        console.warn('[Auth] Supabase profiles 查询失败或为空，回退本地用户列表');
-        return getLocalUsers();
+      if (error) {
+        console.warn('[Auth] Supabase profiles 查询失败:', error.message, '，回退本地用户列表');
+        return mergeWithCurrentUser(getLocalUsers());
+      }
+      if (!data || data.length === 0) {
+        // Supabase 表为空（可能是 RLS 限制或确实无数据），回退本地并合并当前用户
+        console.warn('[Auth] Supabase profiles 查询为空，回退本地用户列表');
+        return mergeWithCurrentUser(getLocalUsers());
       }
       return data;
     } catch {
-      return getLocalUsers();
+      return mergeWithCurrentUser(getLocalUsers());
     }
-  }, [supabaseOk]);
+  }, [supabaseOk, user]);
 
   // ---- 授权用户 ----
   const authorizeUser = useCallback(async (userId) => {
