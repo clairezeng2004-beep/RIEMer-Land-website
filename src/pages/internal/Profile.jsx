@@ -28,15 +28,23 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
+  // 标记是否已经从 user 对象恢复过数据（避免异步 user 更新反复覆盖用户正在编辑的内容）
+  const restoredRef = useRef(false);
 
   // 当 user 对象更新时（如刷新后恢复登录态），同步表单字段
   useEffect(() => {
-    if (user) {
-      setName(user.name || '');
-      setNickname(user.nickname || '');
-      setSignature(user.signature || '');
-      setAvatarPreview(user.avatar || null);
+    if (!user) {
+      restoredRef.current = false;
+      return;
     }
+    // 只在首次获取到 user 时回填（避免保存后 setUser 再次触发覆盖）
+    if (restoredRef.current) return;
+
+    setName(user.name || '');
+    setNickname(user.nickname || '');
+    setSignature(user.signature || '');
+    setAvatarPreview(user.avatar || null);
+    restoredRef.current = true;
   }, [user]);
 
   // 从本地 localStorage 加载入学年份

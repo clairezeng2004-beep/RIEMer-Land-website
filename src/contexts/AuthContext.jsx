@@ -24,6 +24,8 @@ function hasRole(userRole, requiredRole) {
 const USERS_DB_KEY = 'riemer_users';
 const AUTH_KEY = 'riemer_auth';
 const DEVICE_KEY = 'riemer_device_id';
+// 独立缓存当前登录用户的完整 profile（解决 Supabase 用户不在 riemer_users 中的问题）
+const PROFILE_CACHE_KEY = 'riemer_profile_cache';
 
 const getDeviceId = () => {
   let deviceId = localStorage.getItem(DEVICE_KEY);
@@ -53,6 +55,34 @@ const saveLocalUsers = (users) => {
   localStorage.setItem(USERS_DB_KEY, JSON.stringify(users));
 };
 
+/** 缓存当前登录用户的完整 profile 到 localStorage */
+const cacheProfile = (profile) => {
+  if (!profile?.id) return;
+  try {
+    localStorage.setItem(PROFILE_CACHE_KEY, JSON.stringify(profile));
+  } catch (err) {
+    console.warn('[Auth] profile 缓存写入失败:', err.message);
+  }
+};
+
+/** 读取缓存的 profile */
+const getCachedProfile = (userId) => {
+  try {
+    const stored = localStorage.getItem(PROFILE_CACHE_KEY);
+    if (!stored) return null;
+    const cached = JSON.parse(stored);
+    if (cached?.id === userId) return cached;
+    return null;
+  } catch {
+    return null;
+  }
+};
+
+/** 清除 profile 缓存 */
+const clearProfileCache = () => {
+  localStorage.removeItem(PROFILE_CACHE_KEY);
+};
+
 // ============================================
 // AuthProvider
 // ============================================
@@ -68,16 +98,24 @@ export function AuthProvider({ children }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
+        // 优先从 riemer_users 查找（本地注册的用户）
         const users = getLocalUsers();
         const found = users.find((u) => u.id === parsed.id);
         if (found && found.authorized) {
           setUser(found);
+          cacheProfile(found);
           return true;
-        } else {
-          localStorage.removeItem(AUTH_KEY);
-          setUser(null);
-          return false;
         }
+        // riemer_users 找不到（Supabase 用户）→ 尝试 profile 缓存
+        const cached = getCachedProfile(parsed.id);
+        if (cached && cached.authorized) {
+          setUser(cached);
+          return true;
+        }
+        // 都找不到 → 清除登录态
+        localStorage.removeItem(AUTH_KEY);
+        setUser(null);
+        return false;
       } catch {
         localStorage.removeItem(AUTH_KEY);
         setUser(null);
@@ -97,10 +135,12 @@ export function AuthProvider({ children }) {
       if (stored) {
         try {
           const parsed = JSON.parse(stored);
+          // 优先从 riemer_users 查找
           const users = getLocalUsers();
           const found = users.find((u) => u.id === parsed.id);
           if (found && found.authorized) {
             setUser(found);
+            cacheProfile(found);
             localStorage.setItem(
               AUTH_KEY,
               JSON.stringify({
@@ -114,7 +154,13 @@ export function AuthProvider({ children }) {
               })
             );
           } else {
-            localStorage.removeItem(AUTH_KEY);
+            // riemer_users 找不到 → 尝试 profile 缓存（Supabase 用户降级场景）
+            const cached = getCachedProfile(parsed.id);
+            if (cached && cached.authorized) {
+              setUser(cached);
+            } else {
+              localStorage.removeItem(AUTH_KEY);
+            }
           }
         } catch {
           localStorage.removeItem(AUTH_KEY);
@@ -251,8 +297,23 @@ export function AuthProvider({ children }) {
         };
         await supabase.from('profiles').insert(newProfile);
         setUser(newProfile);
+        cacheProfile(newProfile);
       } else if (data) {
         setUser(data);
+        cacheProfile(data);
+        // 同步写入 AUTH_KEY（确保降级时有登录凭证）
+        localStorage.setItem(
+          AUTH_KEY,
+          JSON.stringify({
+            id: data.id,
+            name: data.name,
+            email: data.email,
+            role: data.role,
+            deviceId: getDeviceId(),
+            loginAt: new Date().toISOString(),
+            persistent: true,
+          })
+        );
       }
     } catch (err) {
       console.error('[Auth] Failed to fetch profile:', err);
@@ -271,6 +332,7 @@ export function AuthProvider({ children }) {
       if (!found) return { success: false, message: '邮箱或密码错误' };
       if (!found.authorized) return { success: false, message: '您的账号尚未被授权，请联系管理员' };
       setUser(found);
+      cacheProfile(found);
       localStorage.setItem(
         AUTH_KEY,
         JSON.stringify({
@@ -293,6 +355,7 @@ export function AuthProvider({ children }) {
       if (!found) return null;
       if (!found.authorized) return { success: false, message: '您的账号尚未被授权，请联系管理员' };
       setUser(found);
+      cacheProfile(found);
       localStorage.setItem(
         AUTH_KEY,
         JSON.stringify({
@@ -367,6 +430,7 @@ export function AuthProvider({ children }) {
 
         // 直接设置用户状态，避免 onAuthStateChange 再次查询 profile
         setUser(profile);
+        cacheProfile(profile);
         return { success: true };
       })();
 
@@ -507,6 +571,7 @@ export function AuthProvider({ children }) {
     }
     setUser(null);
     localStorage.removeItem(AUTH_KEY);
+    clearProfileCache();
   }, []);
 
   // ---- 忘记密码 / 重置密码 ----
@@ -708,6 +773,9 @@ export function AuthProvider({ children }) {
     // 始终更新前端 user 状态（不论是否在本地用户库中找到）
     setUser(updatedUser);
 
+    // 缓存完整 profile 到 localStorage（保证刷新后可恢复）
+    cacheProfile(updatedUser);
+
     // 同步 AUTH_KEY
     localStorage.setItem(
       AUTH_KEY,
@@ -737,9 +805,12 @@ export function AuthProvider({ children }) {
           .eq('id', user.id);
         if (error) {
           console.warn('[Auth] Supabase profile 更新失败:', error.message);
+          // 远端写入失败但本地已保存，提示用户
+          return { success: true, message: '已保存到本地，云端同步失败：' + error.message };
         }
       } catch (err) {
         console.warn('[Auth] Supabase profile 更新异常:', err.message);
+        return { success: true, message: '已保存到本地，云端同步异常：' + err.message };
       }
     }
 
