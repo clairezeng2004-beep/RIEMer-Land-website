@@ -20,7 +20,7 @@ import './MemberProfiles.css';
 const COLUMNS = [
   { key: 'name', label: '姓名', width: '90px', editable: false },
   { key: 'enrollment_year', label: '入学年份', width: '100px', editable: true, placeholder: '如 2023' },
-  { key: 'joined_at_display', label: '加入时间', width: '110px', editable: false },
+  { key: 'joined_at_display', label: '加入时间', width: '140px', editable: true, inputType: 'yearMonth' },
   { key: 'bio', label: '一句话概括自己', width: '180px', editable: true, placeholder: '用一句话介绍自己' },
   { key: 'further_education', label: '升学去向', width: '150px', editable: true, placeholder: '如 XX大学XX专业' },
   { key: 'career', label: '工作去向', width: '150px', editable: true, placeholder: '如 XX公司XX岗位' },
@@ -30,6 +30,25 @@ const COLUMNS = [
   { key: 'dream_city', label: '未来想定居的城市', width: '150px', editable: true, placeholder: '如 北京、上海' },
   { key: 'other', label: '其他', width: '180px', editable: true, placeholder: '任何想补充的内容' },
 ];
+
+// 生成年份选项（从 2015 到当前年份 +1）
+const currentYear = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: currentYear - 2015 + 2 }, (_, i) => 2015 + i);
+const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
+
+// 将 ISO 日期转为 { year, month }
+function dateToYearMonth(dateStr) {
+  if (!dateStr) return { year: '', month: '' };
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return { year: '', month: '' };
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
+
+// 将 year+month 转为 ISO 日期字符串（月初）
+function yearMonthToDate(year, month) {
+  if (!year || !month) return '';
+  return new Date(year, month - 1, 1).toISOString();
+}
 
 // localStorage key
 const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
@@ -110,9 +129,12 @@ export default function MemberProfiles() {
         name: p.profiles?.name || '未知用户',
         enrollment_year: p.enrollment_year || '',
         joined_at: p.joined_at || p.profiles?.created_at || '',
-        joined_at_display: p.joined_at || p.profiles?.created_at
-          ? new Date(p.joined_at || p.profiles?.created_at).toLocaleDateString('zh-CN')
-          : '',
+        joined_at_display: (() => {
+          const raw = p.joined_at || p.profiles?.created_at;
+          if (!raw) return '';
+          const d = new Date(raw);
+          return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+        })(),
         bio: p.bio || '',
         further_education: p.further_education || '',
         career: p.career || '',
@@ -163,9 +185,11 @@ export default function MemberProfiles() {
             ...p,
             id: p.user_id,
             name: u?.name || p.name || '未知用户',
-            joined_at_display: p.joined_at
-              ? new Date(p.joined_at).toLocaleDateString('zh-CN')
-              : '',
+            joined_at_display: (() => {
+              if (!p.joined_at) return '';
+              const d = new Date(p.joined_at);
+              return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+            })(),
           };
         })
         .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));
@@ -181,7 +205,12 @@ export default function MemberProfiles() {
   // 开始编辑
   const startEdit = (profile) => {
     setEditingId(profile.user_id);
-    setEditData({ ...profile });
+    const ym = dateToYearMonth(profile.joined_at);
+    setEditData({
+      ...profile,
+      _joined_year: ym.year,
+      _joined_month: ym.month,
+    });
   };
 
   // 取消编辑
@@ -196,13 +225,20 @@ export default function MemberProfiles() {
     setSaving(true);
 
     try {
+      // 计算加入时间
+      const newJoinedAt = yearMonthToDate(editData._joined_year, editData._joined_month);
+
       if (isSupabaseConfigured) {
         const updateData = {};
         COLUMNS.forEach((col) => {
-          if (col.editable && editData[col.key] !== undefined) {
+          if (col.editable && col.key !== 'joined_at_display' && editData[col.key] !== undefined) {
             updateData[col.key] = editData[col.key];
           }
         });
+        // 加入时间单独处理
+        if (newJoinedAt) {
+          updateData.joined_at = newJoinedAt;
+        }
 
         const { error } = await supabase
           .from('member_profiles')
@@ -221,10 +257,14 @@ export default function MemberProfiles() {
         const idx = localProfiles.findIndex((p) => p.user_id === editingId);
         if (idx >= 0) {
           COLUMNS.forEach((col) => {
-            if (col.editable && editData[col.key] !== undefined) {
+            if (col.editable && col.key !== 'joined_at_display' && editData[col.key] !== undefined) {
               localProfiles[idx][col.key] = editData[col.key];
             }
           });
+          // 加入时间单独处理
+          if (newJoinedAt) {
+            localProfiles[idx].joined_at = newJoinedAt;
+          }
           saveLocalProfiles(localProfiles);
         }
       }
@@ -327,16 +367,47 @@ export default function MemberProfiles() {
                     {COLUMNS.map((col) => (
                       <td key={col.key}>
                         {isEditing && col.editable ? (
-                          <input
-                            className="member-profiles-table__input"
-                            type="text"
-                            value={editData[col.key] || ''}
-                            onChange={(e) =>
-                              setEditData({ ...editData, [col.key]: e.target.value })
-                            }
-                            placeholder={col.placeholder}
-                            autoFocus={col.key === 'enrollment_year'}
-                          />
+                          col.inputType === 'yearMonth' ? (
+                            <div className="member-profiles-table__year-month">
+                              <select
+                                className="member-profiles-table__select"
+                                value={editData._joined_year || ''}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, _joined_year: e.target.value ? Number(e.target.value) : '' })
+                                }
+                              >
+                                <option value="">年</option>
+                                {YEAR_OPTIONS.map((y) => (
+                                  <option key={y} value={y}>{y}</option>
+                                ))}
+                              </select>
+                              <span className="member-profiles-table__year-month-sep">年</span>
+                              <select
+                                className="member-profiles-table__select"
+                                value={editData._joined_month || ''}
+                                onChange={(e) =>
+                                  setEditData({ ...editData, _joined_month: e.target.value ? Number(e.target.value) : '' })
+                                }
+                              >
+                                <option value="">月</option>
+                                {MONTH_OPTIONS.map((m) => (
+                                  <option key={m} value={m}>{m}</option>
+                                ))}
+                              </select>
+                              <span className="member-profiles-table__year-month-sep">月</span>
+                            </div>
+                          ) : (
+                            <input
+                              className="member-profiles-table__input"
+                              type="text"
+                              value={editData[col.key] || ''}
+                              onChange={(e) =>
+                                setEditData({ ...editData, [col.key]: e.target.value })
+                              }
+                              placeholder={col.placeholder}
+                              autoFocus={col.key === 'enrollment_year'}
+                            />
+                          )
                         ) : (
                           <span
                             className={`member-profiles-table__cell ${
