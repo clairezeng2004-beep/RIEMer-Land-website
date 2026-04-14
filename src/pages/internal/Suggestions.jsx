@@ -21,7 +21,7 @@ import {
 import './Suggestions.css';
 
 export default function Suggestions() {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, user } = useAuth();
   const { suggestions, addSuggestion, updateSuggestion, deleteSuggestion, internalConfig, updateInternalConfig } = useSiteContent();
   const { addNotification } = useNotifications();
   const { editing } = useWysiwyg();
@@ -135,7 +135,7 @@ export default function Suggestions() {
               setEditingSuggestion({
                 id: `sug-${Date.now()}`,
                 content: '',
-                proposer: '',
+                proposer: user?.name || user?.nickname || '',
                 status: '处理中',
                 statusUpdatedAt: new Date().toISOString().split('T')[0],
                 statusUpdatedBy: '',
@@ -195,9 +195,8 @@ export default function Suggestions() {
                 <input
                   type="text"
                   value={editingSuggestion.proposer}
-                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })}
-                  className="suggestions-page__input"
-                  placeholder="你的姓名"
+                  className="suggestions-page__input suggestions-page__input--readonly"
+                  readOnly
                 />
               </div>
               <div className="suggestions-page__field suggestions-page__field--flex">
