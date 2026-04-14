@@ -425,7 +425,17 @@ export function AuthProvider({ children }) {
       const users = getLocalUsers();
       const found = users.find((u) => u.email === email && u.password === password);
       if (!found) return { success: false, message: '邮箱或密码错误' };
-      if (!found.authorized) return { success: false, message: '您的账号尚未被授权，请联系管理员' };
+      if (!found.authorized) {
+        // 补救检查：如果该邮箱在预授权列表中，自动补授权
+        if (isEmailPreAuthorized(email)) {
+          found.authorized = true;
+          saveLocalUsers(users);
+          removePreAuthEmail(email);
+          console.log('[Auth] 本地登录：检测到预授权邮箱，自动授权:', email);
+        } else {
+          return { success: false, message: '您的账号尚未被授权，请联系管理员' };
+        }
+      }
       setUser(found);
       cacheProfile(found);
       localStorage.setItem(
@@ -448,7 +458,15 @@ export function AuthProvider({ children }) {
       const users = getLocalUsers();
       const found = users.find((u) => u.email === email && u.password === password);
       if (!found) return null;
-      if (!found.authorized) return { success: false, message: '您的账号尚未被授权，请联系管理员' };
+      if (!found.authorized) {
+        if (isEmailPreAuthorized(email)) {
+          found.authorized = true;
+          saveLocalUsers(users);
+          removePreAuthEmail(email);
+        } else {
+          return { success: false, message: '您的账号尚未被授权，请联系管理员' };
+        }
+      }
       setUser(found);
       cacheProfile(found);
       localStorage.setItem(
@@ -497,6 +515,27 @@ export function AuthProvider({ children }) {
 
                   if (profile) {
                     if (!profile.authorized) {
+                      // 补救检查：预授权列表
+                      let shouldAuto = isEmailPreAuthorized(profile.email);
+                      if (!shouldAuto) {
+                        try {
+                          const { data: pr } = await supabase
+                            .from('pre_authorized_emails')
+                            .select('email')
+                            .ilike('email', profile.email)
+                            .maybeSingle();
+                          if (pr) shouldAuto = true;
+                        } catch { /* ignore */ }
+                      }
+                      if (shouldAuto) {
+                        await supabase.from('profiles').update({ authorized: true }).eq('id', profile.id);
+                        removePreAuthEmail(profile.email);
+                        try { await supabase.from('pre_authorized_emails').delete().ilike('email', profile.email); } catch { /* ignore */ }
+                        profile.authorized = true;
+                        setUser(profile);
+                        cacheProfile(profile);
+                        return { success: true };
+                      }
                       await supabase.auth.signOut();
                       return { success: false, message: '您的账号尚未被授权，请联系管理员。' };
                     }
@@ -549,6 +588,33 @@ export function AuthProvider({ children }) {
         }
 
         if (!profile.authorized) {
+          // 补救检查：看看该邮箱是否在预授权列表中（管理员已授权但 profiles 未同步的情况）
+          let shouldAutoAuthorize = isEmailPreAuthorized(profile.email);
+          if (!shouldAutoAuthorize) {
+            try {
+              const { data: preAuthRow } = await supabase
+                .from('pre_authorized_emails')
+                .select('email')
+                .ilike('email', profile.email)
+                .maybeSingle();
+              if (preAuthRow) shouldAutoAuthorize = true;
+            } catch { /* 表可能不存在 */ }
+          }
+
+          if (shouldAutoAuthorize) {
+            // 自动授权：更新 profiles 表 + 清理预授权列表
+            console.log('[Auth] 检测到预授权邮箱，自动授权:', profile.email);
+            await supabase.from('profiles').update({ authorized: true }).eq('id', profile.id);
+            removePreAuthEmail(profile.email);
+            try {
+              await supabase.from('pre_authorized_emails').delete().ilike('email', profile.email);
+            } catch { /* ignore */ }
+            profile.authorized = true;
+            setUser(profile);
+            cacheProfile(profile);
+            return { success: true };
+          }
+
           await supabase.auth.signOut();
           return {
             success: false,
@@ -1044,19 +1110,26 @@ export function AuthProvider({ children }) {
         return { success: true, message: `已授权用户「${existingUser.name}」（${normalizedEmail}）` };
       }
     } else {
-      // Supabase 模式：查询 profiles 表
+      // Supabase 模式：查询 profiles 表（使用 maybeSingle 避免 PGRST116 异常）
       try {
-        const { data: existingProfile } = await supabase
+        const { data: existingProfile, error: profileQueryError } = await supabase
           .from('profiles')
           .select('*')
           .ilike('email', normalizedEmail)
-          .single();
+          .maybeSingle();
+        if (profileQueryError) {
+          console.warn('[Auth] preAuthorizeByEmail: profiles 查询失败:', profileQueryError.message);
+        }
         if (existingProfile) {
           if (existingProfile.authorized) {
             return { success: false, message: '该用户已被授权' };
           }
           // 已注册但未授权：直接授权
-          await supabase.from('profiles').update({ authorized: true }).eq('id', existingProfile.id);
+          const { error: updateError } = await supabase.from('profiles').update({ authorized: true }).eq('id', existingProfile.id);
+          if (updateError) {
+            console.error('[Auth] preAuthorizeByEmail: 授权更新失败:', updateError.message);
+            return { success: false, message: `授权更新失败：${updateError.message}` };
+          }
           // 同步本地
           const users = getLocalUsers();
           const localIdx = users.findIndex((u) => u.email.toLowerCase() === normalizedEmail);
@@ -1066,8 +1139,8 @@ export function AuthProvider({ children }) {
           }
           return { success: true, message: `已授权用户「${existingProfile.name}」（${normalizedEmail}）` };
         }
-      } catch {
-        // PGRST116 = no rows, 继续添加预授权
+      } catch (err) {
+        console.error('[Auth] preAuthorizeByEmail: 查询/授权异常:', err.message);
       }
     }
 
