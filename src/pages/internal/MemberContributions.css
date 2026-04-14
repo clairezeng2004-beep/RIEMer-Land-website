@@ -622,14 +622,6 @@
 
 /* iPhone 适配（≤430px） */
 @media (max-width: 430px) {
-  .mc-page__header h1 {
-    font-size: 1.15rem;
-  }
-
-  .mc-page__header p {
-    font-size: 0.75rem;
-  }
-
   .mc-period-dropdown__trigger {
     font-size: 0.75rem;
     padding: 6px 10px;
