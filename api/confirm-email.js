@@ -40,27 +40,38 @@ export default async function handler(req, res) {
   const normalizedEmail = email.trim().toLowerCase();
 
   try {
-    // 1. 通过邮箱查找用户
-    const listRes = await fetch(
-      `${supabaseUrl}/auth/v1/admin/users?page=1&per_page=50`,
-      {
-        headers: {
-          apikey: supabaseServiceKey,
-          Authorization: `Bearer ${supabaseServiceKey}`,
-        },
+    // 1. 通过邮箱查找用户（分页遍历所有用户，避免超过50人时漏掉）
+    let targetUser = null;
+    let page = 1;
+    const perPage = 50;
+
+    while (!targetUser) {
+      const listRes = await fetch(
+        `${supabaseUrl}/auth/v1/admin/users?page=${page}&per_page=${perPage}`,
+        {
+          headers: {
+            apikey: supabaseServiceKey,
+            Authorization: `Bearer ${supabaseServiceKey}`,
+          },
+        }
+      );
+
+      if (!listRes.ok) {
+        const errorText = await listRes.text().catch(() => '');
+        console.error('[confirm-email] 获取用户列表失败:', listRes.status, errorText);
+        return res.status(500).json({ error: '获取用户列表失败' });
       }
-    );
 
-    if (!listRes.ok) {
-      const errorText = await listRes.text().catch(() => '');
-      console.error('[confirm-email] 获取用户列表失败:', listRes.status, errorText);
-      return res.status(500).json({ error: '获取用户列表失败' });
+      const { users } = await listRes.json();
+      if (!users || users.length === 0) break;
+
+      targetUser = users.find(
+        (u) => u.email?.toLowerCase() === normalizedEmail
+      );
+
+      if (users.length < perPage) break; // 已经是最后一页
+      page++;
     }
-
-    const { users } = await listRes.json();
-    const targetUser = users?.find(
-      (u) => u.email?.toLowerCase() === normalizedEmail
-    );
 
     if (!targetUser) {
       return res.status(404).json({ error: '未找到该邮箱对应的用户' });

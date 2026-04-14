@@ -496,12 +496,18 @@ export function AuthProvider({ children }) {
         if (error) {
           if (error.message === 'Email not confirmed') {
             // 尝试通过服务端 API 自动确认邮箱后重试登录
+            console.log('[Auth] 邮箱未确认，尝试自动确认:', email);
             try {
               const confirmRes = await fetch('/api/confirm-email', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email }),
               });
+              console.log('[Auth] confirm-email 响应状态:', confirmRes.status);
+              if (!confirmRes.ok) {
+                const errBody = await confirmRes.text().catch(() => '');
+                console.warn('[Auth] confirm-email 失败:', confirmRes.status, errBody);
+              }
               if (confirmRes.ok) {
                 // 确认成功，重试登录
                 const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password });
