@@ -126,49 +126,61 @@
   line-height: 1.5;
 }
 
-/* Voice input */
-.suggestions-page__textarea-wrap {
-  position: relative;
+/* Voice input — label row layout */
+.suggestions-page__label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
 }
 
-.suggestions-page__textarea-wrap .suggestions-page__textarea {
-  padding-right: 44px;
+.suggestions-page__label-row > label {
+  margin-bottom: 0;
 }
 
-.suggestions-page__voice-btn {
-  position: absolute;
-  right: 8px;
-  bottom: 8px;
+/* Inline voice button (beside label) */
+.suggestions-page__voice-btn-inline {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
+  gap: 5px;
+  padding: 4px 12px;
   border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-full);
   background: var(--color-bg);
   color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
 }
 
-.suggestions-page__voice-btn:hover {
+.suggestions-page__voice-btn-inline:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
   background: rgba(91, 140, 62, 0.06);
 }
 
-.suggestions-page__voice-btn--active {
+.suggestions-page__voice-btn-inline--active {
   border-color: #e74c3c;
   color: #e74c3c;
   background: rgba(231, 76, 60, 0.08);
   animation: voice-pulse 1.5s ease-in-out infinite;
 }
 
-.suggestions-page__voice-btn--active:hover {
+.suggestions-page__voice-btn-inline--active:hover {
   border-color: #c0392b;
   color: #c0392b;
   background: rgba(231, 76, 60, 0.12);
+}
+
+/* Legacy textarea-wrap (kept for backward compat) */
+.suggestions-page__textarea-wrap {
+  position: relative;
+}
+
+.suggestions-page__textarea-wrap .suggestions-page__textarea {
+  padding-right: 44px;
 }
 
 @keyframes voice-pulse {

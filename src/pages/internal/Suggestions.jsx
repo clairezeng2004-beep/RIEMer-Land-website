@@ -242,26 +242,27 @@ export default function Suggestions() {
             </div>
 
             <div className="suggestions-page__field">
-              <label>具体建议</label>
-              <div className="suggestions-page__textarea-wrap">
-                <textarea
-                  value={editingSuggestion.content}
-                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                  className="suggestions-page__input suggestions-page__textarea"
-                  rows={3}
-                  placeholder="描述你的建议…（可以是网站功能改进、组织活动策划、团队协作优化等）"
-                />
+              <div className="suggestions-page__label-row">
+                <label>具体建议</label>
                 <button
                   type="button"
-                  className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                  className={`suggestions-page__voice-btn-inline${isListening ? ' suggestions-page__voice-btn-inline--active' : ''}`}
                   onClick={() => toggleVoiceInput('content')}
-                  title={isListening ? '停止语音输入' : '语音输入'}
+                  title={isListening ? '停止语音输入' : '点击开始语音输入，说话即可自动转为文字'}
                 >
-                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                  <span>{isListening ? '停止录音' : '语音输入'}</span>
                 </button>
               </div>
+              <textarea
+                value={editingSuggestion.content}
+                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                className="suggestions-page__input suggestions-page__textarea"
+                rows={3}
+                placeholder="描述你的建议…（可以是网站功能改进、组织活动策划、团队协作优化等）"
+              />
               {isListening && (
-                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话…识别到的文字将自动填入上方输入框</span>
               )}
             </div>
 
@@ -379,25 +380,26 @@ export default function Suggestions() {
                         <td colSpan={7} className="sug-table__td sug-table__td--edit">
                           <div className="sug-edit-form">
                             <div className="suggestions-page__field">
-                              <label>具体建议</label>
-                              <div className="suggestions-page__textarea-wrap">
-                                <textarea
-                                  value={editingSuggestion.content}
-                                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                                  className="suggestions-page__input suggestions-page__textarea"
-                                  rows={2}
-                                />
+                              <div className="suggestions-page__label-row">
+                                <label>具体建议</label>
                                 <button
                                   type="button"
-                                  className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                                  className={`suggestions-page__voice-btn-inline${isListening ? ' suggestions-page__voice-btn-inline--active' : ''}`}
                                   onClick={() => toggleVoiceInput('content')}
-                                  title={isListening ? '停止语音输入' : '语音输入'}
+                                  title={isListening ? '停止语音输入' : '点击开始语音输入，说话即可自动转为文字'}
                                 >
-                                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                                  <span>{isListening ? '停止录音' : '语音输入'}</span>
                                 </button>
                               </div>
+                              <textarea
+                                value={editingSuggestion.content}
+                                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                                className="suggestions-page__input suggestions-page__textarea"
+                                rows={2}
+                              />
                               {isListening && (
-                                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+                                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话…识别到的文字将自动填入上方输入框</span>
                               )}
                             </div>
                             <div className="suggestions-page__inline-group">
@@ -582,25 +584,26 @@ export default function Suggestions() {
                         <td colSpan={7} className="sug-table__td sug-table__td--edit">
                           <div className="sug-edit-form">
                             <div className="suggestions-page__field">
-                              <label>具体建议</label>
-                              <div className="suggestions-page__textarea-wrap">
-                                <textarea
-                                  value={editingSuggestion.content}
-                                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                                  className="suggestions-page__input suggestions-page__textarea"
-                                  rows={2}
-                                />
+                              <div className="suggestions-page__label-row">
+                                <label>具体建议</label>
                                 <button
                                   type="button"
-                                  className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                                  className={`suggestions-page__voice-btn-inline${isListening ? ' suggestions-page__voice-btn-inline--active' : ''}`}
                                   onClick={() => toggleVoiceInput('content')}
-                                  title={isListening ? '停止语音输入' : '语音输入'}
+                                  title={isListening ? '停止语音输入' : '点击开始语音输入，说话即可自动转为文字'}
                                 >
-                                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                                  <span>{isListening ? '停止录音' : '语音输入'}</span>
                                 </button>
                               </div>
+                              <textarea
+                                value={editingSuggestion.content}
+                                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                                className="suggestions-page__input suggestions-page__textarea"
+                                rows={2}
+                              />
                               {isListening && (
-                                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+                                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话…识别到的文字将自动填入上方输入框</span>
                               )}
                             </div>
                             <div className="suggestions-page__inline-group">
