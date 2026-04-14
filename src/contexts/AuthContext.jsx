@@ -799,16 +799,15 @@ export function AuthProvider({ children }) {
   // ---- 获取所有用户 ----
   const getAllUsers = useCallback(async () => {
     /**
-     * 合并多个数据源的用户列表，去重后返回。
-     * 优先级：Supabase 数据 > 本地 riemer_users > 当前登录用户 profile cache
+     * 合并多个数据源的用户列表，按 id 去重。
+     * 前面的列表优先级更高（不会被后面的覆盖）。
      */
     const mergeLists = (...lists) => {
-      const seen = new Map(); // id → user object
+      const seen = new Map();
       for (const list of lists) {
         if (!Array.isArray(list)) continue;
         for (const u of list) {
           if (!u || !u.id) continue;
-          // 如果已有该 id，用后来的数据更新（后来的数据源优先级更低，所以不覆盖）
           if (!seen.has(u.id)) {
             seen.set(u.id, u);
           }
@@ -817,7 +816,7 @@ export function AuthProvider({ children }) {
       return Array.from(seen.values());
     };
 
-    // 构造当前用户的 profile 对象（兜底，确保至少能显示自己）
+    // 构造当前用户的 profile 对象（兜底）
     const currentUserProfile = user ? [{
       id: user.id,
       email: user.email,
@@ -830,20 +829,17 @@ export function AuthProvider({ children }) {
       created_at: user.created_at || user.createdAt || new Date().toISOString(),
     }] : [];
 
-    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    // supabaseOk: null=检测中, true=可达, false=不可达
+    // 只有明确为 true 时才走 Supabase 路径；null（检测中）和 false 都走本地
+    const useLocal = !isSupabaseConfigured || supabaseOk !== true;
     if (useLocal) {
-      console.log('[Auth] getAllUsers: 本地模式');
+      console.log('[Auth] getAllUsers: 本地模式 (supabaseOk=' + supabaseOk + ')');
       return mergeLists(getLocalUsers(), currentUserProfile);
     }
 
     // Supabase 模式
     try {
-      // 先检查 session 是否有效，避免以 anon 角色查询导致数据不完整
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData?.session) {
-        console.warn('[Auth] getAllUsers: Supabase session 无效，回退本地模式');
-        return mergeLists(getLocalUsers(), currentUserProfile);
-      }
+      console.log('[Auth] getAllUsers: 尝试 Supabase 查询...');
 
       const { data, error } = await supabase
         .from('profiles')
@@ -851,17 +847,20 @@ export function AuthProvider({ children }) {
         .order('created_at', { ascending: true });
 
       if (error) {
-        console.warn('[Auth] Supabase profiles 查询失败:', error.message, '，回退本地用户列表');
+        console.warn('[Auth] Supabase profiles 查询失败:', error.message, error.code);
         return mergeLists(getLocalUsers(), currentUserProfile);
       }
 
       if (!data || data.length === 0) {
-        console.warn('[Auth] Supabase profiles 查询为空，回退本地用户列表');
+        console.warn('[Auth] Supabase profiles 查询为空（可能是 RLS/session 问题）');
         return mergeLists(getLocalUsers(), currentUserProfile);
       }
 
-      console.log('[Auth] getAllUsers: Supabase 返回', data.length, '条记录');
-      // 合并 Supabase 数据 + 当前用户（防止 RLS 导致当前用户不在结果中）
+      console.log('[Auth] getAllUsers: Supabase 返回', data.length, '条记录, authorized 分布:',
+        data.filter(u => u.authorized).length, '已授权 /',
+        data.filter(u => !u.authorized).length, '未授权'
+      );
+      // 合并 Supabase 数据 + 当前用户
       return mergeLists(data, currentUserProfile);
     } catch (err) {
       console.warn('[Auth] getAllUsers 异常:', err.message);

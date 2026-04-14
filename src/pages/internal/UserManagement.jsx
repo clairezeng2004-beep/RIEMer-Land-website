@@ -58,9 +58,10 @@ export default function UserManagement() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
 
-  // 已授权 / 待授权用户分组
-  const authorizedUsers = users.filter((u) => u.authorized);
-  const pendingUsers = users.filter((u) => !u.authorized);
+  // 已授权 / 待授权用户分组（兼容 boolean / string / truthy 值）
+  const isAuthorized = (u) => u.authorized === true || u.authorized === 'true' || u.authorized === 'TRUE';
+  const authorizedUsers = users.filter(isAuthorized);
+  const pendingUsers = users.filter((u) => !isAuthorized(u));
 
   // 预授权相关状态
   const [preAuthEmail, setPreAuthEmail] = useState('');
@@ -124,7 +125,10 @@ export default function UserManagement() {
     if (isAuthenticated) {
       const loadUsers = async () => {
         const data = await getAllUsers();
-        setUsers(data);
+        console.log('[UserManagement] getAllUsers 返回:', data?.length, '条',
+          data?.map(u => ({ id: u.id?.slice(0,8), email: u.email, authorized: u.authorized, type: typeof u.authorized }))
+        );
+        setUsers(data || []);
       };
       loadUsers();
       if (isAdmin) {
