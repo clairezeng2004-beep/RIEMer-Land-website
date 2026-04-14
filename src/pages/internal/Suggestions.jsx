@@ -5,6 +5,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import CustomSelect from '../../components/CustomSelect';
 import {
   Plus,
   Trash2,
@@ -290,15 +291,13 @@ export default function Suggestions() {
             <div className="suggestions-page__inline-group">
               <div className="suggestions-page__field suggestions-page__field--flex">
                 <label>当前状态</label>
-                <select
+                <CustomSelect
                   value={editingSuggestion.status}
-                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })}
-                  className="suggestions-page__input"
-                >
-                  {getStatusOptions(editingSuggestion.category).map(s => (
-                    <option key={s} value={s}>{s}</option>
-                  ))}
-                </select>
+                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, status: val })}
+                  options={getStatusOptions(editingSuggestion.category)}
+                  placeholder="请选择状态"
+                  allowClear
+                />
               </div>
               <div className="suggestions-page__field suggestions-page__field--flex">
                 <label>负责人</label>
@@ -409,11 +408,13 @@ export default function Suggestions() {
                               </div>
                               <div className="suggestions-page__field suggestions-page__field--flex">
                                 <label>当前状态</label>
-                                <select value={editingSuggestion.status} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })} className="suggestions-page__input">
-                                  {WEBSITE_STATUSES.map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                  ))}
-                                </select>
+                                <CustomSelect
+                                  value={editingSuggestion.status}
+                                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, status: val })}
+                                  options={WEBSITE_STATUSES}
+                                  placeholder="请选择状态"
+                                  allowClear
+                                />
                               </div>
                             </div>
                             <div className="suggestions-page__inline-group">
@@ -613,11 +614,13 @@ export default function Suggestions() {
                               </div>
                               <div className="suggestions-page__field suggestions-page__field--flex">
                                 <label>当前状态</label>
-                                <select value={editingSuggestion.status} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })} className="suggestions-page__input">
-                                  {ORG_STATUSES.map(s => (
-                                    <option key={s} value={s}>{s}</option>
-                                  ))}
-                                </select>
+                                <CustomSelect
+                                  value={editingSuggestion.status}
+                                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, status: val })}
+                                  options={ORG_STATUSES}
+                                  placeholder="请选择状态"
+                                  allowClear
+                                />
                               </div>
                             </div>
                             <div className="suggestions-page__inline-group">

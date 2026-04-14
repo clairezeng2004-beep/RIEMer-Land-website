@@ -212,6 +212,11 @@
   margin-bottom: 0;
 }
 
+/* CustomSelect inside flex fields should fill width */
+.suggestions-page__field--flex .custom-select {
+  width: 100%;
+}
+
 .suggestions-page__form-actions {
   display: flex;
   gap: var(--space-sm);

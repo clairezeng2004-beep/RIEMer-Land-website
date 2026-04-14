@@ -51,6 +51,19 @@
   transform: rotate(180deg);
 }
 
+/* Clear button */
+.custom-select__clear {
+  flex-shrink: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: color var(--transition-fast);
+  border-radius: 50%;
+}
+
+.custom-select__clear:hover {
+  color: var(--color-danger);
+}
+
 /* ---- Dropdown Panel ---- */
 .custom-select__dropdown {
   position: absolute;

@@ -14,6 +14,7 @@ import './CustomSelect.css';
  *   size         — 'sm' | 'md'（默认 'md'）
  *   placeholder  — 占位文字
  *   multiple     — 是否启用多选模式（默认 false）
+ *   allowClear   — 是否允许清空选择（默认 false，单选模式专用）
  */
 export default function CustomSelect({
   value,
@@ -24,6 +25,7 @@ export default function CustomSelect({
   size = 'md',
   placeholder = '请选择',
   multiple = false,
+  allowClear = false,
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
@@ -65,6 +67,12 @@ export default function CustomSelect({
     }
   };
 
+  const handleClear = (e) => {
+    e.stopPropagation();
+    onChange('');
+    setOpen(false);
+  };
+
   const handleRemoveTag = (e, val) => {
     e.stopPropagation();
     if (!multiple) return;
@@ -75,7 +83,11 @@ export default function CustomSelect({
   // 多选显示内容
   const renderTriggerContent = () => {
     if (!multiple) {
-      return <span className="custom-select__value">{selected ? selected.label : placeholder}</span>;
+      return (
+        <span className={`custom-select__value${!selected ? ' custom-select__placeholder' : ''}`}>
+          {selected ? selected.label : placeholder}
+        </span>
+      );
     }
     if (selectedLabels.length === 0) {
       return <span className="custom-select__value custom-select__placeholder">{placeholder}</span>;
@@ -104,7 +116,11 @@ export default function CustomSelect({
         onClick={() => setOpen(!open)}
       >
         {renderTriggerContent()}
-        <ChevronDown size={size === 'sm' ? 12 : 14} className="custom-select__icon" />
+        {allowClear && !multiple && value ? (
+          <X size={size === 'sm' ? 12 : 14} className="custom-select__clear" onMouseDown={handleClear} />
+        ) : (
+          <ChevronDown size={size === 'sm' ? 12 : 14} className="custom-select__icon" />
+        )}
       </button>
 
       {open && (
