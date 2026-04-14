@@ -21,6 +21,8 @@ import {
   CheckCircle,
   AlertCircle,
   Loader2,
+  ChevronDown,
+  Clock,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -53,6 +55,11 @@ export default function UserManagement() {
   );
   const [users, setUsers] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [showPendingPanel, setShowPendingPanel] = useState(false);
+
+  // 已授权 / 待授权用户分组
+  const authorizedUsers = users.filter((u) => u.authorized);
+  const pendingUsers = users.filter((u) => !u.authorized);
 
   // 预授权相关状态
   const [preAuthEmail, setPreAuthEmail] = useState('');
@@ -228,21 +235,68 @@ export default function UserManagement() {
             <UserCheck size={20} />
             <div>
               <div className="users-stat__value">
-                {users.filter((u) => u.authorized).length}
+                {authorizedUsers.length}
               </div>
               <div className="users-stat__label">已授权</div>
             </div>
           </div>
-          <div className="users-stat users-stat--pending">
+          <div
+            className={`users-stat users-stat--pending users-stat--clickable${showPendingPanel ? ' users-stat--active' : ''}`}
+            onClick={() => pendingUsers.length > 0 && setShowPendingPanel((v) => !v)}
+            style={{ cursor: pendingUsers.length > 0 ? 'pointer' : 'default' }}
+            title={pendingUsers.length > 0 ? '点击查看待授权用户' : '暂无待授权用户'}
+          >
             <UserX size={20} />
             <div>
               <div className="users-stat__value">
-                {users.filter((u) => !u.authorized).length}
+                {pendingUsers.length}
               </div>
               <div className="users-stat__label">待授权</div>
             </div>
+            {pendingUsers.length > 0 && (
+              <ChevronDown
+                size={16}
+                className={`users-stat__chevron${showPendingPanel ? ' users-stat__chevron--open' : ''}`}
+              />
+            )}
           </div>
         </div>
+
+        {/* 待授权用户面板 */}
+        {showPendingPanel && pendingUsers.length > 0 && (
+          <div className="users-pending-panel">
+            <div className="users-pending-panel__header">
+              <Clock size={15} />
+              <span>等待授权的用户（{pendingUsers.length}）</span>
+            </div>
+            <div className="users-pending-panel__list">
+              {pendingUsers.map((u) => (
+                <div key={u.id} className="users-pending-panel__item">
+                  <div className="users-pending-panel__user">
+                    <div className="users-pending-panel__avatar">
+                      {u.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="users-pending-panel__info">
+                      <span className="users-pending-panel__name">{u.name}</span>
+                      <span className="users-pending-panel__email">{u.email}</span>
+                    </div>
+                    <span className="users-pending-panel__date">
+                      {new Date(u.createdAt || u.created_at).toLocaleDateString('zh-CN')} 注册
+                    </span>
+                  </div>
+                  {isAdmin && canManageAuth(u) && (
+                    <button
+                      className="btn btn-primary btn-sm"
+                      onClick={() => handleAuthorize(u.id)}
+                    >
+                      <Shield size={14} /> 授权
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* 权限说明 */}
         <div className="users-roles-info">
@@ -350,7 +404,7 @@ export default function UserManagement() {
           </div>
         )}
 
-        {/* User List */}
+        {/* User List — 仅已授权用户 */}
         <div className="users-table-wrapper">
           <table className="users-table">
             <thead>
@@ -359,68 +413,62 @@ export default function UserManagement() {
                 <th>邮箱</th>
                 <th>角色</th>
                 <th>注册时间</th>
-                <th>状态</th>
                 {isAdmin && <th>操作</th>}
               </tr>
             </thead>
             <tbody>
-              {users.map((u) => (
-                <tr key={u.id}>
-                  <td>
-                    <div className="users-table__user">
-                      <div className="users-table__avatar">
-                        {u.name.charAt(0).toUpperCase()}
-                      </div>
-                      <span>{u.name}</span>
-                    </div>
+              {authorizedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={isAdmin ? 5 : 4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                    暂无已授权用户
                   </td>
-                  <td>
-                    <span className="users-table__email">{u.email}</span>
-                  </td>
-                  <td>
-                    {canManageRole(u) ? (
-                      <div className="users-table__role-select-wrapper">
-                        <CustomSelect
-                          value={u.role}
-                          onChange={(val) => handleRoleChange(u.id, val)}
-                          options={getAvailableRoles().map((role) => ({
-                            value: role,
-                            label: ROLE_LABELS[role],
-                          }))}
-                          size="sm"
-                          style={{ color: ROLE_COLORS[u.role] }}
-                        />
-                      </div>
-                    ) : (
-                      <span
-                        className={`users-table__role users-table__role--${u.role}`}
-                        style={{ color: ROLE_COLORS[u.role] }}
-                      >
-                        {ROLE_LABELS[u.role]}
-                      </span>
-                    )}
-                  </td>
-                  <td>
-                    <span className="users-table__date">
-                      {new Date(u.createdAt || u.created_at).toLocaleDateString('zh-CN')}
-                    </span>
-                  </td>
-                  <td>
-                    {u.authorized ? (
-                      <span className="users-table__status users-table__status--authorized">
-                        <Check size={14} /> 已授权
-                      </span>
-                    ) : (
-                      <span className="users-table__status users-table__status--pending">
-                        <X size={14} /> 待授权
-                      </span>
-                    )}
-                  </td>
-                  {isAdmin && (
+                </tr>
+              ) : (
+                authorizedUsers.map((u) => (
+                  <tr key={u.id}>
                     <td>
-                      <div className="users-table__actions">
-                        {canManageAuth(u) ? (
-                          u.authorized ? (
+                      <div className="users-table__user">
+                        <div className="users-table__avatar">
+                          {u.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span>{u.name}</span>
+                      </div>
+                    </td>
+                    <td>
+                      <span className="users-table__email">{u.email}</span>
+                    </td>
+                    <td>
+                      {canManageRole(u) ? (
+                        <div className="users-table__role-select-wrapper">
+                          <CustomSelect
+                            value={u.role}
+                            onChange={(val) => handleRoleChange(u.id, val)}
+                            options={getAvailableRoles().map((role) => ({
+                              value: role,
+                              label: ROLE_LABELS[role],
+                            }))}
+                            size="sm"
+                            style={{ color: ROLE_COLORS[u.role] }}
+                          />
+                        </div>
+                      ) : (
+                        <span
+                          className={`users-table__role users-table__role--${u.role}`}
+                          style={{ color: ROLE_COLORS[u.role] }}
+                        >
+                          {ROLE_LABELS[u.role]}
+                        </span>
+                      )}
+                    </td>
+                    <td>
+                      <span className="users-table__date">
+                        {new Date(u.createdAt || u.created_at).toLocaleDateString('zh-CN')}
+                      </span>
+                    </td>
+                    {isAdmin && (
+                      <td>
+                        <div className="users-table__actions">
+                          {canManageAuth(u) ? (
                             <button
                               className="btn btn-ghost btn-sm"
                               onClick={() => handleRevoke(u.id)}
@@ -428,21 +476,14 @@ export default function UserManagement() {
                               <ShieldOff size={14} /> 撤销
                             </button>
                           ) : (
-                            <button
-                              className="btn btn-primary btn-sm"
-                              onClick={() => handleAuthorize(u.id)}
-                            >
-                              <Shield size={14} /> 授权
-                            </button>
-                          )
-                        ) : (
-                          <span className="users-table__no-action">—</span>
-                        )}
-                      </div>
-                    </td>
-                  )}
-                </tr>
-              ))}
+                            <span className="users-table__no-action">—</span>
+                          )}
+                        </div>
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
