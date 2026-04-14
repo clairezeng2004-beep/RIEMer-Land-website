@@ -15,6 +15,7 @@ import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
 import ProcessTemplates from './pages/internal/ProcessTemplates';
 import MemberSharing from './pages/internal/MemberSharing';
+import MemberSharingDetail from './pages/internal/MemberSharingDetail';
 import Tasks from './pages/internal/Tasks';
 import UserManagement from './pages/internal/UserManagement';
 import ContentManagement from './pages/internal/ContentManagement';
@@ -52,6 +53,7 @@ function App() {
                   <Route index element={<Navigate to="notifications" replace />} />
                   <Route path="process-templates" element={<ProcessTemplates />} />
                   <Route path="member-sharing" element={<MemberSharing />} />
+                  <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
                   {/* 兼容旧链接 */}
                   <Route path="documents" element={<Documents />} />
                   <Route path="articles" element={<InternalArticles />} />
