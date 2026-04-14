@@ -9,9 +9,6 @@ import './Profile.css';
 
 const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
 
-/** 判断 Supabase 是否真正可用（已配置 + 可达） */
-const isSupabaseUsable = () => isSupabaseConfigured && supabase && getReachable() !== false;
-
 export default function Profile() {
   const { user, updateProfile, supabaseOk } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
@@ -61,25 +58,28 @@ export default function Profile() {
     }
   };
 
+  // 判断 Supabase 是否真正可用（已配置 + 可达 + AuthContext 确认 ok）
+  const canUseSupabase = isSupabaseConfigured && supabase && supabaseOk === true && getReachable() !== false;
+
   // 加载入学年份（Supabase 优先，本地兜底）
   useEffect(() => {
     if (!user) return;
     const loadEnrollmentYear = async () => {
-      const useSupabase = isSupabaseUsable() && supabaseOk !== false;
-
-      if (useSupabase) {
+      if (canUseSupabase) {
         try {
           const { data, error } = await supabase
             .from('member_profiles')
             .select('enrollment_year')
             .eq('user_id', user.id)
             .maybeSingle();
-          if (!error && data?.enrollment_year) {
+          if (error) {
+            console.warn('[Profile] Supabase 加载入学年份失败:', error.message);
+          } else if (data?.enrollment_year) {
             setEnrollmentYear(data.enrollment_year);
             return;
           }
         } catch (err) {
-          console.warn('[Profile] Supabase 加载入学年份失败，回退本地:', err);
+          console.warn('[Profile] Supabase 加载入学年份异常，回退本地:', err);
         }
       }
 
@@ -87,7 +87,7 @@ export default function Profile() {
       loadLocalEnrollmentYear(user.id);
     };
     loadEnrollmentYear();
-  }, [user, supabaseOk]);
+  }, [user, canUseSupabase]);
 
   const handleAvatarClick = () => {
     fileInputRef.current?.click();
@@ -115,6 +115,8 @@ export default function Profile() {
     setSaving(true);
     setMessage(null);
 
+    const warnings = []; // 收集非致命警告
+
     try {
       const updates = {
         name: name.trim(),
@@ -127,8 +129,21 @@ export default function Profile() {
         updates.avatar = avatarPreview;
       }
 
+      console.log('[Profile] 开始保存，canUseSupabase:', canUseSupabase, 'supabaseOk:', supabaseOk);
+
       // updateProfile 会同时更新本地 + Supabase（如果可用）
       const result = await updateProfile(updates);
+      console.log('[Profile] updateProfile 结果:', result);
+
+      if (!result.success) {
+        setMessage({ type: 'error', text: result.message || '保存失败' });
+        return;
+      }
+
+      // 如果 updateProfile 返回了云端同步警告，收集起来
+      if (result.message) {
+        warnings.push(result.message);
+      }
 
       // ---- 入学年份：始终先保存到本地，再尝试同步 Supabase ----
       const yearVal = enrollmentYear.trim();
@@ -148,33 +163,62 @@ export default function Profile() {
         console.warn('[Profile] 本地入学年份保存失败:', err);
       }
 
-      // 2. Supabase 同步（如果可用）
-      const useSupabase = isSupabaseUsable() && supabaseOk !== false;
-      if (useSupabase) {
+      // 2. Supabase 同步入学年份（如果可用）
+      if (canUseSupabase) {
         try {
-          await supabase
+          // 先检查是否已有记录
+          const { data: existingRecord, error: selectError } = await supabase
             .from('member_profiles')
-            .upsert(
-              {
+            .select('user_id')
+            .eq('user_id', user.id)
+            .maybeSingle();
+
+          if (selectError) {
+            console.warn('[Profile] 查询 member_profiles 失败:', selectError.message);
+          }
+
+          let upsertError;
+          if (existingRecord) {
+            // 已有记录 → 只更新 enrollment_year（不覆盖 joined_at 和其他字段）
+            const { error } = await supabase
+              .from('member_profiles')
+              .update({ enrollment_year: yearVal, updated_at: new Date().toISOString() })
+              .eq('user_id', user.id);
+            upsertError = error;
+          } else {
+            // 无记录 → 插入新记录
+            const { error } = await supabase
+              .from('member_profiles')
+              .insert({
                 user_id: user.id,
                 enrollment_year: yearVal,
-                joined_at: new Date().toISOString(),
-              },
-              { onConflict: 'user_id' }
-            );
+                joined_at: user.created_at || new Date().toISOString(),
+              });
+            upsertError = error;
+          }
+
+          if (upsertError) {
+            console.warn('[Profile] Supabase member_profiles 同步失败:', upsertError.message, upsertError.code, upsertError.details);
+            warnings.push('入学年份云端同步失败: ' + upsertError.message);
+          } else {
+            console.log('[Profile] Supabase member_profiles 同步成功');
+          }
         } catch (err) {
-          console.warn('[Profile] Supabase 入学年份同步失败（本地已保存）:', err);
+          console.warn('[Profile] Supabase 入学年份同步异常:', err);
+          warnings.push('入学年份云端同步异常: ' + err.message);
         }
       }
 
-      if (result.success) {
-        setMessage({ type: 'success', text: '个人资料保存成功！' });
-        setAvatarFile(null);
+      // 设置成功消息
+      setAvatarFile(null);
+      if (warnings.length > 0) {
+        setMessage({ type: 'success', text: '个人资料已保存！（' + warnings.join('；') + '）' });
       } else {
-        setMessage({ type: 'error', text: result.message || '保存失败' });
+        setMessage({ type: 'success', text: '个人资料保存成功！' });
       }
-    } catch {
-      setMessage({ type: 'error', text: '保存失败，请重试' });
+    } catch (err) {
+      console.error('[Profile] handleSave 异常:', err);
+      setMessage({ type: 'error', text: '保存失败，请重试：' + (err.message || '未知错误') });
     } finally {
       setSaving(false);
     }

@@ -752,6 +752,8 @@ export function AuthProvider({ children }) {
   const updateProfile = useCallback(async (updates) => {
     if (!user) return { success: false, message: '未登录' };
 
+    console.log('[Auth] updateProfile 开始:', { userId: user.id, updates: Object.keys(updates), supabaseOk, isSupabaseConfigured });
+
     // 构造更新后的用户对象（前端状态）
     const updatedUser = { ...user };
     if (updates.name !== undefined) updatedUser.name = updates.name;
@@ -790,26 +792,45 @@ export function AuthProvider({ children }) {
       })
     );
 
-    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    const useLocal = !isSupabaseConfigured || supabaseOk !== true;
     if (!useLocal) {
       // Supabase 模式：同时更新远端
       try {
+        // 先检查 session 是否有效
+        const { data: sessionData } = await supabase.auth.getSession();
+        if (!sessionData?.session) {
+          console.warn('[Auth] Supabase session 无效，无法同步远端');
+          return { success: true, message: '已保存到本地（云端 session 已过期，请重新登录后再试）' };
+        }
+
         const updateData = {};
         if (updates.name !== undefined) updateData.name = updates.name;
         if (updates.nickname !== undefined) updateData.nickname = updates.nickname;
         if (updates.avatar !== undefined) updateData.avatar = updates.avatar;
         if (updates.signature !== undefined) updateData.signature = updates.signature;
-        const { error } = await supabase
+
+        console.log('[Auth] Supabase 更新 profiles 表:', { userId: user.id, fields: Object.keys(updateData) });
+
+        const { error, data: returnedData } = await supabase
           .from('profiles')
           .update(updateData)
-          .eq('id', user.id);
+          .eq('id', user.id)
+          .select();
+
         if (error) {
-          console.warn('[Auth] Supabase profile 更新失败:', error.message);
-          // 远端写入失败但本地已保存，提示用户
+          console.error('[Auth] Supabase profiles 更新失败:', error.message, error.code, error.details, error.hint);
           return { success: true, message: '已保存到本地，云端同步失败：' + error.message };
         }
+
+        // 检查是否实际更新了行（RLS 可能导致 0 行受影响但不报错）
+        if (returnedData && returnedData.length === 0) {
+          console.warn('[Auth] Supabase profiles 更新返回 0 行（可能是 RLS 策略阻止）');
+          return { success: true, message: '已保存到本地，云端同步可能未生效（RLS 策略阻止）' };
+        }
+
+        console.log('[Auth] Supabase profiles 更新成功:', returnedData?.length, '行');
       } catch (err) {
-        console.warn('[Auth] Supabase profile 更新异常:', err.message);
+        console.error('[Auth] Supabase profile 更新异常:', err);
         return { success: true, message: '已保存到本地，云端同步异常：' + err.message };
       }
     }
