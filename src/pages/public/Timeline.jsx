@@ -2,6 +2,7 @@ import { useRef, useState, useEffect, useCallback } from 'react';
 import { Star, ChevronLeft, ChevronRight, User } from 'lucide-react';
 import { supabase, isSupabaseConfigured, getReachable } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { membersData } from '../../data/siteData';
 import './Timeline.css';
 
 // localStorage keys
@@ -31,16 +32,38 @@ export default function Timeline() {
       });
 
       const authorizedUsers = users.filter((u) => u.authorized);
-      const formatted = authorizedUsers.map((u) => ({
-        id: u.id,
-        nickname: u.nickname || u.name || '匿名成员',
-        avatar: u.avatar || null,
-        signature: u.signature || '',
-        enrollment_year: enrollmentMap[u.id] || '',
-      }));
-      setMembers(formatted);
+
+      if (authorizedUsers.length > 0) {
+        const formatted = authorizedUsers.map((u) => ({
+          id: u.id,
+          nickname: u.nickname || u.name || '匿名成员',
+          avatar: u.avatar || null,
+          signature: u.signature || '',
+          enrollment_year: enrollmentMap[u.id] || '',
+        }));
+        setMembers(formatted);
+      } else {
+        // 本地也没有已授权用户 → 使用 siteData 默认成员数据兜底
+        console.info('[Timeline] 本地无已授权用户，使用默认成员数据');
+        const fallback = membersData.map((m) => ({
+          id: m.id,
+          nickname: m.name || '匿名成员',
+          avatar: m.avatar || null,
+          signature: m.bio || '',
+          enrollment_year: '',
+        }));
+        setMembers(fallback);
+      }
     } catch {
-      setMembers([]);
+      // 解析异常时也使用默认数据
+      const fallback = membersData.map((m) => ({
+        id: m.id,
+        nickname: m.name || '匿名成员',
+        avatar: m.avatar || null,
+        signature: m.bio || '',
+        enrollment_year: '',
+      }));
+      setMembers(fallback);
     }
   }, []);
 

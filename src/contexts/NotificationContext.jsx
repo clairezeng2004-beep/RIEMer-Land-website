@@ -83,7 +83,16 @@ export function NotificationProvider({ children }) {
           if (profile) userRole = profile.role;
         }
 
-        const filtered = (data || []).filter((n) => {
+        // 如果 Supabase 通知表为空，使用默认通知数据兜底
+        const sourceData = (data && data.length > 0) ? data : null;
+
+        if (!sourceData) {
+          console.info('[Notification] Supabase 通知表为空，使用默认通知数据');
+          loadLocalNotifications();
+          return;
+        }
+
+        const filtered = sourceData.filter((n) => {
           if (!n.target_role) return true; // target_role 为 null 表示所有人可见
           return n.target_role === userRole || userRole === 'admin';
         });
