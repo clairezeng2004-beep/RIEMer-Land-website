@@ -266,9 +266,7 @@
   }
 
   .footer__grid > .footer__nav:nth-child(2) .footer__nav-title {
-    display: block;
-    padding-bottom: var(--space-xs);
-    margin-bottom: 0;
+    display: none;
   }
 
   .footer__grid > .footer__nav:nth-child(2) .footer__about-texts {
