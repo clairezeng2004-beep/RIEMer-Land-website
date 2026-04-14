@@ -323,9 +323,11 @@ input, textarea, select {
   h2 { font-size: var(--text-2xl); }
   h3 { font-size: var(--text-lg); }
   .section { padding: var(--space-2xl) 0; }
+  main { padding-top: 64px; }
 }
 
 @media (max-width: 480px) {
   h1 { font-size: var(--text-2xl); }
   h2 { font-size: var(--text-xl); }
+  main { padding-top: 56px; }
 }

@@ -44,7 +44,7 @@
     align-items: center;
     gap: 4px;
     position: sticky;
-    top: 72px;
+    top: 64px;
     z-index: 50;
     background: rgba(255, 255, 255, 0.95);
     backdrop-filter: blur(12px);
@@ -115,5 +115,11 @@
     font-weight: 700;
     line-height: 1;
     margin-left: 2px;
+  }
+}
+
+@media (max-width: 480px) {
+  .internal-mobile-nav {
+    top: 56px;
   }
 }
