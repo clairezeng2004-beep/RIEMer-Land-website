@@ -293,6 +293,11 @@
     flex-direction: column;
     gap: var(--space-md);
   }
+  .notifications-page__header .btn {
+    align-self: flex-start;
+    padding: 0.3rem 0.8rem;
+    font-size: var(--text-sm);
+  }
   .notification-item {
     flex-direction: column;
     gap: var(--space-md);
