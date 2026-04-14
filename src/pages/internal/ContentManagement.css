@@ -554,6 +554,7 @@
     overflow-x: auto;
     gap: var(--space-xs);
     position: static;
+    margin-bottom: var(--space-sm);
   }
 
   .content-mgmt__tab {
