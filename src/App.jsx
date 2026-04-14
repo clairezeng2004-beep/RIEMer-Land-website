@@ -27,6 +27,7 @@ import MemberContributions from './pages/internal/MemberContributions';
 import MemberProfiles from './pages/internal/MemberProfiles';
 import Profile from './pages/internal/Profile';
 import Suggestions from './pages/internal/Suggestions';
+import Guestbook from './pages/internal/Guestbook';
 
 function App() {
   return (
