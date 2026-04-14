@@ -148,25 +148,25 @@ export default function Notifications() {
                         <CheckCircle size={12} /> 已读
                       </span>
                     )}
+                    <div className="notification-item__actions">
+                      {!notif.read && (
+                        <button
+                          className="notification-item__action"
+                          onClick={(e) => { e.stopPropagation(); markAsRead(notif.id); }}
+                          title="标记已读"
+                        >
+                          <CheckCheck size={14} />
+                        </button>
+                      )}
+                      <button
+                        className="notification-item__action notification-item__action--danger"
+                        onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
+                        title="删除"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
                   </div>
-                </div>
-                <div className="notification-item__actions">
-                  {!notif.read && (
-                    <button
-                      className="notification-item__action"
-                      onClick={(e) => { e.stopPropagation(); markAsRead(notif.id); }}
-                      title="标记已读"
-                    >
-                      <CheckCheck size={14} />
-                    </button>
-                  )}
-                  <button
-                    className="notification-item__action notification-item__action--danger"
-                    onClick={(e) => { e.stopPropagation(); deleteNotification(notif.id); }}
-                    title="删除"
-                  >
-                    <Trash2 size={14} />
-                  </button>
                 </div>
               </div>
             );

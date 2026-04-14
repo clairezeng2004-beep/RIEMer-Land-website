@@ -212,12 +212,9 @@
 
 .notification-item__actions {
   display: flex;
-  justify-content: flex-end;
   gap: var(--space-xs);
   flex-shrink: 0;
-  min-width: 64px;
-  opacity: 0;
-  transition: opacity var(--transition-fast);
+  margin-left: auto;
 }
 
 .notification-item:hover .notification-item__actions {
@@ -300,12 +297,10 @@
   }
   .notification-item {
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--space-sm);
   }
   .notification-item__actions {
     opacity: 1;
-    width: 100%;
-    justify-content: flex-end;
   }
 }
 
