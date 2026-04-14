@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { supabase, isSupabaseConfigured, getReachable } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from './AuthContext';
 import { notificationsData } from '../data/siteData';
 
@@ -22,7 +22,7 @@ function getWeekStart(date = new Date()) {
 
 export function NotificationProvider({ children }) {
   const location = useLocation();
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, supabaseOk } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [reads, setReads] = useState(new Set()); // 当前用户已读的通知 ID 集合
   const [emailReminderSent, setEmailReminderSent] = useState(false);
@@ -39,33 +39,55 @@ export function NotificationProvider({ children }) {
     }
   })());
 
-  // 判断是否使用 Supabase
-  const useSupabase = isSupabaseConfigured && getReachable() !== false;
+  // 判断是否使用 Supabase —— 只有 supabaseOk === true 时才走 Supabase 路径
+  // supabaseOk: null=检测中, true=可达, false=不可达
+  const useSupabase = isSupabaseConfigured && supabaseOk === true;
 
   // ---- 加载通知 ----
   const loadNotifications = useCallback(async () => {
     if (useSupabase) {
       try {
-        // 从 Supabase 加载通知
-        const { data, error } = await supabase
+        console.log('[Notification] 尝试从 Supabase 加载通知...');
+
+        // 查询通知
+        let { data, error } = await supabase
           .from('notifications')
           .select('*')
           .order('created_at', { ascending: false });
 
+        // 查询失败（可能 401/session 过期），尝试刷新 session 后重试
         if (error) {
-          console.warn('[Notification] Supabase 加载通知失败，降级本地:', error.message);
+          console.warn('[Notification] Supabase 通知查询失败:', error.message, '，尝试刷新 session...');
+          try {
+            const { data: refreshData } = await supabase.auth.refreshSession();
+            if (refreshData?.session) {
+              console.log('[Notification] Session 刷新成功，重试查询...');
+              const retry = await supabase
+                .from('notifications')
+                .select('*')
+                .order('created_at', { ascending: false });
+              data = retry.data;
+              error = retry.error;
+            }
+          } catch (refreshErr) {
+            console.warn('[Notification] Session 刷新异常:', refreshErr.message);
+          }
+        }
+
+        if (error) {
+          console.warn('[Notification] Supabase 加载通知最终失败，降级本地:', error.message);
           loadLocalNotifications();
           return;
         }
 
         // 加载当前用户的已读状态
-        const { data: { user } } = await supabase.auth.getUser();
+        const { data: { user: authUser } } = await supabase.auth.getUser();
         let readSet = new Set();
-        if (user) {
+        if (authUser) {
           const { data: readData } = await supabase
             .from('notification_reads')
             .select('notification_id')
-            .eq('user_id', user.id);
+            .eq('user_id', authUser.id);
           if (readData) {
             readSet = new Set(readData.map((r) => r.notification_id));
           }
@@ -74,11 +96,11 @@ export function NotificationProvider({ children }) {
         // 根据用户角色过滤通知（管理员看所有，普通成员只看非 admin-only）
         // 获取当前用户的角色
         let userRole = 'member';
-        if (user) {
+        if (authUser) {
           const { data: profile } = await supabase
             .from('profiles')
             .select('role')
-            .eq('id', user.id)
+            .eq('id', authUser.id)
             .single();
           if (profile) userRole = profile.role;
         }
@@ -87,10 +109,12 @@ export function NotificationProvider({ children }) {
         const sourceData = (data && data.length > 0) ? data : null;
 
         if (!sourceData) {
-          console.info('[Notification] Supabase 通知表为空，使用默认通知数据');
+          console.info('[Notification] Supabase 通知表为空，降级本地模板数据');
           loadLocalNotifications();
           return;
         }
+
+        console.log('[Notification] Supabase 返回', data.length, '条通知, 用户角色:', userRole);
 
         const filtered = sourceData.filter((n) => {
           if (!n.target_role) return true; // target_role 为 null 表示所有人可见
@@ -120,17 +144,24 @@ export function NotificationProvider({ children }) {
   }, [useSupabase, isAdmin]);
 
   const loadLocalNotifications = () => {
-    const stored = localStorage.getItem(NOTIFICATIONS_KEY);
-    let notifs;
-    if (stored) {
-      try {
-        notifs = JSON.parse(stored);
-      } catch {
-        notifs = notificationsData;
+    let notifs = null;
+    try {
+      const stored = localStorage.getItem(NOTIFICATIONS_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // 只有解析后确实有数据才使用，空数组视为无数据
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          notifs = parsed;
+        }
       }
-    } else {
+    } catch {
+      // 解析失败，忽略
+    }
+    // 无有效本地数据时，使用默认模板数据
+    if (!notifs) {
       notifs = notificationsData;
     }
+    console.log('[Notification] 本地模式加载:', notifs.length, '条通知');
     // 本地模式：过滤 target_role（非管理员看不到 admin-only 通知）
     const filtered = notifs.filter((n) => {
       if (!n.target_role) return true;
