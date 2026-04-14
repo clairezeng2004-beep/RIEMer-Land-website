@@ -12,7 +12,7 @@
 }
 
 .mc-page {
-  min-height: 60vh;
+  min-height: 100vh;
   padding-top: 120px;
   padding-bottom: var(--space-4xl);
   overflow-x: hidden;
@@ -23,19 +23,18 @@
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
-  margin-bottom: var(--space-lg);
+  margin-bottom: var(--space-2xl);
 }
 
 .mc-page__header h1 {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: var(--text-xl);
-  color: var(--color-text);
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-xs);
 }
 
 .mc-page__header p {
-  margin-top: var(--space-xs);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
