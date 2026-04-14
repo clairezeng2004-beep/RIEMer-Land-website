@@ -241,9 +241,20 @@
 @media (max-width: 768px) {
   .users-page { padding-top: 108px; }
   .users-stats {
-    flex-direction: column;
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: var(--space-sm);
   }
-  .users-stat { padding: var(--space-md) var(--space-lg); }
+  .users-stat {
+    padding: var(--space-sm) var(--space-md);
+    gap: var(--space-sm);
+  }
+  .users-stat__value {
+    font-size: var(--text-lg);
+  }
+  .users-stat__label {
+    font-size: var(--text-xs);
+  }
   .users-roles-info__grid {
     flex-direction: column;
     gap: var(--space-sm);
@@ -252,6 +263,10 @@
 
 @media (max-width: 480px) {
   .users-page { padding-top: 88px; }
+  .users-stat {
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-md);
+  }
 }
 
 /* ============ 只读模式横幅 ============ */
