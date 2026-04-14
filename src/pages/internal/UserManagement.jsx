@@ -60,6 +60,58 @@ export default function UserManagement() {
   const [preAuthMessage, setPreAuthMessage] = useState({ type: '', text: '' });
   const [preAuthList, setPreAuthList] = useState([]);
 
+  // 邮箱后缀自动提示
+  const EMAIL_SUFFIXES = [
+    'qq.com', '163.com', '126.com', 'gmail.com', 'outlook.com',
+    'foxmail.com', 'hotmail.com', 'yeah.net', 'sina.com', 'sohu.com',
+    'icloud.com', '139.com', '188.com', 'yahoo.com',
+  ];
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [activeSuggestionIdx, setActiveSuggestionIdx] = useState(-1);
+
+  const emailSuggestions = (() => {
+    const atIdx = preAuthEmail.indexOf('@');
+    if (atIdx < 1) return []; // 没输入 @ 或 @ 在开头，不提示
+    const typed = preAuthEmail.slice(atIdx + 1).toLowerCase();
+    return EMAIL_SUFFIXES
+      .filter((s) => s.startsWith(typed) && s !== typed)
+      .map((s) => preAuthEmail.slice(0, atIdx + 1) + s);
+  })();
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value;
+    setPreAuthEmail(val);
+    setShowSuggestions(val.includes('@'));
+    setActiveSuggestionIdx(-1);
+  };
+
+  const handleSuggestionClick = (suggestion) => {
+    setPreAuthEmail(suggestion);
+    setShowSuggestions(false);
+    setActiveSuggestionIdx(-1);
+  };
+
+  const handleEmailKeyDown = (e) => {
+    if (!showSuggestions || emailSuggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveSuggestionIdx((i) => (i + 1) % emailSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveSuggestionIdx((i) => (i <= 0 ? emailSuggestions.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && activeSuggestionIdx >= 0) {
+      e.preventDefault();
+      handleSuggestionClick(emailSuggestions[activeSuggestionIdx]);
+    } else if (e.key === 'Escape') {
+      setShowSuggestions(false);
+    }
+  };
+
+  const handleEmailBlur = () => {
+    // 延迟关闭，让 click 事件有时间触发
+    setTimeout(() => setShowSuggestions(false), 150);
+  };
+
   useEffect(() => {
     if (isAuthenticated) {
       const loadUsers = async () => {
@@ -225,11 +277,31 @@ export default function UserManagement() {
                 <input
                   type="email"
                   value={preAuthEmail}
-                  onChange={(e) => setPreAuthEmail(e.target.value)}
+                  onChange={handleEmailChange}
+                  onKeyDown={handleEmailKeyDown}
+                  onBlur={handleEmailBlur}
+                  onFocus={() => preAuthEmail.includes('@') && setShowSuggestions(true)}
                   placeholder="输入成员邮箱地址…"
                   className="users-preauth__input"
                   disabled={preAuthLoading}
+                  autoComplete="off"
                 />
+                {showSuggestions && emailSuggestions.length > 0 && (
+                  <ul className="users-preauth__suggestions">
+                    {emailSuggestions.map((s, idx) => (
+                      <li
+                        key={s}
+                        className={`users-preauth__suggestion-item${idx === activeSuggestionIdx ? ' users-preauth__suggestion-item--active' : ''}`}
+                        onMouseDown={() => handleSuggestionClick(s)}
+                      >
+                        <Mail size={13} />
+                        <span>
+                          <strong>{s.split('@')[0]}@</strong>{s.split('@')[1]}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
               <button
                 type="submit"
