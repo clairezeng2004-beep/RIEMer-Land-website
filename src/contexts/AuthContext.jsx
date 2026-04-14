@@ -798,48 +798,74 @@ export function AuthProvider({ children }) {
 
   // ---- 获取所有用户 ----
   const getAllUsers = useCallback(async () => {
-    // 合并本地用户和当前登录用户的 profile cache，确保不丢失任何数据源
-    const mergeWithCurrentUser = (list) => {
-      if (!user) return list;
-      // 如果当前登录用户不在列表中（Supabase 用户不在 localStorage），补充进去
-      const exists = list.some((u) => u.id === user.id || (u.email && user.email && u.email.toLowerCase() === u.email.toLowerCase()));
-      if (!exists) {
-        return [...list, {
-          id: user.id,
-          email: user.email,
-          name: user.name || user.nickname || '',
-          nickname: user.nickname || '',
-          avatar: user.avatar || null,
-          signature: user.signature || '',
-          role: user.role || 'member',
-          authorized: user.authorized !== undefined ? user.authorized : true,
-          created_at: user.created_at || user.createdAt || new Date().toISOString(),
-        }];
+    /**
+     * 合并多个数据源的用户列表，去重后返回。
+     * 优先级：Supabase 数据 > 本地 riemer_users > 当前登录用户 profile cache
+     */
+    const mergeLists = (...lists) => {
+      const seen = new Map(); // id → user object
+      for (const list of lists) {
+        if (!Array.isArray(list)) continue;
+        for (const u of list) {
+          if (!u || !u.id) continue;
+          // 如果已有该 id，用后来的数据更新（后来的数据源优先级更低，所以不覆盖）
+          if (!seen.has(u.id)) {
+            seen.set(u.id, u);
+          }
+        }
       }
-      return list;
+      return Array.from(seen.values());
     };
+
+    // 构造当前用户的 profile 对象（兜底，确保至少能显示自己）
+    const currentUserProfile = user ? [{
+      id: user.id,
+      email: user.email,
+      name: user.name || user.nickname || '',
+      nickname: user.nickname || '',
+      avatar: user.avatar || null,
+      signature: user.signature || '',
+      role: user.role || 'member',
+      authorized: user.authorized !== undefined ? user.authorized : true,
+      created_at: user.created_at || user.createdAt || new Date().toISOString(),
+    }] : [];
 
     const useLocal = !isSupabaseConfigured || supabaseOk === false;
     if (useLocal) {
-      return mergeWithCurrentUser(getLocalUsers());
+      console.log('[Auth] getAllUsers: 本地模式');
+      return mergeLists(getLocalUsers(), currentUserProfile);
     }
+
+    // Supabase 模式
     try {
+      // 先检查 session 是否有效，避免以 anon 角色查询导致数据不完整
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData?.session) {
+        console.warn('[Auth] getAllUsers: Supabase session 无效，回退本地模式');
+        return mergeLists(getLocalUsers(), currentUserProfile);
+      }
+
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: true });
+
       if (error) {
         console.warn('[Auth] Supabase profiles 查询失败:', error.message, '，回退本地用户列表');
-        return mergeWithCurrentUser(getLocalUsers());
+        return mergeLists(getLocalUsers(), currentUserProfile);
       }
+
       if (!data || data.length === 0) {
-        // Supabase 表为空（可能是 RLS 限制或确实无数据），回退本地并合并当前用户
         console.warn('[Auth] Supabase profiles 查询为空，回退本地用户列表');
-        return mergeWithCurrentUser(getLocalUsers());
+        return mergeLists(getLocalUsers(), currentUserProfile);
       }
-      return data;
-    } catch {
-      return mergeWithCurrentUser(getLocalUsers());
+
+      console.log('[Auth] getAllUsers: Supabase 返回', data.length, '条记录');
+      // 合并 Supabase 数据 + 当前用户（防止 RLS 导致当前用户不在结果中）
+      return mergeLists(data, currentUserProfile);
+    } catch (err) {
+      console.warn('[Auth] getAllUsers 异常:', err.message);
+      return mergeLists(getLocalUsers(), currentUserProfile);
     }
   }, [supabaseOk, user]);
 
