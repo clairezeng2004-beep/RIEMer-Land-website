@@ -294,6 +294,9 @@
     gap: var(--space-md);
   }
 
+  /* 手机端隐藏卡片封面图，只保留文字 */
+  .article-card__cover { display: none; }
+
   .article-card__body {
     padding: var(--space-lg);
     gap: var(--space-sm);

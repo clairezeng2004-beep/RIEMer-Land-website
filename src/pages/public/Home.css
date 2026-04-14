@@ -467,6 +467,8 @@
   .featured__header { margin-bottom: var(--space-sm); }
   .featured .section-title { margin-bottom: var(--space-md); }
   .featured__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
+  /* 手机端隐藏卡片封面图，只保留文字 */
+  .featured__cover { display: none; }
   .featured__card-body { padding: var(--space-lg); gap: var(--space-sm); }
   .featured__title { font-size: var(--text-base); min-height: auto; }
   .featured__excerpt { font-size: var(--text-sm); -webkit-line-clamp: 3; min-height: auto; }
