@@ -555,6 +555,26 @@
     gap: var(--space-xs);
     position: static;
     margin-bottom: var(--space-sm);
+    padding-bottom: 10px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border, #d1d5db) transparent;
+  }
+
+  .content-mgmt__tabs::-webkit-scrollbar {
+    height: 4px;
+  }
+
+  .content-mgmt__tabs::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .content-mgmt__tabs::-webkit-scrollbar-thumb {
+    background: var(--color-border, #d1d5db);
+    border-radius: 4px;
+  }
+
+  .content-mgmt__tabs::-webkit-scrollbar-thumb:hover {
+    background: var(--color-text-muted, #9ca3af);
   }
 
   .content-mgmt__tab {
