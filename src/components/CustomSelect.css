@@ -125,3 +125,72 @@
   padding: 0.35rem 0.6rem;
   font-size: var(--text-sm);
 }
+
+/* ---- Multiple Mode ---- */
+.custom-select--multiple .custom-select__trigger {
+  min-height: 2.4rem;
+  flex-wrap: wrap;
+  height: auto;
+}
+
+.custom-select__placeholder {
+  color: var(--color-text-muted);
+}
+
+.custom-select__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  flex: 1;
+  min-width: 0;
+}
+
+.custom-select__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 6px 2px 8px;
+  background: rgba(91, 140, 62, 0.1);
+  color: var(--color-primary);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.custom-select__tag-remove {
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.custom-select__tag-remove:hover {
+  color: var(--color-danger);
+}
+
+/* Checkbox indicator for multi-select options */
+.custom-select__checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--color-border);
+  border-radius: 3px;
+  margin-right: 6px;
+  flex-shrink: 0;
+  transition: all var(--transition-fast);
+}
+
+.custom-select__checkbox--checked {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: #fff;
+}
+
+.custom-select--multiple .custom-select__option {
+  display: flex;
+  align-items: center;
+}

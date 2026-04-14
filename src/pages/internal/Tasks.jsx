@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -33,7 +33,7 @@ const statusColors = {
 };
 
 export default function Tasks() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, getAllUsers } = useAuth();
   const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const tc = internalConfig.tasks;
@@ -48,13 +48,57 @@ export default function Tasks() {
   const taskStatuses = filterOptions.taskStatuses;
   const teamMembers = filterOptions.teamMembers;
 
+  // 已注册已授权用户列表（动态获取）
+  const [authorizedMembers, setAuthorizedMembers] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUsers = async () => {
+      try {
+        const allUsers = await getAllUsers();
+        if (!cancelled) {
+          const authorized = (allUsers || [])
+            .filter((u) => u.authorized)
+            .map((u) => ({
+              id: u.id,
+              name: u.name || u.email?.split('@')[0] || '未命名',
+            }));
+          setAuthorizedMembers(authorized);
+        }
+      } catch {
+        // 出错时回退到硬编码 teamMembers
+        if (!cancelled) {
+          setAuthorizedMembers(
+            teamMembers.map((m) => ({ id: m.id, name: m.name }))
+          );
+        }
+      }
+    };
+    fetchUsers();
+    return () => { cancelled = true; };
+  }, [getAllUsers, teamMembers]);
+
+  // 负责人选项列表（已授权用户真名）
+  const assigneeOptions = useMemo(
+    () => authorizedMembers.map((m) => ({ value: m.id, label: m.name })),
+    [authorizedMembers]
+  );
+
   // 添加新标签状态
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
-  const memberMap = useMemo(
-    () => Object.fromEntries(teamMembers.map((m) => [m.id, m])),
-    [teamMembers]
-  );
+
+  // memberMap 合并硬编码和动态用户
+  const memberMap = useMemo(() => {
+    const map = Object.fromEntries(teamMembers.map((m) => [m.id, m]));
+    // 把动态获取的已授权用户也加进去（用于表格显示名称）
+    authorizedMembers.forEach((m) => {
+      if (!map[m.id]) {
+        map[m.id] = { id: m.id, name: m.name, profileUrl: '' };
+      }
+    });
+    return map;
+  }, [teamMembers, authorizedMembers]);
 
   const [tasks, setTasks] = useState(initialTasks);
   const [showForm, setShowForm] = useState(false);
@@ -65,7 +109,7 @@ export default function Tasks() {
     description: '',
     category: taskCategories[0] || '',
     status: '规划中',
-    assignee: '',
+    assignee: [],
     helpers: [],
   });
   const [notes, setNotes] = useState({});
@@ -94,7 +138,7 @@ export default function Tasks() {
       description: '',
       category: taskCategories[0] || '',
       status: '规划中',
-      assignee: '',
+      assignee: [],
       helpers: [],
     });
     setShowForm(false);
@@ -237,12 +281,11 @@ export default function Tasks() {
                 <div className="tasks-form__field">
                   <label>负责人</label>
                   <CustomSelect
-                    value={newTask.assignee ? (memberMap[newTask.assignee]?.name || newTask.assignee) : '请选择'}
-                    onChange={(val) => {
-                      const member = teamMembers.find((m) => m.name === val);
-                      setNewTask({ ...newTask, assignee: member ? member.id : '' });
-                    }}
-                    options={teamMembers.map((m) => m.name)}
+                    value={newTask.assignee}
+                    onChange={(vals) => setNewTask({ ...newTask, assignee: vals })}
+                    options={assigneeOptions}
+                    placeholder="选择负责人…"
+                    multiple
                   />
                 </div>
               </div>
@@ -353,7 +396,13 @@ export default function Tasks() {
             </thead>
             <tbody>
               {filtered.map((task) => {
-                const member = memberMap[task.assignee];
+                // 兼容旧数据（assignee 为单个 id 字符串）和新数据（数组）
+                const assigneeIds = Array.isArray(task.assignee)
+                  ? task.assignee
+                  : task.assignee ? [task.assignee] : [];
+                const assigneeMembers = assigneeIds
+                  .map((aId) => memberMap[aId])
+                  .filter(Boolean);
                 const helperMembers = (task.helpers || [])
                   .map((hId) => memberMap[hId])
                   .filter(Boolean);
@@ -380,12 +429,24 @@ export default function Tasks() {
                     </div>
                   </td>
                   <td>
-                    {member ? (
-                      <Link to={member.profileUrl} className="tasks-table__member-link">
-                        @{member.name}
-                      </Link>
+                    {assigneeMembers.length > 0 ? (
+                      <div className="tasks-table__helpers">
+                        {assigneeMembers.map((m) => (
+                          m.profileUrl ? (
+                            <Link key={m.id} to={m.profileUrl} className="tasks-table__member-link">
+                              @{m.name}
+                            </Link>
+                          ) : (
+                            <span key={m.id} className="tasks-table__member-link">
+                              @{m.name}
+                            </span>
+                          )
+                        ))}
+                      </div>
                     ) : (
-                      <span className="tasks-table__assignee">{task.assignee || '—'}</span>
+                      <span className="tasks-table__assignee">
+                        {(Array.isArray(task.assignee) ? task.assignee.join(', ') : task.assignee) || '—'}
+                      </span>
                     )}
                   </td>
                   <td>
