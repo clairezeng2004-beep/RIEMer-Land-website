@@ -574,11 +574,25 @@ export function AuthProvider({ children }) {
         console.warn('[Auth] Supabase 注册失败，回退本地注册:', error.message);
         return registerLocal(email, password, name);
       }
-      // 检查该邮箱是否已被管理员预授权
-      const preAuthorized = isEmailPreAuthorized(email);
-      // 创建 profile 记录
+      // 检查该邮箱是否已被管理员预授权（本地 + Supabase）
+      let preAuthorized = isEmailPreAuthorized(email);
+      // 也检查 Supabase pre_authorized_emails 表（本地列表可能未同步）
+      if (!preAuthorized) {
+        try {
+          const { data: preAuthRow } = await supabase
+            .from('pre_authorized_emails')
+            .select('email')
+            .ilike('email', email)
+            .maybeSingle();
+          if (preAuthRow) preAuthorized = true;
+        } catch { /* 表可能不存在，忽略 */ }
+      }
+
+      // 创建/更新 profile 记录
+      // 注意：Supabase 的 on_auth_user_created 触发器会自动创建 profile（authorized=false）
+      // 所以先尝试 insert，如果冲突则用 update 覆盖
       if (data.user) {
-        await supabase.from('profiles').insert({
+        const profileData = {
           id: data.user.id,
           email,
           name,
@@ -588,7 +602,16 @@ export function AuthProvider({ children }) {
           role: 'member',
           authorized: preAuthorized,
           created_at: new Date().toISOString(),
-        });
+        };
+
+        const { error: insertError } = await supabase.from('profiles').insert(profileData);
+        if (insertError) {
+          // 触发器已创建记录，用 update 设置正确的字段
+          await supabase.from('profiles').update({
+            name,
+            authorized: preAuthorized,
+          }).eq('id', data.user.id);
+        }
 
         if (preAuthorized) {
           // 预授权邮箱：从预授权列表移除 + Supabase pre_authorized_emails 表也清理

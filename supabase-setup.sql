@@ -67,9 +67,19 @@ CREATE POLICY "允许插入 profile"
   WITH CHECK (id = auth.uid());
 
 -- 4. 自动创建 profile 的触发器函数
+-- 注意：会自动检查 pre_authorized_emails 表，若邮箱已被预授权则直接设 authorized=true
+--       并自动从预授权列表中移除该邮箱
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS TRIGGER AS $$
+DECLARE
+  is_pre_authorized BOOLEAN := false;
 BEGIN
+  -- 检查该邮箱是否在预授权列表中（忽略大小写）
+  SELECT EXISTS(
+    SELECT 1 FROM public.pre_authorized_emails
+    WHERE lower(email) = lower(NEW.email)
+  ) INTO is_pre_authorized;
+
   INSERT INTO public.profiles (id, email, name, nickname, avatar, signature, role, authorized)
   VALUES (
     NEW.id,
@@ -79,8 +89,14 @@ BEGIN
     NULL,
     '',
     'member',
-    false
+    is_pre_authorized
   );
+
+  -- 如果是预授权用户，从预授权列表中移除
+  IF is_pre_authorized THEN
+    DELETE FROM public.pre_authorized_emails WHERE lower(email) = lower(NEW.email);
+  END IF;
+
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;

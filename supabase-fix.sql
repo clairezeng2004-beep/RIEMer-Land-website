@@ -151,3 +151,43 @@ CREATE POLICY "匿名用户可查看预授权列表"
   ON public.pre_authorized_emails FOR SELECT
   TO anon
   USING (true);
+
+-- ========== 修复 8：更新 handle_new_user 触发器，支持预授权自动授权 ==========
+-- 注册时自动检查 pre_authorized_emails 表，若匹配则 authorized=true 并移除预授权记录
+CREATE OR REPLACE FUNCTION public.handle_new_user()
+RETURNS TRIGGER AS $$
+DECLARE
+  is_pre_authorized BOOLEAN := false;
+BEGIN
+  -- 检查该邮箱是否在预授权列表中（忽略大小写）
+  SELECT EXISTS(
+    SELECT 1 FROM public.pre_authorized_emails
+    WHERE lower(email) = lower(NEW.email)
+  ) INTO is_pre_authorized;
+
+  INSERT INTO public.profiles (id, email, name, nickname, avatar, signature, role, authorized)
+  VALUES (
+    NEW.id,
+    NEW.email,
+    COALESCE(NEW.raw_user_meta_data->>'name', split_part(NEW.email, '@', 1)),
+    '',
+    NULL,
+    '',
+    'member',
+    is_pre_authorized
+  );
+
+  -- 如果是预授权用户，从预授权列表中移除
+  IF is_pre_authorized THEN
+    DELETE FROM public.pre_authorized_emails WHERE lower(email) = lower(NEW.email);
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
+CREATE TRIGGER on_auth_user_created
+  AFTER INSERT ON auth.users
+  FOR EACH ROW
+  EXECUTE FUNCTION public.handle_new_user();
