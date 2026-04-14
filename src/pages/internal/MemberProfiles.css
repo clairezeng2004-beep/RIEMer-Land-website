@@ -156,6 +156,12 @@
   background: rgba(91, 140, 62, 0.02);
 }
 
+/* 普通行 hover 时 sticky 列也要不透明背景 */
+.member-profiles-table tbody tr:hover .member-profiles-table__sticky-col,
+.member-profiles-table tbody tr:hover .member-profiles-table__action-col {
+  background: #f8faf6;  /* 不透明：等价于 rgba(91,140,62,0.02) on #FFFFFF */
+}
+
 /* ============ Sticky Column ============ */
 .member-profiles-table__sticky-col {
   position: sticky;
@@ -183,15 +189,17 @@
   position: sticky;
   right: 0;
   z-index: 2;
-  background: var(--color-bg-card);
+  background: #FFFFFF;
   min-width: 72px;
   width: 72px;
   text-align: center;
+  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.06);
 }
 
 .member-profiles-table thead .member-profiles-table__action-col {
-  background: var(--color-bg);
+  background: #F7FAF5;
   z-index: 3;
+  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.06);
 }
 
 /* ============ Row Variants ============ */
@@ -201,7 +209,7 @@
 
 .member-profiles-table__row--self .member-profiles-table__sticky-col,
 .member-profiles-table__row--self .member-profiles-table__action-col {
-  background: rgba(91, 140, 62, 0.04);
+  background: #f5f9f2;  /* 不透明：等价于 rgba(91,140,62,0.04) on #FFFFFF */
 }
 
 .member-profiles-table__row--self:hover {
@@ -210,7 +218,7 @@
 
 .member-profiles-table__row--self:hover .member-profiles-table__sticky-col,
 .member-profiles-table__row--self:hover .member-profiles-table__action-col {
-  background: rgba(91, 140, 62, 0.07);
+  background: #f1f6ed;  /* 不透明：等价于 rgba(91,140,62,0.07) on #FFFFFF */
 }
 
 .member-profiles-table__row--editing {
@@ -219,7 +227,7 @@
 
 .member-profiles-table__row--editing .member-profiles-table__sticky-col,
 .member-profiles-table__row--editing .member-profiles-table__action-col {
-  background: rgba(79, 191, 196, 0.04);
+  background: #f4fbfb;  /* 不透明：等价于 rgba(79,191,196,0.04) on #FFFFFF */
 }
 
 /* ============ Cell ============ */
