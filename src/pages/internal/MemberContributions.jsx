@@ -147,7 +147,7 @@ export default function MemberContributions() {
           isInPeriod(t.createdAt, currentPeriod)
       ).length;
 
-      // 4. 内部资料上传次数：documents 中 uploadedById 或 uploadedBy 匹配
+      // 4. 内部分享次数：documents 中 uploadedById 或 uploadedBy 匹配
       const uploadCount = documentsData.filter(
         (d) =>
           ((d.uploadedById && d.uploadedById === member.id) ||
@@ -359,7 +359,7 @@ export default function MemberContributions() {
                 <th><Mic size={14} /> 线上分享会</th>
                 <th><FileText size={14} /> 公众号文章</th>
                 <th><Handshake size={14} /> 协作帮助</th>
-                <th><Upload size={14} /> 资料上传</th>
+                <th><Upload size={14} /> 内部分享</th>
                 <th className="mc-table__th--custom">其他</th>
                 <th className="mc-table__th--total"><Trophy size={14} /> 总计</th>
               </tr>

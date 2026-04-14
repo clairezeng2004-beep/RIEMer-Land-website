@@ -171,7 +171,7 @@ const getDefaultInternalConfig = () => ({
     labelShareEvents: '线上分享会',
     labelArticleCount: '公众号文章',
     labelHelpCount: '协作帮助',
-    labelUploadCount: '资料上传',
+    labelUploadCount: '内部分享',
     labelTotal: '贡献总计',
     noteTitle: '数据说明',
     noteShareEvents: '统计事项追踪中分类为「线上分享」且该成员为负责人的事项数量',

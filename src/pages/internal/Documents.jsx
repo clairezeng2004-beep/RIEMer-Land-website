@@ -174,7 +174,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     setDocuments([doc, ...documents]);
     // 自动发送已读通知到通知中心
     addNotification({
-      title: '新资料上传',
+      title: '新内部分享',
       message: `${doc.uploadedBy} 上传了文档「${doc.title}」（${typeLabels[doc.type]}）`,
       type: 'info',
       read: true, // 自动已读，不打扰成员
