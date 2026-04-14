@@ -242,6 +242,46 @@ CREATE POLICY "用户可标记自己的已读"
 --     无需数据库触发器，避免重复通知。
 
 -- ============================================
+-- 15. 创建 pre_authorized_emails 表（管理员预授权邮箱）
+-- ============================================
+-- 管理员可以提前输入邮箱授权，用户注册时自动匹配并获得访问权限
+CREATE TABLE IF NOT EXISTS pre_authorized_emails (
+  email TEXT PRIMARY KEY,
+  added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 16. 启用 pre_authorized_emails 的 RLS
+ALTER TABLE pre_authorized_emails ENABLE ROW LEVEL SECURITY;
+
+-- 所有已认证用户可以查看预授权列表
+CREATE POLICY "所有认证用户可查看预授权列表"
+  ON pre_authorized_emails FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 管理员可以添加预授权邮箱
+CREATE POLICY "管理员可添加预授权邮箱"
+  ON pre_authorized_emails FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- 管理员可以删除预授权邮箱
+CREATE POLICY "管理员可删除预授权邮箱"
+  ON pre_authorized_emails FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- 匿名用户可以查看预授权列表（注册时需要检查）
+CREATE POLICY "匿名用户可查看预授权列表"
+  ON pre_authorized_emails FOR SELECT
+  TO anon
+  USING (true);
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，

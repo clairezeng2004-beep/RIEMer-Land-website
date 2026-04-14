@@ -26,6 +26,8 @@ const AUTH_KEY = 'riemer_auth';
 const DEVICE_KEY = 'riemer_device_id';
 // 独立缓存当前登录用户的完整 profile（解决 Supabase 用户不在 riemer_users 中的问题）
 const PROFILE_CACHE_KEY = 'riemer_profile_cache';
+// 预授权邮箱列表（管理员直接输入邮箱授权，用户注册后自动拥有权限）
+const PRE_AUTH_EMAILS_KEY = 'riemer_pre_authorized_emails';
 
 const getDeviceId = () => {
   let deviceId = localStorage.getItem(DEVICE_KEY);
@@ -81,6 +83,34 @@ const getCachedProfile = (userId) => {
 /** 清除 profile 缓存 */
 const clearProfileCache = () => {
   localStorage.removeItem(PROFILE_CACHE_KEY);
+};
+
+/** 获取本地预授权邮箱列表 */
+const getLocalPreAuthEmails = () => {
+  try {
+    const stored = localStorage.getItem(PRE_AUTH_EMAILS_KEY);
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+};
+
+/** 保存本地预授权邮箱列表 */
+const saveLocalPreAuthEmails = (emails) => {
+  localStorage.setItem(PRE_AUTH_EMAILS_KEY, JSON.stringify(emails));
+};
+
+/** 检查邮箱是否在预授权列表中 */
+const isEmailPreAuthorized = (email) => {
+  const list = getLocalPreAuthEmails();
+  return list.some((item) => item.email.toLowerCase() === email.toLowerCase());
+};
+
+/** 从预授权列表中移除邮箱（用户已注册并授权后） */
+const removePreAuthEmail = (email) => {
+  const list = getLocalPreAuthEmails();
+  const filtered = list.filter((item) => item.email.toLowerCase() !== email.toLowerCase());
+  saveLocalPreAuthEmails(filtered);
 };
 
 // ============================================
@@ -476,6 +506,8 @@ export function AuthProvider({ children }) {
     if (users.find((u) => u.email === email)) {
       return { success: false, message: '该邮箱已被注册' };
     }
+    // 检查该邮箱是否已被管理员预授权
+    const preAuthorized = isEmailPreAuthorized(email);
     const newUser = {
       id: Date.now().toString(),
       email,
@@ -485,11 +517,17 @@ export function AuthProvider({ children }) {
       avatar: null,
       signature: '',
       role: 'member',
-      authorized: false,
+      authorized: preAuthorized,
       createdAt: new Date().toISOString(),
     };
     users.push(newUser);
     saveLocalUsers(users);
+
+    if (preAuthorized) {
+      // 预授权邮箱注册后，从预授权列表中移除
+      removePreAuthEmail(email);
+      return { success: true, message: '注册成功！您的邮箱已被管理员预授权，可直接登录。' };
+    }
 
     // 本地模式：在 localStorage 通知列表中添加授权通知
     try {
@@ -536,6 +574,8 @@ export function AuthProvider({ children }) {
         console.warn('[Auth] Supabase 注册失败，回退本地注册:', error.message);
         return registerLocal(email, password, name);
       }
+      // 检查该邮箱是否已被管理员预授权
+      const preAuthorized = isEmailPreAuthorized(email);
       // 创建 profile 记录
       if (data.user) {
         await supabase.from('profiles').insert({
@@ -546,27 +586,36 @@ export function AuthProvider({ children }) {
           avatar: null,
           signature: '',
           role: 'member',
-          authorized: false,
+          authorized: preAuthorized,
           created_at: new Date().toISOString(),
         });
 
-        // 显式插入授权通知到 notifications 表
-        // （如果数据库触发器已存在会产生两条，用 title+email 去重即可；
-        //   如果触发器尚未部署，这里保证通知一定会被创建）
-        try {
-          await supabase.from('notifications').insert({
-            title: '新成员注册申请',
-            message: `${name}（${email}）已注册账号，请前往用户管理页面进行授权。`,
-            type: 'system',
-            date: new Date().toISOString().split('T')[0],
-            target_role: 'admin',
-          });
-        } catch (notifErr) {
-          console.warn('[Auth] Supabase 通知插入失败（触发器可能已处理）:', notifErr.message);
+        if (preAuthorized) {
+          // 预授权邮箱：从预授权列表移除 + Supabase pre_authorized_emails 表也清理
+          removePreAuthEmail(email);
+          try {
+            await supabase.from('pre_authorized_emails').delete().ilike('email', email);
+          } catch { /* 表可能不存在，忽略 */ }
+        } else {
+          // 非预授权：插入授权通知
+          try {
+            await supabase.from('notifications').insert({
+              title: '新成员注册申请',
+              message: `${name}（${email}）已注册账号，请前往用户管理页面进行授权。`,
+              type: 'system',
+              date: new Date().toISOString().split('T')[0],
+              target_role: 'admin',
+            });
+          } catch (notifErr) {
+            console.warn('[Auth] Supabase 通知插入失败（触发器可能已处理）:', notifErr.message);
+          }
         }
       }
       // 同时写入本地用户数据库备份
       registerLocal(email, password, name);
+      if (preAuthorized) {
+        return { success: true, message: '注册成功！您的邮箱已被管理员预授权，可直接登录。' };
+      }
       return { success: true, message: '注册成功！请等待管理员授权后方可登录内部系统。' };
     } catch (err) {
       console.warn('[Auth] Supabase 注册异常，回退本地注册:', err.message);
@@ -758,6 +807,107 @@ export function AuthProvider({ children }) {
     }
   }, [supabaseOk]);
 
+  // ---- 预授权邮箱：管理员直接输入邮箱授权 ----
+  const preAuthorizeByEmail = useCallback(async (email) => {
+    if (!email || !email.trim()) return { success: false, message: '请输入邮箱地址' };
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // 1. 检查该邮箱是否已注册
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (useLocal) {
+      const users = getLocalUsers();
+      const existingUser = users.find((u) => u.email.toLowerCase() === normalizedEmail);
+      if (existingUser) {
+        // 已注册：直接授权
+        if (existingUser.authorized) {
+          return { success: false, message: '该用户已被授权' };
+        }
+        existingUser.authorized = true;
+        saveLocalUsers(users);
+        return { success: true, message: `已授权用户「${existingUser.name}」（${normalizedEmail}）` };
+      }
+    } else {
+      // Supabase 模式：查询 profiles 表
+      try {
+        const { data: existingProfile } = await supabase
+          .from('profiles')
+          .select('*')
+          .ilike('email', normalizedEmail)
+          .single();
+        if (existingProfile) {
+          if (existingProfile.authorized) {
+            return { success: false, message: '该用户已被授权' };
+          }
+          // 已注册但未授权：直接授权
+          await supabase.from('profiles').update({ authorized: true }).eq('id', existingProfile.id);
+          // 同步本地
+          const users = getLocalUsers();
+          const localIdx = users.findIndex((u) => u.email.toLowerCase() === normalizedEmail);
+          if (localIdx >= 0) {
+            users[localIdx].authorized = true;
+            saveLocalUsers(users);
+          }
+          return { success: true, message: `已授权用户「${existingProfile.name}」（${normalizedEmail}）` };
+        }
+      } catch {
+        // PGRST116 = no rows, 继续添加预授权
+      }
+    }
+
+    // 2. 用户尚未注册：添加到预授权列表
+    const list = getLocalPreAuthEmails();
+    if (list.some((item) => item.email.toLowerCase() === normalizedEmail)) {
+      return { success: false, message: '该邮箱已在预授权列表中' };
+    }
+    list.push({ email: normalizedEmail, addedAt: new Date().toISOString() });
+    saveLocalPreAuthEmails(list);
+
+    // Supabase 模式：同步到 pre_authorized_emails 表
+    if (!useLocal) {
+      try {
+        await supabase.from('pre_authorized_emails').insert({ email: normalizedEmail });
+      } catch {
+        // 表可能不存在，忽略
+      }
+    }
+
+    return { success: true, message: `已将「${normalizedEmail}」加入预授权列表，该邮箱注册后将自动拥有访问权限` };
+  }, [supabaseOk]);
+
+  // ---- 获取预授权邮箱列表 ----
+  const getPreAuthorizedEmails = useCallback(async () => {
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      try {
+        const { data } = await supabase
+          .from('pre_authorized_emails')
+          .select('*')
+          .order('added_at', { ascending: false });
+        if (data && data.length > 0) {
+          // 同步到本地
+          saveLocalPreAuthEmails(data.map((d) => ({ email: d.email, addedAt: d.added_at })));
+          return data.map((d) => ({ email: d.email, addedAt: d.added_at }));
+        }
+      } catch {
+        // 表可能不存在，回退本地
+      }
+    }
+    return getLocalPreAuthEmails();
+  }, [supabaseOk]);
+
+  // ---- 移除预授权邮箱 ----
+  const removePreAuthorizedEmail = useCallback(async (email) => {
+    const normalizedEmail = email.trim().toLowerCase();
+    removePreAuthEmail(normalizedEmail);
+
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      try {
+        await supabase.from('pre_authorized_emails').delete().ilike('email', normalizedEmail);
+      } catch { /* ignore */ }
+    }
+  }, [supabaseOk]);
+
   // ---- 更新用户个人资料（昵称、头像等） ----
   const updateProfile = useCallback(async (updates) => {
     if (!user) return { success: false, message: '未登录' };
@@ -902,6 +1052,9 @@ export function AuthProvider({ children }) {
         authorizeUser,
         revokeUser,
         changeUserRole,
+        preAuthorizeByEmail,
+        getPreAuthorizedEmails,
+        removePreAuthorizedEmail,
         ROLES,
         ROLE_LABELS,
       }}

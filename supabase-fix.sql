@@ -115,3 +115,39 @@ ON CONFLICT (user_id) DO NOTHING;
 -- ✅ 修复完成！
 -- 现在可以正常保存个人资料到云端了
 -- ============================================
+
+-- ========== 修复 7：创建 pre_authorized_emails 表（管理员预授权邮箱） ==========
+CREATE TABLE IF NOT EXISTS public.pre_authorized_emails (
+  email TEXT PRIMARY KEY,
+  added_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.pre_authorized_emails ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "所有认证用户可查看预授权列表" ON public.pre_authorized_emails;
+CREATE POLICY "所有认证用户可查看预授权列表"
+  ON public.pre_authorized_emails FOR SELECT
+  TO authenticated
+  USING (true);
+
+DROP POLICY IF EXISTS "管理员可添加预授权邮箱" ON public.pre_authorized_emails;
+CREATE POLICY "管理员可添加预授权邮箱"
+  ON public.pre_authorized_emails FOR INSERT
+  TO authenticated
+  WITH CHECK (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+DROP POLICY IF EXISTS "管理员可删除预授权邮箱" ON public.pre_authorized_emails;
+CREATE POLICY "管理员可删除预授权邮箱"
+  ON public.pre_authorized_emails FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+DROP POLICY IF EXISTS "匿名用户可查看预授权列表" ON public.pre_authorized_emails;
+CREATE POLICY "匿名用户可查看预授权列表"
+  ON public.pre_authorized_emails FOR SELECT
+  TO anon
+  USING (true);

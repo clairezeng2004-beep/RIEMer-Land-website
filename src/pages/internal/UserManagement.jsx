@@ -15,6 +15,12 @@ import {
   UserCheck,
   UserX,
   Eye,
+  Mail,
+  Plus,
+  Trash2,
+  CheckCircle,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -33,6 +39,9 @@ export default function UserManagement() {
     authorizeUser,
     revokeUser,
     changeUserRole,
+    preAuthorizeByEmail,
+    getPreAuthorizedEmails,
+    removePreAuthorizedEmail,
   } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
@@ -45,6 +54,12 @@ export default function UserManagement() {
   const [users, setUsers] = useState([]);
   const [refreshKey, setRefreshKey] = useState(0);
 
+  // 预授权相关状态
+  const [preAuthEmail, setPreAuthEmail] = useState('');
+  const [preAuthLoading, setPreAuthLoading] = useState(false);
+  const [preAuthMessage, setPreAuthMessage] = useState({ type: '', text: '' });
+  const [preAuthList, setPreAuthList] = useState([]);
+
   useEffect(() => {
     if (isAuthenticated) {
       const loadUsers = async () => {
@@ -52,8 +67,11 @@ export default function UserManagement() {
         setUsers(data);
       };
       loadUsers();
+      if (isAdmin) {
+        getPreAuthorizedEmails().then(setPreAuthList);
+      }
     }
-  }, [isAuthenticated, refreshKey, getAllUsers]);
+  }, [isAuthenticated, refreshKey, getAllUsers, isAdmin, getPreAuthorizedEmails]);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -91,6 +109,38 @@ export default function UserManagement() {
   const canManageAuth = (targetUser) => {
     if (targetUser.id === currentUser?.id) return false;
     return isAdmin;
+  };
+
+  // 预授权邮箱提交
+  const handlePreAuthorize = async (e) => {
+    e.preventDefault();
+    if (!preAuthEmail.trim()) return;
+    setPreAuthLoading(true);
+    setPreAuthMessage({ type: '', text: '' });
+    try {
+      const result = await preAuthorizeByEmail(preAuthEmail.trim());
+      if (result.success) {
+        setPreAuthMessage({ type: 'success', text: result.message });
+        setPreAuthEmail('');
+        // 刷新用户列表和预授权列表
+        setRefreshKey((k) => k + 1);
+        getPreAuthorizedEmails().then(setPreAuthList);
+      } else {
+        setPreAuthMessage({ type: 'error', text: result.message });
+      }
+    } catch (err) {
+      setPreAuthMessage({ type: 'error', text: '操作失败：' + err.message });
+    } finally {
+      setPreAuthLoading(false);
+      // 3 秒后清除消息
+      setTimeout(() => setPreAuthMessage({ type: '', text: '' }), 4000);
+    }
+  };
+
+  // 移除预授权邮箱
+  const handleRemovePreAuth = async (email) => {
+    await removePreAuthorizedEmail(email);
+    getPreAuthorizedEmails().then(setPreAuthList);
   };
 
   return (
@@ -160,6 +210,73 @@ export default function UserManagement() {
             </div>
           </div>
         </div>
+
+        {/* 邮箱预授权（仅管理员可见） */}
+        {isAdmin && (
+          <div className="users-preauth">
+            <div className="users-preauth__header">
+              <h4><Mail size={16} /> 邮箱授权</h4>
+              <p>输入成员邮箱直接授权 — 已注册的用户将立即获得权限，未注册的邮箱将加入预授权列表，注册后自动拥有权限</p>
+            </div>
+
+            <form className="users-preauth__form" onSubmit={handlePreAuthorize}>
+              <div className="users-preauth__input-wrap">
+                <Mail size={16} className="users-preauth__input-icon" />
+                <input
+                  type="email"
+                  value={preAuthEmail}
+                  onChange={(e) => setPreAuthEmail(e.target.value)}
+                  placeholder="输入成员邮箱地址…"
+                  className="users-preauth__input"
+                  disabled={preAuthLoading}
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn btn-primary users-preauth__btn"
+                disabled={!preAuthEmail.trim() || preAuthLoading}
+              >
+                {preAuthLoading ? (
+                  <><Loader2 size={16} className="users-preauth__spinner" /> 处理中…</>
+                ) : (
+                  <><Plus size={16} /> 授权</>
+                )}
+              </button>
+            </form>
+
+            {preAuthMessage.text && (
+              <div className={`users-preauth__message users-preauth__message--${preAuthMessage.type}`}>
+                {preAuthMessage.type === 'success' ? <CheckCircle size={14} /> : <AlertCircle size={14} />}
+                <span>{preAuthMessage.text}</span>
+              </div>
+            )}
+
+            {/* 预授权列表 */}
+            {preAuthList.length > 0 && (
+              <div className="users-preauth__list">
+                <div className="users-preauth__list-title">待注册的预授权邮箱（{preAuthList.length}）</div>
+                {preAuthList.map((item) => (
+                  <div key={item.email} className="users-preauth__list-item">
+                    <div className="users-preauth__list-email">
+                      <Mail size={14} />
+                      <span>{item.email}</span>
+                      <span className="users-preauth__list-date">
+                        {item.addedAt ? new Date(item.addedAt).toLocaleDateString('zh-CN') : ''}
+                      </span>
+                    </div>
+                    <button
+                      className="users-preauth__list-remove"
+                      onClick={() => handleRemovePreAuth(item.email)}
+                      title="移除"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* User List */}
         <div className="users-table-wrapper">
