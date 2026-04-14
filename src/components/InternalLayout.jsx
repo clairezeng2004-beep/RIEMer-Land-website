@@ -72,9 +72,9 @@ export default function InternalLayout() {
   const location = useLocation();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
-  // 每次路由变化时滚动到页面顶部
+  // 每次路由变化时立即跳到页面顶部（覆盖 CSS smooth 滚动）
   useEffect(() => {
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
 
   // loading 超时保护：5 秒后强制认为未登录（兜底，正常情况下 initSession 会更快结束）
