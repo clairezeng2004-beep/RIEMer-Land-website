@@ -186,9 +186,9 @@ const getDefaultInternalConfig = () => ({
     pageDesc: '收集和追踪网站改进与组织建设相关建议的进度',
     addBtn: '添加建议',
   },
-  // 成员信息页
+  // 成员通讯录页
   memberProfiles: {
-    pageTitle: '成员信息',
+    pageTitle: '成员通讯录',
     pageDesc: '了解每位成员的基本信息、去向与兴趣，促进彼此交流',
   },
   // 公众号历史文章页

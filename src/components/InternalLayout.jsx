@@ -30,7 +30,7 @@ function MobileInternalNav() {
     { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章归档' },
     { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
     { to: '/internal/suggestions', icon: MessageSquarePlus, label: '建设建议' },
-    { to: '/internal/member-profiles', icon: Contact, label: '成员信息' },
+    { to: '/internal/member-profiles', icon: Contact, label: '成员通讯录' },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
     { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
     { to: '/internal/users', icon: Users, label: sc.labelUsers },

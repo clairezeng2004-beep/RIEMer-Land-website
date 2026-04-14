@@ -301,7 +301,7 @@ export default function Profile() {
               <div className="profile-page__field">
                 <label className="profile-page__label">
                   入学年份
-                  <span className="profile-page__label-hint">（将在成员信息中展示）</span>
+                  <span className="profile-page__label-hint">（将在成员通讯录中展示）</span>
                 </label>
                 <input
                   type="text"

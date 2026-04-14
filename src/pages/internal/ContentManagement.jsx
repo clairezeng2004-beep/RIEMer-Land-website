@@ -1418,7 +1418,7 @@ export default function ContentManagement() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-md)' }}>
                     <h3 className="content-mgmt__section-title" style={{ margin: 0 }}>
                       <Users size={18} style={{ marginRight: 6, verticalAlign: 'middle' }} />
-                      已授权成员信息（自动同步）
+                      已授权成员通讯录（自动同步）
                     </h3>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <button
@@ -1450,7 +1450,7 @@ export default function ContentManagement() {
                     </div>
                   </div>
                   <p className="content-mgmt__section-desc">
-                    以下成员信息自动同步自已授权成员的「成员信息」页面，成员可前往侧边栏「成员信息」编辑自己的行。表格可左右滚动查看更多列。
+                    以下成员信息自动同步自已授权成员的「成员通讯录」页面，成员可前往侧边栏「成员通讯录」编辑自己的行。表格可左右滚动查看更多列。
                   </p>
 
                   {loadingMembers ? (
@@ -1527,7 +1527,7 @@ export default function ContentManagement() {
 
                   <div className="content-mgmt__hint" style={{ marginTop: 'var(--space-md)' }}>
                     <AlertCircle size={16} />
-                    <span>成员信息从「成员信息」页面自动同步，此处仅供查看。成员可在侧边栏「成员信息」中编辑自己的行。</span>
+                    <span>成员信息从「成员通讯录」页面自动同步，此处仅供查看。成员可在侧边栏「成员通讯录」中编辑自己的行。</span>
                   </div>
                 </div>
               </div>
