@@ -190,9 +190,7 @@ export default function ArticleChat() {
 
     try {
       const result = await sendMessage(
-        newMessages
-          .filter((m) => m.role !== 'assistant' || newMessages.indexOf(m) === 0)
-          .map((m) => ({ role: m.role, content: m.content }))
+        newMessages.map((m) => ({ role: m.role, content: m.content }))
       );
       setMessages((prev) => [
         ...prev,
