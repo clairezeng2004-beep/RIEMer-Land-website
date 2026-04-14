@@ -549,6 +549,38 @@ export function AuthProvider({ children }) {
             } catch (confirmErr) {
               console.warn('[Auth] 自动确认邮箱重试失败:', confirmErr.message);
             }
+
+            // confirm-email API 失败时，尝试查一下 profiles 表该用户是否已被后台授权
+            // 如果已授权说明是管理员授权时 confirm-email 没生效，再尝试一次
+            try {
+              const { data: profileCheck } = await supabase
+                .from('profiles')
+                .select('*')
+                .ilike('email', email)
+                .maybeSingle();
+              if (profileCheck?.authorized) {
+                // 用户已被后台授权但邮箱未确认，再次尝试 confirm-email
+                console.log('[Auth] 用户已被后台授权但邮箱未确认，再次尝试 confirm-email');
+                try {
+                  const retryConfirm = await fetch('/api/confirm-email', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                  });
+                  if (retryConfirm.ok) {
+                    // 确认成功，重试登录
+                    const { data: retryData2, error: retryError2 } = await supabase.auth.signInWithPassword({ email, password });
+                    if (!retryError2 && retryData2?.user) {
+                      setUser({ ...profileCheck, role: profileCheck.role || 'member' });
+                      cacheProfile(profileCheck);
+                      return { success: true };
+                    }
+                  }
+                } catch { /* ignore */ }
+                return { success: false, message: '您的账号已被管理员授权，但邮箱确认服务暂时不可用。请稍后重试或联系管理员。' };
+              }
+            } catch { /* ignore */ }
+
             return { success: false, message: '邮箱尚未验证，请联系管理员处理。' };
           }
           // Supabase 认证失败（如用户不存在），回退到本地用户数据库尝试
@@ -1041,6 +1073,33 @@ export function AuthProvider({ children }) {
         await supabase.from('profiles').update({ authorized: true }).eq('id', userId);
       } catch (err) {
         console.warn('[Auth] Supabase 授权更新失败:', err.message);
+      }
+
+      // 同时自动确认该用户的邮箱（解决 Supabase Auth 层面 email_confirmed_at 为空的问题）
+      // 查询该用户的邮箱地址
+      try {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', userId)
+          .single();
+        if (profile?.email) {
+          fetch('/api/confirm-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email: profile.email }),
+          }).then((res) => {
+            if (res.ok) {
+              console.log('[Auth] 授权用户时自动确认邮箱成功:', profile.email);
+            } else {
+              console.warn('[Auth] 授权用户时自动确认邮箱失败:', res.status);
+            }
+          }).catch((err) => {
+            console.warn('[Auth] 授权用户时自动确认邮箱异常:', err.message);
+          });
+        }
+      } catch (err) {
+        console.warn('[Auth] 获取用户邮箱失败:', err.message);
       }
     }
   }, [supabaseOk]);
