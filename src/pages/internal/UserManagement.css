@@ -218,6 +218,7 @@
   font-weight: 500;
   padding: 2px 8px;
   border-radius: var(--radius-full);
+  white-space: nowrap;
 }
 
 .users-table__status--authorized {
@@ -273,6 +274,7 @@
   .users-table__actions .btn {
     font-size: var(--text-xs);
     padding: 3px 10px;
+    white-space: nowrap;
   }
 }
 
