@@ -883,6 +883,13 @@
     -webkit-line-clamp: 2;
     min-height: auto;
   }
+  .doc-card__meta {
+    padding-top: 4px;
+    margin-top: 0;
+  }
+  .doc-card__bottom {
+    padding: 4px var(--space-lg);
+  }
   .doc-preview {
     width: 100vw;
     height: 100vh;
