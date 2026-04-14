@@ -443,10 +443,10 @@ export default function MemberProfiles() {
                             }`}
                           >
                             {col.key === 'name' && isSelf ? (
-                              <>
-                                {profile[col.key]}
+                              <span className="member-profiles-table__name-cell">
+                                <span className="member-profiles-table__name-text">{profile[col.key]}</span>
                                 <span className="member-profiles-table__self-badge">我</span>
-                              </>
+                              </span>
                             ) : (
                               profile[col.key] || '—'
                             )}

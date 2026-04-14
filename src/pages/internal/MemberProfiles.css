@@ -236,6 +236,17 @@
   opacity: 0.5;
 }
 
+.member-profiles-table__name-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+
+.member-profiles-table__name-text {
+  white-space: nowrap;
+}
+
 .member-profiles-table__self-badge {
   display: inline-flex;
   align-items: center;
