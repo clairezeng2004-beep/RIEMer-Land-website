@@ -137,17 +137,27 @@ export default function Suggestions() {
 
   return (
     <div className="suggestions-page">
-      <div className="suggestions-page__header">
-        <div className="suggestions-page__header-icon">
-          <MessageSquarePlus size={24} />
+      <div className="container">
+        <div className="suggestions-page__header">
+          <div>
+            <h1>
+              <MessageSquarePlus size={28} /> <EditableText
+                value={sc.pageTitle || '建设建议'}
+                configKey="suggestions.pageTitle"
+                onChange={v => updateSugs('pageTitle', v)}
+                as="span"
+              />
+            </h1>
+            <p><EditableText
+              value={sc.pageDesc || '收集和追踪网站改进与组织建设相关建议的进度'}
+              configKey="suggestions.pageDesc"
+              onChange={v => updateSugs('pageDesc', v)}
+              as="span"
+            /></p>
+          </div>
         </div>
-        <div>
-          <EditableText as="h2" className="suggestions-page__title" value={sc.pageTitle || '建设建议'} configKey="suggestions.pageTitle" onChange={v => updateSugs('pageTitle', v)} />
-          <EditableText as="p" className="suggestions-page__desc" value={sc.pageDesc || '收集和追踪网站改进与组织建设相关建议的进度'} configKey="suggestions.pageDesc" onChange={v => updateSugs('pageDesc', v)} />
-        </div>
-      </div>
 
-      <div className="suggestions-page__content">
+        <div className="suggestions-page__content">
         {/* 添加新建议 */}
         {!editingSuggestion && (
           <button
@@ -526,6 +536,7 @@ export default function Suggestions() {
             <span>暂无建议，点击上方按钮添加第一条建设建议。</span>
           </div>
         )}
+      </div>
       </div>
     </div>
   );

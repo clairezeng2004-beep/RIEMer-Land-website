@@ -3,48 +3,33 @@
    ============================================ */
 
 .suggestions-page {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: var(--space-2xl) var(--space-xl);
+  padding-top: 120px;
+  padding-bottom: var(--space-4xl);
+  min-height: 100vh;
 }
 
 .suggestions-page__header {
   display: flex;
-  align-items: center;
-  gap: var(--space-lg);
+  justify-content: space-between;
+  align-items: flex-start;
   margin-bottom: var(--space-2xl);
 }
 
-.suggestions-page__header-icon {
-  width: 48px;
-  height: 48px;
+.suggestions-page__header h1 {
   display: flex;
   align-items: center;
-  justify-content: center;
-  border-radius: var(--radius-lg);
-  background: rgba(91, 140, 62, 0.1);
-  color: var(--color-primary);
-  flex-shrink: 0;
+  gap: var(--space-sm);
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-xs);
 }
 
-.suggestions-page__title {
-  font-size: var(--text-xl);
-  font-weight: 700;
-  color: var(--color-text);
-  margin: 0;
-}
-
-.suggestions-page__desc {
-  font-size: var(--text-sm);
+.suggestions-page__header p {
   color: var(--color-text-muted);
-  margin: 4px 0 0;
+  font-size: var(--text-sm);
 }
 
 .suggestions-page__content {
-  background: var(--color-bg-card);
-  border: 1px solid var(--color-border-light);
-  border-radius: var(--radius-xl);
-  padding: var(--space-xl);
+  /* 内容区域 — 与其他 TAB 布局统一，无额外卡片包装 */
 }
 
 /* Add button */
@@ -515,11 +500,12 @@
 /* Responsive */
 @media (max-width: 768px) {
   .suggestions-page {
-    padding: var(--space-lg) var(--space-md);
+    padding-top: var(--space-3xl);
   }
 
-  .suggestions-page__content {
-    padding: var(--space-md);
+  .suggestions-page__header {
+    flex-direction: column;
+    gap: var(--space-md);
   }
 
   .suggestions-page__inline-group {
@@ -531,5 +517,11 @@
     border-radius: 0;
     border-left: none;
     border-right: none;
+  }
+}
+
+@media (max-width: 480px) {
+  .suggestions-page {
+    padding-top: var(--space-xl);
   }
 }
