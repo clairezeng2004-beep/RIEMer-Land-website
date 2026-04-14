@@ -24,7 +24,13 @@ CREATE TABLE IF NOT EXISTS profiles (
 -- 2. 启用 RLS
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
 
--- 3. RLS 策略
+-- 3. RLS 策略（先删除已有策略，避免重复创建报错）
+
+DROP POLICY IF EXISTS "所有认证用户可查看 profiles" ON profiles;
+DROP POLICY IF EXISTS "匿名用户可查看已授权成员公开信息" ON profiles;
+DROP POLICY IF EXISTS "用户可更新自己的基本信息" ON profiles;
+DROP POLICY IF EXISTS "管理员可管理用户" ON profiles;
+DROP POLICY IF EXISTS "允许插入 profile" ON profiles;
 
 -- 所有已认证用户可以查看 profiles（用于用户列表）
 CREATE POLICY "所有认证用户可查看 profiles"
@@ -129,7 +135,13 @@ CREATE TABLE IF NOT EXISTS member_profiles (
 -- 7. 启用 member_profiles 的 RLS
 ALTER TABLE member_profiles ENABLE ROW LEVEL SECURITY;
 
--- 8. member_profiles RLS 策略
+-- 8. member_profiles RLS 策略（先删除已有策略）
+
+DROP POLICY IF EXISTS "所有认证用户可查看成员信息" ON member_profiles;
+DROP POLICY IF EXISTS "匿名用户可查看成员信息" ON member_profiles;
+DROP POLICY IF EXISTS "用户可更新自己的成员信息" ON member_profiles;
+DROP POLICY IF EXISTS "管理员可更新所有成员信息" ON member_profiles;
+DROP POLICY IF EXISTS "用户可插入自己的成员信息" ON member_profiles;
 
 -- 所有已认证用户可以查看所有成员信息
 CREATE POLICY "所有认证用户可查看成员信息"
@@ -208,7 +220,12 @@ CREATE TABLE IF NOT EXISTS notifications (
 -- 12. 启用 notifications 的 RLS
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
--- 所有已认证用户可以查看通知
+-- 所有已认证用户可以查看通知（先删除已有策略）
+DROP POLICY IF EXISTS "所有认证用户可查看通知" ON notifications;
+DROP POLICY IF EXISTS "允许插入通知" ON notifications;
+DROP POLICY IF EXISTS "允许匿名插入通知" ON notifications;
+DROP POLICY IF EXISTS "管理员可删除通知" ON notifications;
+
 CREATE POLICY "所有认证用户可查看通知"
   ON notifications FOR SELECT
   TO authenticated
@@ -244,6 +261,9 @@ CREATE TABLE IF NOT EXISTS notification_reads (
 
 ALTER TABLE notification_reads ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "用户可查看自己的已读状态" ON notification_reads;
+DROP POLICY IF EXISTS "用户可标记自己的已读" ON notification_reads;
+
 CREATE POLICY "用户可查看自己的已读状态"
   ON notification_reads FOR SELECT
   TO authenticated
@@ -269,7 +289,12 @@ CREATE TABLE IF NOT EXISTS pre_authorized_emails (
 -- 16. 启用 pre_authorized_emails 的 RLS
 ALTER TABLE pre_authorized_emails ENABLE ROW LEVEL SECURITY;
 
--- 所有已认证用户可以查看预授权列表
+-- 所有已认证用户可以查看预授权列表（先删除已有策略）
+DROP POLICY IF EXISTS "所有认证用户可查看预授权列表" ON pre_authorized_emails;
+DROP POLICY IF EXISTS "管理员可添加预授权邮箱" ON pre_authorized_emails;
+DROP POLICY IF EXISTS "管理员可删除预授权邮箱" ON pre_authorized_emails;
+DROP POLICY IF EXISTS "匿名用户可查看预授权列表" ON pre_authorized_emails;
+
 CREATE POLICY "所有认证用户可查看预授权列表"
   ON pre_authorized_emails FOR SELECT
   TO authenticated
@@ -313,7 +338,11 @@ CREATE TABLE IF NOT EXISTS guestbook_entries (
 -- 18. 启用 guestbook_entries 的 RLS
 ALTER TABLE guestbook_entries ENABLE ROW LEVEL SECURITY;
 
--- 所有人（包括匿名用户）可以插入留言
+-- 所有人（包括匿名用户）可以插入留言（先删除已有策略）
+DROP POLICY IF EXISTS "所有人可留言" ON guestbook_entries;
+DROP POLICY IF EXISTS "认证用户可查看留言" ON guestbook_entries;
+DROP POLICY IF EXISTS "管理员可删除留言" ON guestbook_entries;
+
 CREATE POLICY "所有人可留言"
   ON guestbook_entries FOR INSERT
   TO anon, authenticated
