@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -15,6 +15,8 @@ import {
   User,
   Save,
   MessageSquarePlus,
+  Mic,
+  MicOff,
 } from 'lucide-react';
 import './Suggestions.css';
 
@@ -28,6 +30,79 @@ export default function Suggestions() {
 
   const [editingSuggestion, setEditingSuggestion] = useState(null);
   const [editingSuggestionId, setEditingSuggestionId] = useState(null);
+  const [isListening, setIsListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // 语音识别
+  const SpeechRecognition = typeof window !== 'undefined'
+    ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+    : null;
+
+  const toggleVoiceInput = useCallback((field = 'content', isEdit = false) => {
+    if (isListening) {
+      // 停止
+      recognitionRef.current?.stop();
+      setIsListening(false);
+      return;
+    }
+
+    if (!SpeechRecognition) {
+      alert('当前浏览器不支持语音输入，请使用 Chrome 或 Edge 浏览器。');
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognitionRef.current = recognition;
+
+    let finalTranscript = '';
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      // 将识别到的文字追加到建议内容中
+      setEditingSuggestion(prev => {
+        if (!prev) return prev;
+        const currentContent = prev[field] || '';
+        // 移除之前的临时文本，追加最终文本和临时文本
+        const baseContent = currentContent.replace(/\u200B.*$/, '');
+        const newContent = baseContent + finalTranscript + (interim ? '\u200B' + interim : '');
+        return { ...prev, [field]: newContent };
+      });
+    };
+
+    recognition.onend = () => {
+      setIsListening(false);
+      // 清理临时标记
+      setEditingSuggestion(prev => {
+        if (!prev) return prev;
+        const cleaned = (prev[field] || '').replace(/\u200B.*$/, '') + finalTranscript;
+        return { ...prev, [field]: cleaned };
+      });
+      recognitionRef.current = null;
+    };
+
+    recognition.onerror = (event) => {
+      console.error('语音识别错误:', event.error);
+      setIsListening(false);
+      recognitionRef.current = null;
+      if (event.error === 'not-allowed') {
+        alert('请允许浏览器使用麦克风。');
+      }
+    };
+
+    recognition.start();
+    setIsListening(true);
+  }, [isListening, SpeechRecognition]);
 
   // 头像 URL 生成
   const sugAvatarUrl = (name) =>
@@ -92,13 +167,26 @@ export default function Suggestions() {
 
             <div className="suggestions-page__field">
               <label>具体建议</label>
-              <textarea
-                value={editingSuggestion.content}
-                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                className="suggestions-page__input suggestions-page__textarea"
-                rows={3}
-                placeholder="描述你的建议…（可以是网站功能改进、组织活动策划、团队协作优化等）"
-              />
+              <div className="suggestions-page__textarea-wrap">
+                <textarea
+                  value={editingSuggestion.content}
+                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                  className="suggestions-page__input suggestions-page__textarea"
+                  rows={3}
+                  placeholder="描述你的建议…（可以是网站功能改进、组织活动策划、团队协作优化等）"
+                />
+                <button
+                  type="button"
+                  className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                  onClick={() => toggleVoiceInput('content')}
+                  title={isListening ? '停止语音输入' : '语音输入'}
+                >
+                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                </button>
+              </div>
+              {isListening && (
+                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+              )}
             </div>
 
             <div className="suggestions-page__inline-group">
@@ -215,12 +303,25 @@ export default function Suggestions() {
                         <div className="sug-edit-form">
                           <div className="suggestions-page__field">
                             <label>具体建议</label>
-                            <textarea
-                              value={editingSuggestion.content}
-                              onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                              className="suggestions-page__input suggestions-page__textarea"
-                              rows={2}
-                            />
+                            <div className="suggestions-page__textarea-wrap">
+                              <textarea
+                                value={editingSuggestion.content}
+                                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                                className="suggestions-page__input suggestions-page__textarea"
+                                rows={2}
+                              />
+                              <button
+                                type="button"
+                                className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                                onClick={() => toggleVoiceInput('content')}
+                                title={isListening ? '停止语音输入' : '语音输入'}
+                              >
+                                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                              </button>
+                            </div>
+                            {isListening && (
+                              <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+                            )}
                           </div>
                           <div className="suggestions-page__inline-group">
                             <div className="suggestions-page__field suggestions-page__field--flex">
