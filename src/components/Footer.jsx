@@ -98,6 +98,8 @@ export default function Footer() {
             )}
           </div>
 
+          <FooterGuestbook />
+
           <div className="footer__bottom">
             <p>© {new Date().getFullYear()} {clubInfo.name}.</p>
           </div>

@@ -298,6 +298,42 @@ CREATE POLICY "匿名用户可查看预授权列表"
   USING (true);
 
 -- ============================================
+-- 17. 创建 guestbook_entries 表（访客留言板）
+-- ============================================
+-- 公开页面的访客可以留言给网站建设者，可选择是否留联系方式
+CREATE TABLE IF NOT EXISTS guestbook_entries (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  nickname TEXT NOT NULL DEFAULT '匿名访客',
+  message TEXT NOT NULL,
+  contact TEXT DEFAULT '',          -- 可选联系方式（邮箱/微信/手机等）
+  show_contact BOOLEAN NOT NULL DEFAULT false,  -- 是否愿意留联系方式
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 18. 启用 guestbook_entries 的 RLS
+ALTER TABLE guestbook_entries ENABLE ROW LEVEL SECURITY;
+
+-- 所有人（包括匿名用户）可以插入留言
+CREATE POLICY "所有人可留言"
+  ON guestbook_entries FOR INSERT
+  TO anon, authenticated
+  WITH CHECK (true);
+
+-- 所有已认证用户可以查看留言（内部空间展示）
+CREATE POLICY "认证用户可查看留言"
+  ON guestbook_entries FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 管理员可以删除留言
+CREATE POLICY "管理员可删除留言"
+  ON guestbook_entries FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，

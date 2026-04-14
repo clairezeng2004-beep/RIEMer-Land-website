@@ -1,0 +1,258 @@
+/* ============================================
+   Internal Guestbook Page
+   ============================================ */
+
+.guestbook-page__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: var(--space-lg);
+}
+
+.guestbook-page__header h1 {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-xs);
+}
+
+.guestbook-page__header p {
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  margin: 0;
+}
+
+.guestbook-page__refresh-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.guestbook-page__refresh-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.guestbook-page__refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.guestbook-page__spin {
+  animation: guestbook-spin 0.8s linear infinite;
+}
+
+@keyframes guestbook-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* 统计信息 */
+.guestbook-page__stats {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  margin-bottom: var(--space-lg);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg, #fafafa);
+  border-radius: var(--radius-lg, 12px);
+}
+
+.guestbook-page__stats-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+/* 加载 & 空状态 */
+.guestbook-page__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-sm);
+  padding: var(--space-3xl);
+  color: var(--color-text-muted);
+  font-size: var(--text-sm);
+}
+
+.guestbook-page__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4xl) var(--space-xl);
+  color: var(--color-text-muted);
+  text-align: center;
+}
+
+.guestbook-page__empty p {
+  font-size: var(--text-lg);
+  font-weight: 500;
+  margin: var(--space-md) 0 var(--space-xs);
+}
+
+.guestbook-page__empty span {
+  font-size: var(--text-sm);
+  opacity: 0.7;
+}
+
+/* 留言列表 */
+.guestbook-page__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+}
+
+/* 留言卡片 */
+.guestbook-card {
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-xl, 16px);
+  padding: var(--space-lg);
+  transition: box-shadow var(--transition-fast);
+}
+
+.guestbook-card:hover {
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+}
+
+.guestbook-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm);
+  flex-wrap: wrap;
+  gap: var(--space-xs);
+}
+
+.guestbook-card__user {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.guestbook-card__avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(91, 140, 62, 0.08);
+  color: var(--color-primary, #5B8C3E);
+  flex-shrink: 0;
+}
+
+.guestbook-card__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.guestbook-card__actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.guestbook-card__time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.guestbook-card__delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: var(--radius-md, 8px);
+  transition: all var(--transition-fast);
+}
+
+.guestbook-card__delete:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #EF4444;
+}
+
+.guestbook-card__message {
+  font-size: var(--text-sm);
+  line-height: 1.7;
+  color: var(--color-text);
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.guestbook-card__contact {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-sm);
+  padding: 4px 12px;
+  background: rgba(91, 140, 62, 0.06);
+  border-radius: var(--radius-full, 999px);
+  font-size: var(--text-xs);
+  color: var(--color-primary, #5B8C3E);
+}
+
+/* 底部提示 */
+.guestbook-page__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+  margin-top: var(--space-xl);
+  padding: var(--space-md);
+  background: rgba(91, 140, 62, 0.04);
+  border-radius: var(--radius-lg, 12px);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
+}
+
+.guestbook-page__hint svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .guestbook-page__header {
+    flex-direction: column;
+    gap: var(--space-sm);
+  }
+
+  .guestbook-page__header h1 {
+    font-size: var(--text-xl);
+  }
+
+  .guestbook-card {
+    padding: var(--space-md);
+  }
+
+  .guestbook-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

@@ -65,6 +65,7 @@ function App() {
                   <Route path="notifications" element={<Notifications />} />
                   <Route path="contributions" element={<MemberContributions />} />
                   <Route path="suggestions" element={<Suggestions />} />
+                  <Route path="guestbook" element={<Guestbook />} />
                   <Route path="profile" element={<Profile />} />
                   <Route path="member-profiles" element={<MemberProfiles />} />
                 </Route>
