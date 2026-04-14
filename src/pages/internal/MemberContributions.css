@@ -115,7 +115,7 @@
 .mc-summary__card {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
+  gap: var(--space-md);
   padding: var(--space-md);
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
@@ -166,8 +166,8 @@
 .mc-summary__info {
   display: flex;
   flex-direction: row;
-  align-items: baseline;
-  gap: 6px;
+  align-items: center;
+  gap: 10px;
   flex-wrap: nowrap;
 }
 
