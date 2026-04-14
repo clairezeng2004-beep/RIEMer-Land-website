@@ -576,6 +576,21 @@
 
   .mc-table-wrapper {
     font-size: 12px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .mc-table {
+    table-layout: auto;
+    min-width: 680px;
+  }
+
+  .mc-table th {
+    padding: 10px 10px;
+    font-size: 11px;
+  }
+
+  .mc-table td {
+    padding: 10px;
   }
 }
 
