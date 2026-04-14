@@ -33,6 +33,7 @@ export default function InternalSidebar() {
   );
 
   const navItems = [
+    { to: '/internal/tasks', icon: CheckSquare, configKey: 'labelTasks', label: sc.labelTasks },
     {
       to: '/internal/notifications',
       icon: Bell,
@@ -41,14 +42,13 @@ export default function InternalSidebar() {
       badge: unreadCount > 0 ? unreadCount : null,
     },
     { to: '/internal/process-templates', icon: FolderOpen, label: '流程模板文件' },
-    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章归档' },
     { to: '/internal/member-sharing', icon: Share2, label: '成员内部分享' },
-    { to: '/internal/tasks', icon: CheckSquare, configKey: 'labelTasks', label: sc.labelTasks },
-    { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
+    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章归档' },
     { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
     { to: '/internal/suggestions', icon: MessageSquarePlus, label: '建设建议' },
-    { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
     { to: '/internal/member-profiles', icon: Contact, label: '成员信息' },
+    { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
+    { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
   ];
 
   // 管理菜单项（所有成员可见，仅管理员可编辑）
