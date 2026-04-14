@@ -211,10 +211,18 @@ export function AuthProvider({ children }) {
     }
 
     // Supabase 模式：先做健康检查，不通则降级本地模式
-    const SESSION_TIMEOUT_MS = 12000; // 12 秒超时（给 token refresh 充裕时间）
     let sessionResolved = false; // 防止超时回调和正常回调重复执行
 
+    /** 带超时的 Promise 包装器 */
+    const withTimeout = (promise, ms, label) => {
+      return Promise.race([
+        promise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} 超时 (${ms/1000}s)`)), ms)),
+      ]);
+    };
+
     const initSession = async () => {
+      const startTime = Date.now();
       // 1. 先快速检测 Supabase 是否可达（3 秒超时）
       const reachable = await checkSupabaseHealth();
       if (!reachable) {
@@ -224,75 +232,71 @@ export function AuthProvider({ children }) {
         setLoading(false);
         return;
       }
-      // 注意：此时只标记 Supabase 服务可达，但不立即设为 true
-      // 等 session 恢复成功后再设为 true，避免 getAllUsers 在 session 未就绪时查询
       console.log('[Auth] Supabase 服务可达，开始恢复 session...');
 
-      // 2. Supabase 可达，正常获取 session（带超时保护）
-      const timeout = setTimeout(() => {
-        if (sessionResolved) return;
-        sessionResolved = true;
-        console.warn('[Auth] Session 初始化超时（' + SESSION_TIMEOUT_MS/1000 + 's），降级本地模式');
-        // 超时时仍将 supabaseOk 设为 true（服务是可达的），让 getAllUsers 能尝试 Supabase 查询
-        setSupabaseOk(true);
-        restoreLocalAuth();
-        setLoading(false);
-      }, SESSION_TIMEOUT_MS);
-
       try {
-        // 尝试获取 session
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-        
-        if (sessionError) {
-          console.warn('[Auth] getSession 返回错误:', sessionError.message, '，尝试 refreshSession...');
+        // 2. 尝试获取 session（独立 5 秒超时，不依赖全局 fetch 超时）
+        let session = null;
+        let sessionUser = null;
+        try {
+          const { data, error: sessionError } = await withTimeout(
+            supabase.auth.getSession(), 5000, 'getSession'
+          );
+          if (sessionError) {
+            console.warn('[Auth] getSession 返回错误:', sessionError.message);
+          }
+          session = data?.session;
+          sessionUser = session?.user;
+        } catch (e) {
+          console.warn('[Auth] getSession 失败:', e.message);
         }
 
-        if (session?.user) {
-          console.log('[Auth] Session 恢复成功，用户:', session.user.email);
+        if (sessionUser) {
+          console.log('[Auth] Session 恢复成功，用户:', sessionUser.email, '耗时:', Date.now() - startTime, 'ms');
           if (!sessionResolved) {
             sessionResolved = true;
-            clearTimeout(timeout);
             setSupabaseOk(true);
-            await fetchProfile(session.user);
+            await fetchProfile(sessionUser);
             setLoading(false);
           }
           return;
         }
 
-        // session 为空，尝试刷新 token
+        // 3. session 为空或失败，尝试刷新 token（独立 5 秒超时）
         console.log('[Auth] getSession 返回空 session，尝试 refreshSession...');
-        const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
-        
-        if (refreshError) {
-          console.warn('[Auth] refreshSession 失败:', refreshError.message);
-        }
-
-        if (refreshData?.session?.user) {
-          console.log('[Auth] refreshSession 成功，用户:', refreshData.session.user.email);
-          if (!sessionResolved) {
-            sessionResolved = true;
-            clearTimeout(timeout);
-            setSupabaseOk(true);
-            await fetchProfile(refreshData.session.user);
-            setLoading(false);
+        try {
+          const { data: refreshData, error: refreshError } = await withTimeout(
+            supabase.auth.refreshSession(), 5000, 'refreshSession'
+          );
+          if (refreshError) {
+            console.warn('[Auth] refreshSession 失败:', refreshError.message);
           }
-          return;
+          if (refreshData?.session?.user) {
+            console.log('[Auth] refreshSession 成功，用户:', refreshData.session.user.email, '耗时:', Date.now() - startTime, 'ms');
+            if (!sessionResolved) {
+              sessionResolved = true;
+              setSupabaseOk(true);
+              await fetchProfile(refreshData.session.user);
+              setLoading(false);
+            }
+            return;
+          }
+        } catch (e) {
+          console.warn('[Auth] refreshSession 失败:', e.message);
         }
 
-        // session 和 refresh 都失败了 → 用户可能需要重新登录
-        console.warn('[Auth] Session 恢复和刷新均失败，用户可能需要重新登录');
+        // 4. session 和 refresh 都失败了 → 用户需要重新登录
+        console.warn('[Auth] Session 恢复和刷新均失败，需重新登录。总耗时:', Date.now() - startTime, 'ms');
         if (!sessionResolved) {
           sessionResolved = true;
-          clearTimeout(timeout);
           setSupabaseOk(true); // 服务可达，只是 session 失效
           restoreLocalAuth();
           setLoading(false);
         }
       } catch (err) {
-        console.error('[Auth] initSession 异常:', err);
+        console.error('[Auth] initSession 异常:', err, '总耗时:', Date.now() - startTime, 'ms');
         if (!sessionResolved) {
           sessionResolved = true;
-          clearTimeout(timeout);
           // 网络错误 → 降级
           setSupabaseOk(false);
           restoreLocalAuth();

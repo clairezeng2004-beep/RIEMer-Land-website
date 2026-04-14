@@ -69,7 +69,7 @@ function saveLocalProfiles(profiles) {
 // MemberProfiles 组件
 // ============================================
 export default function MemberProfiles() {
-  const { user, isAuthenticated, isAdmin, getAllUsers } = useAuth();
+  const { user, isAuthenticated, isAdmin, getAllUsers, supabaseOk } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const mp = internalConfig.memberProfiles || {};
@@ -80,19 +80,95 @@ export default function MemberProfiles() {
   const [saving, setSaving] = useState(false);
   const tableRef = useRef(null);
 
+  // 本地模式加载成员信息
+  const loadLocalFallback = useCallback(async () => {
+    const allUsers = await getAllUsers();
+    let localProfiles = getLocalProfiles();
+
+    // 确保每个已授权用户都有对应记录
+    const authorizedUsers = allUsers.filter((u) => u.authorized);
+    let updated = false;
+
+    authorizedUsers.forEach((u) => {
+      const exists = localProfiles.find((p) => p.user_id === u.id);
+      if (!exists) {
+        localProfiles.push({
+          user_id: u.id,
+          name: u.name,
+          enrollment_year: '',
+          joined_at: u.createdAt || u.created_at || new Date().toISOString(),
+          bio: '',
+          further_education: '',
+          career: '',
+          willing_to_share: '',
+          want_to_learn: '',
+          hobbies: '',
+          dream_city: '',
+          other: '',
+        });
+        updated = true;
+      }
+    });
+
+    if (updated) saveLocalProfiles(localProfiles);
+
+    // 补全 name 并排序
+    const formatted = localProfiles
+      .map((p) => {
+        const u = allUsers.find((u) => u.id === p.user_id);
+        return {
+          ...p,
+          id: p.user_id,
+          name: u?.name || p.name || '未知用户',
+          joined_at_display: (() => {
+            if (!p.joined_at) return '';
+            const d = new Date(p.joined_at);
+            return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+          })(),
+        };
+      })
+      .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));
+
+    setProfiles(formatted);
+  }, [getAllUsers]);
+
   // 加载成员信息
   const loadProfiles = useCallback(async () => {
     if (!isAuthenticated) return;
 
-    if (isSupabaseConfigured) {
+    // 只有 supabaseOk === true 时才走 Supabase 路径
+    const useSupabase = isSupabaseConfigured && supabaseOk === true;
+
+    if (useSupabase) {
       // Supabase 模式：从 member_profiles 表加载
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('member_profiles')
         .select('*, profiles(name, created_at)')
         .order('joined_at', { ascending: true });
 
+      // 查询失败时尝试刷新 session 后重试
       if (error) {
-        console.error('[MemberProfiles] Failed to load:', error);
+        console.warn('[MemberProfiles] Supabase 查询失败:', error.message, '，尝试刷新 session...');
+        try {
+          const { data: refreshData } = await supabase.auth.refreshSession();
+          if (refreshData?.session) {
+            console.log('[MemberProfiles] Session 刷新成功，重试查询...');
+            const retry = await supabase
+              .from('member_profiles')
+              .select('*, profiles(name, created_at)')
+              .order('joined_at', { ascending: true });
+            data = retry.data;
+            error = retry.error;
+          }
+        } catch (refreshErr) {
+          console.warn('[MemberProfiles] Session 刷新异常:', refreshErr.message);
+        }
+      }
+
+      if (error) {
+        console.error('[MemberProfiles] Supabase 加载最终失败，降级本地模式:', error.message);
+        // 降级到本地模式
+        await loadLocalFallback();
         return;
       }
 
@@ -146,57 +222,9 @@ export default function MemberProfiles() {
       }));
       setProfiles(formatted);
     } else {
-      // 本地模式
-      const allUsers = await getAllUsers();
-      let localProfiles = getLocalProfiles();
-
-      // 确保每个已授权用户都有对应记录
-      const authorizedUsers = allUsers.filter((u) => u.authorized);
-      let updated = false;
-
-      authorizedUsers.forEach((u) => {
-        const exists = localProfiles.find((p) => p.user_id === u.id);
-        if (!exists) {
-          localProfiles.push({
-            user_id: u.id,
-            name: u.name,
-            enrollment_year: '',
-            joined_at: u.createdAt || u.created_at || new Date().toISOString(),
-            bio: '',
-            further_education: '',
-            career: '',
-            willing_to_share: '',
-            want_to_learn: '',
-            hobbies: '',
-            dream_city: '',
-            other: '',
-          });
-          updated = true;
-        }
-      });
-
-      if (updated) saveLocalProfiles(localProfiles);
-
-      // 补全 name 并排序
-      const formatted = localProfiles
-        .map((p) => {
-          const u = allUsers.find((u) => u.id === p.user_id);
-          return {
-            ...p,
-            id: p.user_id,
-            name: u?.name || p.name || '未知用户',
-            joined_at_display: (() => {
-              if (!p.joined_at) return '';
-              const d = new Date(p.joined_at);
-              return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
-            })(),
-          };
-        })
-        .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));
-
-      setProfiles(formatted);
+      await loadLocalFallback();
     }
-  }, [isAuthenticated, user, getAllUsers]);
+  }, [isAuthenticated, user, getAllUsers, supabaseOk, loadLocalFallback]);
 
   useEffect(() => {
     loadProfiles();
@@ -228,7 +256,7 @@ export default function MemberProfiles() {
       // 计算加入时间
       const newJoinedAt = yearMonthToDate(editData._joined_year, editData._joined_month);
 
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && supabaseOk === true) {
         const updateData = {};
         COLUMNS.forEach((col) => {
           if (col.editable && col.key !== 'joined_at_display' && editData[col.key] !== undefined) {

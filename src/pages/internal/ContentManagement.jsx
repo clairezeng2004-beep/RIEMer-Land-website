@@ -45,7 +45,7 @@ import {
 import './ContentManagement.css';
 
 export default function ContentManagement() {
-  const { isAuthenticated, isAdmin, getAllUsers } = useAuth();
+  const { isAuthenticated, isAdmin, getAllUsers, supabaseOk } = useAuth();
   const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline } = useSiteContent();
   const { addNotification } = useNotifications();
 
@@ -87,7 +87,7 @@ export default function ContentManagement() {
   const loadAuthorizedMembers = useCallback(async () => {
     setLoadingMembers(true);
     try {
-      if (isSupabaseConfigured) {
+      if (isSupabaseConfigured && supabaseOk === true) {
         // Supabase 模式：获取已授权成员 + member_profiles 完整信息
         const { data: profiles } = await supabase
           .from('profiles')

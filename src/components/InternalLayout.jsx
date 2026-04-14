@@ -68,7 +68,7 @@ function MobileInternalNav() {
 }
 
 export default function InternalLayout() {
-  const { isAuthenticated, loading } = useAuth();
+  const { isAuthenticated, loading, supabaseOk } = useAuth();
   const location = useLocation();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
@@ -77,13 +77,15 @@ export default function InternalLayout() {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }, [location.pathname]);
 
-  // loading 超时保护：5 秒后强制认为未登录（兜底，正常情况下 initSession 会更快结束）
+  // loading 超时保护：15 秒后强制结束等待
+  // initSession 内部有独立超时（getSession 5s + refreshSession 5s + 健康检查 3s ≈ 13s），
+  // 这里留 15s 作为最终兜底
   useEffect(() => {
     if (!loading) return;
     const timer = setTimeout(() => {
-      console.warn('[InternalLayout] Loading 超时（5s），跳转登录页');
+      console.warn('[InternalLayout] Loading 超时（15s），结束等待');
       setLoadingTimeout(true);
-    }, 5000);
+    }, 15000);
     return () => clearTimeout(timer);
   }, [loading]);
 
