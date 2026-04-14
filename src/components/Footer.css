@@ -261,12 +261,20 @@
     flex-direction: column;
     align-items: center;
     padding-top: var(--space-md);
-    border-top: 1px solid var(--color-border-light);
+    border-top: none;
     border-bottom: none;
   }
 
   .footer__grid > .footer__nav:nth-child(2) .footer__nav-title {
-    display: none;
+    display: block;
+    padding-bottom: var(--space-xs);
+    margin-bottom: 0;
+  }
+
+  .footer__grid > .footer__nav:nth-child(2) .footer__about-texts {
+    border-top: 1px solid var(--color-border-light);
+    padding-top: var(--space-md);
+    width: 100%;
   }
 
   .footer__about-texts {
