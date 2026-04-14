@@ -495,99 +495,107 @@ export function AuthProvider({ children }) {
 
         if (error) {
           if (error.message === 'Email not confirmed') {
-            // 尝试通过服务端 API 自动确认邮箱后重试登录
-            console.log('[Auth] 邮箱未确认，尝试自动确认:', email);
+            // ============================================
+            // 邮箱未确认 → 通过服务端 admin-login API 彻底处理
+            // 服务端会：1) Admin API 强制确认邮箱  2) 直接登录返回 session
+            // ============================================
+            console.log('[Auth] 邮箱未确认，调用 admin-login API 处理:', email);
             try {
-              const confirmRes = await fetch('/api/confirm-email', {
+              const adminLoginRes = await fetch('/api/admin-login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email }),
+                body: JSON.stringify({ email, password }),
               });
-              console.log('[Auth] confirm-email 响应状态:', confirmRes.status);
-              if (!confirmRes.ok) {
-                const errBody = await confirmRes.text().catch(() => '');
-                console.warn('[Auth] confirm-email 失败:', confirmRes.status, errBody);
-              }
-              if (confirmRes.ok) {
-                // 确认成功，重试登录
-                const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password });
-                if (!retryError && retryData?.user) {
-                  // 重试登录成功，继续正常流程
-                  const { data: profile, error: profileError } = await supabase
-                    .from('profiles')
-                    .select('*')
-                    .eq('id', retryData.user.id)
-                    .single();
 
-                  if (profile) {
-                    if (!profile.authorized) {
-                      // 补救检查：预授权列表
-                      let shouldAuto = isEmailPreAuthorized(profile.email);
-                      if (!shouldAuto) {
-                        try {
-                          const { data: pr } = await supabase
-                            .from('pre_authorized_emails')
-                            .select('email')
-                            .ilike('email', profile.email)
-                            .maybeSingle();
-                          if (pr) shouldAuto = true;
-                        } catch { /* ignore */ }
-                      }
-                      if (shouldAuto) {
-                        await supabase.from('profiles').update({ authorized: true }).eq('id', profile.id);
-                        removePreAuthEmail(profile.email);
-                        try { await supabase.from('pre_authorized_emails').delete().ilike('email', profile.email); } catch { /* ignore */ }
-                        profile.authorized = true;
-                        setUser(profile);
-                        cacheProfile(profile);
-                        return { success: true };
-                      }
-                      await supabase.auth.signOut();
-                      return { success: false, message: '您的账号尚未被授权，请联系管理员。' };
-                    }
-                    setUser(profile);
-                    cacheProfile(profile);
-                    return { success: true };
-                  }
-                  return { success: true };
-                }
-              }
-            } catch (confirmErr) {
-              console.warn('[Auth] 自动确认邮箱重试失败:', confirmErr.message);
-            }
+              console.log('[Auth] admin-login 响应状态:', adminLoginRes.status);
 
-            // confirm-email API 失败时，尝试查一下 profiles 表该用户是否已被后台授权
-            // 如果已授权说明是管理员授权时 confirm-email 没生效，再尝试一次
-            try {
-              const { data: profileCheck } = await supabase
-                .from('profiles')
-                .select('*')
-                .ilike('email', email)
-                .maybeSingle();
-              if (profileCheck?.authorized) {
-                // 用户已被后台授权但邮箱未确认，再次尝试 confirm-email
-                console.log('[Auth] 用户已被后台授权但邮箱未确认，再次尝试 confirm-email');
-                try {
-                  const retryConfirm = await fetch('/api/confirm-email', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email }),
+              if (adminLoginRes.ok) {
+                const { session } = await adminLoginRes.json();
+
+                if (session?.access_token && session?.refresh_token) {
+                  // 使用服务端返回的 session 设置客户端会话
+                  const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+                    access_token: session.access_token,
+                    refresh_token: session.refresh_token,
                   });
-                  if (retryConfirm.ok) {
-                    // 确认成功，重试登录
-                    const { data: retryData2, error: retryError2 } = await supabase.auth.signInWithPassword({ email, password });
-                    if (!retryError2 && retryData2?.user) {
-                      setUser({ ...profileCheck, role: profileCheck.role || 'member' });
-                      cacheProfile(profileCheck);
+
+                  if (sessionError) {
+                    console.error('[Auth] setSession 失败:', sessionError.message);
+                    return { success: false, message: '登录会话设置失败，请重试。' };
+                  }
+
+                  const sessionUser = sessionData?.user || session.user;
+                  if (sessionUser) {
+                    // 获取 profile
+                    const { data: profile } = await supabase
+                      .from('profiles')
+                      .select('*')
+                      .eq('id', sessionUser.id)
+                      .single();
+
+                    if (profile) {
+                      if (!profile.authorized) {
+                        // 检查预授权列表
+                        let shouldAuto = isEmailPreAuthorized(profile.email);
+                        if (!shouldAuto) {
+                          try {
+                            const { data: pr } = await supabase
+                              .from('pre_authorized_emails')
+                              .select('email')
+                              .ilike('email', profile.email)
+                              .maybeSingle();
+                            if (pr) shouldAuto = true;
+                          } catch { /* ignore */ }
+                        }
+                        if (shouldAuto) {
+                          await supabase.from('profiles').update({ authorized: true }).eq('id', profile.id);
+                          removePreAuthEmail(profile.email);
+                          try { await supabase.from('pre_authorized_emails').delete().ilike('email', profile.email); } catch { /* ignore */ }
+                          profile.authorized = true;
+                        } else {
+                          await supabase.auth.signOut();
+                          return { success: false, message: '您的账号尚未被授权，请联系管理员。' };
+                        }
+                      }
+                      setUser(profile);
+                      cacheProfile(profile);
                       return { success: true };
                     }
+                    // profile 不存在但用户已登录（可能是新用户，trigger 会自动创建 profile）
+                    // 等待一下再查一次
+                    await new Promise(r => setTimeout(r, 500));
+                    const { data: retryProfile } = await supabase
+                      .from('profiles')
+                      .select('*')
+                      .eq('id', sessionUser.id)
+                      .single();
+                    if (retryProfile) {
+                      setUser(retryProfile);
+                      cacheProfile(retryProfile);
+                      return { success: true };
+                    }
+                    return { success: true };
                   }
-                } catch { /* ignore */ }
-                return { success: false, message: '您的账号已被管理员授权，但邮箱确认服务暂时不可用。请稍后重试或联系管理员。' };
-              }
-            } catch { /* ignore */ }
+                }
 
-            return { success: false, message: '邮箱尚未验证，请联系管理员处理。' };
+                // session 格式不对但 API 返回了 ok
+                console.warn('[Auth] admin-login 返回 ok 但 session 格式异常');
+                return { success: false, message: '登录异常，请重试。' };
+              }
+
+              // admin-login API 返回了错误
+              const errBody = await adminLoginRes.json().catch(() => ({}));
+              console.warn('[Auth] admin-login 失败:', adminLoginRes.status, errBody);
+
+              if (adminLoginRes.status === 401) {
+                return { success: false, message: errBody.error || '邮箱或密码错误' };
+              }
+
+              return { success: false, message: errBody.error || '邮箱验证服务暂时不可用，请稍后重试。' };
+            } catch (adminLoginErr) {
+              console.error('[Auth] admin-login 调用异常:', adminLoginErr.message);
+              return { success: false, message: '登录服务暂时不可用，请稍后重试。' };
+            }
           }
           // Supabase 认证失败（如用户不存在），回退到本地用户数据库尝试
           if (error.message === 'Invalid login credentials') {
