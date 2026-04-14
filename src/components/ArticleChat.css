@@ -237,6 +237,57 @@
   color: var(--color-primary);
 }
 
+/* ---- 快捷指令 ---- */
+.article-chat__quick-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 4px 0 2px;
+}
+
+.article-chat__quick-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  opacity: 0.7;
+}
+
+.article-chat__quick-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.article-chat__quick-btn {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  font-size: var(--text-xs);
+  font-family: var(--font-body);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.article-chat__quick-btn:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.06);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(91, 140, 62, 0.12);
+}
+
+.article-chat__quick-btn:active {
+  transform: translateY(0);
+  box-shadow: none;
+}
+
 /* ---- 输入区域 ---- */
 .article-chat__input-area {
   display: flex;

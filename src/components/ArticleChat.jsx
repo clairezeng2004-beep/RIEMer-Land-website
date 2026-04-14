@@ -1,11 +1,69 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, X, Send, ArrowRight, Loader2, Mic, MicOff } from 'lucide-react';
+import { MessageCircle, X, Send, ArrowRight, Loader2, Mic, MicOff, Sparkles } from 'lucide-react';
 import { sendMessage } from '../services/chatService';
 import './ArticleChat.css';
 
 // 浏览器 SpeechRecognition 兼容处理
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+// ---- 快捷指令配置 ----
+const INITIAL_QUICK_ACTIONS = [
+  { label: '🎓 保研经验', text: '有没有保研相关的经验分享？' },
+  { label: '📝 课程测评', text: '想看看课程测评，帮我选课' },
+  { label: '💼 求职分享', text: '有求职或实习相关的分享吗？' },
+  { label: '🌟 热门推荐', text: '最近有什么值得看的文章？' },
+];
+
+// 根据最后一条 AI 回复的内容，动态生成后续快捷指令
+function getContextQuickActions(lastAssistantMsg) {
+  if (!lastAssistantMsg) return [];
+  const text = lastAssistantMsg.toLowerCase();
+  const actions = [];
+
+  // 提到了保研/考研
+  if (text.includes('保研') || text.includes('推免')) {
+    actions.push({ label: '📋 保研时间线', text: '保研的时间线大概是怎样的？' });
+    actions.push({ label: '🆚 考研还是保研', text: '考研和保研怎么选？' });
+  }
+  if (text.includes('考研')) {
+    actions.push({ label: '📖 考研备考', text: '考研应该怎么准备？' });
+  }
+  // 提到了课程
+  if (text.includes('课程') || text.includes('选课')) {
+    actions.push({ label: '⭐ 推荐课程', text: '有哪些好评比较多的课？' });
+    actions.push({ label: '⚠️ 避坑指南', text: '有没有不太推荐的课？' });
+  }
+  // 提到了求职/实习
+  if (text.includes('求职') || text.includes('实习') || text.includes('工作')) {
+    actions.push({ label: '📄 简历建议', text: '简历应该怎么写比较好？' });
+    actions.push({ label: '🏢 实习经验', text: '有实习经验分享吗？' });
+  }
+  // 提到了出国/留学
+  if (text.includes('出国') || text.includes('留学') || text.includes('申请')) {
+    actions.push({ label: '🌍 留学规划', text: '出国留学应该怎么规划？' });
+    actions.push({ label: '📑 申请经验', text: '有留学申请的经验分享吗？' });
+  }
+  // 提到了迷茫/焦虑/规划
+  if (text.includes('迷茫') || text.includes('焦虑') || text.includes('规划') || text.includes('方向')) {
+    actions.push({ label: '🧭 大学规划', text: '大学四年应该怎么规划？' });
+    actions.push({ label: '💪 学长学姐建议', text: '学长学姐有什么建议给迷茫的同学？' });
+  }
+  // 推荐了文章，可以继续探索
+  if (text.includes('#')) {
+    actions.push({ label: '📚 看更多', text: '还有其他类似的文章吗？' });
+    actions.push({ label: '🔍 换个方向', text: '换个方向，还有什么值得看的？' });
+  }
+
+  // 通用兜底
+  if (actions.length === 0) {
+    actions.push({ label: '📚 推荐文章', text: '给我推荐几篇值得看的文章吧' });
+    actions.push({ label: '💬 随便聊聊', text: '我想随便聊聊' });
+  }
+
+  // 最多显示 3 个
+  return actions.slice(0, 3);
+}
 
 export default function ArticleChat() {
   const [isOpen, setIsOpen] = useState(false);
@@ -14,7 +72,7 @@ export default function ArticleChat() {
     {
       role: 'assistant',
       content:
-        '嗨～我是小 R，你的 RIEMer Land 助手 🌿\n有什么想聊的都可以跟我说，比如：\n\n• 保研/考研有什么经验可以参考？\n• 大二上的课怎么选比较好？\n• 最近有点迷茫，想看看学长学姐的分享',
+        '嗨～我是小 R，你的 RIEMer Land 助手 🌿\n有什么想聊的都可以跟我说～',
       articles: [],
     },
   ]);
@@ -23,6 +81,15 @@ export default function ArticleChat() {
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
+
+  // 根据对话上下文计算当前应显示的快捷指令
+  const quickActions = useMemo(() => {
+    // 只有初始欢迎语时，显示初始指令
+    if (messages.length <= 1) return INITIAL_QUICK_ACTIONS;
+    // 找到最后一条 AI 回复
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant');
+    return getContextQuickActions(lastAssistant?.content || '');
+  }, [messages]);
 
   // ---- 语音识别 ----
   const stopListening = useCallback(() => {
@@ -111,8 +178,8 @@ export default function ArticleChat() {
     }
   }, [isOpen]);
 
-  const handleSend = async () => {
-    const text = input.trim();
+  const handleSend = async (overrideText) => {
+    const text = (overrideText || input).trim();
     if (!text || loading) return;
 
     const userMsg = { role: 'user', content: text, articles: [] };
@@ -219,6 +286,26 @@ export default function ArticleChat() {
               <div className="article-chat__msg-bubble article-chat__msg-loading">
                 <Loader2 size={16} className="article-chat__spinner" />
                 <span>正在查找...</span>
+              </div>
+            </div>
+          )}
+          {/* 快捷指令 */}
+          {!loading && quickActions.length > 0 && (
+            <div className="article-chat__quick-actions">
+              <div className="article-chat__quick-label">
+                <Sparkles size={12} />
+                <span>试试问问</span>
+              </div>
+              <div className="article-chat__quick-list">
+                {quickActions.map((action, idx) => (
+                  <button
+                    key={idx}
+                    className="article-chat__quick-btn"
+                    onClick={() => handleSend(action.text)}
+                  >
+                    {action.label}
+                  </button>
+                ))}
               </div>
             </div>
           )}
