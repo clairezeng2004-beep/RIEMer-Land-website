@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
-import { MessageCircle, X, Send, ArrowRight, Loader2, Mic, MicOff, Sparkles } from 'lucide-react';
+import { MessageCircle, X, Send, ArrowRight, Loader2, Mic, MicOff } from 'lucide-react';
 import { sendMessage } from '../services/chatService';
 import './ArticleChat.css';
 
@@ -9,10 +9,10 @@ const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecogni
 
 // ---- 快捷指令配置 ----
 const INITIAL_QUICK_ACTIONS = [
-  { label: '🎓 保研经验', text: '有没有保研相关的经验分享？' },
-  { label: '📝 课程测评', text: '想看看课程测评，帮我选课' },
-  { label: '💼 求职分享', text: '有求职或实习相关的分享吗？' },
-  { label: '🌟 热门推荐', text: '最近有什么值得看的文章？' },
+  { label: '保研经验', text: '有没有保研相关的经验分享？' },
+  { label: '课程测评', text: '课程测评 选课推荐' },
+  { label: '求职分享', text: '有求职或实习相关的经验分享吗？' },
+  { label: '考研备考', text: '考研应该怎么准备？' },
 ];
 
 // 根据最后一条 AI 回复的内容，动态生成后续快捷指令
@@ -23,42 +23,42 @@ function getContextQuickActions(lastAssistantMsg) {
 
   // 提到了保研/考研
   if (text.includes('保研') || text.includes('推免')) {
-    actions.push({ label: '📋 保研时间线', text: '保研的时间线大概是怎样的？' });
-    actions.push({ label: '🆚 考研还是保研', text: '考研和保研怎么选？' });
+    actions.push({ label: '保研时间线', text: '保研准备时间线是怎样的？' });
+    actions.push({ label: '考研还是保研', text: '考研和保研怎么选？' });
   }
   if (text.includes('考研')) {
-    actions.push({ label: '📖 考研备考', text: '考研应该怎么准备？' });
+    actions.push({ label: '考研备考', text: '考研备考复习经验' });
   }
   // 提到了课程
   if (text.includes('课程') || text.includes('选课')) {
-    actions.push({ label: '⭐ 推荐课程', text: '有哪些好评比较多的课？' });
-    actions.push({ label: '⚠️ 避坑指南', text: '有没有不太推荐的课？' });
+    actions.push({ label: '推荐课程', text: '课程测评 选课推荐' });
+    actions.push({ label: '大一选课', text: '大一专业必修课程测评' });
   }
   // 提到了求职/实习
   if (text.includes('求职') || text.includes('实习') || text.includes('工作')) {
-    actions.push({ label: '📄 简历建议', text: '简历应该怎么写比较好？' });
-    actions.push({ label: '🏢 实习经验', text: '有实习经验分享吗？' });
+    actions.push({ label: '简历建议', text: '求职简历面试经验分享' });
+    actions.push({ label: '实习经验', text: '有实习求职经验分享吗？' });
   }
   // 提到了出国/留学
   if (text.includes('出国') || text.includes('留学') || text.includes('申请')) {
-    actions.push({ label: '🌍 留学规划', text: '出国留学应该怎么规划？' });
-    actions.push({ label: '📑 申请经验', text: '有留学申请的经验分享吗？' });
+    actions.push({ label: '留学规划', text: '出国留学申请经验分享' });
+    actions.push({ label: '申请经验', text: '留学申请经历分享' });
   }
   // 提到了迷茫/焦虑/规划
   if (text.includes('迷茫') || text.includes('焦虑') || text.includes('规划') || text.includes('方向')) {
-    actions.push({ label: '🧭 大学规划', text: '大学四年应该怎么规划？' });
-    actions.push({ label: '💪 学长学姐建议', text: '学长学姐有什么建议给迷茫的同学？' });
+    actions.push({ label: '大学规划', text: '大学规划方向成长经验' });
+    actions.push({ label: '学长学姐建议', text: '迷茫焦虑 成长心态经验分享' });
   }
   // 推荐了文章，可以继续探索
   if (text.includes('#')) {
-    actions.push({ label: '📚 看更多', text: '还有其他类似的文章吗？' });
-    actions.push({ label: '🔍 换个方向', text: '换个方向，还有什么值得看的？' });
+    actions.push({ label: '看更多', text: '还有其他相关的经验分享吗？' });
+    actions.push({ label: '换个方向', text: '换个方向，有什么值得看的经验分享？' });
   }
 
   // 通用兜底
   if (actions.length === 0) {
-    actions.push({ label: '📚 推荐文章', text: '给我推荐几篇值得看的文章吧' });
-    actions.push({ label: '💬 随便聊聊', text: '我想随便聊聊' });
+    actions.push({ label: '推荐文章', text: '推荐几篇值得看的经验分享' });
+    actions.push({ label: '随便看看', text: '有什么保研 考研 求职的经验？' });
   }
 
   // 最多显示 3 个
@@ -291,7 +291,6 @@ export default function ArticleChat() {
           {!loading && quickActions.length > 0 && (
             <div className="article-chat__quick-actions">
               <div className="article-chat__quick-label">
-                <Sparkles size={12} />
                 <span>试试问问</span>
               </div>
               <div className="article-chat__quick-list">
