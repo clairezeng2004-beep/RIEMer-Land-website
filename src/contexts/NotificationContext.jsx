@@ -8,6 +8,7 @@ const NotificationContext = createContext(null);
 
 const NOTIFICATIONS_KEY = 'riemer_notifications';
 const LAST_EMAIL_KEY = 'riemer_last_email_reminder';
+const UNREAD_CACHE_KEY = 'riemer_unread_count';
 
 // 获取当前周的起始日期（周一）
 function getWeekStart(date = new Date()) {
@@ -27,6 +28,16 @@ export function NotificationProvider({ children }) {
   const [emailReminderSent, setEmailReminderSent] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const pollRef = useRef(null);
+
+  // 从 localStorage 读取上次缓存的未读数，避免刷新时 badge 闪动（0 → N）
+  const cachedUnreadRef = useRef((() => {
+    try {
+      const cached = localStorage.getItem(UNREAD_CACHE_KEY);
+      return cached ? parseInt(cached, 10) || 0 : 0;
+    } catch {
+      return 0;
+    }
+  })());
 
   // 判断是否使用 Supabase
   const useSupabase = isSupabaseConfigured && getReachable() !== false;
@@ -184,7 +195,18 @@ export function NotificationProvider({ children }) {
     }
   }, [notifications]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const realUnreadCount = notifications.filter((n) => !n.read).length;
+  // 加载完成前使用缓存值，加载完成后使用真实值（避免 badge 从 0 闪到 N）
+  const unreadCount = loaded ? realUnreadCount : cachedUnreadRef.current;
+
+  // 真实未读数变化时，同步缓存到 localStorage（供下次刷新使用）
+  useEffect(() => {
+    if (loaded) {
+      try {
+        localStorage.setItem(UNREAD_CACHE_KEY, String(realUnreadCount));
+      } catch { /* ignore */ }
+    }
+  }, [loaded, realUnreadCount]);
 
   // 未读消息数同步到网页标题
   useEffect(() => {
@@ -352,6 +374,7 @@ export function NotificationProvider({ children }) {
       value={{
         notifications,
         unreadCount,
+        loaded,
         markAsRead,
         markAllAsRead,
         addNotification,
