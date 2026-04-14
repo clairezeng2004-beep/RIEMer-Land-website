@@ -584,26 +584,6 @@ export function AuthProvider({ children }) {
       return { success: true, message: '注册成功！您的邮箱已被管理员预授权，可直接登录。' };
     }
 
-    // 本地模式：在 localStorage 通知列表中添加授权通知
-    try {
-      const NOTIFICATIONS_KEY = 'riemer_notifications';
-      const stored = localStorage.getItem(NOTIFICATIONS_KEY);
-      const notifications = stored ? JSON.parse(stored) : [];
-      const newNotif = {
-        id: 'reg_' + Date.now().toString(),
-        title: '新成员注册申请',
-        message: `${name}（${email}）已注册账号，请前往用户管理页面进行授权。`,
-        type: 'system',
-        date: new Date().toISOString().split('T')[0],
-        read: false,
-        target_role: 'admin',
-      };
-      notifications.unshift(newNotif);
-      localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifications));
-    } catch (err) {
-      console.warn('[Auth] 本地通知写入失败:', err.message);
-    }
-
     return { success: true, message: '注册成功！请等待管理员授权后方可登录内部系统。' };
   };
 
@@ -674,19 +654,6 @@ export function AuthProvider({ children }) {
           try {
             await supabase.from('pre_authorized_emails').delete().ilike('email', email);
           } catch { /* 表可能不存在，忽略 */ }
-        } else {
-          // 非预授权：插入授权通知
-          try {
-            await supabase.from('notifications').insert({
-              title: '新成员注册申请',
-              message: `${name}（${email}）已注册账号，请前往用户管理页面进行授权。`,
-              type: 'system',
-              date: new Date().toISOString().split('T')[0],
-              target_role: 'admin',
-            });
-          } catch (notifErr) {
-            console.warn('[Auth] Supabase 通知插入失败（触发器可能已处理）:', notifErr.message);
-          }
         }
       }
       // 同时写入本地用户数据库备份
