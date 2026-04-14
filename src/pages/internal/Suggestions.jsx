@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -17,9 +17,14 @@ import {
   MessageSquarePlus,
   Mic,
   MicOff,
-  ThumbsUp,
+  Monitor,
+  Users,
 } from 'lucide-react';
 import './Suggestions.css';
+
+// 两类建议的状态选项
+const WEBSITE_STATUSES = ['处理中', '已完成', '暂时搁置'];
+const ORG_STATUSES = ['已完成', '暂时不做'];
 
 export default function Suggestions() {
   const { isAuthenticated, user } = useAuth();
@@ -33,6 +38,10 @@ export default function Suggestions() {
   const [editingSuggestionId, setEditingSuggestionId] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
+
+  // 按类别分组（无 category 的旧数据默认归入网站建设）
+  const websiteSugs = useMemo(() => suggestions.filter(s => !s.category || s.category === 'website'), [suggestions]);
+  const orgSugs = useMemo(() => suggestions.filter(s => s.category === 'organization'), [suggestions]);
 
   // 语音识别
   const SpeechRecognition = typeof window !== 'undefined'
@@ -127,6 +136,16 @@ export default function Suggestions() {
     }
   }, [suggestions, currentUserName, updateSuggestion]);
 
+  // 根据类别返回可用状态选项
+  const getStatusOptions = (category) => {
+    return category === 'organization' ? ORG_STATUSES : WEBSITE_STATUSES;
+  };
+
+  // 根据类别返回默认状态
+  const getDefaultStatus = (category) => {
+    return category === 'organization' ? '已完成' : '处理中';
+  };
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -162,6 +181,7 @@ export default function Suggestions() {
               setEditingSuggestion({
                 id: `sug-${Date.now()}`,
                 content: '',
+                category: 'website',
                 proposer: user?.name || user?.nickname || '',
                 supporters: [],
                 status: '处理中',
@@ -191,6 +211,34 @@ export default function Suggestions() {
               >
                 <X size={14} />
               </button>
+            </div>
+
+            <div className="suggestions-page__field">
+              <label>建议类别</label>
+              <div className="suggestions-page__category-toggle">
+                <button
+                  type="button"
+                  className={`suggestions-page__category-btn${editingSuggestion.category === 'website' ? ' suggestions-page__category-btn--active' : ''}`}
+                  onClick={() => setEditingSuggestion({
+                    ...editingSuggestion,
+                    category: 'website',
+                    status: getDefaultStatus('website'),
+                  })}
+                >
+                  <Monitor size={14} /> 网站建设
+                </button>
+                <button
+                  type="button"
+                  className={`suggestions-page__category-btn${editingSuggestion.category === 'organization' ? ' suggestions-page__category-btn--active' : ''}`}
+                  onClick={() => setEditingSuggestion({
+                    ...editingSuggestion,
+                    category: 'organization',
+                    status: getDefaultStatus('organization'),
+                  })}
+                >
+                  <Users size={14} /> 组织建设
+                </button>
+              </div>
             </div>
 
             <div className="suggestions-page__field">
@@ -246,9 +294,9 @@ export default function Suggestions() {
                   onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })}
                   className="suggestions-page__input"
                 >
-                  <option value="处理中">处理中</option>
-                  <option value="已完成">已完成</option>
-                  <option value="暂时搁置">暂时搁置</option>
+                  {getStatusOptions(editingSuggestion.category).map(s => (
+                    <option key={s} value={s}>{s}</option>
+                  ))}
                 </select>
               </div>
               <div className="suggestions-page__field suggestions-page__field--flex">
@@ -263,15 +311,15 @@ export default function Suggestions() {
               </div>
             </div>
 
-            {editingSuggestion.status === '暂时搁置' && (
+            {(editingSuggestion.status === '暂时搁置' || editingSuggestion.status === '暂时不做') && (
               <div className="suggestions-page__field">
-                <label><AlertCircle size={14} /> 搁置原因</label>
+                <label><AlertCircle size={14} /> {editingSuggestion.status === '暂时不做' ? '原因说明' : '搁置原因'}</label>
                 <textarea
                   value={editingSuggestion.skipReason}
                   onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
                   className="suggestions-page__input suggestions-page__textarea"
                   rows={2}
-                  placeholder="请说明暂时搁置的原因…"
+                  placeholder={editingSuggestion.status === '暂时不做' ? '请说明暂时不做的原因…' : '请说明暂时搁置的原因…'}
                 />
               </div>
             )}
@@ -307,226 +355,411 @@ export default function Suggestions() {
           </div>
         )}
 
-        {/* 建议列表表格 */}
-        {suggestions.length > 0 && (
-          <div className="sug-table-wrap">
-            <table className="sug-table">
-              <thead>
-                <tr>
-                  <th className="sug-table__th">具体建议</th>
-                  <th className="sug-table__th">提出人</th>
-                  <th className="sug-table__th">当前状态</th>
-                  <th className="sug-table__th">提出时间</th>
-                  <th className="sug-table__th">状态更新时间</th>
-                  <th className="sug-table__th">负责人</th>
-                  <th className="sug-table__th">操作</th>
-                </tr>
-              </thead>
-              <tbody>
-                {suggestions.map((sug) => (
-                  editingSuggestionId === sug.id && editingSuggestion ? (
-                    <tr key={sug.id} className="sug-table__row sug-table__row--editing">
-                      <td colSpan={7} className="sug-table__td sug-table__td--edit">
-                        <div className="sug-edit-form">
-                          <div className="suggestions-page__field">
-                            <label>具体建议</label>
-                            <div className="suggestions-page__textarea-wrap">
-                              <textarea
-                                value={editingSuggestion.content}
-                                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                                className="suggestions-page__input suggestions-page__textarea"
-                                rows={2}
-                              />
+        {/* ============ 网站建设相关 ============ */}
+        <div className="sug-section">
+          <h3 className="sug-section__title"><Monitor size={18} /> 网站建设相关</h3>
+          {websiteSugs.length > 0 ? (
+            <div className="sug-table-wrap">
+              <table className="sug-table">
+                <thead>
+                  <tr>
+                    <th className="sug-table__th">具体建议</th>
+                    <th className="sug-table__th">提出人</th>
+                    <th className="sug-table__th">当前状态</th>
+                    <th className="sug-table__th">提出时间</th>
+                    <th className="sug-table__th">状态更新时间</th>
+                    <th className="sug-table__th">负责人</th>
+                    <th className="sug-table__th">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {websiteSugs.map((sug) => (
+                    editingSuggestionId === sug.id && editingSuggestion ? (
+                      <tr key={sug.id} className="sug-table__row sug-table__row--editing">
+                        <td colSpan={7} className="sug-table__td sug-table__td--edit">
+                          <div className="sug-edit-form">
+                            <div className="suggestions-page__field">
+                              <label>具体建议</label>
+                              <div className="suggestions-page__textarea-wrap">
+                                <textarea
+                                  value={editingSuggestion.content}
+                                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                                  className="suggestions-page__input suggestions-page__textarea"
+                                  rows={2}
+                                />
+                                <button
+                                  type="button"
+                                  className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                                  onClick={() => toggleVoiceInput('content')}
+                                  title={isListening ? '停止语音输入' : '语音输入'}
+                                >
+                                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                                </button>
+                              </div>
+                              {isListening && (
+                                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+                              )}
+                            </div>
+                            <div className="suggestions-page__inline-group">
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>提出人</label>
+                                <input type="text" value={editingSuggestion.proposer} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })} className="suggestions-page__input" />
+                              </div>
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>当前状态</label>
+                                <select value={editingSuggestion.status} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })} className="suggestions-page__input">
+                                  {WEBSITE_STATUSES.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="suggestions-page__inline-group">
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>负责人</label>
+                                <input type="text" value={editingSuggestion.resolver} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })} className="suggestions-page__input" />
+                              </div>
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>状态更新人（显示头像）</label>
+                                <input type="text" value={editingSuggestion.statusUpdatedBy} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, statusUpdatedBy: e.target.value })} className="suggestions-page__input" placeholder="谁更新了这个状态" />
+                              </div>
+                            </div>
+                            {editingSuggestion.status === '暂时搁置' && (
+                              <div className="suggestions-page__field">
+                                <label>搁置原因</label>
+                                <textarea
+                                  value={editingSuggestion.skipReason}
+                                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
+                                  className="suggestions-page__input suggestions-page__textarea"
+                                  rows={2}
+                                  placeholder="请说明暂时搁置的原因…"
+                                />
+                              </div>
+                            )}
+                            <div className="suggestions-page__form-actions">
                               <button
-                                type="button"
-                                className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
-                                onClick={() => toggleVoiceInput('content')}
-                                title={isListening ? '停止语音输入' : '语音输入'}
+                                className="btn btn-primary"
+                                onClick={() => {
+                                  const oldSug = suggestions.find(s => s.id === sug.id);
+                                  updateSuggestion(sug.id, {
+                                    ...editingSuggestion,
+                                    category: 'website',
+                                    statusUpdatedAt: new Date().toISOString().split('T')[0],
+                                    statusUpdatedByAvatar: null,
+                                  });
+                                  if (oldSug && oldSug.status !== editingSuggestion.status) {
+                                    addNotification({
+                                      title: '建设建议状态变更',
+                                      message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
+                                      type: 'system',
+                                      read: true,
+                                    });
+                                  }
+                                  setEditingSuggestionId(null);
+                                  setEditingSuggestion(null);
+                                }}
                               >
-                                {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                                <Save size={14} /> 保存
+                              </button>
+                              <button
+                                className="btn btn-ghost"
+                                onClick={() => { setEditingSuggestionId(null); setEditingSuggestion(null); }}
+                              >
+                                取消
                               </button>
                             </div>
-                            {isListening && (
-                              <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
-                            )}
                           </div>
-                          <div className="suggestions-page__inline-group">
-                            <div className="suggestions-page__field suggestions-page__field--flex">
-                              <label>提出人</label>
-                              <input type="text" value={editingSuggestion.proposer} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })} className="suggestions-page__input" />
-                            </div>
-                            <div className="suggestions-page__field suggestions-page__field--flex">
-                              <label>当前状态</label>
-                              <select value={editingSuggestion.status} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })} className="suggestions-page__input">
-                                <option value="处理中">处理中</option>
-                                <option value="已完成">已完成</option>
-                                <option value="暂时搁置">暂时搁置</option>
-                              </select>
-                            </div>
-                          </div>
-                          <div className="suggestions-page__inline-group">
-                            <div className="suggestions-page__field suggestions-page__field--flex">
-                              <label>负责人</label>
-                              <input type="text" value={editingSuggestion.resolver} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })} className="suggestions-page__input" />
-                            </div>
-                            <div className="suggestions-page__field suggestions-page__field--flex">
-                              <label>状态更新人（显示头像）</label>
-                              <input type="text" value={editingSuggestion.statusUpdatedBy} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, statusUpdatedBy: e.target.value })} className="suggestions-page__input" placeholder="谁更新了这个状态" />
-                            </div>
-                          </div>
-                          {editingSuggestion.status === '暂时搁置' && (
-                            <div className="suggestions-page__field">
-                              <label>搁置原因</label>
-                              <textarea
-                                value={editingSuggestion.skipReason}
-                                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
-                                className="suggestions-page__input suggestions-page__textarea"
-                                rows={2}
-                                placeholder="请说明暂时搁置的原因…"
-                              />
-                            </div>
-                          )}
-                          <div className="suggestions-page__form-actions">
-                            <button
-                              className="btn btn-primary"
-                              onClick={() => {
-                                const oldSug = suggestions.find(s => s.id === sug.id);
-                                updateSuggestion(sug.id, {
-                                  ...editingSuggestion,
-                                  statusUpdatedAt: new Date().toISOString().split('T')[0],
-                                  statusUpdatedByAvatar: null,
-                                });
-                                if (oldSug && oldSug.status !== editingSuggestion.status) {
-                                  addNotification({
-                                    title: '建设建议状态变更',
-                                    message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
-                                    type: 'system',
-                                    read: true,
-                                  });
-                                }
-                                setEditingSuggestionId(null);
-                                setEditingSuggestion(null);
-                              }}
-                            >
-                              <Save size={14} /> 保存
-                            </button>
-                            <button
-                              className="btn btn-ghost"
-                              onClick={() => { setEditingSuggestionId(null); setEditingSuggestion(null); }}
-                            >
-                              取消
-                            </button>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ) : (
-                    <React.Fragment key={sug.id}>
-                    <tr className={`sug-table__row${sug.status === '暂时搁置' && sug.skipReason ? ' sug-table__row--has-note' : sug.status === '暂时不做' && sug.skipReason ? ' sug-table__row--has-note' : ''}`}>
-                      <td className="sug-table__td sug-table__td--content">
-                        <span>{sug.content}</span>
-                      </td>
-                      <td className="sug-table__td sug-table__td--proposer">
-                        <div className="sug-table__proposer-wrap">
-                          <span className="sug-table__person">
-                            {sug.proposer}
-                          </span>
-                          {(sug.supporters || []).length > 0 && (
-                            <div className="sug-table__supporters">
-                              {(sug.supporters || []).map((s, i) => (
-                                <span
-                                  key={i}
-                                  className="sug-table__supporter-name"
-                                  title={s.name}
-                                >
-                                  {s.name}{i < (sug.supporters || []).length - 1 ? '、' : ''}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                          <button
-                            className={`sug-table__plus-one${(sug.supporters || []).some(s => s.name === currentUserName) ? ' sug-table__plus-one--active' : ''}`}
-                            onClick={() => handlePlusOne(sug.id)}
-                            title={(sug.supporters || []).some(s => s.name === currentUserName) ? '取消 +1' : '+1 支持这个建议'}
-                          >
-                            <ThumbsUp size={12} />
-                            <span>+1</span>
-                            {(sug.supporters || []).length > 0 && (
-                              <span className="sug-table__plus-one-count">{(sug.supporters || []).length}</span>
-                            )}
-                          </button>
-                        </div>
-                      </td>
-                      <td className="sug-table__td">
-                        <span className={`sug-table__status sug-table__status--${sug.status === '已完成' || sug.status === '已修复' ? 'done' : sug.status === '处理中' || sug.status === '修复中' ? 'wip' : 'skip'}`}>
-                          {sug.status}
-                        </span>
-                      </td>
-                      <td className="sug-table__td sug-table__td--date">{sug.createdAt}</td>
-                      <td className="sug-table__td sug-table__td--date">
-                        <span className="sug-table__person">
-                          <span>
-                            <span className="sug-table__date-text">{sug.statusUpdatedAt}</span>
-                            {sug.statusUpdatedBy && <span className="sug-table__updater">by {sug.statusUpdatedBy}</span>}
-                          </span>
-                        </span>
-                      </td>
-                      <td className="sug-table__td">
-                        {sug.resolver ? (
-                          <span className="sug-table__person">
-                            {sug.resolver}
-                          </span>
-                        ) : (
-                          <span className="sug-table__empty">未指派</span>
-                        )}
-                      </td>
-                      <td className="sug-table__td sug-table__td--actions">
-                        <button
-                          className="suggestions-page__icon-btn"
-                          onClick={() => {
-                            setEditingSuggestionId(sug.id);
-                            setEditingSuggestion({ ...sug });
-                          }}
-                          title="编辑"
-                        >
-                          <Pencil size={14} />
-                        </button>
-                        <button
-                          className="suggestions-page__icon-btn suggestions-page__icon-btn--danger"
-                          onClick={() => {
-                            if (window.confirm(`确定删除这条建议吗？`)) {
-                              deleteSuggestion(sug.id);
-                            }
-                          }}
-                          title="删除"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </td>
-                    </tr>
-                    {(sug.status === '暂时搁置' || sug.status === '暂时不做') && sug.skipReason && (
-                      <tr className="sug-table__row sug-table__row--note">
-                        <td colSpan={7} className="sug-table__td sug-table__td--note">
-                          <span className="sug-table__skip-reason">
-                            <AlertCircle size={12} /> {sug.skipReason}
-                          </span>
                         </td>
                       </tr>
-                    )}
-                    </React.Fragment>
-                  )
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+                    ) : (
+                      <React.Fragment key={sug.id}>
+                      <tr className={`sug-table__row${sug.status === '暂时搁置' && sug.skipReason ? ' sug-table__row--has-note' : ''}`}>
+                        <td className="sug-table__td sug-table__td--content">
+                          <span>{sug.content}</span>
+                        </td>
+                        <td className="sug-table__td sug-table__td--proposer">
+                          <div className="sug-table__proposer-wrap">
+                            <span className="sug-table__person">
+                              {sug.proposer}
+                            </span>
+                            <div className="sug-table__plus-one-row">
+                              <button
+                                className={`sug-table__plus-one${(sug.supporters || []).some(s => s.name === currentUserName) ? ' sug-table__plus-one--active' : ''}`}
+                                onClick={() => handlePlusOne(sug.id)}
+                                title={(sug.supporters || []).some(s => s.name === currentUserName) ? '取消 +1' : '+1 支持这个建议'}
+                              >
+                                <span>+1</span>
+                                {(sug.supporters || []).length > 0 && (
+                                  <span className="sug-table__plus-one-count">{(sug.supporters || []).length}</span>
+                                )}
+                              </button>
+                              {(sug.supporters || []).length > 0 && (
+                                <div className="sug-table__supporters">
+                                  {(sug.supporters || []).map((s, i) => (
+                                    <span key={i} className="sug-table__supporter-name" title={s.name}>
+                                      {s.name}{i < (sug.supporters || []).length - 1 ? '、' : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="sug-table__td">
+                          <span className={`sug-table__status sug-table__status--${sug.status === '已完成' || sug.status === '已修复' ? 'done' : sug.status === '处理中' || sug.status === '修复中' ? 'wip' : 'skip'}`}>
+                            {sug.status}
+                          </span>
+                        </td>
+                        <td className="sug-table__td sug-table__td--date">{sug.createdAt}</td>
+                        <td className="sug-table__td sug-table__td--date">
+                          <span className="sug-table__person">
+                            <span>
+                              <span className="sug-table__date-text">{sug.statusUpdatedAt}</span>
+                              {sug.statusUpdatedBy && <span className="sug-table__updater">by {sug.statusUpdatedBy}</span>}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="sug-table__td">
+                          {sug.resolver ? (
+                            <span className="sug-table__person">{sug.resolver}</span>
+                          ) : (
+                            <span className="sug-table__empty">未指派</span>
+                          )}
+                        </td>
+                        <td className="sug-table__td sug-table__td--actions">
+                          <button className="suggestions-page__icon-btn" onClick={() => { setEditingSuggestionId(sug.id); setEditingSuggestion({ ...sug }); }} title="编辑">
+                            <Pencil size={14} />
+                          </button>
+                          <button className="suggestions-page__icon-btn suggestions-page__icon-btn--danger" onClick={() => { if (window.confirm('确定删除这条建议吗？')) deleteSuggestion(sug.id); }} title="删除">
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                      {sug.status === '暂时搁置' && sug.skipReason && (
+                        <tr className="sug-table__row sug-table__row--note">
+                          <td colSpan={7} className="sug-table__td sug-table__td--note">
+                            <span className="sug-table__skip-reason">
+                              <AlertCircle size={12} /> {sug.skipReason}
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
+                    )
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="suggestions-page__empty suggestions-page__empty--inline">
+              <AlertCircle size={14} />
+              <span>暂无网站建设相关建议</span>
+            </div>
+          )}
+        </div>
 
-        {suggestions.length === 0 && (
-          <div className="suggestions-page__empty">
-            <AlertCircle size={16} />
-            <span>暂无建议，点击上方按钮添加第一条建设建议。</span>
-          </div>
-        )}
+        {/* ============ 组织建设相关 ============ */}
+        <div className="sug-section">
+          <h3 className="sug-section__title"><Users size={18} /> 组织建设相关</h3>
+          {orgSugs.length > 0 ? (
+            <div className="sug-table-wrap">
+              <table className="sug-table">
+                <thead>
+                  <tr>
+                    <th className="sug-table__th">具体建议</th>
+                    <th className="sug-table__th">提出人</th>
+                    <th className="sug-table__th">当前状态</th>
+                    <th className="sug-table__th">提出时间</th>
+                    <th className="sug-table__th">状态更新时间</th>
+                    <th className="sug-table__th">负责人</th>
+                    <th className="sug-table__th">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orgSugs.map((sug) => (
+                    editingSuggestionId === sug.id && editingSuggestion ? (
+                      <tr key={sug.id} className="sug-table__row sug-table__row--editing">
+                        <td colSpan={7} className="sug-table__td sug-table__td--edit">
+                          <div className="sug-edit-form">
+                            <div className="suggestions-page__field">
+                              <label>具体建议</label>
+                              <div className="suggestions-page__textarea-wrap">
+                                <textarea
+                                  value={editingSuggestion.content}
+                                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                                  className="suggestions-page__input suggestions-page__textarea"
+                                  rows={2}
+                                />
+                                <button
+                                  type="button"
+                                  className={`suggestions-page__voice-btn${isListening ? ' suggestions-page__voice-btn--active' : ''}`}
+                                  onClick={() => toggleVoiceInput('content')}
+                                  title={isListening ? '停止语音输入' : '语音输入'}
+                                >
+                                  {isListening ? <MicOff size={16} /> : <Mic size={16} />}
+                                </button>
+                              </div>
+                              {isListening && (
+                                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话...</span>
+                              )}
+                            </div>
+                            <div className="suggestions-page__inline-group">
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>提出人</label>
+                                <input type="text" value={editingSuggestion.proposer} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })} className="suggestions-page__input" />
+                              </div>
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>当前状态</label>
+                                <select value={editingSuggestion.status} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, status: e.target.value })} className="suggestions-page__input">
+                                  {ORG_STATUSES.map(s => (
+                                    <option key={s} value={s}>{s}</option>
+                                  ))}
+                                </select>
+                              </div>
+                            </div>
+                            <div className="suggestions-page__inline-group">
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>负责人</label>
+                                <input type="text" value={editingSuggestion.resolver} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, resolver: e.target.value })} className="suggestions-page__input" />
+                              </div>
+                              <div className="suggestions-page__field suggestions-page__field--flex">
+                                <label>状态更新人（显示头像）</label>
+                                <input type="text" value={editingSuggestion.statusUpdatedBy} onChange={(e) => setEditingSuggestion({ ...editingSuggestion, statusUpdatedBy: e.target.value })} className="suggestions-page__input" placeholder="谁更新了这个状态" />
+                              </div>
+                            </div>
+                            {editingSuggestion.status === '暂时不做' && (
+                              <div className="suggestions-page__field">
+                                <label>原因说明</label>
+                                <textarea
+                                  value={editingSuggestion.skipReason}
+                                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
+                                  className="suggestions-page__input suggestions-page__textarea"
+                                  rows={2}
+                                  placeholder="请说明暂时不做的原因…"
+                                />
+                              </div>
+                            )}
+                            <div className="suggestions-page__form-actions">
+                              <button
+                                className="btn btn-primary"
+                                onClick={() => {
+                                  const oldSug = suggestions.find(s => s.id === sug.id);
+                                  updateSuggestion(sug.id, {
+                                    ...editingSuggestion,
+                                    category: 'organization',
+                                    statusUpdatedAt: new Date().toISOString().split('T')[0],
+                                    statusUpdatedByAvatar: null,
+                                  });
+                                  if (oldSug && oldSug.status !== editingSuggestion.status) {
+                                    addNotification({
+                                      title: '建设建议状态变更',
+                                      message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
+                                      type: 'system',
+                                      read: true,
+                                    });
+                                  }
+                                  setEditingSuggestionId(null);
+                                  setEditingSuggestion(null);
+                                }}
+                              >
+                                <Save size={14} /> 保存
+                              </button>
+                              <button
+                                className="btn btn-ghost"
+                                onClick={() => { setEditingSuggestionId(null); setEditingSuggestion(null); }}
+                              >
+                                取消
+                              </button>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      <React.Fragment key={sug.id}>
+                      <tr className={`sug-table__row${sug.status === '暂时不做' && sug.skipReason ? ' sug-table__row--has-note' : ''}`}>
+                        <td className="sug-table__td sug-table__td--content">
+                          <span>{sug.content}</span>
+                        </td>
+                        <td className="sug-table__td sug-table__td--proposer">
+                          <div className="sug-table__proposer-wrap">
+                            <span className="sug-table__person">
+                              {sug.proposer}
+                            </span>
+                            <div className="sug-table__plus-one-row">
+                              <button
+                                className={`sug-table__plus-one${(sug.supporters || []).some(s => s.name === currentUserName) ? ' sug-table__plus-one--active' : ''}`}
+                                onClick={() => handlePlusOne(sug.id)}
+                                title={(sug.supporters || []).some(s => s.name === currentUserName) ? '取消 +1' : '+1 支持这个建议'}
+                              >
+                                <span>+1</span>
+                                {(sug.supporters || []).length > 0 && (
+                                  <span className="sug-table__plus-one-count">{(sug.supporters || []).length}</span>
+                                )}
+                              </button>
+                              {(sug.supporters || []).length > 0 && (
+                                <div className="sug-table__supporters">
+                                  {(sug.supporters || []).map((s, i) => (
+                                    <span key={i} className="sug-table__supporter-name" title={s.name}>
+                                      {s.name}{i < (sug.supporters || []).length - 1 ? '、' : ''}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="sug-table__td">
+                          <span className={`sug-table__status sug-table__status--${sug.status === '已完成' ? 'done' : 'skip'}`}>
+                            {sug.status}
+                          </span>
+                        </td>
+                        <td className="sug-table__td sug-table__td--date">{sug.createdAt}</td>
+                        <td className="sug-table__td sug-table__td--date">
+                          <span className="sug-table__person">
+                            <span>
+                              <span className="sug-table__date-text">{sug.statusUpdatedAt}</span>
+                              {sug.statusUpdatedBy && <span className="sug-table__updater">by {sug.statusUpdatedBy}</span>}
+                            </span>
+                          </span>
+                        </td>
+                        <td className="sug-table__td">
+                          {sug.resolver ? (
+                            <span className="sug-table__person">{sug.resolver}</span>
+                          ) : (
+                            <span className="sug-table__empty">未指派</span>
+                          )}
+                        </td>
+                        <td className="sug-table__td sug-table__td--actions">
+                          <button className="suggestions-page__icon-btn" onClick={() => { setEditingSuggestionId(sug.id); setEditingSuggestion({ ...sug }); }} title="编辑">
+                            <Pencil size={14} />
+                          </button>
+                          <button className="suggestions-page__icon-btn suggestions-page__icon-btn--danger" onClick={() => { if (window.confirm('确定删除这条建议吗？')) deleteSuggestion(sug.id); }} title="删除">
+                            <Trash2 size={14} />
+                          </button>
+                        </td>
+                      </tr>
+                      {sug.status === '暂时不做' && sug.skipReason && (
+                        <tr className="sug-table__row sug-table__row--note">
+                          <td colSpan={7} className="sug-table__td sug-table__td--note">
+                            <span className="sug-table__skip-reason">
+                              <AlertCircle size={12} /> {sug.skipReason}
+                            </span>
+                          </td>
+                        </tr>
+                      )}
+                      </React.Fragment>
+                    )
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="suggestions-page__empty suggestions-page__empty--inline">
+              <AlertCircle size={14} />
+              <span>暂无组织建设相关建议</span>
+            </div>
+          )}
+        </div>
       </div>
       </div>
     </div>
