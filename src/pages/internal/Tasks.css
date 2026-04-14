@@ -75,6 +75,10 @@
   gap: var(--space-lg);
 }
 
+.tasks-form__body > .btn {
+  align-self: flex-start;
+}
+
 .tasks-form__row {
   display: grid;
   grid-template-columns: 2fr 1fr;

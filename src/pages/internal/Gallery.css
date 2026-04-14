@@ -44,6 +44,10 @@
   gap: var(--space-lg);
 }
 
+.gallery-create__form > .btn {
+  align-self: flex-start;
+}
+
 .gallery-create__field {
   display: flex;
   flex-direction: column;
@@ -75,6 +79,18 @@
 .gallery-create__textarea {
   resize: vertical;
   min-height: 80px;
+}
+
+.gallery-create__date-row {
+  display: flex;
+  gap: var(--space-md);
+}
+
+.gallery-create__select {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  appearance: auto;
 }
 
 /* ============ Album Grid ============ */

@@ -32,14 +32,24 @@ const getOriginalUrl = (url) => {
   return url.replace(/[?&](w|q)=\d+/g, '').replace(/\?$/, '');
 };
 
+/* ---------- 工具函数：格式化日期显示 ---------- */
+const formatAlbumDate = (dateStr) => {
+  if (!dateStr) return '';
+  // 支持 "2025-03" 或 "2025-03-22" 格式
+  const parts = dateStr.split('-');
+  const y = parts[0];
+  const m = parts[1] ? parseInt(parts[1], 10) : null;
+  return m ? `${y} 年 ${m} 月` : `${y} 年`;
+};
+
 /* ---------- 示例相册数据 ---------- */
 const initialAlbums = [
   {
     id: '1',
-    title: '2025 春季聚会',
+    title: '春季聚会',
     description: '成员线下春季见面会，烧烤与户外活动',
     coverIndex: 0,
-    date: '2025-03-22',
+    date: '2025-03',
     photos: [
       { id: 'p1', url: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=640&q=75', caption: '合照' },
       { id: 'p2', url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=640&q=75', caption: '烧烤现场' },
@@ -52,7 +62,7 @@ const initialAlbums = [
     title: '线上读书分享会',
     description: '第三期线上读书会，分享近期阅读心得',
     coverIndex: 0,
-    date: '2025-02-15',
+    date: '2025-02',
     photos: [
       { id: 'p5', url: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=640&q=75', caption: '读书会截图' },
       { id: 'p6', url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=640&q=75', caption: '推荐书单' },
@@ -60,10 +70,10 @@ const initialAlbums = [
   },
   {
     id: '3',
-    title: '2024 年末总结会',
+    title: '年末总结会',
     description: '回顾这一年的成长与收获，展望新年计划',
     coverIndex: 0,
-    date: '2024-12-28',
+    date: '2024-12',
     photos: [
       { id: 'p7', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=640&q=75', caption: '总结会现场' },
       { id: 'p8', url: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=640&q=75', caption: '颁奖环节' },
@@ -87,7 +97,13 @@ export default function Gallery() {
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
   const [showAddPhoto, setShowAddPhoto] = useState(false);
-  const [newAlbum, setNewAlbum] = useState({ title: '', description: '' });
+  const now = new Date();
+  const [newAlbum, setNewAlbum] = useState({
+    title: '',
+    description: '',
+    year: now.getFullYear().toString(),
+    month: (now.getMonth() + 1).toString(),
+  });
   const [selectedFiles, setSelectedFiles] = useState([]);
   const fileInputRef = useRef(null);
   const albumFileInputRef = useRef(null);
@@ -100,18 +116,26 @@ export default function Gallery() {
   const handleCreateAlbum = (e) => {
     e.preventDefault();
     if (!newAlbum.title.trim()) return;
+    const y = newAlbum.year || now.getFullYear().toString();
+    const m = (newAlbum.month || '1').padStart(2, '0');
     const album = {
       id: Date.now().toString(),
       title: newAlbum.title,
       description: newAlbum.description,
       coverIndex: 0,
-      date: new Date().toISOString().split('T')[0],
+      date: `${y}-${m}`,
       createdById: user?.id || null,
       createdBy: user?.nickname || user?.name || 'Unknown',
       photos: [],
     };
     setAlbums([album, ...albums]);
-    setNewAlbum({ title: '', description: '' });
+    const resetNow = new Date();
+    setNewAlbum({
+      title: '',
+      description: '',
+      year: resetNow.getFullYear().toString(),
+      month: (resetNow.getMonth() + 1).toString(),
+    });
     setShowCreateAlbum(false);
   };
 
@@ -280,10 +304,34 @@ export default function Gallery() {
                     type="text"
                     value={newAlbum.title}
                     onChange={(e) => setNewAlbum({ ...newAlbum, title: e.target.value })}
-                    placeholder="例如：2025 春季聚会"
+                    placeholder="例如：招新聚会"
                     className="gallery-create__input"
                     required
                   />
+                </div>
+                <div className="gallery-create__field">
+                  <label>时间</label>
+                  <div className="gallery-create__date-row">
+                    <select
+                      value={newAlbum.year}
+                      onChange={(e) => setNewAlbum({ ...newAlbum, year: e.target.value })}
+                      className="gallery-create__input gallery-create__select"
+                    >
+                      {Array.from({ length: 10 }, (_, i) => {
+                        const y = new Date().getFullYear() - i;
+                        return <option key={y} value={y}>{y} 年</option>;
+                      })}
+                    </select>
+                    <select
+                      value={newAlbum.month}
+                      onChange={(e) => setNewAlbum({ ...newAlbum, month: e.target.value })}
+                      className="gallery-create__input gallery-create__select"
+                    >
+                      {Array.from({ length: 12 }, (_, i) => (
+                        <option key={i + 1} value={i + 1}>{i + 1} 月</option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
                 <div className="gallery-create__field">
                   <label>描述（选填）</label>
@@ -305,7 +353,7 @@ export default function Gallery() {
           {/* 相册列表 */}
           {albums.length > 0 ? (
             <div className="gallery-grid">
-              {albums.map((album) => {
+              {[...albums].sort((a, b) => b.date.localeCompare(a.date)).map((album) => {
                 const cover = album.photos[album.coverIndex] || album.photos[0];
                 return (
                   <div
@@ -335,7 +383,7 @@ export default function Gallery() {
                       )}
                       <div className="album-card__meta">
                         <span>
-                          <Calendar size={12} /> {album.date}
+                          <Calendar size={12} /> {formatAlbumDate(album.date)}
                         </span>
                       </div>
                     </div>
@@ -392,7 +440,7 @@ export default function Gallery() {
               <p className="gallery-detail__desc">{selectedAlbum.description}</p>
             )}
             <span className="gallery-detail__meta">
-              <Calendar size={14} /> {selectedAlbum.date} · {selectedAlbum.photos.length} 张照片
+              <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photos.length} 张照片
             </span>
           </div>
           <button
