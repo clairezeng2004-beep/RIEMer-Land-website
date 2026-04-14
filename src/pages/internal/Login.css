@@ -159,6 +159,54 @@
   position: relative;
 }
 
+/* 邮箱后缀自动提示 */
+.login-card__email-wrap {
+  position: relative;
+}
+
+.login-card__email-suggestions {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 50;
+  margin-top: 4px;
+  padding: 4px 0;
+  list-style: none;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.login-card__email-suggestion-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.login-card__email-suggestion-item:hover,
+.login-card__email-suggestion-item--active {
+  background: rgba(91, 140, 62, 0.08);
+}
+
+.login-card__email-suggestion-item strong {
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.login-card__email-suggestion-item svg {
+  color: var(--color-text-muted);
+  flex-shrink: 0;
+}
+
 .login-card__password-wrapper .login-card__input {
   padding-right: 44px;
 }

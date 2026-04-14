@@ -41,6 +41,61 @@ export default function Login() {
   const { login, register, resetPassword, changePassword, sendResetCode, verifyResetCode, isAuthenticated, supabaseOk } = useAuth();
   const navigate = useNavigate();
 
+  // 邮箱后缀自动提示
+  const EMAIL_SUFFIXES = [
+    'qq.com', '163.com', '126.com', 'gmail.com', 'outlook.com',
+    'foxmail.com', 'hotmail.com', 'yeah.net', 'sina.com', 'sohu.com',
+    'icloud.com', '139.com', '188.com', 'yahoo.com',
+  ];
+  const [showEmailSuggestions, setShowEmailSuggestions] = useState(false);
+  const [activeEmailIdx, setActiveEmailIdx] = useState(-1);
+
+  const emailSuggestions = (() => {
+    const atIdx = email.indexOf('@');
+    if (atIdx < 1) return [];
+    const typed = email.slice(atIdx + 1).toLowerCase();
+    return EMAIL_SUFFIXES
+      .filter((s) => s.startsWith(typed) && s !== typed)
+      .map((s) => email.slice(0, atIdx + 1) + s);
+  })();
+
+  const handleEmailChange = (e) => {
+    const val = e.target.value;
+    setEmail(val);
+    setShowEmailSuggestions(val.includes('@'));
+    setActiveEmailIdx(-1);
+  };
+
+  const handleEmailSuggestionClick = (suggestion) => {
+    setEmail(suggestion);
+    setShowEmailSuggestions(false);
+    setActiveEmailIdx(-1);
+  };
+
+  const handleEmailKeyDown = (e) => {
+    if (!showEmailSuggestions || emailSuggestions.length === 0) return;
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActiveEmailIdx((i) => (i + 1) % emailSuggestions.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActiveEmailIdx((i) => (i <= 0 ? emailSuggestions.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && activeEmailIdx >= 0) {
+      e.preventDefault();
+      handleEmailSuggestionClick(emailSuggestions[activeEmailIdx]);
+    } else if (e.key === 'Escape') {
+      setShowEmailSuggestions(false);
+    }
+  };
+
+  const handleEmailBlur = () => {
+    setTimeout(() => setShowEmailSuggestions(false), 150);
+  };
+
+  const handleEmailFocus = () => {
+    if (email.includes('@')) setShowEmailSuggestions(true);
+  };
+
   // 页面加载时恢复已保存的凭据
   useEffect(() => {
     try {
@@ -365,14 +420,33 @@ export default function Login() {
               <label className="login-card__label">
                 <Mail size={16} /> 邮箱
               </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="请输入邮箱地址"
-                className="login-card__input"
-                autoComplete="username"
-              />
+              <div className="login-card__email-wrap">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  onKeyDown={handleEmailKeyDown}
+                  onBlur={handleEmailBlur}
+                  onFocus={handleEmailFocus}
+                  placeholder="请输入邮箱地址"
+                  className="login-card__input"
+                  autoComplete="off"
+                />
+                {showEmailSuggestions && emailSuggestions.length > 0 && (
+                  <ul className="login-card__email-suggestions">
+                    {emailSuggestions.map((s, idx) => (
+                      <li
+                        key={s}
+                        className={`login-card__email-suggestion-item${idx === activeEmailIdx ? ' login-card__email-suggestion-item--active' : ''}`}
+                        onMouseDown={() => handleEmailSuggestionClick(s)}
+                      >
+                        <Mail size={13} />
+                        <span><strong>{s.split('@')[0]}@</strong>{s.split('@')[1]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             <div className="login-card__field">
@@ -452,14 +526,33 @@ export default function Login() {
               <label className="login-card__label">
                 <Mail size={16} /> 邮箱
               </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="请输入邮箱地址"
-                className="login-card__input"
-                autoComplete="username"
-              />
+              <div className="login-card__email-wrap">
+                <input
+                  type="email"
+                  value={email}
+                  onChange={handleEmailChange}
+                  onKeyDown={handleEmailKeyDown}
+                  onBlur={handleEmailBlur}
+                  onFocus={handleEmailFocus}
+                  placeholder="请输入邮箱地址"
+                  className="login-card__input"
+                  autoComplete="off"
+                />
+                {showEmailSuggestions && emailSuggestions.length > 0 && (
+                  <ul className="login-card__email-suggestions">
+                    {emailSuggestions.map((s, idx) => (
+                      <li
+                        key={s}
+                        className={`login-card__email-suggestion-item${idx === activeEmailIdx ? ' login-card__email-suggestion-item--active' : ''}`}
+                        onMouseDown={() => handleEmailSuggestionClick(s)}
+                      >
+                        <Mail size={13} />
+                        <span><strong>{s.split('@')[0]}@</strong>{s.split('@')[1]}</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
             </div>
 
             <div className="login-card__field">
@@ -501,14 +594,33 @@ export default function Login() {
                   <label className="login-card__label">
                     <Mail size={16} /> 注册邮箱
                   </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="请输入注册时使用的邮箱地址"
-                    className="login-card__input"
-                    autoComplete="username"
-                  />
+                  <div className="login-card__email-wrap">
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={handleEmailChange}
+                      onKeyDown={handleEmailKeyDown}
+                      onBlur={handleEmailBlur}
+                      onFocus={handleEmailFocus}
+                      placeholder="请输入注册时使用的邮箱地址"
+                      className="login-card__input"
+                      autoComplete="off"
+                    />
+                    {showEmailSuggestions && emailSuggestions.length > 0 && (
+                      <ul className="login-card__email-suggestions">
+                        {emailSuggestions.map((s, idx) => (
+                          <li
+                            key={s}
+                            className={`login-card__email-suggestion-item${idx === activeEmailIdx ? ' login-card__email-suggestion-item--active' : ''}`}
+                            onMouseDown={() => handleEmailSuggestionClick(s)}
+                          >
+                            <Mail size={13} />
+                            <span><strong>{s.split('@')[0]}@</strong>{s.split('@')[1]}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
 
                 <button type="submit" className="btn btn-primary btn-lg login-card__submit" disabled={submitting}>
