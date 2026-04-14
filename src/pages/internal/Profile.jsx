@@ -21,6 +21,7 @@ export default function Profile() {
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [signature, setSignature] = useState(user?.signature || '');
   const [enrollmentYear, setEnrollmentYear] = useState('');
+  const [enrollmentYearLoaded, setEnrollmentYearLoaded] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
   const [avatarFile, setAvatarFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -55,6 +56,8 @@ export default function Profile() {
       }
     } catch {
       // ignore
+    } finally {
+      setEnrollmentYearLoaded(true);
     }
   };
 
@@ -77,6 +80,7 @@ export default function Profile() {
             console.warn('[Profile] Supabase 加载入学年份失败:', error.message);
           } else if (data?.enrollment_year) {
             setEnrollmentYear(data.enrollment_year);
+            setEnrollmentYearLoaded(true);
             return;
           }
         } catch (err) {
@@ -303,14 +307,24 @@ export default function Profile() {
                   入学年份
                   <span className="profile-page__label-hint">（将在成员通讯录中展示）</span>
                 </label>
-                <input
-                  type="text"
-                  className="profile-page__input"
-                  value={enrollmentYear}
-                  onChange={(e) => setEnrollmentYear(e.target.value)}
-                  placeholder="如 2023"
-                  maxLength={10}
-                />
+                {enrollmentYearLoaded ? (
+                  <input
+                    type="text"
+                    className="profile-page__input"
+                    value={enrollmentYear}
+                    onChange={(e) => setEnrollmentYear(e.target.value)}
+                    placeholder="如 2023"
+                    maxLength={10}
+                  />
+                ) : (
+                  <input
+                    type="text"
+                    className="profile-page__input profile-page__input--disabled"
+                    value=""
+                    placeholder="加载中..."
+                    disabled
+                  />
+                )}
               </div>
 
               <div className="profile-page__field">
