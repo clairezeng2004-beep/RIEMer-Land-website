@@ -811,11 +811,33 @@ export function AuthProvider({ children }) {
 
         console.log('[Auth] Supabase 更新 profiles 表:', { userId: user.id, fields: Object.keys(updateData) });
 
-        const { error, data: returnedData } = await supabase
+        let { error, data: returnedData } = await supabase
           .from('profiles')
           .update(updateData)
           .eq('id', user.id)
           .select();
+
+        // 如果是因为 signature 列不存在导致失败，去掉 signature 再试一次
+        if (error && error.message?.includes('signature')) {
+          console.warn('[Auth] profiles 表缺少 signature 列，去掉 signature 重试');
+          delete updateData.signature;
+          if (Object.keys(updateData).length > 0) {
+            const retry = await supabase
+              .from('profiles')
+              .update(updateData)
+              .eq('id', user.id)
+              .select();
+            error = retry.error;
+            returnedData = retry.data;
+          } else {
+            error = null;
+            returnedData = [{}];
+          }
+          if (!error) {
+            console.log('[Auth] Supabase profiles 更新成功（跳过 signature）');
+            return { success: true, message: '已保存到本地，云端同步成功（个性签名暂不支持云端同步，请联系管理员执行数据库修复脚本）' };
+          }
+        }
 
         if (error) {
           console.error('[Auth] Supabase profiles 更新失败:', error.message, error.code, error.details, error.hint);

@@ -73,6 +73,7 @@ export default function Profile() {
             .eq('user_id', user.id)
             .maybeSingle();
           if (error) {
+            // 表不存在或列缺失时静默回退本地，不打扰用户
             console.warn('[Profile] Supabase 加载入学年份失败:', error.message);
           } else if (data?.enrollment_year) {
             setEnrollmentYear(data.enrollment_year);
@@ -174,45 +175,55 @@ export default function Profile() {
             .maybeSingle();
 
           if (selectError) {
-            console.warn('[Profile] 查询 member_profiles 失败:', selectError.message);
-          }
-
-          let upsertError;
-          if (existingRecord) {
-            // 已有记录 → 只更新 enrollment_year（不覆盖 joined_at 和其他字段）
-            const { error } = await supabase
-              .from('member_profiles')
-              .update({ enrollment_year: yearVal, updated_at: new Date().toISOString() })
-              .eq('user_id', user.id);
-            upsertError = error;
+            // 表不存在时直接跳过，不展示技术性错误
+            const isTableMissing = selectError.message?.includes('member_profiles') ||
+              selectError.message?.includes('schema cache') ||
+              selectError.code === '42P01';
+            if (isTableMissing) {
+              console.warn('[Profile] member_profiles 表不存在，跳过云端同步');
+              warnings.push('入学年份仅保存在本地（请联系管理员执行数据库修复脚本）');
+            } else {
+              console.warn('[Profile] 查询 member_profiles 失败:', selectError.message);
+              warnings.push('入学年份云端同步失败');
+            }
           } else {
-            // 无记录 → 插入新记录
-            const { error } = await supabase
-              .from('member_profiles')
-              .insert({
-                user_id: user.id,
-                enrollment_year: yearVal,
-                joined_at: user.created_at || new Date().toISOString(),
-              });
-            upsertError = error;
-          }
+            let upsertError;
+            if (existingRecord) {
+              // 已有记录 → 只更新 enrollment_year（不覆盖 joined_at 和其他字段）
+              const { error } = await supabase
+                .from('member_profiles')
+                .update({ enrollment_year: yearVal, updated_at: new Date().toISOString() })
+                .eq('user_id', user.id);
+              upsertError = error;
+            } else {
+              // 无记录 → 插入新记录
+              const { error } = await supabase
+                .from('member_profiles')
+                .insert({
+                  user_id: user.id,
+                  enrollment_year: yearVal,
+                  joined_at: user.created_at || new Date().toISOString(),
+                });
+              upsertError = error;
+            }
 
-          if (upsertError) {
-            console.warn('[Profile] Supabase member_profiles 同步失败:', upsertError.message, upsertError.code, upsertError.details);
-            warnings.push('入学年份云端同步失败: ' + upsertError.message);
-          } else {
-            console.log('[Profile] Supabase member_profiles 同步成功');
+            if (upsertError) {
+              console.warn('[Profile] Supabase member_profiles 同步失败:', upsertError.message, upsertError.code, upsertError.details);
+              warnings.push('入学年份云端同步失败');
+            } else {
+              console.log('[Profile] Supabase member_profiles 同步成功');
+            }
           }
         } catch (err) {
           console.warn('[Profile] Supabase 入学年份同步异常:', err);
-          warnings.push('入学年份云端同步异常: ' + err.message);
+          warnings.push('入学年份云端同步失败');
         }
       }
 
       // 设置成功消息
       setAvatarFile(null);
       if (warnings.length > 0) {
-        setMessage({ type: 'success', text: '个人资料已保存！（' + warnings.join('；') + '）' });
+        setMessage({ type: 'success', text: '个人资料已保存！（部分信息仅保存在本地，如需云端同步请联系管理员执行数据库修复脚本 supabase-fix.sql）' });
       } else {
         setMessage({ type: 'success', text: '个人资料保存成功！' });
       }
