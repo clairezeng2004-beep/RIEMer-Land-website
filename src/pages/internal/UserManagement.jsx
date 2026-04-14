@@ -433,9 +433,6 @@ export default function UserManagement() {
                   <tr key={u.id}>
                     <td>
                       <div className="users-table__user">
-                        <div className="users-table__avatar">
-                          <User size={16} />
-                        </div>
                         <span>{u.name}</span>
                       </div>
                     </td>

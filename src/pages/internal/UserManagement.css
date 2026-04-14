@@ -231,6 +231,7 @@
   align-items: center;
   gap: var(--space-sm);
   font-weight: 500;
+  white-space: nowrap;
 }
 
 .users-table__avatar {
