@@ -477,7 +477,40 @@ export function AuthProvider({ children }) {
 
         if (error) {
           if (error.message === 'Email not confirmed') {
-            return { success: false, message: '邮箱尚未验证。请到 Supabase Dashboard → Authentication → Users 中手动确认该邮箱，或关闭邮箱验证（Providers → Email → Confirm email 关闭）' };
+            // 尝试通过服务端 API 自动确认邮箱后重试登录
+            try {
+              const confirmRes = await fetch('/api/confirm-email', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+              });
+              if (confirmRes.ok) {
+                // 确认成功，重试登录
+                const { data: retryData, error: retryError } = await supabase.auth.signInWithPassword({ email, password });
+                if (!retryError && retryData?.user) {
+                  // 重试登录成功，继续正常流程
+                  const { data: profile, error: profileError } = await supabase
+                    .from('profiles')
+                    .select('*')
+                    .eq('id', retryData.user.id)
+                    .single();
+
+                  if (profile) {
+                    if (!profile.authorized) {
+                      await supabase.auth.signOut();
+                      return { success: false, message: '您的账号尚未被授权，请联系管理员。' };
+                    }
+                    setUser(profile);
+                    cacheProfile(profile);
+                    return { success: true };
+                  }
+                  return { success: true };
+                }
+              }
+            } catch (confirmErr) {
+              console.warn('[Auth] 自动确认邮箱重试失败:', confirmErr.message);
+            }
+            return { success: false, message: '邮箱尚未验证，请联系管理员处理。' };
           }
           // Supabase 认证失败（如用户不存在），回退到本地用户数据库尝试
           if (error.message === 'Invalid login credentials') {
@@ -654,6 +687,17 @@ export function AuthProvider({ children }) {
           try {
             await supabase.from('pre_authorized_emails').delete().ilike('email', email);
           } catch { /* 表可能不存在，忽略 */ }
+
+          // 预授权用户：通过服务端 API 自动确认邮箱（跳过 Supabase 邮箱验证）
+          try {
+            await fetch('/api/confirm-email', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email }),
+            });
+          } catch (confirmErr) {
+            console.warn('[Auth] 自动确认邮箱失败:', confirmErr.message);
+          }
         }
       }
       // 同时写入本地用户数据库备份
