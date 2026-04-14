@@ -13,7 +13,8 @@
 
 .mc-page {
   min-height: 60vh;
-  padding: var(--space-xl) 0;
+  padding-top: 120px;
+  padding-bottom: var(--space-4xl);
   overflow-x: hidden;
   box-sizing: border-box;
 }
@@ -544,6 +545,17 @@
   }
 }
 
+@media (max-width: 768px) {
+  .mc-page {
+    padding-top: var(--space-3xl);
+  }
+
+  .mc-page__header {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+}
+
 @media (max-width: 640px) {
   .mc-summary {
     grid-template-columns: repeat(2, 1fr);
@@ -600,6 +612,12 @@
 
   .mc-table td {
     padding: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  .mc-page {
+    padding-top: var(--space-xl);
   }
 }
 

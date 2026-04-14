@@ -283,7 +283,7 @@
 
 @media (max-width: 480px) {
   .profile-page {
-    padding-top: 88px;
+    padding-top: var(--space-xl);
   }
 
   .profile-page__card {

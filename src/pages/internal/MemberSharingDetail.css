@@ -348,7 +348,7 @@
 
 @media (max-width: 480px) {
   .msd-page {
-    padding-top: 88px;
+    padding-top: var(--space-xl);
   }
 
   .msd-article__content {

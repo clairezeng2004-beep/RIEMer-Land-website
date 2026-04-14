@@ -671,7 +671,7 @@
 
 @media (max-width: 480px) {
   .gallery-page {
-    padding-top: 88px;
+    padding-top: var(--space-xl);
   }
 
   .photo-grid {
