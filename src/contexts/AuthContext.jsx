@@ -87,7 +87,17 @@ const clearProfileCache = () => {
 // AuthProvider
 // ============================================
 export function AuthProvider({ children }) {
-  const [user, setUser] = useState(null);
+  // 同步从 localStorage 读取缓存的 profile，避免刷新时 loading 阶段 user 为 null 导致 UI 跳动
+  const [user, setUser] = useState(() => {
+    try {
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.id) return parsed;
+      }
+    } catch { /* ignore */ }
+    return null;
+  });
   const [loading, setLoading] = useState(true);
   // Supabase 是否可达：null=检测中, true=可达, false=不可达（降级本地模式）
   const [supabaseOk, setSupabaseOk] = useState(isSupabaseConfigured ? null : false);

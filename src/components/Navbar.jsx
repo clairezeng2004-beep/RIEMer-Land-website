@@ -65,9 +65,7 @@ export default function Navbar() {
 
         {/* 最右侧：成员入口 / 用户信息 */}
         <div className="navbar__right">
-          {loading ? (
-            <Link to="/login" className="navbar__member-entry">主理团队内部空间</Link>
-          ) : isAuthenticated ? (
+          {(isAuthenticated || (loading && user)) ? (
             <>
               <Link
                 to="/internal"
@@ -140,7 +138,7 @@ export default function Navbar() {
             关于我们
           </Link>
 
-          {!loading && isAuthenticated && (
+          {(isAuthenticated || (loading && user)) && (
             <Link
               to="/internal"
               className={`navbar__link ${
@@ -155,7 +153,7 @@ export default function Navbar() {
           )}
 
           <div className="navbar__mobile-auth">
-            {loading ? null : isAuthenticated ? (
+            {(isAuthenticated || (loading && user)) ? (
               <div className="navbar__mobile-user">
                 <span className="navbar__user-name">{user?.nickname || '未设置昵称'}</span>
                 <button onClick={handleLogout} className="btn btn-ghost btn-sm">
@@ -163,11 +161,11 @@ export default function Navbar() {
                   退出
                 </button>
               </div>
-            ) : (
+            ) : !loading ? (
               <Link to="/login" className="navbar__link navbar__mobile-entry">
                 主理团队内部空间
               </Link>
-            )}
+            ) : null}
           </div>
         </div>
       </div>
