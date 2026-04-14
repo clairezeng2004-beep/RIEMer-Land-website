@@ -17,6 +17,7 @@ import {
   MessageSquarePlus,
   Mic,
   MicOff,
+  ThumbsUp,
 } from 'lucide-react';
 import './Suggestions.css';
 
@@ -110,6 +111,26 @@ export default function Suggestions() {
       ? `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=5B8C3E&color=fff&size=80&font-size=0.4&rounded=true`
       : null;
 
+  // +1 支持功能
+  const currentUserName = user?.name || user?.nickname || '';
+  const handlePlusOne = useCallback((sugId) => {
+    const sug = suggestions.find(s => s.id === sugId);
+    if (!sug || !currentUserName) return;
+    const supporters = sug.supporters || [];
+    const alreadySupported = supporters.some(s => s.name === currentUserName);
+    if (alreadySupported) {
+      // 取消 +1
+      updateSuggestion(sugId, {
+        supporters: supporters.filter(s => s.name !== currentUserName),
+      });
+    } else {
+      // 添加 +1
+      updateSuggestion(sugId, {
+        supporters: [...supporters, { name: currentUserName }],
+      });
+    }
+  }, [suggestions, currentUserName, updateSuggestion]);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -136,6 +157,7 @@ export default function Suggestions() {
                 id: `sug-${Date.now()}`,
                 content: '',
                 proposer: user?.name || user?.nickname || '',
+                supporters: [],
                 status: '处理中',
                 statusUpdatedAt: new Date().toISOString().split('T')[0],
                 statusUpdatedBy: '',
@@ -398,11 +420,37 @@ export default function Suggestions() {
                       <td className="sug-table__td sug-table__td--content">
                         <span>{sug.content}</span>
                       </td>
-                      <td className="sug-table__td">
-                        <span className="sug-table__person">
-                          <img src={sugAvatarUrl(sug.proposer)} alt={sug.proposer} className="sug-table__avatar" />
-                          {sug.proposer}
-                        </span>
+                      <td className="sug-table__td sug-table__td--proposer">
+                        <div className="sug-table__proposer-wrap">
+                          <span className="sug-table__person">
+                            <img src={sugAvatarUrl(sug.proposer)} alt={sug.proposer} className="sug-table__avatar" />
+                            {sug.proposer}
+                          </span>
+                          {(sug.supporters || []).length > 0 && (
+                            <div className="sug-table__supporters">
+                              {(sug.supporters || []).map((s, i) => (
+                                <img
+                                  key={i}
+                                  src={sugAvatarUrl(s.name)}
+                                  alt={s.name}
+                                  className="sug-table__supporter-avatar"
+                                  title={s.name}
+                                />
+                              ))}
+                            </div>
+                          )}
+                          <button
+                            className={`sug-table__plus-one${(sug.supporters || []).some(s => s.name === currentUserName) ? ' sug-table__plus-one--active' : ''}`}
+                            onClick={() => handlePlusOne(sug.id)}
+                            title={(sug.supporters || []).some(s => s.name === currentUserName) ? '取消 +1' : '+1 支持这个建议'}
+                          >
+                            <ThumbsUp size={12} />
+                            <span>+1</span>
+                            {(sug.supporters || []).length > 0 && (
+                              <span className="sug-table__plus-one-count">{(sug.supporters || []).length}</span>
+                            )}
+                          </button>
+                        </div>
                       </td>
                       <td className="sug-table__td">
                         <span className={`sug-table__status sug-table__status--${sug.status === '已完成' || sug.status === '已修复' ? 'done' : sug.status === '处理中' || sug.status === '修复中' ? 'wip' : 'skip'}`}>
