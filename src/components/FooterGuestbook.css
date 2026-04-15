@@ -140,6 +140,84 @@
   border-color: var(--color-primary);
 }
 
+.footer-guestbook__textarea--listening {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.12);
+}
+
+/* textarea + 语音按钮 容器 */
+.footer-guestbook__textarea-wrap {
+  position: relative;
+}
+
+.footer-guestbook__textarea-wrap .footer-guestbook__textarea {
+  padding-right: 40px; /* 为语音按钮留空间 */
+}
+
+/* 语音输入按钮 */
+.footer-guestbook__voice-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-muted, rgba(0, 0, 0, 0.04));
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.footer-guestbook__voice-btn:hover {
+  background: rgba(91, 140, 62, 0.1);
+  color: var(--color-primary);
+}
+
+.footer-guestbook__voice-btn--active {
+  background: var(--color-primary, #5B8C3E);
+  color: white;
+  animation: voicePulse 1.5s ease-in-out infinite;
+}
+
+.footer-guestbook__voice-btn--active:hover {
+  background: var(--color-primary-hover, #4a7332);
+  color: white;
+}
+
+/* 录音脉冲动画 */
+@keyframes voicePulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(91, 140, 62, 0.3); }
+  50% { box-shadow: 0 0 0 6px rgba(91, 140, 62, 0); }
+}
+
+/* 正在聆听提示 */
+.footer-guestbook__listening-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--color-primary, #5B8C3E);
+  font-weight: 500;
+}
+
+.footer-guestbook__listening-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-primary, #5B8C3E);
+  animation: listeningBlink 1s ease-in-out infinite;
+}
+
+@keyframes listeningBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
 .footer-guestbook__char-count {
   position: absolute;
   bottom: 8px;

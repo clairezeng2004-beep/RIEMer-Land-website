@@ -1,9 +1,14 @@
-import { useState, useCallback } from 'react';
-import { Send, MessageCircle, X, Check, User, Mail } from 'lucide-react';
+import { useState, useCallback, useRef, useEffect } from 'react';
+import { Send, MessageCircle, X, Check, User, Mail, Mic, MicOff } from 'lucide-react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import './FooterGuestbook.css';
 
 const GUESTBOOK_LS_KEY = 'riemer_guestbook';
+
+// 检测浏览器是否支持 Web Speech API
+const SpeechRecognition = typeof window !== 'undefined'
+  ? (window.SpeechRecognition || window.webkitSpeechRecognition)
+  : null;
 
 export default function FooterGuestbook() {
   const [open, setOpen] = useState(false);
@@ -13,6 +18,83 @@ export default function FooterGuestbook() {
   const [showContact, setShowContact] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recognitionRef = useRef(null);
+
+  // 清理语音识别
+  useEffect(() => {
+    return () => {
+      if (recognitionRef.current) {
+        recognitionRef.current.abort();
+        recognitionRef.current = null;
+      }
+    };
+  }, []);
+
+  const toggleSpeech = useCallback(() => {
+    if (!SpeechRecognition) {
+      alert('您的浏览器不支持语音输入，请使用 Chrome 或 Safari 浏览器');
+      return;
+    }
+
+    if (listening) {
+      // 停止录音
+      recognitionRef.current?.stop();
+      return;
+    }
+
+    // 开始录音
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'zh-CN';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+
+    let finalTranscript = '';
+
+    recognition.onstart = () => setListening(true);
+
+    recognition.onresult = (event) => {
+      let interim = '';
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          finalTranscript += transcript;
+        } else {
+          interim += transcript;
+        }
+      }
+      // 实时更新：已确认的文字 + 正在识别的文字
+      setMessage((prev) => {
+        const base = prev.endsWith(finalTranscript) ? prev : prev + finalTranscript;
+        // 保持在 500 字限制内
+        const combined = (base + interim).slice(0, 500);
+        return combined;
+      });
+    };
+
+    recognition.onerror = (event) => {
+      console.warn('[Speech] 识别出错:', event.error);
+      if (event.error === 'not-allowed') {
+        alert('请允许麦克风权限以使用语音输入');
+      }
+      setListening(false);
+    };
+
+    recognition.onend = () => {
+      setListening(false);
+      // 把最终结果合并到 message
+      if (finalTranscript) {
+        setMessage((prev) => {
+          const result = (prev.includes(finalTranscript) ? prev : prev + finalTranscript).slice(0, 500);
+          return result;
+        });
+      }
+      recognitionRef.current = null;
+    };
+
+    recognitionRef.current = recognition;
+    recognition.start();
+  }, [listening]);
 
   const handleSubmit = useCallback(async () => {
     if (!message.trim()) return;
@@ -115,14 +197,33 @@ export default function FooterGuestbook() {
             </div>
 
             <div className="footer-guestbook__field">
-              <textarea
-                value={message}
-                onChange={(e) => setMessage(e.target.value)}
-                placeholder="写下你想说的话…"
-                className="footer-guestbook__textarea"
-                rows={3}
-                maxLength={500}
-              />
+              <div className="footer-guestbook__textarea-wrap">
+                <textarea
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  placeholder="写下你想说的话…"
+                  className={`footer-guestbook__textarea${listening ? ' footer-guestbook__textarea--listening' : ''}`}
+                  rows={3}
+                  maxLength={500}
+                />
+                {SpeechRecognition && (
+                  <button
+                    type="button"
+                    className={`footer-guestbook__voice-btn${listening ? ' footer-guestbook__voice-btn--active' : ''}`}
+                    onClick={toggleSpeech}
+                    title={listening ? '停止语音输入' : '语音输入'}
+                    aria-label={listening ? '停止语音输入' : '语音输入'}
+                  >
+                    {listening ? <MicOff size={16} /> : <Mic size={16} />}
+                  </button>
+                )}
+              </div>
+              {listening && (
+                <span className="footer-guestbook__listening-hint">
+                  <span className="footer-guestbook__listening-dot" />
+                  正在聆听…
+                </span>
+              )}
               <span className="footer-guestbook__char-count">
                 {message.length}/500
               </span>
