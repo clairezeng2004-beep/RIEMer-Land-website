@@ -166,7 +166,7 @@
 }
 
 .footer-guestbook__textarea-wrap .footer-guestbook__textarea {
-  padding-right: 40px; /* 为语音按钮留空间 */
+  padding-right: 100px; /* 为语音按钮+文字留空间 */
 }
 
 /* 语音输入按钮 */
@@ -177,7 +177,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 30px;
+  gap: 4px;
+  padding: 0 10px;
   height: 30px;
   border: none;
   border-radius: var(--radius-md, 8px);
@@ -185,6 +186,13 @@
   color: var(--color-text-muted);
   cursor: pointer;
   transition: all var(--transition-fast);
+  white-space: nowrap;
+}
+
+.footer-guestbook__voice-label {
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
 }
 
 .footer-guestbook__voice-btn:hover {

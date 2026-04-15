@@ -210,6 +210,7 @@ export default function FooterGuestbook() {
                       aria-label={listening ? '停止语音输入' : '语音输入'}
                     >
                       {listening ? <MicOff size={16} /> : <Mic size={16} />}
+                      <span className="footer-guestbook__voice-label">{listening ? '停止' : '语音输入'}</span>
                     </button>
                   )}
                 </div>
