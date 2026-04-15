@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Mail, MapPin, Copy, Check } from 'lucide-react';
 import { clubInfo } from '../data/siteData';
 import { useSiteContent } from '../contexts/SiteContentContext';
+import FooterGuestbook from './FooterGuestbook';
 import './Footer.css';
 
 export default function Footer() {
