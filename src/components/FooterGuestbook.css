@@ -6,13 +6,16 @@
   display: flex;
   justify-content: center;
   margin-top: var(--space-md);
+  width: 100%;
 }
 
 /* 触发按钮 */
 .footer-guestbook__trigger {
-  display: inline-flex;
+  display: flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  width: 100%;
   padding: 8px 20px;
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-full, 999px);
