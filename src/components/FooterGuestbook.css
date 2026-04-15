@@ -7,6 +7,7 @@
   justify-content: center;
   margin-top: var(--space-md);
   width: 100%;
+  position: relative;
 }
 
 /* 触发按钮 */
@@ -32,19 +33,30 @@
   background: rgba(91, 140, 62, 0.04);
 }
 
-/* 展开面板 */
+/* 展开面板 - 往上弹出 */
 .footer-guestbook--open {
-  margin-top: var(--space-lg);
+  margin-top: var(--space-md);
 }
 
 .footer-guestbook__panel {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
   width: 100%;
   max-width: 480px;
   background: var(--color-bg-card, #fff);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-xl, 16px);
   padding: var(--space-lg) var(--space-xl);
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
+  animation: guestbookSlideUp 0.3s ease-out;
+  z-index: 100;
+}
+
+@keyframes guestbookSlideUp {
+  from { opacity: 0; transform: translateX(-50%) translateY(12px); }
+  to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
 .footer-guestbook__header {
@@ -294,7 +306,7 @@
 }
 
 @keyframes guestbookFadeIn {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(-8px); }
   to   { opacity: 1; transform: translateY(0); }
 }
 

@@ -142,9 +142,9 @@ export default function FooterGuestbook() {
     }
   }, [nickname, message, contact, showContact]);
 
-  if (!open) {
-    return (
-      <div className="footer-guestbook">
+  return (
+    <div className="footer-guestbook">
+      {!open ? (
         <button
           className="footer-guestbook__trigger"
           onClick={() => setOpen(true)}
@@ -152,128 +152,124 @@ export default function FooterGuestbook() {
           <MessageCircle size={15} />
           <span>给我们留言</span>
         </button>
-      </div>
-    );
-  }
-
-  return (
-    <div className="footer-guestbook footer-guestbook--open">
-      <div className="footer-guestbook__panel">
-        <div className="footer-guestbook__header">
-          <h4 className="footer-guestbook__title">
-            <MessageCircle size={16} /> 留言板
-          </h4>
-          <button
-            className="footer-guestbook__close"
-            onClick={() => setOpen(false)}
-          >
-            <X size={14} />
-          </button>
-        </div>
-
-        <p className="footer-guestbook__desc">
-          欢迎留下你想对我们说的话 ✨
-        </p>
-
-        {submitted ? (
-          <div className="footer-guestbook__success">
-            <Check size={20} />
-            <span>留言成功，感谢你的反馈！</span>
+      ) : (
+        <div className="footer-guestbook__panel">
+          <div className="footer-guestbook__header">
+            <h4 className="footer-guestbook__title">
+              <MessageCircle size={16} /> 留言板
+            </h4>
+            <button
+              className="footer-guestbook__close"
+              onClick={() => setOpen(false)}
+            >
+              <X size={14} />
+            </button>
           </div>
-        ) : (
-          <>
-            <div className="footer-guestbook__field">
-              <div className="footer-guestbook__input-wrap">
-                <User size={14} className="footer-guestbook__input-icon" />
-                <input
-                  type="text"
-                  value={nickname}
-                  onChange={(e) => setNickname(e.target.value)}
-                  placeholder="你的昵称（可选）"
-                  className="footer-guestbook__input"
-                  maxLength={30}
-                />
-              </div>
-            </div>
 
-            <div className="footer-guestbook__field">
-              <div className="footer-guestbook__textarea-wrap">
-                <textarea
-                  value={message}
-                  onChange={(e) => setMessage(e.target.value)}
-                  placeholder="写下你想说的话…"
-                  className={`footer-guestbook__textarea${listening ? ' footer-guestbook__textarea--listening' : ''}`}
-                  rows={3}
-                  maxLength={500}
-                />
-                {SpeechRecognition && (
-                  <button
-                    type="button"
-                    className={`footer-guestbook__voice-btn${listening ? ' footer-guestbook__voice-btn--active' : ''}`}
-                    onClick={toggleSpeech}
-                    title={listening ? '停止语音输入' : '语音输入'}
-                    aria-label={listening ? '停止语音输入' : '语音输入'}
-                  >
-                    {listening ? <MicOff size={16} /> : <Mic size={16} />}
-                  </button>
-                )}
-              </div>
-              {listening && (
-                <span className="footer-guestbook__listening-hint">
-                  <span className="footer-guestbook__listening-dot" />
-                  正在聆听…
-                </span>
-              )}
-              <span className="footer-guestbook__char-count">
-                {message.length}/500
-              </span>
-            </div>
+          <p className="footer-guestbook__desc">
+            欢迎留下你想对我们说的话 ✨
+          </p>
 
-            <div className="footer-guestbook__contact-toggle">
-              <label className="footer-guestbook__checkbox-label">
-                <input
-                  type="checkbox"
-                  checked={showContact}
-                  onChange={(e) => setShowContact(e.target.checked)}
-                  className="footer-guestbook__checkbox"
-                />
-                <span>留下联系方式</span>
-              </label>
+          {submitted ? (
+            <div className="footer-guestbook__success">
+              <Check size={20} />
+              <span>留言成功，感谢你的反馈！</span>
             </div>
-
-            {showContact && (
+          ) : (
+            <>
               <div className="footer-guestbook__field">
                 <div className="footer-guestbook__input-wrap">
-                  <Mail size={14} className="footer-guestbook__input-icon" />
+                  <User size={14} className="footer-guestbook__input-icon" />
                   <input
                     type="text"
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
-                    placeholder="邮箱 / 微信 / 手机号"
+                    value={nickname}
+                    onChange={(e) => setNickname(e.target.value)}
+                    placeholder="你的昵称（可选）"
                     className="footer-guestbook__input"
-                    maxLength={100}
+                    maxLength={30}
                   />
                 </div>
               </div>
-            )}
 
-            <button
-              className="footer-guestbook__submit"
-              disabled={!message.trim() || submitting}
-              onClick={handleSubmit}
-            >
-              {submitting ? (
-                <span>提交中…</span>
-              ) : (
-                <>
-                  <Send size={14} />
-                  <span>提交留言</span>
-                </>
+              <div className="footer-guestbook__field">
+                <div className="footer-guestbook__textarea-wrap">
+                  <textarea
+                    value={message}
+                    onChange={(e) => setMessage(e.target.value)}
+                    placeholder="写下你想说的话…"
+                    className={`footer-guestbook__textarea${listening ? ' footer-guestbook__textarea--listening' : ''}`}
+                    rows={3}
+                    maxLength={500}
+                  />
+                  {SpeechRecognition && (
+                    <button
+                      type="button"
+                      className={`footer-guestbook__voice-btn${listening ? ' footer-guestbook__voice-btn--active' : ''}`}
+                      onClick={toggleSpeech}
+                      title={listening ? '停止语音输入' : '语音输入'}
+                      aria-label={listening ? '停止语音输入' : '语音输入'}
+                    >
+                      {listening ? <MicOff size={16} /> : <Mic size={16} />}
+                    </button>
+                  )}
+                </div>
+                {listening && (
+                  <span className="footer-guestbook__listening-hint">
+                    <span className="footer-guestbook__listening-dot" />
+                    正在聆听…
+                  </span>
+                )}
+                <span className="footer-guestbook__char-count">
+                  {message.length}/500
+                </span>
+              </div>
+
+              <div className="footer-guestbook__contact-toggle">
+                <label className="footer-guestbook__checkbox-label">
+                  <input
+                    type="checkbox"
+                    checked={showContact}
+                    onChange={(e) => setShowContact(e.target.checked)}
+                    className="footer-guestbook__checkbox"
+                  />
+                  <span>留下联系方式</span>
+                </label>
+              </div>
+
+              {showContact && (
+                <div className="footer-guestbook__field">
+                  <div className="footer-guestbook__input-wrap">
+                    <Mail size={14} className="footer-guestbook__input-icon" />
+                    <input
+                      type="text"
+                      value={contact}
+                      onChange={(e) => setContact(e.target.value)}
+                      placeholder="邮箱 / 微信 / 手机号"
+                      className="footer-guestbook__input"
+                      maxLength={100}
+                    />
+                  </div>
+                </div>
               )}
-            </button>
-          </>
-        )}
-      </div>
+
+              <button
+                className="footer-guestbook__submit"
+                disabled={!message.trim() || submitting}
+                onClick={handleSubmit}
+              >
+                {submitting ? (
+                  <span>提交中…</span>
+                ) : (
+                  <>
+                    <Send size={14} />
+                    <span>提交留言</span>
+                  </>
+                )}
+              </button>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 }
