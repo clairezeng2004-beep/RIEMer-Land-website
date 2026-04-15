@@ -233,16 +233,24 @@
 }
 
 .mc-table__th--rank {
-  width: 50px;
+  width: 65px;
 }
 
 .mc-table__th--member {
   text-align: left !important;
-  width: 100px;
+  width: 140px;
+}
+
+/* 中间数据列（线上分享会、公众号文章、协作帮助、内部分享）缩小 */
+.mc-table th:nth-child(3),
+.mc-table th:nth-child(4),
+.mc-table th:nth-child(5),
+.mc-table th:nth-child(6) {
+  width: 9%;
 }
 
 .mc-table__th--total {
-  width: 70px;
+  width: 60px;
 }
 
 .mc-table td {
