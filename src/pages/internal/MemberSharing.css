@@ -156,6 +156,89 @@
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
 }
 
+/* Word 富文本编辑器 */
+.ms-create__word-editor-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-xs);
+}
+
+.ms-create__paste-btn {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 6px;
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: white;
+  font-size: var(--text-sm);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.ms-create__paste-btn:hover {
+  background: var(--color-primary-dark, #4a7332);
+  border-color: var(--color-primary-dark, #4a7332);
+}
+
+.ms-create__word-editor {
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  background: var(--color-bg);
+  outline: none;
+  resize: vertical;
+  overflow: auto;
+  min-height: 240px;
+  max-height: 500px;
+  line-height: 1.7;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ms-create__word-editor:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
+}
+
+/* placeholder 效果 */
+.ms-create__word-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--color-text-muted);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* 粘贴内容的排版 */
+.ms-create__word-editor h1,
+.ms-create__word-editor h2,
+.ms-create__word-editor h3 {
+  margin: 0.6em 0 0.3em;
+  line-height: 1.4;
+}
+
+.ms-create__word-editor h1 { font-size: 1.4em; }
+.ms-create__word-editor h2 { font-size: 1.2em; }
+.ms-create__word-editor h3 { font-size: 1.05em; }
+
+.ms-create__word-editor p {
+  margin: 0.4em 0;
+}
+
+.ms-create__word-editor ul,
+.ms-create__word-editor ol {
+  margin: 0.4em 0;
+  padding-left: 1.5em;
+}
+
+.ms-create__word-editor li {
+  margin: 0.2em 0;
+}
+
 /* ============ Filters ============ */
 .ms-filters {
   display: flex;
@@ -461,6 +544,10 @@
   }
 
   .ms-create__textarea {
+    min-height: 180px;
+  }
+
+  .ms-create__word-editor {
     min-height: 180px;
   }
 }
