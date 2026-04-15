@@ -14,6 +14,7 @@ import {
   BookOpen,
   BarChart3,
   MessageSquarePlus,
+  MessageCircle,
   FolderOpen,
   Share2,
   Contact,

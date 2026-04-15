@@ -9,7 +9,7 @@ import WysiwygToolbar from './WysiwygToolbar';
 import ErrorBoundary from './ErrorBoundary';
 import {
   Bell, FolderOpen, Share2, BookOpen, CheckSquare,
-  Camera, BarChart3, MessageSquarePlus, UserCircle, Contact,
+  Camera, BarChart3, MessageSquarePlus, MessageCircle, UserCircle, Contact,
   Users, Settings,
 } from 'lucide-react';
 import './InternalLayout.css';
