@@ -236,7 +236,7 @@
 
   .footer__grid > .footer__qrcode {
     border-bottom: none;
-    padding-bottom: var(--space-sm);
+    padding-bottom: 0;
     gap: var(--space-xs);
     grid-column: auto;
     grid-row: auto;
@@ -246,7 +246,7 @@
     grid-column: auto;
     grid-row: auto;
     align-self: auto;
-    padding: var(--space-md) 0;
+    padding: var(--space-xs) 0 var(--space-md);
     border-bottom: 1px solid var(--color-border-light);
   }
 

@@ -320,6 +320,10 @@
 
 /* 响应式 */
 @media (max-width: 768px) {
+  .footer-guestbook {
+    margin-top: var(--space-xs);
+  }
+
   .footer-guestbook__panel {
     padding: var(--space-md) var(--space-lg);
   }
