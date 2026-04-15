@@ -8,25 +8,14 @@ import {
   CheckSquare,
   Plus,
   X,
-  Clock,
   CheckCircle2,
-  Circle,
-  Ban,
-  Compass,
 } from 'lucide-react';
 import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import './Tasks.css';
 
-const statusIcons = {
-  '规划中': <Compass size={16} />,
-  '进行中': <Clock size={16} />,
-  '已完成': <CheckCircle2 size={16} />,
-  '已取消': <Ban size={16} />,
-};
-
 const statusColors = {
-  '规划中': '#8A9A8C',
+  '待启动': '#8A9A8C',
   '进行中': '#6B8F3C',
   '已完成': '#3A6B35',
   '已取消': '#C0392B',
@@ -108,7 +97,7 @@ export default function Tasks() {
     title: '',
     description: '',
     category: taskCategories[0] || '',
-    status: '规划中',
+    status: '待启动',
     assignee: [],
     helpers: [],
   });
@@ -137,7 +126,7 @@ export default function Tasks() {
       title: '',
       description: '',
       category: taskCategories[0] || '',
-      status: '规划中',
+      status: '待启动',
       assignee: [],
       helpers: [],
     });
@@ -200,7 +189,7 @@ export default function Tasks() {
   // Stats
   const stats = {
     total: tasks.length,
-    pending: tasks.filter((t) => t.status === '规划中').length,
+    pending: tasks.filter((t) => t.status === '待启动').length,
     inProgress: tasks.filter((t) => t.status === '进行中').length,
     completed: tasks.filter((t) => t.status === '已完成').length,
   };
@@ -247,7 +236,7 @@ export default function Tasks() {
           </div>
           <div className="tasks-stat tasks-stat--pending">
             <div className="tasks-stat__value">{stats.pending}</div>
-            <div className="tasks-stat__label">规划中</div>
+            <div className="tasks-stat__label">待启动</div>
           </div>
           <div className="tasks-stat tasks-stat--progress">
             <div className="tasks-stat__value">{stats.inProgress}</div>
@@ -391,7 +380,7 @@ export default function Tasks() {
                 <th>标题</th>
                 <th>负责人</th>
                 <th>协助人</th>
-                <th>操作</th>
+                <th>备注</th>
               </tr>
             </thead>
             <tbody>
@@ -409,12 +398,34 @@ export default function Tasks() {
                 return (
                 <tr key={task.id} className={`tasks-table__row tasks-table__row--${task.status === '已完成' ? 'done' : ''}`}>
                   <td>
-                    <div
-                      className="tasks-table__status"
-                      style={{ color: statusColors[task.status] }}
-                    >
-                      {statusIcons[task.status]}
-                      <span>{task.status}</span>
+                    <div className="tasks-table__status-cell">
+                      <CustomSelect
+                        value={task.status}
+                        onChange={(val) => updateTaskStatus(task.id, val)}
+                        options={taskStatuses.map((s) => ({
+                          value: s,
+                          label: s,
+                        }))}
+                        size="sm"
+                        style={{ color: statusColors[task.status] }}
+                      />
+                      {task.statusHistory && task.statusHistory.length > 0 && (
+                        <div className="tasks-table__history">
+                          {task.statusHistory.map((h, idx) => (
+                            <div key={idx} className="tasks-table__history-item">
+                              <span className="tasks-table__history-change">
+                                {h.from} → {h.to}
+                              </span>
+                              {h.reason && (
+                                <span className="tasks-table__history-reason">
+                                  {h.reason}
+                                </span>
+                              )}
+                              <span className="tasks-table__history-date">{h.date}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </td>
                   <td>
@@ -463,13 +474,7 @@ export default function Tasks() {
                     )}
                   </td>
                   <td>
-                    <div className="tasks-table__actions">
-                      <CustomSelect
-                        value={task.status}
-                        onChange={(val) => updateTaskStatus(task.id, val)}
-                        options={taskStatuses}
-                        size="sm"
-                      />
+                    <div className="tasks-table__note-cell">
                       <input
                         type="text"
                         className="tasks-table__reason-input"
@@ -485,23 +490,6 @@ export default function Tasks() {
                         <X size={14} />
                       </button>
                     </div>
-                    {task.statusHistory && task.statusHistory.length > 0 && (
-                      <div className="tasks-table__history">
-                        {task.statusHistory.map((h, idx) => (
-                          <div key={idx} className="tasks-table__history-item">
-                            <span className="tasks-table__history-change">
-                              {h.from} → {h.to}
-                            </span>
-                            {h.reason && (
-                              <span className="tasks-table__history-reason">
-                                {h.reason}
-                              </span>
-                            )}
-                            <span className="tasks-table__history-date">{h.date}</span>
-                          </div>
-                        ))}
-                      </div>
-                    )}
                   </td>
                 </tr>
                 );

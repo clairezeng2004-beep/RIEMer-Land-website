@@ -736,7 +736,7 @@ export const documentsData = [
 ];
 
 export const taskCategories = ['线上分享', '课程测评', '公众号文章', '其他'];
-export const taskStatuses = ['规划中', '进行中', '已完成', '已取消'];
+export const taskStatuses = ['待启动', '进行中', '已完成', '已取消'];
 
 // 成员数据（用于负责人 / 协助人选择）
 export const teamMembers = [
@@ -799,7 +799,7 @@ export const initialTasks = [
     title: '征集大二上课程测评',
     description: '面向全院征集大二上学期各方向课程评价',
     category: '课程测评',
-    status: '规划中',
+    status: '待启动',
     assignee: 'member-3',
     helpers: [],
     createdAt: '2025-03-15',
@@ -809,7 +809,7 @@ export const initialTasks = [
     title: '筹备 RIEMer\'s Space 第十一期分享会',
     description: '确定主题、邀请分享人、制作宣传海报',
     category: '线上分享',
-    status: '规划中',
+    status: '待启动',
     assignee: 'member-2',
     helpers: ['member-1'],
     createdAt: '2025-03-18',

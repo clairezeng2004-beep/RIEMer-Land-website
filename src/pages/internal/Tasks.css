@@ -290,6 +290,13 @@
   opacity: 0.6;
 }
 
+.tasks-table__status-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 100px;
+}
+
 .tasks-table__status {
   display: flex;
   align-items: center;
@@ -297,6 +304,13 @@
   font-size: var(--text-sm);
   font-weight: 600;
   white-space: nowrap;
+}
+
+/* 备注 + 删除按钮行 */
+.tasks-table__note-cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
 }
 
 .tasks-table__title-cell {
