@@ -30,6 +30,7 @@ export default function Notifications() {
   const {
     notifications,
     unreadCount,
+    loaded,
     markAsRead,
     markAllAsRead,
     deleteNotification,
@@ -109,7 +110,7 @@ export default function Notifications() {
         </div>
 
         {/* 通知列表 */}
-        <div className="notifications-list">
+        <div className={`notifications-list ${loaded ? 'notifications-list--loaded' : ''}`}>
           {filtered.map((notif) => {
             const config = typeConfig[notif.type] || typeConfig.info;
             const Icon = config.icon;
@@ -172,7 +173,7 @@ export default function Notifications() {
             );
           })}
 
-          {filtered.length === 0 && (
+          {filtered.length === 0 && loaded && (
             <div className="notifications-empty">
               <BellOff size={48} />
               <h3>{filter === '未读' ? '没有未读消息' : '暂无消息'}</h3>

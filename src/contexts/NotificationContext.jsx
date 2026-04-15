@@ -9,6 +9,7 @@ const NotificationContext = createContext(null);
 const NOTIFICATIONS_KEY = 'riemer_notifications';
 const LAST_EMAIL_KEY = 'riemer_last_email_reminder';
 const UNREAD_CACHE_KEY = 'riemer_unread_count';
+const NOTIFICATIONS_CACHE_KEY = 'riemer_notifications_cache'; // 缓存完整通知列表（含已读状态）
 
 // 获取当前周的起始日期（周一）
 function getWeekStart(date = new Date()) {
@@ -20,13 +21,36 @@ function getWeekStart(date = new Date()) {
   return d;
 }
 
+// 比较两个通知数组是否等价（避免无变化时触发 setState 导致闪动）
+function notificationsEqual(a, b) {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i].id !== b[i].id || a[i].read !== b[i].read || a[i].title !== b[i].title || a[i].message !== b[i].message || a[i].type !== b[i].type || a[i].date !== b[i].date) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// 从 localStorage 读取缓存的通知列表（用于初始化，避免刷新时列表从空闪到有数据）
+function getCachedNotifications() {
+  try {
+    const cached = localStorage.getItem(NOTIFICATIONS_CACHE_KEY);
+    if (cached) {
+      const parsed = JSON.parse(cached);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch { /* ignore */ }
+  return [];
+}
+
 export function NotificationProvider({ children }) {
   const location = useLocation();
   const { user, isAdmin, supabaseOk } = useAuth();
-  const [notifications, setNotifications] = useState([]);
+  const [notifications, setNotifications] = useState(getCachedNotifications);
   const [reads, setReads] = useState(new Set()); // 当前用户已读的通知 ID 集合
   const [emailReminderSent, setEmailReminderSent] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded, setLoaded] = useState(() => getCachedNotifications().length > 0);
   const pollRef = useRef(null);
 
   // 从 localStorage 读取上次缓存的未读数，避免刷新时 badge 闪动（0 → N）
@@ -131,9 +155,18 @@ export function NotificationProvider({ children }) {
           read: readSet.has(n.id),
         }));
 
-        setNotifications(mapped);
+        // 只有数据真正变化时才更新 state，避免轮询/可见性变化导致列表重渲染闪动
+        setNotifications((prev) => {
+          if (notificationsEqual(prev, mapped)) return prev;
+          return mapped;
+        });
         setReads(readSet);
         setLoaded(true);
+
+        // 同步缓存到 localStorage，下次刷新时可立即显示
+        try {
+          localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(mapped));
+        } catch { /* ignore */ }
       } catch (err) {
         console.warn('[Notification] Supabase 通知加载异常，降级本地:', err.message);
         loadLocalNotifications();
@@ -167,8 +200,16 @@ export function NotificationProvider({ children }) {
       if (!n.target_role) return true;
       return n.target_role === 'admin' && isAdmin;
     });
-    setNotifications(filtered);
+    setNotifications((prev) => {
+      if (notificationsEqual(prev, filtered)) return prev;
+      return filtered;
+    });
     setLoaded(true);
+
+    // 同步缓存
+    try {
+      localStorage.setItem(NOTIFICATIONS_CACHE_KEY, JSON.stringify(filtered));
+    } catch { /* ignore */ }
   };
 
   // ---- 初始化加载 ----
