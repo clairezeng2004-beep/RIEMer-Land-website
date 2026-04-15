@@ -88,7 +88,7 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${resendApiKey}`,
         },
         body: JSON.stringify({
-          from: 'RIEMer Land <onboarding@resend.dev>',
+          from: 'RIEMer Land <noreply@riemerland.org>',
           to: [normalizedEmail],
           subject: '【RIEMer Land】密码重置验证码',
           html: `
@@ -111,7 +111,7 @@ export default async function handler(req, res) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[send-reset-code] Resend API 错误:', response.status, errorData);
-        // Resend 发送失败（可能是 onboarding@resend.dev 只能发给注册邮箱）
+        // Resend 发送失败
         // 回退：直接返回验证码，让前端显示
         console.warn('[send-reset-code] Resend 发送失败，回退为直接返回验证码');
         return res.status(200).json({
