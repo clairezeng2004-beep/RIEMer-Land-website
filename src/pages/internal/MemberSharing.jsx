@@ -303,7 +303,7 @@ export default function MemberSharing() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  const categories = ['全部', 'course', 'history', 'experience'];
+  const categories = ['全部', 'course', 'experience'];
 
   const filtered = sharings.filter((s) => {
     const matchSearch =
