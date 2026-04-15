@@ -13,6 +13,7 @@
 .footer__grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
+  grid-template-rows: auto 1fr;
   column-gap: var(--space-xl);
   align-items: start;
 }
@@ -66,6 +67,20 @@
 .footer__qrcode-text {
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+}
+
+/* 二维码列跨两行 */
+.footer__qrcode {
+  grid-column: 4;
+  grid-row: 1 / 3;
+}
+
+/* "给我们留言"跨前三列，底部对齐二维码列 */
+.footer__guestbook-row {
+  grid-column: 1 / 4;
+  grid-row: 2;
+  align-self: end;
+  padding-top: var(--space-md);
 }
 
 /* 二维码全屏遮罩 */
@@ -223,6 +238,16 @@
     border-bottom: none;
     padding-bottom: var(--space-sm);
     gap: var(--space-xs);
+    grid-column: auto;
+    grid-row: auto;
+  }
+
+  .footer__guestbook-row {
+    grid-column: auto;
+    grid-row: auto;
+    align-self: auto;
+    padding: var(--space-md) 0;
+    border-bottom: 1px solid var(--color-border-light);
   }
 
   .footer__nav-title {

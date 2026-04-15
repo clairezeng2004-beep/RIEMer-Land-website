@@ -71,7 +71,6 @@ export default function Footer() {
                   <MapPin size={16} />
                   <span>{content.footerLocation}</span>
                 </div>
-                <FooterGuestbook />
               </div>
             </div>
 
@@ -98,6 +97,9 @@ export default function Footer() {
                 />
               </div>
             )}
+            <div className="footer__guestbook-row">
+              <FooterGuestbook />
+            </div>
           </div>
 
           <div className="footer__bottom">
