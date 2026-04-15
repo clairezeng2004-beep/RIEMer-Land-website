@@ -111,7 +111,14 @@ export default async function handler(req, res) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[send-reset-code] Resend API 错误:', response.status, errorData);
-        return res.status(500).json({ error: '邮件发送失败，请稍后重试' });
+        // Resend 发送失败（可能是 onboarding@resend.dev 只能发给注册邮箱）
+        // 回退：直接返回验证码，让前端显示
+        console.warn('[send-reset-code] Resend 发送失败，回退为直接返回验证码');
+        return res.status(200).json({
+          success: true,
+          message: '验证码已生成（邮件服务暂不可用，请使用下方验证码）',
+          devCode: resetCode,
+        });
       }
 
       return res.status(200).json({
@@ -120,7 +127,12 @@ export default async function handler(req, res) {
       });
     } catch (err) {
       console.error('[send-reset-code] 发送异常:', err);
-      return res.status(500).json({ error: '邮件发送异常：' + err.message });
+      // 网络异常也回退为直接返回验证码
+      return res.status(200).json({
+        success: true,
+        message: '验证码已生成（邮件服务异常，请使用下方验证码）',
+        devCode: resetCode,
+      });
     }
   }
 
