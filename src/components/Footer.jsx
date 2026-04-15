@@ -71,6 +71,7 @@ export default function Footer() {
                   <MapPin size={16} />
                   <span>{content.footerLocation}</span>
                 </div>
+                <FooterGuestbook />
               </div>
             </div>
 
@@ -98,8 +99,6 @@ export default function Footer() {
               </div>
             )}
           </div>
-
-          <FooterGuestbook />
 
           <div className="footer__bottom">
             <p>© {new Date().getFullYear()} {clubInfo.name}.</p>
