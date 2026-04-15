@@ -307,24 +307,15 @@ export default function Profile() {
                   入学年份
                   <span className="profile-page__label-hint">（将在成员通讯录中展示）</span>
                 </label>
-                {enrollmentYearLoaded ? (
-                  <input
-                    type="text"
-                    className="profile-page__input"
-                    value={enrollmentYear}
-                    onChange={(e) => setEnrollmentYear(e.target.value)}
-                    placeholder="如 2023"
-                    maxLength={10}
-                  />
-                ) : (
-                  <input
-                    type="text"
-                    className="profile-page__input profile-page__input--disabled"
-                    value=""
-                    placeholder="加载中..."
-                    disabled
-                  />
-                )}
+                <input
+                  type="text"
+                  className={`profile-page__input${!enrollmentYearLoaded ? ' profile-page__input--disabled' : ''}`}
+                  value={enrollmentYear}
+                  onChange={(e) => setEnrollmentYear(e.target.value)}
+                  placeholder={enrollmentYearLoaded ? '如 2023' : '加载中...'}
+                  maxLength={10}
+                  disabled={!enrollmentYearLoaded}
+                />
               </div>
 
               <div className="profile-page__field">
