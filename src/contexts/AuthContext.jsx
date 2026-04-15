@@ -769,24 +769,10 @@ export function AuthProvider({ children }) {
       return registerLocal(email, password, name);
     }
 
-    // Supabase 模式 — 同时也写入本地用户数据库作为备份
+    // Supabase 模式 — 通过服务端 Admin API 注册用户（不发送确认邮件）
     try {
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: { data: { name } },
-      });
-      if (error) {
-        if (error.message.includes('already registered')) {
-          return { success: false, message: '该邮箱已被注册' };
-        }
-        // Supabase 注册失败，回退到本地注册
-        console.warn('[Auth] Supabase 注册失败，回退本地注册:', error.message);
-        return registerLocal(email, password, name);
-      }
       // 检查该邮箱是否已被管理员预授权（本地 + Supabase）
       let preAuthorized = isEmailPreAuthorized(email);
-      // 也检查 Supabase pre_authorized_emails 表（本地列表可能未同步）
       if (!preAuthorized) {
         try {
           const { data: preAuthRow } = await supabase
@@ -798,12 +784,29 @@ export function AuthProvider({ children }) {
         } catch { /* 表可能不存在，忽略 */ }
       }
 
+      // 使用服务端 Admin API 创建用户（email_confirm: true，不会发送确认邮件）
+      const registerRes = await fetch('/api/register-preauth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password, name }),
+      });
+      const registerData = await registerRes.json();
+
+      if (!registerRes.ok) {
+        if (registerRes.status === 409) {
+          return { success: false, message: '该邮箱已被注册' };
+        }
+        // 服务端注册失败，回退到本地注册
+        console.warn('[Auth] 服务端注册失败，回退本地注册:', registerData.error);
+        return registerLocal(email, password, name);
+      }
+
+      const userId = registerData.user?.id;
+
       // 创建/更新 profile 记录
-      // 注意：Supabase 的 on_auth_user_created 触发器会自动创建 profile（authorized=false）
-      // 所以先尝试 insert，如果冲突则用 update 覆盖
-      if (data.user) {
+      if (userId) {
         const profileData = {
-          id: data.user.id,
+          id: userId,
           email,
           name,
           nickname: '',
@@ -816,11 +819,11 @@ export function AuthProvider({ children }) {
 
         const { error: insertError } = await supabase.from('profiles').insert(profileData);
         if (insertError) {
-          // 触发器已创建记录，用 update 设置正确的字段
+          // 触发器可能已创建记录，用 update 设置正确的字段
           await supabase.from('profiles').update({
             name,
             authorized: preAuthorized,
-          }).eq('id', data.user.id);
+          }).eq('id', userId);
         }
 
         if (preAuthorized) {
@@ -829,17 +832,6 @@ export function AuthProvider({ children }) {
           try {
             await supabase.from('pre_authorized_emails').delete().ilike('email', email);
           } catch { /* 表可能不存在，忽略 */ }
-
-          // 预授权用户：通过服务端 API 自动确认邮箱（跳过 Supabase 邮箱验证）
-          try {
-            await fetch('/api/confirm-email', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ email }),
-            });
-          } catch (confirmErr) {
-            console.warn('[Auth] 自动确认邮箱失败:', confirmErr.message);
-          }
         }
       }
       // 同时写入本地用户数据库备份
