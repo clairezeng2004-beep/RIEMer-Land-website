@@ -25,18 +25,18 @@ function MobileInternalNav() {
   const navItems = [
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
     { to: '/internal/notifications', icon: Bell, label: sc.labelNotifications, badge: unreadCount > 0 ? unreadCount : null },
-    { to: '/internal/process-templates', icon: FolderOpen, label: '流程模板文件' },
-    { to: '/internal/member-sharing', icon: Share2, label: '成员内部分享' },
-    { to: '/internal/articles', icon: BookOpen, label: '公众号历史文章归档' },
-    { to: '/internal/contributions', icon: BarChart3, label: '成员贡献' },
-    { to: '/internal/suggestions', icon: MessageSquarePlus, label: '建设建议' },
-    { to: '/internal/guestbook', icon: MessageCircle, label: '访客留言板' },
-    { to: '/internal/member-profiles', icon: Contact, label: '成员通讯录' },
+    { to: '/internal/process-templates', icon: FolderOpen, label: sc.labelProcessTemplates },
+    { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
+    { to: '/internal/articles', icon: BookOpen, label: sc.labelArticles },
+    { to: '/internal/contributions', icon: BarChart3, label: sc.labelContributions },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
+    { to: '/internal/guestbook', icon: MessageCircle, label: sc.labelGuestbook },
+    { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
-    { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
+    { to: '/internal/profile', icon: UserCircle, label: sc.labelProfile },
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
-    { to: '/internal/notification-management', icon: BellRing, label: '通知管理' },
+    { to: '/internal/notification-management', icon: BellRing, label: sc.labelNotificationMgmt },
   ];
 
   // 路由变化时将当前激活项滚动到可见区域

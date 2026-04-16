@@ -112,9 +112,18 @@ const getDefaultInternalConfig = () => ({
     labelNotifications: '消息通知',
     labelDocuments: '文档管理',
     labelTasks: '事项追踪',
+    labelProcessTemplates: '流程模板文件',
+    labelMemberSharing: '成员内部分享',
+    labelArticles: '公众号历史文章归档',
+    labelContributions: '成员贡献',
+    labelSuggestions: '建设建议',
+    labelGuestbook: '访客留言板',
+    labelMemberProfiles: '成员通讯录',
     labelGallery: '活动相册',
+    labelProfile: '个人主页',
     labelUsers: '用户管理',
     labelContent: '内容管理',
+    labelNotificationMgmt: '通知管理',
   },
   // 内部首页
   home: {
