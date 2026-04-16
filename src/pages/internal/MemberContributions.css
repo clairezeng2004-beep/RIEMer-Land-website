@@ -233,29 +233,29 @@
 }
 
 .mc-table__th--rank {
-  width: 65px;
+  width: 50px;
 }
 
 .mc-table__th--member {
   text-align: left !important;
-  width: 140px;
+  width: 90px;
 }
 
-/* 中间数据列（线上分享会、公众号文章、协作帮助、内部分享）缩小 */
+/* 中间数据列（线上分享会、公众号文章、协作帮助、内部分享）适当分配 */
 .mc-table th:nth-child(3),
 .mc-table th:nth-child(4),
 .mc-table th:nth-child(5),
 .mc-table th:nth-child(6) {
-  width: 10%;
+  width: 11%;
 }
 
-/* 其他贡献列限制宽度，不让它把总计列推到最右边 */
+/* 其他贡献列 */
 .mc-table__th--custom {
-  width: 22%;
+  width: auto;
 }
 
 .mc-table__th--total {
-  width: 75px;
+  width: 70px;
   text-align: center;
 }
 
