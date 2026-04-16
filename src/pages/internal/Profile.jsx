@@ -20,8 +20,28 @@ export default function Profile() {
   const [name, setName] = useState(user?.name || '');
   const [nickname, setNickname] = useState(user?.nickname || '');
   const [signature, setSignature] = useState(user?.signature || '');
-  const [enrollmentYear, setEnrollmentYear] = useState('');
-  const [enrollmentYearLoaded, setEnrollmentYearLoaded] = useState(false);
+  // 同步从 localStorage 读取入学年份，避免异步加载导致的闪动
+  const [enrollmentYear, setEnrollmentYear] = useState(() => {
+    try {
+      const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
+      const profiles = stored ? JSON.parse(stored) : [];
+      const mp = profiles.find((p) => p.user_id === user?.id);
+      return mp?.enrollment_year || '';
+    } catch {
+      return '';
+    }
+  });
+  const [enrollmentYearLoaded, setEnrollmentYearLoaded] = useState(() => {
+    // 如果本地已有值，直接标记为已加载
+    try {
+      const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
+      const profiles = stored ? JSON.parse(stored) : [];
+      const mp = profiles.find((p) => p.user_id === user?.id);
+      return !!mp?.enrollment_year;
+    } catch {
+      return false;
+    }
+  });
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
   const [avatarFile, setAvatarFile] = useState(null);
   const [saving, setSaving] = useState(false);
