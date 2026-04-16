@@ -23,7 +23,7 @@ const COLUMNS = [
   { key: 'joined_at_display', label: '加入时间', width: '140px', editable: true, inputType: 'yearMonth' },
   { key: 'bio', label: '一句话概括自己', width: '180px', editable: true, placeholder: '用一句话介绍自己' },
   { key: 'further_education', label: '升学去向', width: '150px', editable: true, placeholder: '如 XX大学XX专业' },
-  { key: 'career', label: '工作去向', width: '150px', editable: true, placeholder: '如 XX公司XX岗位' },
+  { key: 'career', label: '工作去向', width: '150px', editable: true, placeholder: '如 XX公司XX岗位 当前base地' },
   { key: 'willing_to_share', label: '我愿意分享什么', width: '180px', editable: true, placeholder: '你愿意和大家分享的内容' },
   { key: 'want_to_learn', label: '我想和大家请教什么', width: '180px', editable: true, placeholder: '你想请教大家的问题' },
   { key: 'hobbies', label: '爱好', width: '150px', editable: true, placeholder: '如 摄影、阅读、运动' },
