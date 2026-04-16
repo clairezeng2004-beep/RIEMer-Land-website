@@ -244,6 +244,10 @@
   opacity: 0.5;
 }
 
+.member-profiles-table__cell--nowrap {
+  white-space: nowrap;
+}
+
 .member-profiles-table__name-cell {
   display: inline-flex;
   align-items: center;
