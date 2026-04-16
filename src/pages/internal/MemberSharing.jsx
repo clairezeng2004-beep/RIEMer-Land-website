@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -8,7 +8,6 @@ import { pinyinMatch } from '../../utils/pinyinSearch';
 import {
   Share2,
   Plus,
-  X,
   Search,
   Clock,
   User,
@@ -18,7 +17,6 @@ import {
   Code2,
   ThumbsUp,
   ExternalLink,
-  Clipboard,
 } from 'lucide-react';
 import './MemberSharing.css';
 
@@ -197,109 +195,7 @@ export default function MemberSharing() {
   const [sharings, setSharings] = useState(loadSharings);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
-  const [showCreate, setShowCreate] = useState(false);
-  const [newPost, setNewPost] = useState({
-    title: '',
-    category: 'experience',
-    format: 'markdown',
-    content: '',
-  });
   const views = loadViews();
-  const wordEditorRef = useRef(null);
-
-  // 清理从 Word/网页粘贴过来的 HTML，只保留安全标签
-  const cleanWordHtml = useCallback((html) => {
-    // 创建临时 DOM 解析
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    // 移除 script、style、meta、link 标签
-    doc.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
-    // 移除所有元素的 style、class 等属性（只保留 href）
-    doc.querySelectorAll('*').forEach((el) => {
-      const attrs = [...el.attributes];
-      attrs.forEach((attr) => {
-        if (attr.name !== 'href') el.removeAttribute(attr.name);
-      });
-    });
-    // 将 div 替换为 p（Word 有时用 div 包裹段落）
-    let cleaned = doc.body.innerHTML;
-    cleaned = cleaned
-      .replace(/<div[^>]*>/gi, '<p>')
-      .replace(/<\/div>/gi, '</p>')
-      .replace(/<span[^>]*>/gi, '')
-      .replace(/<\/span>/gi, '')
-      // 移除空段落
-      .replace(/<p>\s*<\/p>/gi, '')
-      // 移除多余换行
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    return cleaned;
-  }, []);
-
-  // 处理 Word 编辑器的粘贴事件
-  const handleWordPaste = useCallback((e) => {
-    e.preventDefault();
-    const html = e.clipboardData.getData('text/html');
-    const text = e.clipboardData.getData('text/plain');
-
-    if (html) {
-      // 粘贴的是富文本（Word/网页），清理后插入
-      const cleaned = cleanWordHtml(html);
-      // 插入到当前光标位置
-      document.execCommand('insertHTML', false, cleaned);
-    } else if (text) {
-      // 纯文本：将换行转为 <p> 标签
-      const paragraphs = text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-      document.execCommand('insertHTML', false, paragraphs || text);
-    }
-
-    // 同步到 state
-    if (wordEditorRef.current) {
-      setNewPost((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
-    }
-  }, [cleanWordHtml]);
-
-  // 一键粘贴按钮
-  const handleOneClickPaste = useCallback(async () => {
-    try {
-      const items = await navigator.clipboard.read();
-      for (const item of items) {
-        // 优先读取 HTML
-        if (item.types.includes('text/html')) {
-          const blob = await item.getType('text/html');
-          const html = await blob.text();
-          const cleaned = cleanWordHtml(html);
-          if (wordEditorRef.current) {
-            wordEditorRef.current.innerHTML = cleaned;
-            setNewPost((prev) => ({ ...prev, content: cleaned }));
-          }
-          return;
-        }
-        // 其次读取纯文本
-        if (item.types.includes('text/plain')) {
-          const blob = await item.getType('text/plain');
-          const text = await blob.text();
-          const paragraphs = text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-          if (wordEditorRef.current) {
-            wordEditorRef.current.innerHTML = paragraphs;
-            setNewPost((prev) => ({ ...prev, content: paragraphs }));
-          }
-          return;
-        }
-      }
-    } catch {
-      // clipboard.read 不支持时，fallback 到 readText
-      try {
-        const text = await navigator.clipboard.readText();
-        if (text && wordEditorRef.current) {
-          const paragraphs = text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
-          wordEditorRef.current.innerHTML = paragraphs;
-          setNewPost((prev) => ({ ...prev, content: paragraphs }));
-        }
-      } catch {
-        /* 剪贴板权限被拒绝 */
-      }
-    }
-  }, [cleanWordHtml]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -313,30 +209,6 @@ export default function MemberSharing() {
     const matchCat = selectedCategory === '全部' || s.category === selectedCategory;
     return matchSearch && matchCat;
   });
-
-  const handleCreate = (e) => {
-    e.preventDefault();
-    if (!newPost.title.trim() || !newPost.content.trim()) return;
-
-    const post = {
-      id: `sharing-${Date.now()}`,
-      title: newPost.title.trim(),
-      category: newPost.category,
-      format: newPost.format,
-      content: newPost.content,
-      author: user?.nickname || user?.name || 'Unknown',
-      authorId: user?.id || null,
-      createdAt: new Date().toISOString().split('T')[0],
-      likes: [],
-    };
-
-    const updated = [post, ...sharings];
-    setSharings(updated);
-    saveSharings(updated);
-    setNewPost({ title: '', category: 'experience', format: 'markdown', content: '' });
-    if (wordEditorRef.current) wordEditorRef.current.innerHTML = '';
-    setShowCreate(false);
-  };
 
   const handleDelete = (id) => {
     if (!window.confirm('确定要删除这篇分享吗？')) return;
@@ -416,114 +288,10 @@ export default function MemberSharing() {
               />
             </p>
           </div>
-          <button className="btn btn-primary" onClick={() => setShowCreate(!showCreate)}>
-            {showCreate ? <X size={18} /> : <Plus size={18} />}
-            {showCreate ? '取消' : '发布分享'}
-          </button>
+          <Link to="/internal/member-sharing/create" className="btn btn-primary">
+            <Plus size={18} /> 发布分享
+          </Link>
         </div>
-
-        {/* Create Form */}
-        {showCreate && (
-          <div className="ms-create card">
-            <h3><Plus size={18} /> 发布新分享</h3>
-            <form onSubmit={handleCreate} className="ms-create__form">
-              <div className="ms-create__row">
-                <div className="ms-create__field ms-create__field--grow">
-                  <label>标题</label>
-                  <input
-                    type="text"
-                    className="ms-create__input"
-                    value={newPost.title}
-                    onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                    placeholder="请输入分享标题"
-                    required
-                  />
-                </div>
-                <div className="ms-create__field">
-                  <label>分类</label>
-                  <select
-                    className="ms-create__input ms-create__select"
-                    value={newPost.category}
-                    onChange={(e) => setNewPost({ ...newPost, category: e.target.value })}
-                  >
-                    {Object.entries(categoryLabels).map(([key, label]) => (
-                      <option key={key} value={key}>{label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              {/* 格式切换 */}
-              <div className="ms-create__field">
-                <label>内容格式</label>
-                <div className="ms-create__format-toggle">
-                  <button
-                    type="button"
-                    className={`ms-create__format-btn ${newPost.format === 'markdown' ? 'ms-create__format-btn--active' : ''}`}
-                    onClick={() => setNewPost({ ...newPost, format: 'markdown' })}
-                  >
-                    <Code2 size={14} /> Markdown
-                  </button>
-                  <button
-                    type="button"
-                    className={`ms-create__format-btn ${newPost.format === 'word' ? 'ms-create__format-btn--active' : ''}`}
-                    onClick={() => setNewPost({ ...newPost, format: 'word' })}
-                  >
-                    <FileText size={14} /> Word (HTML)
-                  </button>
-                </div>
-              </div>
-
-              <div className="ms-create__field">
-                <label>
-                  内容
-                  <span className="ms-create__hint">
-                    {newPost.format === 'markdown'
-                      ? '支持 Markdown 语法：标题用 #，加粗用 **，列表用 -'
-                      : '支持一键粘贴 Word 文字，自动保留格式'}
-                  </span>
-                </label>
-                {newPost.format === 'markdown' ? (
-                  <textarea
-                    className="ms-create__textarea"
-                    value={newPost.content}
-                    onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                    placeholder={'# 标题\n\n正文内容...\n\n- 列表项 1\n- 列表项 2'}
-                    rows={12}
-                    required
-                  />
-                ) : (
-                  <div className="ms-create__word-editor-wrapper">
-                    <button
-                      type="button"
-                      className="ms-create__paste-btn"
-                      onClick={handleOneClickPaste}
-                    >
-                      <Clipboard size={14} /> 一键粘贴
-                    </button>
-                    <div
-                      ref={wordEditorRef}
-                      className="ms-create__word-editor"
-                      contentEditable
-                      onPaste={handleWordPaste}
-                      onInput={() => {
-                        if (wordEditorRef.current) {
-                          setNewPost((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
-                        }
-                      }}
-                      data-placeholder="从 Word 复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴"
-                      suppressContentEditableWarning
-                    />
-                  </div>
-                )}
-              </div>
-
-              <button type="submit" className="btn btn-primary">
-                <Share2 size={16} /> 发布分享
-              </button>
-            </form>
-          </div>
-        )}
 
         {/* Filters */}
         <div className="ms-filters">

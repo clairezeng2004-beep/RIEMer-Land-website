@@ -55,6 +55,7 @@ function App() {
                   <Route index element={<Navigate to="notifications" replace />} />
                   <Route path="process-templates" element={<ProcessTemplates />} />
                   <Route path="member-sharing" element={<MemberSharing />} />
+                  <Route path="member-sharing/create" element={<MemberSharingCreate />} />
                   <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
                   {/* 兼容旧链接 */}
                   <Route path="documents" element={<Documents />} />
