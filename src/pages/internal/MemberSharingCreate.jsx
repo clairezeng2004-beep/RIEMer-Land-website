@@ -1,6 +1,7 @@
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef, useMemo } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { marked } from 'marked';
 import {
   Share2,
   Plus,
@@ -8,6 +9,7 @@ import {
   Code2,
   FileText,
   Clipboard,
+  Eye,
 } from 'lucide-react';
 import './MemberSharingCreate.css';
 
@@ -124,6 +126,13 @@ export default function MemberSharingCreate() {
     }
   }, [cleanWordHtml]);
 
+  // Markdown 实时预览
+  const markdownPreview = useMemo(() => {
+    if (newPost.format !== 'markdown' || !newPost.content.trim()) return '';
+    marked.setOptions({ breaks: true, gfm: true });
+    return marked.parse(newPost.content);
+  }, [newPost.format, newPost.content]);
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const handleCreate = (e) => {
@@ -223,14 +232,32 @@ export default function MemberSharingCreate() {
                 </span>
               </label>
               {newPost.format === 'markdown' ? (
-                <textarea
-                  className="msc-form__textarea"
-                  value={newPost.content}
-                  onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
-                  placeholder={'# 标题\n\n正文内容...\n\n- 列表项 1\n- 列表项 2'}
-                  rows={16}
-                  required
-                />
+                <div className="msc-md-split">
+                  <div className="msc-md-split__pane">
+                    <div className="msc-md-split__label">
+                      <Code2 size={14} /> 编辑
+                    </div>
+                    <textarea
+                      className="msc-md-split__editor"
+                      value={newPost.content}
+                      onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
+                      placeholder={'# 标题\n\n正文内容...\n\n- 列表项 1\n- 列表项 2'}
+                      rows={16}
+                      required
+                    />
+                  </div>
+                  <div className="msc-md-split__pane">
+                    <div className="msc-md-split__label">
+                      <Eye size={14} /> 预览
+                    </div>
+                    <div
+                      className="msc-md-split__preview"
+                      dangerouslySetInnerHTML={{
+                        __html: markdownPreview || '<p class="msc-md-split__empty">在左侧输入 Markdown 内容后，这里会显示实时预览</p>',
+                      }}
+                    />
+                  </div>
+                </div>
               ) : (
                 <div className="msc-form__word-editor-wrapper">
                   <button
