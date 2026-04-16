@@ -19,8 +19,8 @@ import './MemberProfiles.css';
 // ============================================
 const COLUMNS = [
   { key: 'name', label: '姓名', width: '90px', editable: false },
-  { key: 'enrollment_year', label: '入学年份', width: '100px', editable: true, placeholder: '如 2023' },
-  { key: 'joined_at_display', label: '加入时间', width: '140px', editable: true, inputType: 'yearMonth' },
+  { key: 'enrollment_year', label: '入学年份', width: '72px', editable: true, placeholder: '如 2023' },
+  { key: 'joined_at_display', label: '加入时间', width: '90px', editable: true, inputType: 'yearMonth' },
   { key: 'bio', label: '一句话概括自己', width: '180px', editable: true, placeholder: '用一句话介绍自己' },
   { key: 'further_education', label: '升学去向', width: '150px', editable: true, placeholder: '如 XX大学XX专业' },
   { key: 'career', label: '工作去向', width: '150px', editable: true, placeholder: '如 XX公司XX岗位 当前base地' },
