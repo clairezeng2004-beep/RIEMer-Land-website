@@ -1,7 +1,8 @@
 /* ============ Content Management ============ */
 .content-mgmt {
-  padding: var(--space-3xl) 0;
-  min-height: calc(100vh - 72px);
+  padding-top: 120px;
+  padding-bottom: var(--space-4xl);
+  min-height: 100vh;
 }
 
 .content-mgmt__header {
