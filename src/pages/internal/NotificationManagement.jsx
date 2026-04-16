@@ -22,7 +22,6 @@ import {
   FileText,
   MessageSquarePlus,
   Upload,
-  ArrowRight,
   Filter,
   ChevronDown,
   ChevronUp,
@@ -169,20 +168,6 @@ export default function NotificationManagement() {
     return <Navigate to="/login" replace />;
   }
 
-  if (!isAdmin) {
-    return (
-      <div className="notif-mgmt">
-        <div className="container">
-          <div className="notif-mgmt__no-access">
-            <Shield size={48} />
-            <h3>仅管理员可访问</h3>
-            <p>通知管理功能仅对管理员开放</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="notif-mgmt">
       <div className="container">
@@ -190,14 +175,16 @@ export default function NotificationManagement() {
         <div className="notif-mgmt__header">
           <div>
             <h1><BellRing size={28} /> 通知管理</h1>
-            <p>查看通知触发规则、管理所有通知、发送新通知</p>
+            <p>{isAdmin ? '查看通知触发规则、管理所有通知、发送新通知' : '查看通知触发规则和所有通知'}</p>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowNewForm(true)}
-          >
-            <Plus size={16} /> 发送新通知
-          </button>
+          {isAdmin && (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowNewForm(true)}
+            >
+              <Plus size={16} /> 发送新通知
+            </button>
+          )}
         </div>
 
         {/* ====== 统计卡片 ====== */}
@@ -458,24 +445,26 @@ export default function NotificationManagement() {
                       </span>
                     </div>
                   </div>
-                  <div className="notif-mgmt__notif-actions">
-                    {!notif.read && (
+                  {isAdmin && (
+                    <div className="notif-mgmt__notif-actions">
+                      {!notif.read && (
+                        <button
+                          className="notif-mgmt__action-btn"
+                          onClick={() => markAsRead(notif.id)}
+                          title="标记已读"
+                        >
+                          <CheckCircle size={14} />
+                        </button>
+                      )}
                       <button
-                        className="notif-mgmt__action-btn"
-                        onClick={() => markAsRead(notif.id)}
-                        title="标记已读"
+                        className="notif-mgmt__action-btn notif-mgmt__action-btn--danger"
+                        onClick={() => deleteNotification(notif.id)}
+                        title="删除"
                       >
-                        <CheckCircle size={14} />
+                        <Trash2 size={14} />
                       </button>
-                    )}
-                    <button
-                      className="notif-mgmt__action-btn notif-mgmt__action-btn--danger"
-                      onClick={() => deleteNotification(notif.id)}
-                      title="删除"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
