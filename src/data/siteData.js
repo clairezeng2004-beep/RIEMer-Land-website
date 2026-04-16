@@ -124,6 +124,19 @@ export const membersData = [
 
 export const eventsData = [
   {
+    id: '6',
+    title: 'RIEMer\'s Space 第十二期：大数据与金融科技前沿分享',
+    date: '2026-04-18',
+    category: '分享会',
+    location: '西南财经大学 格致楼 305',
+    leaderId: 'member-4',
+    excerpt:
+      '邀请在金融科技领域深耕的 RIEM 校友，聊聊大数据、AI 在金融行业的真实应用场景，以及如何提前布局相关技能。',
+    hasReplay: false,
+    replayUrl: '',
+    replayPassword: '',
+  },
+  {
     id: '5',
     title: '2026 春季学期保研&考研经验交流会',
     date: '2026-05-10',
