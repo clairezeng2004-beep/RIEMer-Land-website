@@ -417,7 +417,10 @@ export default function Login() {
 
         {/* ==================== 登录表单 ==================== */}
         {view === 'login' && (
-          <form onSubmit={handleLogin} className="login-card__form" autoComplete="off">
+          <form onSubmit={handleLogin} className="login-card__form" autoComplete="off" data-lpignore="true">
+            {/* 隐藏的陷阱输入框，防止 macOS 密码自动填充悬浮提示 */}
+            <input type="text" name="trap-user" autoComplete="username" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
+            <input type="password" name="trap-pass" autoComplete="current-password" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
             <div className="login-card__field">
               <label className="login-card__label">
                 <Mail size={16} /> 邮箱
@@ -435,6 +438,8 @@ export default function Login() {
                   className="login-card__input"
                   autoComplete="off"
                   name="login-email-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 {showEmailSuggestions && emailSuggestions.length > 0 && (
                   <ul className="login-card__email-suggestions">
@@ -464,7 +469,10 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请输入密码"
                   className="login-card__input"
-                  autoComplete="new-password"
+                  autoComplete="off"
+                  name="login-pwd-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 <button
                   type="button"
@@ -511,7 +519,10 @@ export default function Login() {
 
         {/* ==================== 注册表单 ==================== */}
         {view === 'register' && (
-          <form onSubmit={handleRegister} className="login-card__form" autoComplete="off">
+          <form onSubmit={handleRegister} className="login-card__form" autoComplete="off" data-lpignore="true">
+            {/* 隐藏的陷阱输入框，防止 macOS 密码自动填充悬浮提示 */}
+            <input type="text" name="trap-user-reg" autoComplete="username" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
+            <input type="password" name="trap-pass-reg" autoComplete="current-password" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
             <div className="login-card__field">
               <label className="login-card__label">
                 <User size={16} /> 真名 <span className="login-card__required">*必填</span>
@@ -543,6 +554,8 @@ export default function Login() {
                   className="login-card__input"
                   autoComplete="off"
                   name="register-email-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 {showEmailSuggestions && emailSuggestions.length > 0 && (
                   <ul className="login-card__email-suggestions">
@@ -572,7 +585,10 @@ export default function Login() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="请设置密码（至少6位）"
                   className="login-card__input"
-                  autoComplete="new-password"
+                  autoComplete="off"
+                  name="register-pwd-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 <button
                   type="button"
@@ -595,7 +611,7 @@ export default function Login() {
           <>
             {/* 步骤 1：输入邮箱，发送验证码 */}
             {resetStep === 'email' && (
-              <form onSubmit={handleSendCode} className="login-card__form" autoComplete="off">
+              <form onSubmit={handleSendCode} className="login-card__form" autoComplete="off" data-lpignore="true">
                 <div className="login-card__field">
                   <label className="login-card__label">
                     <Mail size={16} /> 注册邮箱
@@ -613,6 +629,8 @@ export default function Login() {
                       className="login-card__input"
                       autoComplete="off"
                       name="reset-email-nonauto"
+                      data-1p-ignore="true"
+                      data-lpignore="true"
                     />
                     {showEmailSuggestions && emailSuggestions.length > 0 && (
                       <ul className="login-card__email-suggestions">
@@ -693,7 +711,10 @@ export default function Login() {
 
             {/* 步骤 3：设置新密码 */}
             {resetStep === 'password' && (
-              <form onSubmit={handleResetPassword} className="login-card__form" autoComplete="off">
+              <form onSubmit={handleResetPassword} className="login-card__form" autoComplete="off" data-lpignore="true">
+                {/* 隐藏的陷阱输入框 */}
+                <input type="text" name="trap-user-reset" autoComplete="username" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
+                <input type="password" name="trap-pass-reset" autoComplete="current-password" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
                 <div className="login-card__field">
                   <label className="login-card__label">
                     <Lock size={16} /> 新密码
@@ -705,7 +726,10 @@ export default function Login() {
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="请设置新密码（至少6位）"
                       className="login-card__input"
-                      autoComplete="new-password"
+                      autoComplete="off"
+                      name="reset-newpwd-nonauto"
+                      data-1p-ignore="true"
+                      data-lpignore="true"
                     />
                     <button
                       type="button"
@@ -728,7 +752,10 @@ export default function Login() {
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="请再次输入新密码"
                       className="login-card__input"
-                      autoComplete="new-password"
+                      autoComplete="off"
+                      name="reset-confirmpwd-nonauto"
+                      data-1p-ignore="true"
+                      data-lpignore="true"
                     />
                     <button
                       type="button"
@@ -750,7 +777,10 @@ export default function Login() {
 
         {/* ==================== 修改密码表单 ==================== */}
         {view === 'changePassword' && (
-          <form onSubmit={handleChangePassword} className="login-card__form" autoComplete="off">
+          <form onSubmit={handleChangePassword} className="login-card__form" autoComplete="off" data-lpignore="true">
+            {/* 隐藏的陷阱输入框 */}
+            <input type="text" name="trap-user-chg" autoComplete="username" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
+            <input type="password" name="trap-pass-chg" autoComplete="current-password" style={{ position: 'absolute', opacity: 0, height: 0, width: 0, padding: 0, border: 'none', pointerEvents: 'none' }} tabIndex={-1} aria-hidden="true" />
             <div className="login-card__field">
               <label className="login-card__label">
                 <Lock size={16} /> 当前密码
@@ -762,7 +792,10 @@ export default function Login() {
                   onChange={(e) => setCurrentPassword(e.target.value)}
                   placeholder="请输入当前密码"
                   className="login-card__input"
-                  autoComplete="current-password"
+                  autoComplete="off"
+                  name="chg-curpwd-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 <button
                   type="button"
@@ -785,7 +818,10 @@ export default function Login() {
                   onChange={(e) => setNewPassword(e.target.value)}
                   placeholder="请设置新密码（至少6位）"
                   className="login-card__input"
-                  autoComplete="new-password"
+                  autoComplete="off"
+                  name="chg-newpwd-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 <button
                   type="button"
@@ -808,7 +844,10 @@ export default function Login() {
                   onChange={(e) => setConfirmPassword(e.target.value)}
                   placeholder="请再次输入新密码"
                   className="login-card__input"
-                  autoComplete="new-password"
+                  autoComplete="off"
+                  name="chg-confirmpwd-nonauto"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
                 />
                 <button
                   type="button"
