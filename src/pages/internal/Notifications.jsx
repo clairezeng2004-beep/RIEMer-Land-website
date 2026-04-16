@@ -10,9 +10,8 @@ import {
   BellOff,
   CheckCheck,
   Trash2,
-  AlertCircle,
+  BookOpen,
   Info,
-  Settings,
   Clock,
   Mail,
   CheckCircle,
@@ -20,9 +19,9 @@ import {
 import './Notifications.css';
 
 const typeConfig = {
-  reminder: { icon: AlertCircle, color: '#F39C12', label: '提醒' },
-  info: { icon: Info, color: '#5EAD8C', label: '通知' },
-  system: { icon: Settings, color: '#8B5CF6', label: '系统' },
+  progress: { icon: CheckCircle, color: '#5EAD8C', label: '事项进度' },
+  sharing: { icon: BookOpen, color: '#5B8C3E', label: '内部分享' },
+  other: { icon: Info, color: '#8B5CF6', label: '其他' },
 };
 
 export default function Notifications() {

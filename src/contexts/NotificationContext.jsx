@@ -367,7 +367,7 @@ export function NotificationProvider({ children }) {
         const newNotif = {
           title: notification.title,
           message: notification.message || '',
-          type: notification.type || 'system',
+          type: notification.type || 'other',
           date: notification.date || new Date().toISOString().split('T')[0],
           target_role: notification.target_role || null,
         };

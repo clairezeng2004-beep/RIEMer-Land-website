@@ -13,9 +13,7 @@ import {
   Zap,
   BookOpen,
   CheckCircle,
-  AlertCircle,
   Info,
-  Settings,
   Send,
   Users,
   Shield,
@@ -31,9 +29,9 @@ import './NotificationManagement.css';
 
 // 通知类型配置
 const typeConfig = {
-  reminder: { icon: AlertCircle, color: '#F39C12', label: '提醒' },
-  info: { icon: Info, color: '#5EAD8C', label: '通知' },
-  system: { icon: Settings, color: '#8B5CF6', label: '系统' },
+  progress: { icon: CheckCircle, color: '#5EAD8C', label: '事项进度' },
+  sharing: { icon: BookOpen, color: '#5B8C3E', label: '内部分享' },
+  other: { icon: Info, color: '#8B5CF6', label: '其他' },
 };
 
 // ====== 通知触发规则定义 ======
@@ -45,7 +43,7 @@ const TRIGGER_RULES = [
     trigger: '成员上传新文档',
     title: '新内部分享',
     message: '「{上传者}」上传了文档「{文档名}」（{文档类型}）',
-    type: 'info',
+    type: 'sharing',
     autoRead: true,
     autoReadReason: '上传者自动已读，不打扰操作者本人',
     file: 'Documents.jsx',
@@ -57,7 +55,7 @@ const TRIGGER_RULES = [
     trigger: '成员提交新的建设建议',
     title: '新建设建议',
     message: '「{提议人}」提出了建议：{建议内容前40字}',
-    type: 'system',
+    type: 'progress',
     autoRead: true,
     autoReadReason: '建议提交者自动已读，仅作为记录',
     file: 'Suggestions.jsx',
@@ -69,7 +67,7 @@ const TRIGGER_RULES = [
     trigger: '管理员修改建议的状态',
     title: '建设建议状态变更',
     message: '建议「{建议内容}」状态：{旧状态} → {新状态}',
-    type: 'system',
+    type: 'progress',
     autoRead: true,
     autoReadReason: '状态变更操作者自动已读',
     file: 'Suggestions.jsx',
@@ -81,7 +79,7 @@ const TRIGGER_RULES = [
     trigger: '本周存在未读消息时（每周最多一次）',
     title: '—（不创建通知，仅触发邮件提醒）',
     message: '系统检测到未读消息，自动向成员邮箱发送一封周度汇总提醒',
-    type: 'system',
+    type: 'other',
     autoRead: false,
     autoReadReason: '非通知，仅控制邮件发送频率',
     file: 'NotificationContext.jsx',
@@ -92,7 +90,7 @@ const TRIGGER_RULES = [
 const defaultNewNotif = {
   title: '',
   message: '',
-  type: 'info',
+  type: 'progress',
   target_role: '', // '' = 所有人
 };
 
@@ -115,14 +113,14 @@ export default function NotificationManagement() {
   const [sendSuccess, setSendSuccess] = useState(false);
   // 通知列表筛选
   const [listFilter, setListFilter] = useState('all'); // all | unread | read
-  const [typeFilter, setTypeFilter] = useState('all'); // all | reminder | info | system
+  const [typeFilter, setTypeFilter] = useState('all'); // all | progress | sharing | other
 
   // 统计
   const stats = useMemo(() => {
     const total = notifications.length;
     const unread = notifications.filter((n) => !n.read).length;
     const read = total - unread;
-    const byType = { reminder: 0, info: 0, system: 0 };
+    const byType = { progress: 0, sharing: 0, other: 0 };
     notifications.forEach((n) => {
       if (byType[n.type] !== undefined) byType[n.type]++;
     });

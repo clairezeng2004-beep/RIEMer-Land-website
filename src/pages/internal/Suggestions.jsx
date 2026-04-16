@@ -358,7 +358,7 @@ export default function Suggestions() {
                   addNotification({
                     title: '新建设建议',
                     message: `${editingSuggestion.proposer} 提出了建议：${editingSuggestion.content.slice(0, 40)}${editingSuggestion.content.length > 40 ? '…' : ''}`,
-                    type: 'system',
+                    type: 'progress',
                     read: true,
                   });
                   setEditingSuggestion(null);
@@ -481,7 +481,7 @@ export default function Suggestions() {
                                     addNotification({
                                       title: '建设建议状态变更',
                                       message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
-                                      type: 'system',
+                                      type: 'progress',
                                       read: true,
                                     });
                                   }
@@ -693,7 +693,7 @@ export default function Suggestions() {
                                     addNotification({
                                       title: '建设建议状态变更',
                                       message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
-                                      type: 'system',
+                                      type: 'progress',
                                       read: true,
                                     });
                                   }

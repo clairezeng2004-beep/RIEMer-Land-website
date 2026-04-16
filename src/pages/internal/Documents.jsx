@@ -176,7 +176,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     addNotification({
       title: '新内部分享',
       message: `${doc.uploadedBy} 上传了文档「${doc.title}」（${typeLabels[doc.type]}）`,
-      type: 'info',
+      type: 'sharing',
       read: true, // 自动已读，不打扰成员
     });
     setNewDoc({ title: '', type: 'course', description: '' });
