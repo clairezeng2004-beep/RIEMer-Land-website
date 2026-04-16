@@ -735,6 +735,10 @@
     padding: var(--space-md);
   }
 
+  .notif-mgmt__stat-value {
+    font-size: var(--text-lg);
+  }
+
   .notif-mgmt__modal {
     width: 95%;
   }
