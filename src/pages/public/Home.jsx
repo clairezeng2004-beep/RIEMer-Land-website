@@ -102,6 +102,50 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Latest Events */}
+      <section className="featured section section--compact">
+        <div className="container">
+          <div className="featured__header">
+            <h2 className="section-title">最新活动</h2>
+          </div>
+          <div className="featured__grid">
+            {recentEvents.map((event) => (
+                <div
+                  key={event.id}
+                  className={`featured__card ${event.hasReplay ? 'featured__card--clickable' : ''}`}
+                  onClick={() => handleEventClick(event)}
+                  style={event.hasReplay ? { cursor: 'pointer' } : undefined}
+                >
+                  <div className="featured__card-accent" />
+                  <div className="featured__card-body">
+                    <div className="featured__card-top">
+                      <span className="featured__category">{event.category}</span>
+                      {event.hasReplay && (
+                        <span className="featured__replay-badge">
+                          <Video size={12} /> 回放
+                        </span>
+                      )}
+                    </div>
+                    <h3 className="featured__title">{event.title}</h3>
+                    <p className="featured__excerpt">{event.excerpt}</p>
+                    <div className="featured__meta">
+                      <span className="featured__meta-item">
+                        <Clock size={14} />
+                        {event.date}
+                      </span>
+                      {event.hasReplay && (
+                        <span className="featured__meta-item featured__meta-item--replay">
+                          <Lock size={12} /> 需密码
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+          </div>
+        </div>
+      </section>
+
       {/* Featured Articles */}
       <section className="featured section">
         <div className="container">
@@ -149,50 +193,6 @@ export default function Home() {
             <Link to="/articles" className="btn btn-secondary">
               查看全部文章 <ArrowRight size={16} />
             </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Latest Events */}
-      <section className="featured section section--compact">
-        <div className="container">
-          <div className="featured__header">
-            <h2 className="section-title">最新活动</h2>
-          </div>
-          <div className="featured__grid">
-            {recentEvents.map((event) => (
-                <div
-                  key={event.id}
-                  className={`featured__card ${event.hasReplay ? 'featured__card--clickable' : ''}`}
-                  onClick={() => handleEventClick(event)}
-                  style={event.hasReplay ? { cursor: 'pointer' } : undefined}
-                >
-                  <div className="featured__card-accent" />
-                  <div className="featured__card-body">
-                    <div className="featured__card-top">
-                      <span className="featured__category">{event.category}</span>
-                      {event.hasReplay && (
-                        <span className="featured__replay-badge">
-                          <Video size={12} /> 回放
-                        </span>
-                      )}
-                    </div>
-                    <h3 className="featured__title">{event.title}</h3>
-                    <p className="featured__excerpt">{event.excerpt}</p>
-                    <div className="featured__meta">
-                      <span className="featured__meta-item">
-                        <Clock size={14} />
-                        {event.date}
-                      </span>
-                      {event.hasReplay && (
-                        <span className="featured__meta-item featured__meta-item--replay">
-                          <Lock size={12} /> 需密码
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
           </div>
         </div>
       </section>
