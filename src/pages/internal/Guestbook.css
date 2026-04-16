@@ -269,4 +269,8 @@
   .guestbook-page {
     padding-top: var(--space-xl);
   }
+
+  .guestbook-page__refresh-btn {
+    display: none;
+  }
 }
