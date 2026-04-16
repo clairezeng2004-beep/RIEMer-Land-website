@@ -70,9 +70,7 @@
   align-items: center;
   gap: var(--space-md);
   margin-bottom: var(--space-xl);
-  padding: 10px var(--space-lg);
-  background: var(--color-bg, #fafafa);
-  border-radius: var(--radius-lg, 12px);
+  padding: 10px 0;
 }
 
 .guestbook-page__stats-item {
