@@ -128,7 +128,23 @@ export function AuthProvider({ children }) {
     } catch { /* ignore */ }
     return null;
   });
-  const [loading, setLoading] = useState(true);
+  // 快速加载优化：如果有缓存的用户 profile，直接跳过 loading 让用户先进入页面
+  // 后台再静默验证 session（如果验证失败会自动登出）
+  const [loading, setLoading] = useState(() => {
+    try {
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.id && parsed?.authorized) {
+          console.log('[Auth] 检测到缓存用户，跳过 loading 等待');
+          return false; // 有缓存的已授权用户 → 不需要等待
+        }
+      }
+    } catch { /* ignore */ }
+    return true; // 没有缓存 → 需要等待验证
+  });
+  // 后台 session 验证是否正在进行中
+  const [bgVerifying, setBgVerifying] = useState(false);
   // Supabase 是否可达：null=检测中, true=可达, false=不可达（降级本地模式）
   const [supabaseOk, setSupabaseOk] = useState(isSupabaseConfigured ? null : false);
 
@@ -213,6 +229,16 @@ export function AuthProvider({ children }) {
     // Supabase 模式：先做健康检查，不通则降级本地模式
     let sessionResolved = false; // 防止超时回调和正常回调重复执行
 
+    // 判断是否有缓存用户（决定是否走后台静默验证模式）
+    let hasCachedUser = false;
+    try {
+      const cached = localStorage.getItem(PROFILE_CACHE_KEY);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.id && parsed?.authorized) hasCachedUser = true;
+      }
+    } catch { /* ignore */ }
+
     /** 带超时的 Promise 包装器 */
     const withTimeout = (promise, ms, label) => {
       return Promise.race([
@@ -223,16 +249,26 @@ export function AuthProvider({ children }) {
 
     const initSession = async () => {
       const startTime = Date.now();
+      const isBgMode = hasCachedUser; // 有缓存用户 → 后台模式（loading 已经是 false）
+
+      if (isBgMode) {
+        console.log('[Auth] 后台静默验证模式（缓存用户已可用）');
+        setBgVerifying(true);
+      }
+
       // 1. 先快速检测 Supabase 是否可达（3 秒超时）
       const reachable = await checkSupabaseHealth();
       if (!reachable) {
         console.warn('[Auth] Supabase 不可达，自动降级到本地模式');
         setSupabaseOk(false);
-        restoreLocalAuth();
-        setLoading(false);
+        if (!isBgMode) {
+          restoreLocalAuth();
+          setLoading(false);
+        }
+        setBgVerifying(false);
         return;
       }
-      console.log('[Auth] Supabase 服务可达，开始恢复 session...');
+      console.log('[Auth] Supabase 服务可达，开始恢复 session...', isBgMode ? '(后台)' : '');
 
       try {
         // 2. 尝试获取 session（独立 5 秒超时，不依赖全局 fetch 超时）
@@ -259,6 +295,7 @@ export function AuthProvider({ children }) {
             await fetchProfile(sessionUser);
             setLoading(false);
           }
+          setBgVerifying(false);
           return;
         }
 
@@ -279,6 +316,7 @@ export function AuthProvider({ children }) {
               await fetchProfile(refreshData.session.user);
               setLoading(false);
             }
+            setBgVerifying(false);
             return;
           }
         } catch (e) {
@@ -290,18 +328,30 @@ export function AuthProvider({ children }) {
         if (!sessionResolved) {
           sessionResolved = true;
           setSupabaseOk(true); // 服务可达，只是 session 失效
-          restoreLocalAuth();
+          if (isBgMode) {
+            // 后台验证失败 → session 已过期，需要清除用户状态让用户重新登录
+            console.warn('[Auth] 后台验证：session 已失效，需重新登录');
+            setUser(null);
+            localStorage.removeItem(AUTH_KEY);
+            clearProfileCache();
+          } else {
+            restoreLocalAuth();
+          }
           setLoading(false);
         }
+        setBgVerifying(false);
       } catch (err) {
         console.error('[Auth] initSession 异常:', err, '总耗时:', Date.now() - startTime, 'ms');
         if (!sessionResolved) {
           sessionResolved = true;
-          // 网络错误 → 降级
+          // 网络错误 → 降级（保留缓存用户，不强制登出）
           setSupabaseOk(false);
-          restoreLocalAuth();
+          if (!isBgMode) {
+            restoreLocalAuth();
+          }
           setLoading(false);
         }
+        setBgVerifying(false);
       }
     };
 
@@ -1459,6 +1509,7 @@ export function AuthProvider({ children }) {
       value={{
         user,
         loading,
+        bgVerifying,
         login,
         register,
         logout,

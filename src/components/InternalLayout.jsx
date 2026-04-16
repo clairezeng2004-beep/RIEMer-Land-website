@@ -70,7 +70,7 @@ function MobileInternalNav() {
 }
 
 export default function InternalLayout() {
-  const { isAuthenticated, loading, supabaseOk } = useAuth();
+  const { isAuthenticated, loading } = useAuth();
   const location = useLocation();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
