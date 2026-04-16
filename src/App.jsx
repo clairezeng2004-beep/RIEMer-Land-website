@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
@@ -31,54 +31,68 @@ import Suggestions from './pages/internal/Suggestions';
 import Guestbook from './pages/internal/Guestbook';
 import NotificationManagement from './pages/internal/NotificationManagement';
 
+/* 独立全屏页面路径（不显示 Navbar / Footer） */
+const FULLSCREEN_PATHS = ['/internal/member-sharing/create'];
+
+function AppShell() {
+  const { pathname } = useLocation();
+  const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname.startsWith(p));
+
+  return (
+    <>
+      <ScrollToTop />
+      {!isFullscreen && <Navbar />}
+      <main>
+        <Routes>
+          {/* Public Routes */}
+          <Route path="/" element={<Home />} />
+          <Route path="/timeline" element={<Timeline />} />
+          <Route path="/articles" element={<Articles />} />
+          <Route path="/article/:id" element={<ArticleDetail />} />
+
+          {/* Auth */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+
+          {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
+          <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
+
+          {/* Internal Routes (Protected) — 带侧边栏布局 */}
+          <Route path="/internal" element={<InternalLayout />}>
+            <Route index element={<Navigate to="notifications" replace />} />
+            <Route path="process-templates" element={<ProcessTemplates />} />
+            <Route path="member-sharing" element={<MemberSharing />} />
+            <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
+            {/* 兼容旧链接 */}
+            <Route path="documents" element={<Documents />} />
+            <Route path="articles" element={<InternalArticles />} />
+            <Route path="article/:id" element={<InternalArticleDetail />} />
+            <Route path="tasks" element={<Tasks />} />
+            <Route path="gallery" element={<Gallery />} />
+            <Route path="users" element={<UserManagement />} />
+            <Route path="content" element={<ContentManagement />} />
+            <Route path="notification-management" element={<NotificationManagement />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="contributions" element={<MemberContributions />} />
+            <Route path="suggestions" element={<Suggestions />} />
+            <Route path="guestbook" element={<Guestbook />} />
+            <Route path="profile" element={<Profile />} />
+            <Route path="member-profiles" element={<MemberProfiles />} />
+          </Route>
+        </Routes>
+      </main>
+      {!isFullscreen && <Footer />}
+    </>
+  );
+}
+
 function App() {
   return (
     <AuthProvider>
       <SiteContentProvider>
         <Router>
           <NotificationProvider>
-            <ScrollToTop />
-            <Navbar />
-            <main>
-              <Routes>
-                {/* Public Routes */}
-                <Route path="/" element={<Home />} />
-                <Route path="/timeline" element={<Timeline />} />
-                <Route path="/articles" element={<Articles />} />
-                <Route path="/article/:id" element={<ArticleDetail />} />
-
-                {/* Auth */}
-                <Route path="/login" element={<Login />} />
-                <Route path="/reset-password" element={<ResetPassword />} />
-
-                {/* 独立全屏页面（不带侧边栏） */}
-                <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
-
-                {/* Internal Routes (Protected) — 带侧边栏布局 */}
-                <Route path="/internal" element={<InternalLayout />}>
-                  <Route index element={<Navigate to="notifications" replace />} />
-                  <Route path="process-templates" element={<ProcessTemplates />} />
-                  <Route path="member-sharing" element={<MemberSharing />} />
-                  <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
-                  {/* 兼容旧链接 */}
-                  <Route path="documents" element={<Documents />} />
-                  <Route path="articles" element={<InternalArticles />} />
-                  <Route path="article/:id" element={<InternalArticleDetail />} />
-                  <Route path="tasks" element={<Tasks />} />
-                  <Route path="gallery" element={<Gallery />} />
-                  <Route path="users" element={<UserManagement />} />
-                  <Route path="content" element={<ContentManagement />} />
-                  <Route path="notification-management" element={<NotificationManagement />} />
-                  <Route path="notifications" element={<Notifications />} />
-                  <Route path="contributions" element={<MemberContributions />} />
-                  <Route path="suggestions" element={<Suggestions />} />
-                  <Route path="guestbook" element={<Guestbook />} />
-                  <Route path="profile" element={<Profile />} />
-                  <Route path="member-profiles" element={<MemberProfiles />} />
-                </Route>
-              </Routes>
-            </main>
-            <Footer />
+            <AppShell />
           </NotificationProvider>
         </Router>
       </SiteContentProvider>

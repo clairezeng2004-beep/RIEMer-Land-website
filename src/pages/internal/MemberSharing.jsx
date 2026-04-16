@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -380,9 +380,9 @@ export default function MemberSharing() {
               />
             </p>
           </div>
-          <Link to="/internal/member-sharing/create" className="btn btn-primary">
+          <a href="/internal/member-sharing/create" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
             <Plus size={18} /> 发布分享
-          </Link>
+          </a>
         </div>
 
         {/* Filters */}
