@@ -126,6 +126,7 @@ CREATE TABLE IF NOT EXISTS member_profiles (
   willing_to_share TEXT DEFAULT '',
   want_to_learn TEXT DEFAULT '',
   hobbies TEXT DEFAULT '',
+  hometown TEXT DEFAULT '',
   dream_city TEXT DEFAULT '',
   other TEXT DEFAULT '',
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),

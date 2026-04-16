@@ -27,6 +27,7 @@ const COLUMNS = [
   { key: 'willing_to_share', label: '我愿意分享什么', width: '180px', editable: true, placeholder: '你愿意和大家分享的内容' },
   { key: 'want_to_learn', label: '我想和大家请教什么', width: '180px', editable: true, placeholder: '你想请教大家的问题' },
   { key: 'hobbies', label: '爱好', width: '150px', editable: true, placeholder: '如 摄影、阅读、运动' },
+  { key: 'hometown', label: '家乡', width: '120px', editable: true, placeholder: '如 广东广州' },
   { key: 'dream_city', label: '未来想定居的城市', width: '150px', editable: true, placeholder: '如 北京、上海' },
   { key: 'other', label: '其他', width: '180px', editable: true, placeholder: '任何想补充的内容' },
 ];
@@ -103,6 +104,7 @@ export default function MemberProfiles() {
           willing_to_share: '',
           want_to_learn: '',
           hobbies: '',
+          hometown: '',
           dream_city: '',
           other: '',
         });
@@ -184,6 +186,7 @@ export default function MemberProfiles() {
           willing_to_share: '',
           want_to_learn: '',
           hobbies: '',
+          hometown: '',
           dream_city: '',
           other: '',
           joined_at: user.created_at || new Date().toISOString(),
@@ -217,6 +220,7 @@ export default function MemberProfiles() {
         willing_to_share: p.willing_to_share || '',
         want_to_learn: p.want_to_learn || '',
         hobbies: p.hobbies || '',
+        hometown: p.hometown || '',
         dream_city: p.dream_city || '',
         other: p.other || '',
       }));
@@ -253,6 +257,7 @@ export default function MemberProfiles() {
               willing_to_share: p.willing_to_share || '',
               want_to_learn: p.want_to_learn || '',
               hobbies: p.hobbies || '',
+              hometown: p.hometown || '',
               dream_city: p.dream_city || '',
               other: p.other || '',
             }));
