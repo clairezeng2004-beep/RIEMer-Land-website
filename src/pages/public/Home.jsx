@@ -12,6 +12,7 @@ import {
   X,
   ExternalLink,
   AlertCircle,
+  CalendarDays,
 } from 'lucide-react';
 import CoverImage from '../../components/CoverImage';
 import { articlesData } from '../../data/siteData';
@@ -32,6 +33,18 @@ export default function Home() {
     .sort((a, b) => b.date.localeCompare(a.date));
   const recentArticles = allArticles.slice(0, 6);
   const recentEvents = events.slice(0, 4);
+
+  // 计算活动倒计时天数（活动日期比当前晚则返回天数，否则返回 null）
+  const getCountdownDays = (eventDate) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const target = new Date(eventDate + 'T00:00:00');
+    const diff = target - today;
+    if (diff > 0) {
+      return Math.ceil(diff / (1000 * 60 * 60 * 24));
+    }
+    return null;
+  };
 
   // 动态计算统计数据：活动讲座 = events 总数，文章分享 = 所有文章总数
   const dynamicStats = content.stats.map((stat) => {
@@ -109,10 +122,12 @@ export default function Home() {
             <h2 className="section-title">最新活动</h2>
           </div>
           <div className="featured__grid">
-            {recentEvents.map((event) => (
+            {recentEvents.map((event) => {
+              const countdownDays = getCountdownDays(event.date);
+              return (
                 <div
                   key={event.id}
-                  className={`featured__card ${event.hasReplay ? 'featured__card--clickable' : ''}`}
+                  className={`featured__card ${event.hasReplay ? 'featured__card--clickable' : ''} ${countdownDays ? 'featured__card--upcoming' : ''}`}
                   onClick={() => handleEventClick(event)}
                   style={event.hasReplay ? { cursor: 'pointer' } : undefined}
                 >
@@ -120,6 +135,11 @@ export default function Home() {
                   <div className="featured__card-body">
                     <div className="featured__card-top">
                       <span className="featured__category">{event.category}</span>
+                      {countdownDays && (
+                        <span className="featured__countdown-badge">
+                          <CalendarDays size={12} /> {countdownDays} 天后
+                        </span>
+                      )}
                       {event.hasReplay && (
                         <span className="featured__replay-badge">
                           <Video size={12} /> 回放
@@ -133,6 +153,11 @@ export default function Home() {
                         <Clock size={14} />
                         {event.date}
                       </span>
+                      {countdownDays && (
+                        <span className="featured__meta-item featured__meta-item--countdown">
+                          <MapPin size={12} /> {event.location}
+                        </span>
+                      )}
                       {event.hasReplay && (
                         <span className="featured__meta-item featured__meta-item--replay">
                           <Lock size={12} /> 需密码
@@ -141,7 +166,8 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-              ))}
+              );
+            })}
           </div>
         </div>
       </section>

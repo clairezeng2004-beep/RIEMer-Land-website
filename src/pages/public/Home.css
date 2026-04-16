@@ -275,6 +275,41 @@
   font-weight: 500;
 }
 
+/* ============ Countdown Badge (Upcoming Events) ============ */
+.featured__card--upcoming {
+  border-color: var(--color-primary);
+  background: linear-gradient(135deg, rgba(var(--color-primary-rgb, 99, 102, 241), 0.03), transparent);
+}
+
+.featured__card--upcoming .featured__card-accent {
+  background: linear-gradient(90deg, var(--color-primary), #f59e0b);
+}
+
+.featured__countdown-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-full, 999px);
+  margin-left: auto;
+  white-space: nowrap;
+  animation: countdown-pulse 2s ease-in-out infinite;
+}
+
+@keyframes countdown-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.featured__meta-item--countdown {
+  color: var(--color-primary) !important;
+  font-weight: 500;
+}
+
 /* ============ Replay Password Modal ============ */
 .replay-modal__overlay {
   position: fixed;

@@ -124,6 +124,19 @@ export const membersData = [
 
 export const eventsData = [
   {
+    id: '5',
+    title: '2026 春季学期保研&考研经验交流会',
+    date: '2026-05-10',
+    category: '分享会',
+    location: '西南财经大学 格致楼 201',
+    leaderId: 'member-1',
+    excerpt:
+      '邀请多位成功保研、考研上岸的 RIEM 学长学姐，分享从择校到复试的全流程经验，助力 2027 届同学备战升学。',
+    hasReplay: false,
+    replayUrl: '',
+    replayPassword: '',
+  },
+  {
     id: '1',
     title: '快消行业与职业选择经验分享',
     date: '2025-03-06',
