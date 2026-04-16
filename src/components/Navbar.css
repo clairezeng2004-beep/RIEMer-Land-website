@@ -4,7 +4,7 @@
   left: 0;
   right: 0;
   z-index: 1000;
-  background: white;
+  background: var(--color-bg);
   transition: background 0.25s ease,
               box-shadow 0.25s ease,
               border-color 0.25s ease;
