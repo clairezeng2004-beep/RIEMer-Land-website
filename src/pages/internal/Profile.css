@@ -294,4 +294,9 @@
     width: 100px;
     height: 100px;
   }
+
+  .profile-page__display-name {
+    font-size: var(--text-lg);
+    font-weight: 500;
+  }
 }
