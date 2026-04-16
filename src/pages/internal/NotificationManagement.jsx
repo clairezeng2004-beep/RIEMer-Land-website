@@ -188,40 +188,20 @@ export default function NotificationManagement() {
         {/* ====== 统计卡片 ====== */}
         <div className="notif-mgmt__stats">
           <div className="notif-mgmt__stat-card">
-            <div className="notif-mgmt__stat-icon" style={{ background: 'rgba(91,140,62,0.1)', color: '#5B8C3E' }}>
-              <Bell size={20} />
-            </div>
-            <div className="notif-mgmt__stat-body">
-              <span className="notif-mgmt__stat-value">{stats.total}</span>
-              <span className="notif-mgmt__stat-label">总通知数</span>
-            </div>
+            <div className="notif-mgmt__stat-value">{stats.total}</div>
+            <div className="notif-mgmt__stat-label">总通知数</div>
           </div>
-          <div className="notif-mgmt__stat-card">
-            <div className="notif-mgmt__stat-icon" style={{ background: 'rgba(192,57,43,0.1)', color: '#C0392B' }}>
-              <EyeOff size={20} />
-            </div>
-            <div className="notif-mgmt__stat-body">
-              <span className="notif-mgmt__stat-value">{stats.unread}</span>
-              <span className="notif-mgmt__stat-label">未读</span>
-            </div>
+          <div className="notif-mgmt__stat-card notif-mgmt__stat-card--unread">
+            <div className="notif-mgmt__stat-value">{stats.unread}</div>
+            <div className="notif-mgmt__stat-label">未读</div>
           </div>
-          <div className="notif-mgmt__stat-card">
-            <div className="notif-mgmt__stat-icon" style={{ background: 'rgba(94,173,140,0.1)', color: '#5EAD8C' }}>
-              <Eye size={20} />
-            </div>
-            <div className="notif-mgmt__stat-body">
-              <span className="notif-mgmt__stat-value">{stats.read}</span>
-              <span className="notif-mgmt__stat-label">已读</span>
-            </div>
+          <div className="notif-mgmt__stat-card notif-mgmt__stat-card--read">
+            <div className="notif-mgmt__stat-value">{stats.read}</div>
+            <div className="notif-mgmt__stat-label">已读</div>
           </div>
-          <div className="notif-mgmt__stat-card">
-            <div className="notif-mgmt__stat-icon" style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
-              <Zap size={20} />
-            </div>
-            <div className="notif-mgmt__stat-body">
-              <span className="notif-mgmt__stat-value">{TRIGGER_RULES.length}</span>
-              <span className="notif-mgmt__stat-label">触发规则</span>
-            </div>
+          <div className="notif-mgmt__stat-card notif-mgmt__stat-card--rules">
+            <div className="notif-mgmt__stat-value">{TRIGGER_RULES.length}</div>
+            <div className="notif-mgmt__stat-label">触发规则</div>
           </div>
         </div>
 
