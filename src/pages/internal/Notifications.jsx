@@ -22,6 +22,7 @@ const typeConfig = {
   progress: { icon: CheckCircle, color: '#5EAD8C', label: '事项进度' },
   sharing: { icon: BookOpen, color: '#5B8C3E', label: '内部分享' },
   other: { icon: Info, color: '#8B5CF6', label: '其他' },
+  info: { icon: Info, color: '#8B5CF6', label: '通知' },
 };
 
 export default function Notifications() {
@@ -111,7 +112,7 @@ export default function Notifications() {
         {/* 通知列表 */}
         <div className={`notifications-list ${loaded ? 'notifications-list--loaded' : ''}`}>
           {filtered.map((notif) => {
-            const config = typeConfig[notif.type] || typeConfig.info;
+            const config = typeConfig[notif.type] || typeConfig.other;
             const Icon = config.icon;
             return (
               <div
