@@ -659,9 +659,13 @@
   font-weight: 500;
 }
 
-.ms-card__title-link {
+.ms-card__body-link {
   text-decoration: none;
   color: inherit;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  cursor: pointer;
 }
 
 .ms-card__title {
@@ -671,7 +675,7 @@
   transition: color var(--transition-fast);
 }
 
-.ms-card__title-link:hover .ms-card__title {
+.ms-card:hover .ms-card__title {
   color: var(--color-primary);
 }
 

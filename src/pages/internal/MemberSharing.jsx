@@ -533,51 +533,51 @@ export default function MemberSharing() {
           {filtered.map((post) => (
             <div key={post.id} className="ms-card card">
               <div className="ms-card__accent" style={{ background: categoryColors[post.category] || '#6B7280' }} />
-              <div className="ms-card__body">
-                <div className="ms-card__top">
-                  <span
-                    className="ms-card__badge"
-                    style={{
-                      color: categoryColors[post.category] || '#6B7280',
-                      background: `${categoryColors[post.category] || '#6B7280'}15`,
-                    }}
-                  >
-                    {categoryLabels[post.category] || post.category}
-                  </span>
-                  <span className="ms-card__format-tag">
-                    {post.format === 'markdown' ? <><Code2 size={11} /> Markdown</> : <><FileText size={11} /> Word</>}
-                  </span>
-                  {post.attachments && post.attachments.length > 0 && (
-                    <span className="ms-card__attach-tag">
-                      <Paperclip size={11} /> {post.attachments.length} 个附件
+              <a href={`/internal/member-sharing/view/${post.id}`} target="_blank" rel="noopener noreferrer" className="ms-card__body-link">
+                <div className="ms-card__body">
+                  <div className="ms-card__top">
+                    <span
+                      className="ms-card__badge"
+                      style={{
+                        color: categoryColors[post.category] || '#6B7280',
+                        background: `${categoryColors[post.category] || '#6B7280'}15`,
+                      }}
+                    >
+                      {categoryLabels[post.category] || post.category}
+                    </span>
+                    <span className="ms-card__format-tag">
+                      {post.format === 'markdown' ? <><Code2 size={11} /> Markdown</> : <><FileText size={11} /> Word</>}
+                    </span>
+                    {post.attachments && post.attachments.length > 0 && (
+                      <span className="ms-card__attach-tag">
+                        <Paperclip size={11} /> {post.attachments.length} 个附件
+                      </span>
+                    )}
+                  </div>
+
+                  <h4 className="ms-card__title">{post.title}</h4>
+
+                  <p className="ms-card__excerpt">{getExcerpt(post)}</p>
+
+                  {post.period && (
+                    <span className="ms-card__period">
+                      <Clock size={11} /> {post.period}
                     </span>
                   )}
+
+                  <div className="ms-card__meta">
+                    <span className="ms-card__author">
+                      <User size={12} /> {post.author}
+                    </span>
+                    <span className="ms-card__date">
+                      <Clock size={12} /> {post.createdAt}
+                    </span>
+                    <span className="ms-card__views">
+                      <Eye size={12} /> {views[post.id] || 0}
+                    </span>
+                  </div>
                 </div>
-
-                <a href={`/internal/member-sharing/view/${post.id}`} target="_blank" rel="noopener noreferrer" className="ms-card__title-link">
-                  <h4 className="ms-card__title">{post.title}</h4>
-                </a>
-
-                <p className="ms-card__excerpt">{getExcerpt(post)}</p>
-
-                {post.period && (
-                  <span className="ms-card__period">
-                    <Clock size={11} /> {post.period}
-                  </span>
-                )}
-
-                <div className="ms-card__meta">
-                  <span className="ms-card__author">
-                    <User size={12} /> {post.author}
-                  </span>
-                  <span className="ms-card__date">
-                    <Clock size={12} /> {post.createdAt}
-                  </span>
-                  <span className="ms-card__views">
-                    <Eye size={12} /> {views[post.id] || 0}
-                  </span>
-                </div>
-              </div>
+              </a>
 
               <div className="ms-card__bottom" onClick={(e) => e.stopPropagation()}>
                 <div className="ms-card__bottom-left">
