@@ -8,14 +8,12 @@ import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
 import {
   fetchAndParseArticle,
-  generateOutline,
   inferCategory,
   inferTags,
-  generateSummary,
 } from '../../services/articleService';
 import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
-  Plus, Link2, Loader2, X, Check, Tag, List, AlertCircle,
+  Plus, Link2, Loader2, X, Check, Tag, AlertCircle,
   ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
   CheckSquare,
 } from 'lucide-react';
@@ -88,15 +86,12 @@ export default function InternalArticles() {
 
   // 抓取后的文章数据（待确认）
   const [draft, setDraft] = useState(null);
-  // 用户可编辑的大纲和标签
-  const [editOutline, setEditOutline] = useState([]);
+  // 用户可编辑的标签
   const [editTags, setEditTags] = useState([]);
   const [editTitle, setEditTitle] = useState('');
   const [editCategory, setEditCategory] = useState('');
   const [editExcerpt, setEditExcerpt] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
-  const [newOutlineInput, setNewOutlineInput] = useState('');
-  const [showOutlineEditor, setShowOutlineEditor] = useState(true);
   const [showTagsEditor, setShowTagsEditor] = useState(true);
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
   const tagInputRef = useRef(null);
@@ -227,10 +222,8 @@ export default function InternalArticles() {
     setUrlInput('');
     setFetchError('');
     setDraft(null);
-    setEditOutline([]);
     setEditTags([]);
     setNewTagInput('');
-    setNewOutlineInput('');
   };
 
   // ---- 抓取文章 ----
@@ -251,7 +244,6 @@ export default function InternalArticles() {
       setEditCategory(parsed.category);
       setEditTags([...parsed.tags]);
       setEditExcerpt(parsed.excerpt);
-      setEditOutline(parsed.outline || []);
       setStep('confirm');
     } catch (err) {
       setFetchError(err.message || '抓取失败，请检查链接');
@@ -272,23 +264,6 @@ export default function InternalArticles() {
     }
   };
 
-  // ---- 大纲操作 ----
-  const removeOutlineItem = (index) => {
-    setEditOutline((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addOutlineItem = () => {
-    const item = newOutlineInput.trim();
-    if (item) {
-      setEditOutline((prev) => [...prev, item]);
-      setNewOutlineInput('');
-    }
-  };
-
-  const updateOutlineItem = (index, value) => {
-    setEditOutline((prev) => prev.map((item, i) => (i === index ? value : item)));
-  };
-
   // ---- 确认保存 ----
   const handleConfirmSave = () => {
     if (!draft) return;
@@ -304,7 +279,7 @@ export default function InternalArticles() {
       category: editCategory || draft.category,
       tags: editTags.length > 0 ? editTags : draft.tags,
       excerpt: editExcerpt.trim() || draft.excerpt,
-      outline: editOutline,
+      outline: [],
       url: draft.url,
       content: draft.content,
       archivedBy: user?.name || user?.nickname || '未知',
@@ -608,62 +583,6 @@ export default function InternalArticles() {
                       onChange={(e) => setEditExcerpt(e.target.value)}
                       rows={3}
                     />
-                  </div>
-
-                  {/* 大纲 */}
-                  <div className="ia-modal__field">
-                    <div
-                      className="ia-modal__label-row ia-modal__label-row--toggle"
-                      onClick={() => setShowOutlineEditor(!showOutlineEditor)}
-                    >
-                      <label className="ia-modal__label">
-                        <List size={16} /> 大纲
-                        <span className="ia-modal__count">（{editOutline.length} 项）</span>
-                      </label>
-                      {showOutlineEditor ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                    </div>
-                    {showOutlineEditor && (
-                      <div className="ia-modal__outline-editor">
-                        {editOutline.length === 0 && (
-                          <p className="ia-modal__empty-hint">暂无大纲，可手动添加</p>
-                        )}
-                        {editOutline.map((item, idx) => (
-                          <div key={idx} className="ia-modal__outline-item">
-                            <span className="ia-modal__outline-num">{idx + 1}.</span>
-                            <input
-                              type="text"
-                              className="ia-modal__outline-input"
-                              value={item}
-                              onChange={(e) => updateOutlineItem(idx, e.target.value)}
-                            />
-                            <button
-                              className="ia-modal__outline-remove"
-                              onClick={() => removeOutlineItem(idx)}
-                              title="移除"
-                            >
-                              <X size={14} />
-                            </button>
-                          </div>
-                        ))}
-                        <div className="ia-modal__outline-add">
-                          <input
-                            type="text"
-                            className="ia-modal__outline-input"
-                            placeholder="添加大纲条目…"
-                            value={newOutlineInput}
-                            onChange={(e) => setNewOutlineInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && addOutlineItem()}
-                          />
-                          <button
-                            className="btn btn-ghost btn-sm"
-                            onClick={addOutlineItem}
-                            disabled={!newOutlineInput.trim()}
-                          >
-                            <Plus size={14} /> 添加
-                          </button>
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* 标签 */}

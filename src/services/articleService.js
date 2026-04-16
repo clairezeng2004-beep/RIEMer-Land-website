@@ -110,15 +110,26 @@ function parseWechatArticle(html) {
 }
 
 /**
- * 解码 HTML 实体
+ * 解码 HTML 实体（包括 &nbsp; 等常见命名实体）
  */
 function decodeHTMLEntities(str) {
   return str
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&ensp;/gi, ' ')
+    .replace(/&emsp;/gi, ' ')
+    .replace(/&thinsp;/gi, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
+    .replace(/&lsquo;/gi, '\u2018')
+    .replace(/&rsquo;/gi, '\u2019')
+    .replace(/&ldquo;/gi, '\u201C')
+    .replace(/&rdquo;/gi, '\u201D')
+    .replace(/&mdash;/gi, '—')
+    .replace(/&ndash;/gi, '–')
+    .replace(/&hellip;/gi, '…')
     .replace(/&#x([0-9A-Fa-f]+);/g, (_, hex) =>
       String.fromCharCode(parseInt(hex, 16))
     )
@@ -126,15 +137,17 @@ function decodeHTMLEntities(str) {
 }
 
 /**
- * 去除 HTML 标签
+ * 去除 HTML 标签，并解码残留的 HTML 实体
  */
 function stripHTML(html) {
-  return html
+  let text = html
     .replace(/<style[\s\S]*?<\/style>/gi, '')
     .replace(/<script[\s\S]*?<\/script>/gi, '')
     .replace(/<[^>]+>/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+  // 去除标签后再解码实体（微信文章中 &nbsp; 非常常见）
+  return decodeHTMLEntities(text);
 }
 
 /**
@@ -148,10 +161,10 @@ function formatDate(d) {
 }
 
 /**
- * 生成智能摘要
- * 本地提取前几个有意义的句子，去除太短的句子
+ * 本地提取摘要（降级方案）
+ * 提取前几个有意义的句子，去除太短的句子
  */
-export function generateSummary(content, maxLength = 120) {
+export function generateSummaryLocal(content, maxLength = 120) {
   if (!content) return '';
 
   // 按句子切分
@@ -177,6 +190,61 @@ export function generateSummary(content, maxLength = 120) {
 
   return summary || content.slice(0, maxLength) + '…';
 }
+
+/**
+ * AI 智能摘要（通过已有的 DeepSeek API）
+ * 将文章正文发送给 AI，让其生成一段简洁、有吸引力的中文摘要
+ * 失败时降级为本地提取
+ */
+export async function generateSummaryAI(title, content) {
+  if (!content) return '';
+
+  // 截取正文前2000字，避免 token 过多
+  const truncated = content.slice(0, 2000);
+
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: 'user',
+            content: `请为以下公众号文章生成一段50-100字的中文摘要，要求：
+1. 用第三人称客观描述，概括文章核心内容和亮点
+2. 语言简洁有吸引力，适合作为文章卡片的预览文字
+3. 不要使用"本文"开头，直接切入主题
+4. 只输出摘要文字，不要任何标注或解释
+
+文章标题：${title}
+
+文章正文：
+${truncated}`,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`API 返回 ${response.status}`);
+    }
+
+    const data = await response.json();
+    const reply = data.reply?.trim();
+
+    if (reply && reply.length >= 10 && reply.length <= 200) {
+      return reply;
+    }
+  } catch (err) {
+    console.warn('[articleService] AI 摘要生成失败，降级为本地提取:', err.message);
+  }
+
+  // 降级：本地提取
+  return generateSummaryLocal(content);
+}
+
+// 保持向后兼容的别名
+export const generateSummary = generateSummaryLocal;
 
 /**
  * 根据标题和内容自动推断分类
@@ -301,6 +369,9 @@ export async function fetchAndParseArticle(url) {
   const titleForInfer = parsed.title || parsed.rawTitle;
   const contentText = parsed.content;
 
+  // 使用 AI 生成摘要（失败时自动降级为本地提取）
+  const excerpt = await generateSummaryAI(titleForInfer, contentText);
+
   return {
     rawTitle: parsed.rawTitle,
     title: titleForInfer,
@@ -308,8 +379,8 @@ export async function fetchAndParseArticle(url) {
     author: parsed.author,
     category: inferCategory(titleForInfer, contentText),
     tags: inferTags(titleForInfer, contentText),
-    excerpt: generateSummary(contentText),
-    outline: generateOutline(contentText),
+    excerpt,
+    outline: [],
     url,
     content: contentText,
   };
