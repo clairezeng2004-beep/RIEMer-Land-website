@@ -76,7 +76,7 @@ export default function Guestbook() {
         <div className="guestbook-page__header">
           <div>
             <h1>
-              <MessageCircle size={28} /> 留言板
+              <MessageCircle size={28} /> 访客留言板
             </h1>
             <p>来自网站访客的留言</p>
           </div>
