@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
