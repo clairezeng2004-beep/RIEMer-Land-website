@@ -50,10 +50,10 @@ export default function Home() {
   // 动态计算统计数据：活动讲座 = events 总数，文章分享 = 所有文章总数
   const dynamicStats = content.stats.map((stat) => {
     if (stat.label === '活动讲座') {
-      return { ...stat, value: `${events.length}+` };
+      return { ...stat, value: `${events.length}` };
     }
     if (stat.label === '文章分享') {
-      return { ...stat, value: `${allArticles.length}+` };
+      return { ...stat, value: `${allArticles.length}` };
     }
     return stat;
   });
