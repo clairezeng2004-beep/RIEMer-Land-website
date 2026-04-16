@@ -16,18 +16,66 @@ import {
 import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
   Plus, Link2, Loader2, X, Check, Tag, List, AlertCircle,
-  ChevronDown, ChevronUp, Pencil,
+  ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
 } from 'lucide-react';
 import './InternalArticles.css';
 
+// ---- 分类管理 ----
+const ARTICLE_CATEGORIES_KEY = 'riemer_article_categories';
+
+const PRESET_COLORS = [
+  '#5EAD8C', '#4FBFC4', '#EC4899', '#F59E0B', '#8B5CF6',
+  '#EF4444', '#3B82F6', '#10B981', '#F97316', '#6366F1',
+  '#14B8A6', '#E11D48', '#0EA5E9', '#84CC16', '#A855F7',
+];
+
+const DEFAULT_ARTICLE_CATEGORIES = [
+  { key: 'riemer-say', label: '听 RIEMer 说系列', color: '#5EAD8C' },
+  { key: 'course-review', label: '课程测评', color: '#4FBFC4' },
+  { key: 'campus-event', label: '校园活动', color: '#EC4899' },
+  { key: 'experience', label: '经验分享', color: '#F59E0B' },
+];
+
+function loadArticleCategories() {
+  try {
+    const stored = localStorage.getItem(ARTICLE_CATEGORIES_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return DEFAULT_ARTICLE_CATEGORIES;
+}
+
+function saveArticleCategories(data) {
+  localStorage.setItem(ARTICLE_CATEGORIES_KEY, JSON.stringify(data));
+}
+
+function buildCategoryMaps(cats) {
+  const labels = {};
+  const colors = {};
+  cats.forEach((c) => {
+    labels[c.label] = c.label;
+    colors[c.label] = c.color;
+  });
+  return { labels, colors };
+}
+
 export default function InternalArticles() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
   const { userArticles, addArticle, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const ia = internalConfig.internalArticles || {};
   const updateIA = useCallback((key, val) => updateInternalConfig({ internalArticles: { [key]: val } }), [updateInternalConfig]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
+
+  // ---- 分类管理状态 ----
+  const [categoryList, setCategoryList] = useState(loadArticleCategories);
+  const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState('');
+  const [newCatColor, setNewCatColor] = useState(PRESET_COLORS[0]);
+  const [editingCatKey, setEditingCatKey] = useState(null);
+  const [editCatLabel, setEditCatLabel] = useState('');
+  const [editCatColor, setEditCatColor] = useState('');
 
   // ---- 新建归档弹窗状态 ----
   const [showModal, setShowModal] = useState(false);
@@ -57,10 +105,57 @@ export default function InternalArticles() {
     [userArticles]
   );
 
+  // 合并持久化分类 + 文章中动态提取的分类（去重）
   const categories = useMemo(() => {
-    const cats = new Set(allArticles.map((a) => a.category));
-    return ['全部', ...cats];
-  }, [allArticles]);
+    const managedLabels = new Set(categoryList.map((c) => c.label));
+    const dynamicCats = allArticles
+      .map((a) => a.category)
+      .filter((cat) => cat && !managedLabels.has(cat));
+    const uniqueDynamic = [...new Set(dynamicCats)];
+    return ['全部', ...categoryList.map((c) => c.label), ...uniqueDynamic];
+  }, [allArticles, categoryList]);
+
+  // ---- 分类 CRUD ----
+  const handleAddCategory = () => {
+    const label = newCatLabel.trim();
+    if (!label) return;
+    if (categoryList.some((c) => c.label === label)) {
+      alert('该分类名称已存在');
+      return;
+    }
+    const key = 'acat_' + Date.now();
+    const updated = [...categoryList, { key, label, color: newCatColor }];
+    setCategoryList(updated);
+    saveArticleCategories(updated);
+    setNewCatLabel('');
+    setNewCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
+  };
+
+  const startEditCategory = (cat) => {
+    setEditingCatKey(cat.key);
+    setEditCatLabel(cat.label);
+    setEditCatColor(cat.color);
+  };
+
+  const saveEditCategory = () => {
+    if (!editCatLabel.trim()) return;
+    const updated = categoryList.map((c) =>
+      c.key === editingCatKey ? { ...c, label: editCatLabel.trim(), color: editCatColor } : c,
+    );
+    setCategoryList(updated);
+    saveArticleCategories(updated);
+    setEditingCatKey(null);
+  };
+
+  const handleDeleteCategory = (key) => {
+    const cat = categoryList.find((c) => c.key === key);
+    if (!cat) return;
+    if (!window.confirm(`确定要删除分类「${cat.label}」吗？该分类下的文章不会被删除。`)) return;
+    const updated = categoryList.filter((c) => c.key !== key);
+    setCategoryList(updated);
+    saveArticleCategories(updated);
+    if (selectedCategory === cat.label) setSelectedCategory('全部');
+  };
 
   const filtered = useMemo(() => {
     return allArticles.filter((a) => {
@@ -204,17 +299,133 @@ export default function InternalArticles() {
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <div className="ia-list__categories">
-            {categories.map((cat) => (
+          <div className="ia-list__filter-bar">
+            <div className="ia-list__categories">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+            {editing && (
               <button
-                key={cat}
-                className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
-                onClick={() => setSelectedCategory(cat)}
+                className={`ia-list__manage-btn ${showCatManager ? 'ia-list__manage-btn--active' : ''}`}
+                onClick={() => setShowCatManager(!showCatManager)}
+                title="管理筛选分类"
               >
-                {cat}
+                <Settings2 size={16} />
               </button>
-            ))}
+            )}
           </div>
+
+          {/* 分类管理面板 */}
+          {editing && showCatManager && (
+            <div className="ia-cat-manager card">
+              <div className="ia-cat-manager__header">
+                <h4><Settings2 size={16} /> 筛选分类管理</h4>
+                <button className="ia-cat-manager__close" onClick={() => setShowCatManager(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* 现有分类列表 */}
+              <div className="ia-cat-manager__list">
+                {categoryList.map((cat) => (
+                  <div key={cat.key} className="ia-cat-item">
+                    {editingCatKey === cat.key ? (
+                      <div className="ia-cat-item__edit">
+                        <div className="ia-cat-item__edit-row">
+                          <span
+                            className="ia-cat-item__color-dot"
+                            style={{ background: editCatColor }}
+                          />
+                          <input
+                            type="text"
+                            className="ia-cat-item__edit-input"
+                            value={editCatLabel}
+                            onChange={(e) => setEditCatLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEditCategory()}
+                            autoFocus
+                          />
+                          <button className="ia-cat-item__action ia-cat-item__action--save" onClick={saveEditCategory} title="保存">
+                            <Check size={14} />
+                          </button>
+                          <button className="ia-cat-item__action" onClick={() => setEditingCatKey(null)} title="取消">
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="ia-cat-item__colors">
+                          {PRESET_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              className={`ia-cat-item__color-btn ${editCatColor === c ? 'ia-cat-item__color-btn--active' : ''}`}
+                              style={{ background: c }}
+                              onClick={() => setEditCatColor(c)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="ia-cat-item__display">
+                        <span
+                          className="ia-cat-item__color-dot"
+                          style={{ background: cat.color }}
+                        />
+                        <span className="ia-cat-item__label">{cat.label}</span>
+                        <div className="ia-cat-item__actions">
+                          <button className="ia-cat-item__action" onClick={() => startEditCategory(cat)} title="编辑">
+                            <Pencil size={12} />
+                          </button>
+                          <button className="ia-cat-item__action ia-cat-item__action--danger" onClick={() => handleDeleteCategory(cat.key)} title="删除">
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 新建分类 */}
+              <div className="ia-cat-manager__add">
+                <div className="ia-cat-manager__add-row">
+                  <span
+                    className="ia-cat-item__color-dot"
+                    style={{ background: newCatColor }}
+                  />
+                  <input
+                    type="text"
+                    className="ia-cat-manager__add-input"
+                    placeholder="输入新分类名称..."
+                    value={newCatLabel}
+                    onChange={(e) => setNewCatLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                  />
+                  <button
+                    className="ia-cat-manager__add-btn"
+                    onClick={handleAddCategory}
+                    disabled={!newCatLabel.trim()}
+                  >
+                    <Plus size={14} /> 添加
+                  </button>
+                </div>
+                <div className="ia-cat-item__colors">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`ia-cat-item__color-btn ${newCatColor === c ? 'ia-cat-item__color-btn--active' : ''}`}
+                      style={{ background: c }}
+                      onClick={() => setNewCatColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 文章列表 */}
