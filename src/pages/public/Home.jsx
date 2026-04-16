@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -13,7 +13,6 @@ import {
   ExternalLink,
   AlertCircle,
   CalendarDays,
-  Tag,
 } from 'lucide-react';
 import CoverImage from '../../components/CoverImage';
 import { articlesData } from '../../data/siteData';
@@ -30,33 +29,11 @@ export default function Home() {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // 标签筛选状态
-  const [selectedTag, setSelectedTag] = useState('全部');
-
   // 合并硬编码文章和用户添加的文章，按日期降序排列
   const allArticles = [...userArticles, ...articlesData]
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // 从所有文章中动态提取标签（按出现频次降序排列）
-  const allTags = useMemo(() => {
-    const tagCount = {};
-    allArticles.forEach((a) => {
-      (a.tags || []).forEach((t) => {
-        tagCount[t] = (tagCount[t] || 0) + 1;
-      });
-    });
-    return Object.entries(tagCount)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag);
-  }, [allArticles]);
-
-  // 按标签筛选后的文章
-  const filteredArticles = useMemo(() => {
-    if (selectedTag === '全部') return allArticles;
-    return allArticles.filter((a) => (a.tags || []).includes(selectedTag));
-  }, [allArticles, selectedTag]);
-
-  const recentArticles = filteredArticles.slice(0, 6);
+  const recentArticles = allArticles.slice(0, 6);
   const recentEvents = events.slice(0, 4);
 
   // 计算活动倒计时天数（活动日期比当前晚则返回天数，否则返回 null）
@@ -281,7 +258,7 @@ export default function Home() {
           </div>
           <div className="featured__more">
             <Link to="/articles" className="btn btn-secondary" onClick={() => trackEvent('nav_click', { link: '/articles', source: 'home' })}>
-              查看全部文章{selectedTag !== '全部' ? `（${filteredArticles.length} 篇）` : ''} <ArrowRight size={16} />
+              查看全部文章 <ArrowRight size={16} />
             </Link>
           </div>
         </div>

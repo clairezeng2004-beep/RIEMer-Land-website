@@ -19,6 +19,7 @@ import './Articles.css';
 export default function Articles() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [selectedTag, setSelectedTag] = useState('全部');
   const { userArticles } = useSiteContent();
 
   // 合并所有文章，按日期降序
@@ -32,6 +33,19 @@ export default function Articles() {
     return ['全部', ...cats];
   }, [allArticles]);
 
+  // 从所有文章中动态提取标签（按出现频次降序排列）
+  const allTags = useMemo(() => {
+    const tagCount = {};
+    allArticles.forEach((a) => {
+      (a.tags || []).forEach((t) => {
+        tagCount[t] = (tagCount[t] || 0) + 1;
+      });
+    });
+    return Object.entries(tagCount)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag]) => tag);
+  }, [allArticles]);
+
   const filtered = useMemo(() => {
     return allArticles.filter((article) => {
       const matchesSearch =
@@ -43,9 +57,11 @@ export default function Articles() {
         article.tags.some((t) => pinyinMatch(t, searchTerm));
       const matchesCategory =
         selectedCategory === '全部' || article.category === selectedCategory;
-      return matchesSearch && matchesCategory;
+      const matchesTag =
+        selectedTag === '全部' || (article.tags || []).includes(selectedTag);
+      return matchesSearch && matchesCategory && matchesTag;
     });
-  }, [searchTerm, selectedCategory]);
+  }, [searchTerm, selectedCategory, selectedTag]);
 
   return (
     <div className="articles-page">
@@ -88,6 +104,25 @@ export default function Articles() {
                 </button>
               ))}
             </div>
+            {allTags.length > 0 && (
+              <div className="articles-filters__tags">
+                <button
+                  className={`articles-filters__tag ${selectedTag === '全部' ? 'articles-filters__tag--active' : ''}`}
+                  onClick={() => setSelectedTag('全部')}
+                >
+                  全部标签
+                </button>
+                {allTags.map((tag) => (
+                  <button
+                    key={tag}
+                    className={`articles-filters__tag ${selectedTag === tag ? 'articles-filters__tag--active' : ''}`}
+                    onClick={() => setSelectedTag(tag)}
+                  >
+                    <Tag size={12} /> {tag}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       </section>
