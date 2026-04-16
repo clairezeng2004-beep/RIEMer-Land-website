@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -17,7 +17,9 @@ import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
   Plus, Link2, Loader2, X, Check, Tag, List, AlertCircle,
   ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
+  CheckSquare,
 } from 'lucide-react';
+import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
 
 // ---- 分类管理 ----
@@ -62,6 +64,7 @@ export default function InternalArticles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { userArticles, addArticle, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
+  const navigate = useNavigate();
   const ia = internalConfig.internalArticles || {};
   const updateIA = useCallback((key, val) => updateInternalConfig({ internalArticles: { [key]: val } }), [updateInternalConfig]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -95,6 +98,8 @@ export default function InternalArticles() {
   const [newOutlineInput, setNewOutlineInput] = useState('');
   const [showOutlineEditor, setShowOutlineEditor] = useState(true);
   const [showTagsEditor, setShowTagsEditor] = useState(true);
+  // 跨模块联动提示
+  const [taskPrompt, setTaskPrompt] = useState(null);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -269,8 +274,11 @@ export default function InternalArticles() {
       archivedAt: new Date().toISOString(),
     };
 
+    const articleTitle = newArticle.title;
     addArticle(newArticle, user?.id);
     closeModal();
+    // 归档成功后提示用户是否去事项追踪标记对应事项为"已完成"
+    setTaskPrompt({ articleTitle });
   };
 
   return (
@@ -689,6 +697,42 @@ export default function InternalArticles() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 跨模块联动提示：归档成功 → 引导去事项追踪 */}
+      {taskPrompt && (
+        <div className="cross-link-overlay" onClick={() => setTaskPrompt(null)}>
+          <div className="cross-link-toast" onClick={(e) => e.stopPropagation()}>
+            <div className="cross-link-toast__icon cross-link-toast__icon--archive">
+              <FileText size={22} />
+            </div>
+            <div className="cross-link-toast__body">
+              <p className="cross-link-toast__title">文章归档成功 🎉</p>
+              <p className="cross-link-toast__desc">
+                「{taskPrompt.articleTitle}」已成功归档，是否前往
+                <strong>事项追踪</strong>页面将对应的事项标记为"已完成"？
+              </p>
+            </div>
+            <div className="cross-link-toast__actions">
+              <button
+                className="cross-link-toast__btn cross-link-toast__btn--primary"
+                onClick={() => {
+                  setTaskPrompt(null);
+                  navigate('/internal/tasks');
+                }}
+              >
+                <CheckSquare size={15} /> 去标记完成
+                <ArrowRight size={14} />
+              </button>
+              <button
+                className="cross-link-toast__btn cross-link-toast__btn--ghost"
+                onClick={() => setTaskPrompt(null)}
+              >
+                暂不需要
+              </button>
+            </div>
           </div>
         </div>
       )}

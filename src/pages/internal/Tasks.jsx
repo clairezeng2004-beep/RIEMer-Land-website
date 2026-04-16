@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -9,9 +9,12 @@ import {
   Plus,
   X,
   CheckCircle2,
+  FileText,
+  ArrowRight,
 } from 'lucide-react';
 import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
+import '../../components/CrossLinkToast.css';
 import './Tasks.css';
 
 const statusColors = {
@@ -25,6 +28,7 @@ export default function Tasks() {
   const { isAuthenticated, user, getAllUsers } = useAuth();
   const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
+  const navigate = useNavigate();
   const tc = internalConfig.tasks || {};
 
   const updateTasks = useCallback(
@@ -102,6 +106,8 @@ export default function Tasks() {
     helpers: [],
   });
   const [notes, setNotes] = useState({});
+  // 跨模块联动提示
+  const [archivePrompt, setArchivePrompt] = useState(null);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -135,6 +141,7 @@ export default function Tasks() {
 
   const updateTaskStatus = (id, newStatus) => {
     const note = notes[id] || '';
+    const targetTask = tasks.find((t) => t.id === id);
     setTasks(
       tasks.map((t) => {
         if (t.id !== id) return t;
@@ -157,6 +164,15 @@ export default function Tasks() {
       delete next[id];
       return next;
     });
+    // 公众号文章分类的事项标记为"已完成"时，提示用户是否去归档页面
+    if (
+      targetTask &&
+      targetTask.category === '公众号文章' &&
+      newStatus === '已完成' &&
+      targetTask.status !== '已完成'
+    ) {
+      setArchivePrompt({ taskTitle: targetTask.title });
+    }
   };
 
   const updateNote = (id, value) => {
@@ -506,6 +522,42 @@ export default function Tasks() {
           </div>
         )}
       </div>
+
+      {/* 跨模块联动提示：公众号文章事项完成 → 引导归档 */}
+      {archivePrompt && (
+        <div className="cross-link-overlay" onClick={() => setArchivePrompt(null)}>
+          <div className="cross-link-toast" onClick={(e) => e.stopPropagation()}>
+            <div className="cross-link-toast__icon">
+              <CheckSquare size={22} />
+            </div>
+            <div className="cross-link-toast__body">
+              <p className="cross-link-toast__title">事项已标记为完成 🎉</p>
+              <p className="cross-link-toast__desc">
+                「{archivePrompt.taskTitle}」已完成，是否前往
+                <strong>公众号历史文章归档</strong>页面归档对应的文章？
+              </p>
+            </div>
+            <div className="cross-link-toast__actions">
+              <button
+                className="cross-link-toast__btn cross-link-toast__btn--primary"
+                onClick={() => {
+                  setArchivePrompt(null);
+                  navigate('/internal/articles');
+                }}
+              >
+                <FileText size={15} /> 去归档
+                <ArrowRight size={14} />
+              </button>
+              <button
+                className="cross-link-toast__btn cross-link-toast__btn--ghost"
+                onClick={() => setArchivePrompt(null)}
+              >
+                暂不需要
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

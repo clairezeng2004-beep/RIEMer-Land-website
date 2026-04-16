@@ -1,0 +1,136 @@
+/* ============================================
+   跨模块联动提示 — 通用样式
+   用于事项追踪 ↔ 文章归档 等模块间的引导提示
+   ============================================ */
+
+.cross-link-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.25);
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: crossLinkFadeIn 0.2s ease-out;
+}
+
+@keyframes crossLinkFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.cross-link-toast {
+  background: var(--color-bg-card, #fff);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.06);
+  padding: var(--space-xl, 28px);
+  max-width: 420px;
+  width: calc(100vw - 40px);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md, 16px);
+  animation: crossLinkSlideUp 0.25s ease-out;
+}
+
+@keyframes crossLinkSlideUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.cross-link-toast__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg, 12px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(58, 107, 53, 0.1);
+  color: #3A6B35;
+  flex-shrink: 0;
+}
+
+.cross-link-toast__icon--archive {
+  background: rgba(91, 140, 62, 0.1);
+  color: #5B8C3E;
+}
+
+.cross-link-toast__body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cross-link-toast__title {
+  font-size: var(--text-base, 15px);
+  font-weight: 600;
+  color: var(--color-text, #2D3B2D);
+  margin: 0;
+}
+
+.cross-link-toast__desc {
+  font-size: var(--text-sm, 13px);
+  color: var(--color-text-muted, #7A8F7A);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.cross-link-toast__desc strong {
+  color: var(--color-primary, #5B8C3E);
+  font-weight: 600;
+}
+
+.cross-link-toast__actions {
+  display: flex;
+  gap: var(--space-sm, 10px);
+  margin-top: var(--space-xs, 6px);
+}
+
+.cross-link-toast__btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.55rem 1.1rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-sm, 13px);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+.cross-link-toast__btn--primary {
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+}
+
+.cross-link-toast__btn--primary:hover {
+  background: var(--color-primary-dark, #4a7332);
+  box-shadow: 0 2px 8px rgba(91, 140, 62, 0.25);
+}
+
+.cross-link-toast__btn--ghost {
+  background: transparent;
+  color: var(--color-text-muted, #7A8F7A);
+  border: 1px solid var(--color-border, #D4D9D4);
+}
+
+.cross-link-toast__btn--ghost:hover {
+  background: var(--color-bg, #F5F3EE);
+  color: var(--color-text, #2D3B2D);
+}
+
+/* 手机端适配 */
+@media (max-width: 480px) {
+  .cross-link-toast {
+    padding: var(--space-lg, 20px);
+    max-width: calc(100vw - 32px);
+  }
+
+  .cross-link-toast__actions {
+    flex-direction: column;
+  }
+
+  .cross-link-toast__btn {
+    justify-content: center;
+  }
+}
