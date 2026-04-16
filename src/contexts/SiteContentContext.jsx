@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { fetchArticles as fetchArticlesFromDb, addArticleToDb, updateArticleInDb, deleteArticleFromDb, migrateLocalArticlesToDb } from '../services/articleDbService';
 
 const SiteContentContext = createContext(null);
 
@@ -250,18 +251,9 @@ export function SiteContentProvider({ children }) {
     return getDefaultFilters();
   });
 
-  // 用户添加的文章
-  const [userArticles, setUserArticles] = useState(() => {
-    const stored = localStorage.getItem(ARTICLES_KEY);
-    if (stored) {
-      try {
-        return JSON.parse(stored);
-      } catch {
-        return [];
-      }
-    }
-    return [];
-  });
+  // 用户添加的文章（初始为空，从 Supabase 加载）
+  const [userArticles, setUserArticles] = useState([]);
+  const [articlesLoaded, setArticlesLoaded] = useState(false);
 
   // 内部空间配置
   const [internalConfig, setInternalConfig] = useState(() => {
@@ -330,9 +322,32 @@ export function SiteContentProvider({ children }) {
     localStorage.setItem(FILTERS_KEY, JSON.stringify(filterOptions));
   }, [filterOptions]);
 
+  // 从 Supabase 加载文章（初始化 + 迁移本地数据）
   useEffect(() => {
-    localStorage.setItem(ARTICLES_KEY, JSON.stringify(userArticles));
-  }, [userArticles]);
+    let cancelled = false;
+    const loadArticles = async () => {
+      try {
+        const articles = await fetchArticlesFromDb();
+        if (!cancelled) {
+          setUserArticles(articles);
+          setArticlesLoaded(true);
+        }
+        // 尝试迁移 localStorage 中的旧文章到 Supabase
+        const migrated = await migrateLocalArticlesToDb();
+        if (migrated > 0 && !cancelled) {
+          // 重新加载以包含迁移的数据
+          const refreshed = await fetchArticlesFromDb();
+          if (!cancelled) setUserArticles(refreshed);
+        }
+      } catch {
+        if (!cancelled) {
+          setArticlesLoaded(true);
+        }
+      }
+    };
+    loadArticles();
+    return () => { cancelled = true; };
+  }, []);
 
   useEffect(() => {
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(internalConfig));
@@ -387,20 +402,37 @@ export function SiteContentProvider({ children }) {
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(defaults));
   };
 
-  // 文章管理 CRUD
-  const addArticle = (article) => {
+  // 文章管理 CRUD（Supabase 优先，localStorage 回退）
+  const addArticle = async (article, userId) => {
+    // 乐观更新 UI
     setUserArticles((prev) => [article, ...prev]);
+    // 异步写入数据库
+    const saved = await addArticleToDb(article, userId);
+    if (saved && saved.id !== article.id) {
+      // 如果数据库返回了新 ID，更新列表
+      setUserArticles((prev) =>
+        prev.map((a) => (a.id === article.id ? saved : a))
+      );
+    }
   };
 
-  const updateArticle = (id, updates) => {
+  const updateArticle = async (id, updates) => {
     setUserArticles((prev) =>
       prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
     );
+    await updateArticleInDb(id, updates);
   };
 
-  const deleteArticle = (id) => {
+  const deleteArticle = async (id) => {
     setUserArticles((prev) => prev.filter((a) => a.id !== id));
+    await deleteArticleFromDb(id);
   };
+
+  // 刷新文章列表（从数据库重新加载）
+  const refreshArticles = useCallback(async () => {
+    const articles = await fetchArticlesFromDb();
+    setUserArticles(articles);
+  }, []);
 
   // 网站建设建议 CRUD
   const addSuggestion = (suggestion) => {
@@ -515,7 +547,7 @@ export function SiteContentProvider({ children }) {
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
       filterOptions, updateFilterOptions, resetFilterOptions,
-      userArticles, addArticle, updateArticle, deleteArticle,
+      userArticles, addArticle, updateArticle, deleteArticle, refreshArticles, articlesLoaded,
       internalConfig, updateInternalConfig, resetInternalConfig,
       suggestions, addSuggestion, updateSuggestion, deleteSuggestion,
       events, addEvent, updateEvent, deleteEvent,

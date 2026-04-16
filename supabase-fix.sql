@@ -253,3 +253,70 @@ CREATE POLICY "用户可标记自己的已读"
   ON public.notification_reads FOR INSERT
   TO authenticated
   WITH CHECK (user_id = auth.uid());
+
+-- ========== 修复 11：创建 articles 表（公众号文章归档） ==========
+CREATE TABLE IF NOT EXISTS public.articles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  raw_title TEXT DEFAULT '',
+  author TEXT DEFAULT 'RIEMer Land',
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  category TEXT DEFAULT '经验分享',
+  tags TEXT[] DEFAULT '{}',
+  excerpt TEXT DEFAULT '',
+  outline TEXT[] DEFAULT '{}',
+  url TEXT DEFAULT '',
+  content TEXT DEFAULT '',
+  cover_image TEXT DEFAULT NULL,
+  archived_by TEXT DEFAULT '未知',
+  archived_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.articles ENABLE ROW LEVEL SECURITY;
+
+-- 所有认证用户可查看文章
+DROP POLICY IF EXISTS "所有认证用户可查看文章" ON public.articles;
+CREATE POLICY "所有认证用户可查看文章"
+  ON public.articles FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 匿名用户可查看文章（公开页面展示）
+DROP POLICY IF EXISTS "匿名用户可查看文章" ON public.articles;
+CREATE POLICY "匿名用户可查看文章"
+  ON public.articles FOR SELECT
+  TO anon
+  USING (true);
+
+-- 认证用户可以添加文章
+DROP POLICY IF EXISTS "认证用户可添加文章" ON public.articles;
+CREATE POLICY "认证用户可添加文章"
+  ON public.articles FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- 管理员可以更新文章
+DROP POLICY IF EXISTS "管理员可更新文章" ON public.articles;
+CREATE POLICY "管理员可更新文章"
+  ON public.articles FOR UPDATE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR archived_by_id = auth.uid()
+  )
+  WITH CHECK (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR archived_by_id = auth.uid()
+  );
+
+-- 管理员可以删除文章
+DROP POLICY IF EXISTS "管理员可删除文章" ON public.articles;
+CREATE POLICY "管理员可删除文章"
+  ON public.articles FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR archived_by_id = auth.uid()
+  );

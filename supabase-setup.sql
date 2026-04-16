@@ -364,6 +364,73 @@ CREATE POLICY "管理员可删除留言"
   );
 
 -- ============================================
+-- 18. 创建 articles 表（公众号文章归档）
+-- ============================================
+CREATE TABLE IF NOT EXISTS articles (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  raw_title TEXT DEFAULT '',
+  author TEXT DEFAULT 'RIEMer Land',
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  category TEXT DEFAULT '经验分享',
+  tags TEXT[] DEFAULT '{}',
+  excerpt TEXT DEFAULT '',
+  outline TEXT[] DEFAULT '{}',
+  url TEXT DEFAULT '',
+  content TEXT DEFAULT '',
+  cover_image TEXT DEFAULT NULL,
+  archived_by TEXT DEFAULT '未知',
+  archived_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 19. 启用 articles 的 RLS
+ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
+
+-- 20. articles RLS 策略
+DROP POLICY IF EXISTS "所有认证用户可查看文章" ON articles;
+DROP POLICY IF EXISTS "匿名用户可查看文章" ON articles;
+DROP POLICY IF EXISTS "认证用户可添加文章" ON articles;
+DROP POLICY IF EXISTS "管理员可更新文章" ON articles;
+DROP POLICY IF EXISTS "管理员可删除文章" ON articles;
+
+CREATE POLICY "所有认证用户可查看文章"
+  ON articles FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "匿名用户可查看文章"
+  ON articles FOR SELECT
+  TO anon
+  USING (true);
+
+CREATE POLICY "认证用户可添加文章"
+  ON articles FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "管理员可更新文章"
+  ON articles FOR UPDATE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR archived_by_id = auth.uid()
+  )
+  WITH CHECK (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR archived_by_id = auth.uid()
+  );
+
+CREATE POLICY "管理员可删除文章"
+  ON articles FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR archived_by_id = auth.uid()
+  );
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，

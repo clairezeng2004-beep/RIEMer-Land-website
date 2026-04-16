@@ -771,7 +771,7 @@ export default function ContentManagement() {
                           className="btn btn-primary content-mgmt__confirm-btn"
                           disabled={!editingArticle.title.trim()}
                           onClick={() => {
-                            addArticle(editingArticle);
+                            addArticle(editingArticle, user?.id);
                             setEditingArticle(null);
                             setArticleUrl('');
                           }}

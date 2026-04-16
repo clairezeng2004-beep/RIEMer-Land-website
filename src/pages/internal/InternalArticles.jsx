@@ -159,6 +159,7 @@ export default function InternalArticles() {
     const newArticle = {
       id: `user-${Date.now()}`,
       title: editTitle.trim() || draft.title,
+      rawTitle: draft.rawTitle || '',
       author: draft.author || 'RIEMer Land',
       avatar: null,
       coverImage: null,
@@ -173,7 +174,7 @@ export default function InternalArticles() {
       archivedAt: new Date().toISOString(),
     };
 
-    addArticle(newArticle);
+    addArticle(newArticle, user?.id);
     closeModal();
   };
 
