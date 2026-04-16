@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -18,11 +18,29 @@ const GUESTBOOK_LS_KEY = 'riemer_guestbook';
 
 export default function Guestbook() {
   const { isAuthenticated, isAdmin, supabaseOk } = useAuth();
-  const [entries, setEntries] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // 同步从 localStorage 读取缓存，有缓存时直接渲染，避免切换 tab 时闪烁 loading
+  const [entries, setEntries] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(GUESTBOOK_LS_KEY) || '[]');
+      if (stored.length > 0) return stored;
+    } catch { /* ignore */ }
+    return [];
+  });
+  const hasCachedRef = useRef(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem(GUESTBOOK_LS_KEY) || '[]');
+      return stored.length > 0;
+    } catch {
+      return false;
+    }
+  });
+  const [loading, setLoading] = useState(!hasCachedRef.current());
 
   const loadEntries = useCallback(async () => {
-    setLoading(true);
+    // 只有当前没有缓存数据时才显示 loading（有缓存数据则后台静默刷新）
+    if (!hasCachedRef.current()) {
+      setLoading(true);
+    }
     try {
       if (isSupabaseConfigured && supabaseOk === true) {
         const { data, error } = await supabase

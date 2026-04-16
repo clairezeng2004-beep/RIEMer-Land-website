@@ -75,7 +75,25 @@ export default function MemberProfiles() {
   const { editing } = useWysiwyg();
   const mp = internalConfig.memberProfiles || {};
   const updateMP = useCallback((key, val) => updateInternalConfig({ memberProfiles: { [key]: val } }), [updateInternalConfig]);
-  const [profiles, setProfiles] = useState([]);
+  // 同步从 localStorage 读取缓存，避免切换 tab 时闪现空状态
+  const [profiles, setProfiles] = useState(() => {
+    try {
+      const cached = getLocalProfiles();
+      if (cached.length > 0) {
+        return cached.map((p) => ({
+          ...p,
+          id: p.user_id,
+          name: p.name || '未知用户',
+          joined_at_display: (() => {
+            if (!p.joined_at) return '';
+            const d = new Date(p.joined_at);
+            return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+          })(),
+        })).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
