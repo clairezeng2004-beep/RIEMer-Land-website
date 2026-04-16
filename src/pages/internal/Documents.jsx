@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -23,6 +23,8 @@ import {
   HardDrive,
   BarChart3,
   ThumbsUp,
+  CheckCircle2,
+  Edit3,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
@@ -34,7 +36,7 @@ import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
 import './Documents.css';
 
-const typeLabels = {
+const defaultTypeLabels = {
   course: '课程及考试资料',
   history: '历史会议',
   process: '流程手册及模版文件',
@@ -42,7 +44,7 @@ const typeLabels = {
   experience: '成员经验分享',
 };
 
-const typeColors = {
+const defaultTypeColors = {
   course: '#5EAD8C',
   history: '#4FBFC4',
   process: '#D4A44C',
@@ -79,15 +81,70 @@ function inferFileType(fileName) {
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const { internalConfig, updateInternalConfig } = useSiteContent();
+  const { internalConfig, updateInternalConfig, filterOptions, updateFilterOptions } = useSiteContent();
   const { editing } = useWysiwyg();
   const sectionKey = configSection || 'documents';
   const dc = internalConfig[sectionKey] || internalConfig.documents;
+
+  // 从 filterOptions 获取动态文档类型
+  const docTypes = filterOptions.documentTypes || [];
+  const typeLabels = useMemo(() => {
+    const labels = { ...defaultTypeLabels };
+    docTypes.forEach((t) => { labels[t.key] = t.label; });
+    return labels;
+  }, [docTypes]);
+  const typeColors = useMemo(() => {
+    const colors = { ...defaultTypeColors };
+    docTypes.forEach((t) => { colors[t.key] = t.color; });
+    return colors;
+  }, [docTypes]);
 
   const updateDocs = useCallback(
     (key, val) => updateInternalConfig({ [sectionKey]: { [key]: val } }),
     [updateInternalConfig, sectionKey]
   );
+
+  // 编辑模式：添加新筛选项
+  const [showAddType, setShowAddType] = useState(false);
+  const [newTypeLabel, setNewTypeLabel] = useState('');
+  // 编辑模式：重命名筛选项
+  const [renamingType, setRenamingType] = useState(null);
+  const [renameValue, setRenameValue] = useState('');
+
+  const handleAddType = () => {
+    const trimmed = newTypeLabel.trim();
+    if (!trimmed) return;
+    // 生成唯一 key
+    const key = 'custom_' + Date.now();
+    // 随机颜色
+    const palette = ['#5EAD8C', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899', '#F59E0B', '#3B82F6', '#EF4444', '#10B981', '#6366F1'];
+    const color = palette[docTypes.length % palette.length];
+    updateFilterOptions({
+      documentTypes: [...docTypes, { key, label: trimmed, color }],
+    });
+    setNewTypeLabel('');
+    setShowAddType(false);
+  };
+
+  const handleRenameType = (typeKey) => {
+    const trimmed = renameValue.trim();
+    if (!trimmed) return;
+    updateFilterOptions({
+      documentTypes: docTypes.map((t) =>
+        t.key === typeKey ? { ...t, label: trimmed } : t
+      ),
+    });
+    setRenamingType(null);
+    setRenameValue('');
+  };
+
+  const handleDeleteType = (typeKey) => {
+    if (!window.confirm('确定要删除这个筛选分类吗？')) return;
+    updateFilterOptions({
+      documentTypes: docTypes.filter((t) => t.key !== typeKey),
+    });
+    if (selectedType === typeKey) setSelectedType('全部');
+  };
   const [documents, setDocuments] = useState(() =>
     filterTypes ? documentsData.filter((d) => filterTypes.includes(d.type)) : documentsData
   );
@@ -106,8 +163,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   }
 
   const types = filterTypes
-    ? ['全部', ...filterTypes]
-    : ['全部', ...Object.keys(typeLabels)];
+    ? ['全部', ...filterTypes.filter((ft) => docTypes.some((t) => t.key === ft) || defaultTypeLabels[ft])]
+    : ['全部', ...docTypes.map((t) => t.key)];
 
   const filtered = documents.filter((doc) => {
     const matchesSearch =
@@ -401,16 +458,107 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           </div>
           <div className="documents-filters__types">
             {types.map((type) => (
-              <button
-                key={type}
-                className={`documents-filters__type ${
-                  selectedType === type ? 'documents-filters__type--active' : ''
-                }`}
-                onClick={() => setSelectedType(type)}
-              >
-                {type === '全部' ? '全部' : typeLabels[type]}
-              </button>
+              <div key={type} className="documents-filters__type-wrapper">
+                {editing && renamingType === type && type !== '全部' ? (
+                  <div className="documents-filters__rename">
+                    <input
+                      type="text"
+                      className="documents-filters__rename-input"
+                      value={renameValue}
+                      onChange={(e) => setRenameValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleRenameType(type);
+                        if (e.key === 'Escape') { setRenamingType(null); setRenameValue(''); }
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      className="documents-filters__rename-confirm"
+                      onClick={() => handleRenameType(type)}
+                      disabled={!renameValue.trim()}
+                      title="确认"
+                    >
+                      <CheckCircle2 size={14} />
+                    </button>
+                    <button
+                      className="documents-filters__rename-cancel"
+                      onClick={() => { setRenamingType(null); setRenameValue(''); }}
+                      title="取消"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    className={`documents-filters__type ${
+                      selectedType === type ? 'documents-filters__type--active' : ''
+                    }`}
+                    onClick={() => setSelectedType(type)}
+                  >
+                    {type === '全部' ? '全部' : typeLabels[type] || type}
+                  </button>
+                )}
+                {editing && type !== '全部' && renamingType !== type && (
+                  <div className="documents-filters__type-actions">
+                    <button
+                      className="documents-filters__type-edit"
+                      onClick={(e) => { e.stopPropagation(); setRenamingType(type); setRenameValue(typeLabels[type] || type); }}
+                      title="重命名"
+                    >
+                      <Edit3 size={12} />
+                    </button>
+                    <button
+                      className="documents-filters__type-delete"
+                      onClick={(e) => { e.stopPropagation(); handleDeleteType(type); }}
+                      title="删除分类"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
+              </div>
             ))}
+            {editing && (
+              showAddType ? (
+                <div className="documents-filters__add-type">
+                  <input
+                    type="text"
+                    className="documents-filters__add-input"
+                    placeholder="新分类名称"
+                    value={newTypeLabel}
+                    onChange={(e) => setNewTypeLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleAddType();
+                      if (e.key === 'Escape') { setShowAddType(false); setNewTypeLabel(''); }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    className="documents-filters__add-confirm"
+                    onClick={handleAddType}
+                    disabled={!newTypeLabel.trim()}
+                    title="确认添加"
+                  >
+                    <CheckCircle2 size={14} />
+                  </button>
+                  <button
+                    className="documents-filters__add-cancel"
+                    onClick={() => { setShowAddType(false); setNewTypeLabel(''); }}
+                    title="取消"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  className="documents-filters__type documents-filters__type--add"
+                  onClick={() => setShowAddType(true)}
+                  title="添加新分类"
+                >
+                  <Plus size={14} /> 添加分类
+                </button>
+              )
+            )}
           </div>
         </div>
 

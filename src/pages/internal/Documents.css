@@ -249,6 +249,186 @@
   color: white;
 }
 
+/* 筛选项 wrapper（编辑模式下包含操作按钮） */
+.documents-filters__type-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.documents-filters__type-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.documents-filters__type-edit,
+.documents-filters__type-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.documents-filters__type-edit:hover {
+  background: rgba(91, 140, 62, 0.15);
+  color: var(--color-primary);
+}
+
+.documents-filters__type-delete:hover {
+  background: rgba(192, 57, 43, 0.12);
+  color: var(--color-danger);
+}
+
+/* 重命名输入 */
+.documents-filters__rename {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.documents-filters__rename-input {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  outline: none;
+  width: 120px;
+  color: var(--color-text);
+  background: var(--color-bg-card);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.documents-filters__rename-input:focus {
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.15);
+}
+
+.documents-filters__rename-confirm,
+.documents-filters__rename-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.documents-filters__rename-confirm {
+  background: rgba(91, 140, 62, 0.12);
+  color: var(--color-primary);
+}
+
+.documents-filters__rename-confirm:hover {
+  background: rgba(91, 140, 62, 0.22);
+}
+
+.documents-filters__rename-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.documents-filters__rename-cancel {
+  background: rgba(200, 200, 200, 0.15);
+  color: var(--color-text-muted);
+}
+
+.documents-filters__rename-cancel:hover {
+  background: rgba(200, 200, 200, 0.3);
+  color: var(--color-text);
+}
+
+/* 添加新分类 */
+.documents-filters__add-type {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.documents-filters__add-input {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  outline: none;
+  width: 120px;
+  color: var(--color-text);
+  background: var(--color-bg-card);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.documents-filters__add-input:focus {
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.15);
+}
+
+.documents-filters__add-input::placeholder {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.documents-filters__add-confirm,
+.documents-filters__add-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.documents-filters__add-confirm {
+  background: rgba(91, 140, 62, 0.12);
+  color: var(--color-primary);
+}
+
+.documents-filters__add-confirm:hover {
+  background: rgba(91, 140, 62, 0.22);
+}
+
+.documents-filters__add-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.documents-filters__add-cancel {
+  background: rgba(200, 200, 200, 0.15);
+  color: var(--color-text-muted);
+}
+
+.documents-filters__add-cancel:hover {
+  background: rgba(200, 200, 200, 0.3);
+  color: var(--color-text);
+}
+
+.documents-filters__type--add {
+  border-style: dashed;
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.7;
+}
+
+.documents-filters__type--add:hover {
+  opacity: 1;
+  background: rgba(91, 140, 62, 0.08);
+}
+
 /* ============ Documents Grid ============ */
 .documents-grid {
   display: grid;

@@ -214,11 +214,21 @@ const getDefaultInternalConfig = () => ({
   },
 });
 
+// 默认文档类型定义
+const defaultDocumentTypes = [
+  { key: 'course', label: '课程及考试资料', color: '#5EAD8C' },
+  { key: 'history', label: '历史会议', color: '#4FBFC4' },
+  { key: 'process', label: '流程手册及模版文件', color: '#D4A44C' },
+  { key: 'regulation', label: '规章制度', color: '#8B5CF6' },
+  { key: 'experience', label: '成员经验分享', color: '#EC4899' },
+];
+
 // 筛选选项默认值
 const getDefaultFilters = () => ({
   taskCategories: [...defaultTaskCategories],
   taskStatuses: [...defaultTaskStatuses],
   teamMembers: defaultTeamMembers.map((m) => ({ ...m })),
+  documentTypes: defaultDocumentTypes.map((t) => ({ ...t })),
 });
 
 export function SiteContentProvider({ children }) {
