@@ -6,6 +6,7 @@ import { useWysiwyg } from '../contexts/WysiwygContext';
 import EditableText from './EditableText';
 import {
   Bell,
+  BellRing,
   FileText,
   CheckSquare,
   Camera,
@@ -57,6 +58,7 @@ export default function InternalSidebar() {
   const adminItems = [
     { to: '/internal/users', icon: Users, configKey: 'labelUsers', label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, configKey: 'labelContent', label: sc.labelContent },
+    { to: '/internal/notification-management', icon: BellRing, label: '通知管理' },
   ];
 
   return (

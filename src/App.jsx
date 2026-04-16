@@ -28,6 +28,7 @@ import MemberProfiles from './pages/internal/MemberProfiles';
 import Profile from './pages/internal/Profile';
 import Suggestions from './pages/internal/Suggestions';
 import Guestbook from './pages/internal/Guestbook';
+import NotificationManagement from './pages/internal/NotificationManagement';
 
 function App() {
   return (
@@ -63,6 +64,7 @@ function App() {
                   <Route path="gallery" element={<Gallery />} />
                   <Route path="users" element={<UserManagement />} />
                   <Route path="content" element={<ContentManagement />} />
+                  <Route path="notification-management" element={<NotificationManagement />} />
                   <Route path="notifications" element={<Notifications />} />
                   <Route path="contributions" element={<MemberContributions />} />
                   <Route path="suggestions" element={<Suggestions />} />

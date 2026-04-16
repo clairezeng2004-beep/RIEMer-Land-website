@@ -8,7 +8,7 @@ import InternalSidebar from './InternalSidebar';
 import WysiwygToolbar from './WysiwygToolbar';
 import ErrorBoundary from './ErrorBoundary';
 import {
-  Bell, FolderOpen, Share2, BookOpen, CheckSquare,
+  Bell, BellRing, FolderOpen, Share2, BookOpen, CheckSquare,
   Camera, BarChart3, MessageSquarePlus, MessageCircle, UserCircle, Contact,
   Users, Settings,
 } from 'lucide-react';
@@ -36,6 +36,7 @@ function MobileInternalNav() {
     { to: '/internal/profile', icon: UserCircle, label: '个人主页' },
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
+    { to: '/internal/notification-management', icon: BellRing, label: '通知管理' },
   ];
 
   // 路由变化时将当前激活项滚动到可见区域
