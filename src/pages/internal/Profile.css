@@ -111,6 +111,7 @@
 .profile-page__display-name {
   font-size: var(--text-xl);
   font-weight: 600;
+  font-family: var(--font-body);
   margin-bottom: var(--space-xs);
 }
 
