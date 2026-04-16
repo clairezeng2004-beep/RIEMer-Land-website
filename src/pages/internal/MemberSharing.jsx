@@ -17,23 +17,55 @@ import {
   Code2,
   ThumbsUp,
   ExternalLink,
+  Settings2,
+  X,
+  Check,
+  Pencil,
+  Palette,
 } from 'lucide-react';
 import './MemberSharing.css';
 
 const SHARING_KEY = 'riemer_member_sharing';
 const SHARING_VIEWS_KEY = 'riemer_sharing_views';
+const CATEGORIES_KEY = 'riemer_sharing_categories';
 
-const categoryLabels = {
-  course: '课程资料',
-  history: '历史会议',
-  experience: '成员经验分享',
-};
+// 预设颜色供选择
+const PRESET_COLORS = [
+  '#5EAD8C', '#4FBFC4', '#EC4899', '#F59E0B', '#8B5CF6',
+  '#EF4444', '#3B82F6', '#10B981', '#F97316', '#6366F1',
+  '#14B8A6', '#E11D48', '#0EA5E9', '#84CC16', '#A855F7',
+];
 
-const categoryColors = {
-  course: '#5EAD8C',
-  history: '#4FBFC4',
-  experience: '#EC4899',
-};
+// 默认分类
+const DEFAULT_CATEGORIES = [
+  { key: 'course', label: '课程资料', color: '#5EAD8C' },
+  { key: 'history', label: '历史会议', color: '#4FBFC4' },
+  { key: 'experience', label: '成员经验分享', color: '#EC4899' },
+];
+
+// 加载动态分类
+function loadCategories() {
+  try {
+    const stored = localStorage.getItem(CATEGORIES_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return DEFAULT_CATEGORIES;
+}
+
+function saveCategories(data) {
+  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data));
+}
+
+// 从分类数组构建 label / color 映射
+function buildCategoryMaps(cats) {
+  const labels = {};
+  const colors = {};
+  cats.forEach((c) => {
+    labels[c.key] = c.label;
+    colors[c.key] = c.color;
+  });
+  return { labels, colors };
+}
 
 // 初始示例数据
 const defaultSharings = [
@@ -197,9 +229,68 @@ export default function MemberSharing() {
   const [selectedCategory, setSelectedCategory] = useState('全部');
   const views = loadViews();
 
+  // 动态分类管理
+  const [categoryList, setCategoryList] = useState(loadCategories);
+  const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
+
+  // 分类管理面板状态
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [newCatLabel, setNewCatLabel] = useState('');
+  const [newCatColor, setNewCatColor] = useState(PRESET_COLORS[0]);
+  // 编辑中的分类（仅管理员）
+  const [editingCatKey, setEditingCatKey] = useState(null);
+  const [editCatLabel, setEditCatLabel] = useState('');
+  const [editCatColor, setEditCatColor] = useState('');
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  const categories = ['全部', 'course', 'experience'];
+  const categories = ['全部', ...categoryList.map((c) => c.key)];
+
+  // 新建分类（所有成员可用）
+  const handleAddCategory = () => {
+    const label = newCatLabel.trim();
+    if (!label) return;
+    // 检查重名
+    if (categoryList.some((c) => c.label === label)) {
+      alert('该分类名称已存在');
+      return;
+    }
+    const key = 'cat_' + Date.now();
+    const updated = [...categoryList, { key, label, color: newCatColor }];
+    setCategoryList(updated);
+    saveCategories(updated);
+    setNewCatLabel('');
+    setNewCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
+  };
+
+  // 开始编辑分类（仅管理员）
+  const startEditCategory = (cat) => {
+    setEditingCatKey(cat.key);
+    setEditCatLabel(cat.label);
+    setEditCatColor(cat.color);
+  };
+
+  // 保存编辑（仅管理员）
+  const saveEditCategory = () => {
+    if (!editCatLabel.trim()) return;
+    const updated = categoryList.map((c) =>
+      c.key === editingCatKey ? { ...c, label: editCatLabel.trim(), color: editCatColor } : c,
+    );
+    setCategoryList(updated);
+    saveCategories(updated);
+    setEditingCatKey(null);
+  };
+
+  // 删除分类（仅管理员）
+  const handleDeleteCategory = (key) => {
+    const cat = categoryList.find((c) => c.key === key);
+    if (!cat) return;
+    if (!window.confirm(`确定要删除分类「${cat.label}」吗？该分类下的分享不会被删除。`)) return;
+    const updated = categoryList.filter((c) => c.key !== key);
+    setCategoryList(updated);
+    saveCategories(updated);
+    if (selectedCategory === key) setSelectedCategory('全部');
+  };
 
   const filtered = sharings.filter((s) => {
     const matchSearch =
@@ -305,34 +396,152 @@ export default function MemberSharing() {
               className="ms-filters__input"
             />
           </div>
-          <div className="ms-filters__categories">
-            {categories.map((cat) => (
-              <button
-                key={cat}
-                className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
-                onClick={() => setSelectedCategory(cat)}
-              >
-                {cat === '全部' ? '全部' : categoryLabels[cat]}
-              </button>
-            ))}
+          <div className="ms-filters__bar">
+            <div className="ms-filters__categories">
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat === '全部' ? '全部' : categoryLabels[cat] || cat}
+                </button>
+              ))}
+            </div>
+            <button
+              className={`ms-filters__manage-btn ${showCatManager ? 'ms-filters__manage-btn--active' : ''}`}
+              onClick={() => setShowCatManager(!showCatManager)}
+              title="管理筛选分类"
+            >
+              <Settings2 size={16} />
+            </button>
           </div>
+
+          {/* 分类管理面板 */}
+          {showCatManager && (
+            <div className="ms-cat-manager card">
+              <div className="ms-cat-manager__header">
+                <h4><Settings2 size={16} /> 筛选分类管理</h4>
+                <button className="ms-cat-manager__close" onClick={() => setShowCatManager(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* 现有分类列表 */}
+              <div className="ms-cat-manager__list">
+                {categoryList.map((cat) => (
+                  <div key={cat.key} className="ms-cat-item">
+                    {editingCatKey === cat.key ? (
+                      /* 编辑模式（仅管理员） */
+                      <div className="ms-cat-item__edit">
+                        <div className="ms-cat-item__edit-row">
+                          <span
+                            className="ms-cat-item__color-dot"
+                            style={{ background: editCatColor }}
+                          />
+                          <input
+                            type="text"
+                            className="ms-cat-item__edit-input"
+                            value={editCatLabel}
+                            onChange={(e) => setEditCatLabel(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEditCategory()}
+                            autoFocus
+                          />
+                          <button className="ms-cat-item__action ms-cat-item__action--save" onClick={saveEditCategory} title="保存">
+                            <Check size={14} />
+                          </button>
+                          <button className="ms-cat-item__action" onClick={() => setEditingCatKey(null)} title="取消">
+                            <X size={14} />
+                          </button>
+                        </div>
+                        <div className="ms-cat-item__colors">
+                          {PRESET_COLORS.map((c) => (
+                            <button
+                              key={c}
+                              className={`ms-cat-item__color-btn ${editCatColor === c ? 'ms-cat-item__color-btn--active' : ''}`}
+                              style={{ background: c }}
+                              onClick={() => setEditCatColor(c)}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      /* 展示模式 */
+                      <div className="ms-cat-item__display">
+                        <span
+                          className="ms-cat-item__color-dot"
+                          style={{ background: cat.color }}
+                        />
+                        <span className="ms-cat-item__label">{cat.label}</span>
+                        {isAdmin && (
+                          <div className="ms-cat-item__actions">
+                            <button className="ms-cat-item__action" onClick={() => startEditCategory(cat)} title="编辑">
+                              <Pencil size={12} />
+                            </button>
+                            <button className="ms-cat-item__action ms-cat-item__action--danger" onClick={() => handleDeleteCategory(cat.key)} title="删除">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 新建分类（所有成员可用） */}
+              <div className="ms-cat-manager__add">
+                <div className="ms-cat-manager__add-row">
+                  <span
+                    className="ms-cat-item__color-dot"
+                    style={{ background: newCatColor }}
+                  />
+                  <input
+                    type="text"
+                    className="ms-cat-manager__add-input"
+                    placeholder="输入新分类名称..."
+                    value={newCatLabel}
+                    onChange={(e) => setNewCatLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
+                  />
+                  <button
+                    className="ms-cat-manager__add-btn"
+                    onClick={handleAddCategory}
+                    disabled={!newCatLabel.trim()}
+                  >
+                    <Plus size={14} /> 添加
+                  </button>
+                </div>
+                <div className="ms-cat-item__colors">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`ms-cat-item__color-btn ${newCatColor === c ? 'ms-cat-item__color-btn--active' : ''}`}
+                      style={{ background: c }}
+                      onClick={() => setNewCatColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Sharing List */}
         <div className="ms-list">
           {filtered.map((post) => (
             <div key={post.id} className="ms-card card">
-              <div className="ms-card__accent" style={{ background: categoryColors[post.category] }} />
+              <div className="ms-card__accent" style={{ background: categoryColors[post.category] || '#6B7280' }} />
               <div className="ms-card__body">
                 <div className="ms-card__top">
                   <span
                     className="ms-card__badge"
                     style={{
-                      color: categoryColors[post.category],
-                      background: `${categoryColors[post.category]}15`,
+                      color: categoryColors[post.category] || '#6B7280',
+                      background: `${categoryColors[post.category] || '#6B7280'}15`,
                     }}
                   >
-                    {categoryLabels[post.category]}
+                    {categoryLabels[post.category] || post.category}
                   </span>
                   <span className="ms-card__format-tag">
                     {post.format === 'markdown' ? <><Code2 size={11} /> Markdown</> : <><FileText size={11} /> Word</>}

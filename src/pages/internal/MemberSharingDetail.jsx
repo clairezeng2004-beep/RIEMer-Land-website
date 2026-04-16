@@ -16,18 +16,32 @@ import './MemberSharingDetail.css';
 
 const SHARING_KEY = 'riemer_member_sharing';
 const SHARING_VIEWS_KEY = 'riemer_sharing_views';
+const CATEGORIES_KEY = 'riemer_sharing_categories';
 
-const categoryLabels = {
-  course: '课程资料',
-  history: '历史会议',
-  experience: '成员经验分享',
-};
+// 默认分类
+const DEFAULT_CATEGORIES = [
+  { key: 'course', label: '课程资料', color: '#5EAD8C' },
+  { key: 'history', label: '历史会议', color: '#4FBFC4' },
+  { key: 'experience', label: '成员经验分享', color: '#EC4899' },
+];
 
-const categoryColors = {
-  course: '#5EAD8C',
-  history: '#4FBFC4',
-  experience: '#EC4899',
-};
+function loadCategories() {
+  try {
+    const stored = localStorage.getItem(CATEGORIES_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return DEFAULT_CATEGORIES;
+}
+
+function buildCategoryMaps(cats) {
+  const labels = {};
+  const colors = {};
+  cats.forEach((c) => {
+    labels[c.key] = c.label;
+    colors[c.key] = c.color;
+  });
+  return { labels, colors };
+}
 
 // 初始示例数据（与 MemberSharing 保持一致）
 const defaultSharings = [
@@ -102,6 +116,9 @@ export default function MemberSharingDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
   const contentRef = useRef(null);
+
+  // 动态分类
+  const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(loadCategories());
 
   const [sharings, setSharings] = useState(loadSharings);
   const post = sharings.find((s) => s.id === id);
@@ -184,11 +201,11 @@ export default function MemberSharingDetail() {
             <span
               className="msd-article__badge"
               style={{
-                color: categoryColors[post.category],
-                background: `${categoryColors[post.category]}15`,
+                color: categoryColors[post.category] || '#6B7280',
+                background: `${categoryColors[post.category] || '#6B7280'}15`,
               }}
             >
-              {categoryLabels[post.category]}
+              {categoryLabels[post.category] || post.category}
             </span>
             <span className="msd-article__format-tag">
               {post.format === 'markdown' ? <><Code2 size={12} /> Markdown</> : <><FileText size={12} /> Word</>}

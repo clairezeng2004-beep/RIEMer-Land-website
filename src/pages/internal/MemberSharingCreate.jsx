@@ -14,12 +14,22 @@ import {
 import './MemberSharingCreate.css';
 
 const SHARING_KEY = 'riemer_member_sharing';
+const CATEGORIES_KEY = 'riemer_sharing_categories';
 
-const categoryLabels = {
-  course: '课程资料',
-  history: '历史会议',
-  experience: '成员经验分享',
-};
+// 默认分类（与 MemberSharing.jsx 保持一致）
+const DEFAULT_CATEGORIES = [
+  { key: 'course', label: '课程资料', color: '#5EAD8C' },
+  { key: 'history', label: '历史会议', color: '#4FBFC4' },
+  { key: 'experience', label: '成员经验分享', color: '#EC4899' },
+];
+
+function loadCategories() {
+  try {
+    const stored = localStorage.getItem(CATEGORIES_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return DEFAULT_CATEGORIES;
+}
 
 function loadSharings() {
   try {
@@ -38,9 +48,14 @@ export default function MemberSharingCreate() {
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
 
+  // 加载动态分类
+  const cats = loadCategories();
+  const categoryLabels = {};
+  cats.forEach((c) => { categoryLabels[c.key] = c.label; });
+
   const [newPost, setNewPost] = useState({
     title: '',
-    category: 'experience',
+    category: cats.length > 0 ? cats[0].key : 'experience',
     format: 'word',
     content: '',
   });
