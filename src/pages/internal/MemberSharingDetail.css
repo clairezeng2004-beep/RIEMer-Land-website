@@ -100,6 +100,19 @@
   margin-top: var(--space-sm);
 }
 
+.msd-article__period {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.08);
+  padding: 0.25rem 0.75rem;
+  border-radius: var(--radius-full);
+  margin-top: var(--space-sm);
+  width: fit-content;
+}
+
 .msd-article__meta {
   display: flex;
   align-items: center;

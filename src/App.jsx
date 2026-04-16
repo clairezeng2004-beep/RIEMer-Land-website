@@ -51,12 +51,14 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/reset-password" element={<ResetPassword />} />
 
+                {/* 独立全屏页面（不带侧边栏） */}
+                <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
+
                 {/* Internal Routes (Protected) — 带侧边栏布局 */}
                 <Route path="/internal" element={<InternalLayout />}>
                   <Route index element={<Navigate to="notifications" replace />} />
                   <Route path="process-templates" element={<ProcessTemplates />} />
                   <Route path="member-sharing" element={<MemberSharing />} />
-                  <Route path="member-sharing/create" element={<MemberSharingCreate />} />
                   <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
                   {/* 兼容旧链接 */}
                   <Route path="documents" element={<Documents />} />

@@ -213,6 +213,12 @@ export default function MemberSharingDetail() {
 
             <h1 className="msd-article__title">{post.title}</h1>
 
+            {post.period && (
+              <div className="msd-article__period">
+                <Clock size={13} /> 时间段：{post.period}
+              </div>
+            )}
+
             <div className="msd-article__meta">
               <span><User size={14} /> {post.author}</span>
               <span><Clock size={14} /> {post.createdAt}</span>

@@ -554,6 +554,12 @@ export default function MemberSharing() {
 
                 <p className="ms-card__excerpt">{getExcerpt(post)}</p>
 
+                {post.period && (
+                  <span className="ms-card__period">
+                    <Clock size={11} /> {post.period}
+                  </span>
+                )}
+
                 <div className="ms-card__meta">
                   <span className="ms-card__author">
                     <User size={12} /> {post.author}
