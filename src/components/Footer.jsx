@@ -52,7 +52,7 @@ export default function Footer() {
             </div>
 
             <div className="footer__nav footer__nav--contact">
-              <h4 className="footer__nav-title">联系方式</h4>
+              <h4 className="footer__nav-title">留言联系方式</h4>
               <div className="footer__contact-list">
                 <div className="footer__contact-item">
                   <Mail size={16} />
@@ -70,6 +70,9 @@ export default function Footer() {
                 <div className="footer__contact-item">
                   <MapPin size={16} />
                   <span>{content.footerLocation}</span>
+                </div>
+                <div className="footer__contact-guestbook">
+                  <FooterGuestbook />
                 </div>
               </div>
             </div>
@@ -97,9 +100,6 @@ export default function Footer() {
                 />
               </div>
             )}
-            <div className="footer__guestbook-row">
-              <FooterGuestbook />
-            </div>
           </div>
 
           <div className="footer__bottom">
