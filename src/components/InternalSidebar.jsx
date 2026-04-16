@@ -27,7 +27,7 @@ export default function InternalSidebar() {
   const { unreadCount } = useNotifications();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const sc = internalConfig.sidebar;
+  const sc = internalConfig.sidebar || {};
 
   const updateSidebar = useCallback(
     (key, val) => updateInternalConfig({ sidebar: { [key]: val } }),

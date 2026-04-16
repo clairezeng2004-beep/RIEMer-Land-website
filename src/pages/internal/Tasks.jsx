@@ -25,7 +25,7 @@ export default function Tasks() {
   const { isAuthenticated, user, getAllUsers } = useAuth();
   const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const tc = internalConfig.tasks;
+  const tc = internalConfig.tasks || {};
 
   const updateTasks = useCallback(
     (key, val) => updateInternalConfig({ tasks: { [key]: val } }),

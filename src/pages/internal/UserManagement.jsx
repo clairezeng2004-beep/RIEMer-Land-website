@@ -49,7 +49,7 @@ export default function UserManagement() {
   } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const uc = internalConfig.users;
+  const uc = internalConfig.users || {};
 
   const updateUsers = useCallback(
     (key, val) => updateInternalConfig({ users: { [key]: val } }),

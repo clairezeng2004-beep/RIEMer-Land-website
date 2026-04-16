@@ -86,7 +86,7 @@ export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const gc = internalConfig.gallery;
+  const gc = internalConfig.gallery || {};
 
   const updateGallery = useCallback(
     (key, val) => updateInternalConfig({ gallery: { [key]: val } }),

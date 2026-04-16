@@ -37,7 +37,7 @@ export default function Notifications() {
   } = useNotifications();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const nc = internalConfig.notifications;
+  const nc = internalConfig.notifications || { pageTitle: '消息通知', markAllReadBtn: '全部已读' };
 
   const updateNotifs = useCallback(
     (key, val) => updateInternalConfig({ notifications: { [key]: val } }),

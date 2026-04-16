@@ -18,7 +18,7 @@ import './InternalLayout.css';
 function MobileInternalNav() {
   const { unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
-  const sc = internalConfig.sidebar;
+  const sc = internalConfig.sidebar || {};
   const scrollRef = useRef(null);
   const location = useLocation();
 
