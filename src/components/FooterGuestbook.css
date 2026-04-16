@@ -324,13 +324,41 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* 遮罩层 – 桌面端隐藏 */
+.footer-guestbook__overlay {
+  display: none;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .footer-guestbook {
     margin-top: var(--space-xs);
   }
 
+  .footer-guestbook__overlay {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 999;
+  }
+
   .footer-guestbook__panel {
-    padding: var(--space-md) var(--space-lg);
+    position: fixed;
+    bottom: auto;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: calc(100vw - 40px);
+    max-width: 400px;
+    padding: var(--space-lg);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
+    z-index: 1000;
+    animation: guestbookFadeInMobile 0.25s ease-out;
+  }
+
+  @keyframes guestbookFadeInMobile {
+    from { opacity: 0; transform: translate(-50%, -48%); }
+    to   { opacity: 1; transform: translate(-50%, -50%); }
   }
 }

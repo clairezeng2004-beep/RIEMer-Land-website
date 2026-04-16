@@ -156,6 +156,8 @@ export default function FooterGuestbook() {
       </button>
 
       {open && (
+        <>
+        <div className="footer-guestbook__overlay" onClick={() => setOpen(false)} />
         <div className="footer-guestbook__panel">
           <div className="footer-guestbook__header">
             <h4 className="footer-guestbook__title">
@@ -273,6 +275,7 @@ export default function FooterGuestbook() {
             </>
           )}
         </div>
+        </>
       )}
     </div>
   );
