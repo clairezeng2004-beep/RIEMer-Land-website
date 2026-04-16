@@ -172,6 +172,7 @@ export function NotificationProvider({ children }) {
 
   const loadLocalNotifications = () => {
     let notifs = null;
+    let fromDefault = false;
     try {
       const stored = localStorage.getItem(NOTIFICATIONS_KEY);
       if (stored) {
@@ -184,11 +185,18 @@ export function NotificationProvider({ children }) {
     } catch {
       // 解析失败，忽略
     }
-    // 无有效本地数据时，使用默认模板数据
+    // 无有效本地数据时，使用默认模板数据并写入 localStorage
     if (!notifs) {
       notifs = notificationsData;
+      fromDefault = true;
     }
-    console.log('[Notification] 本地模式加载:', notifs.length, '条通知');
+    console.log('[Notification] 本地模式加载:', notifs.length, '条通知', fromDefault ? '(来自默认数据)' : '');
+    // 如果使用了默认数据，立即写入 localStorage，确保后续 markAsRead 等操作能正确持久化
+    if (fromDefault) {
+      try {
+        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifs));
+      } catch { /* ignore */ }
+    }
     // 本地模式：过滤 target_role（非管理员看不到 admin-only 通知）
     const filtered = notifs.filter((n) => {
       if (!n.target_role) return true;

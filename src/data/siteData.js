@@ -755,7 +755,7 @@ export const notificationsData = [
     message: '第十一期分享会的相关资料请各位主理成员尽快上传至文档管理页面。',
     type: 'progress',
     date: '2025-04-10',
-    read: false,
+    read: true,
   },
   {
     id: '2',
@@ -763,7 +763,7 @@ export const notificationsData = [
     message: '大二上课程测评征集问卷已发放，请相关负责人关注填写进度。',
     type: 'progress',
     date: '2025-04-08',
-    read: false,
+    read: true,
   },
   {
     id: '3',
