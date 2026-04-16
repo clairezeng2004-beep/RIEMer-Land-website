@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate, Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSupabaseConfigured } from '../../lib/supabase';
+import { trackEvent } from '../../lib/analytics';
 import {
   Mail, Lock, User, LogIn, UserPlus, Eye, EyeOff,
   AlertCircle, CheckCircle, KeyRound, ArrowLeft,
@@ -166,6 +167,7 @@ export default function Login() {
       const result = await login(email, password);
       console.log('[Login] 登录结果:', result);
       if (result.success) {
+        trackEvent('login', { method: 'email' });
         if (rememberPassword) {
           localStorage.setItem(
             SAVED_CREDENTIALS_KEY,

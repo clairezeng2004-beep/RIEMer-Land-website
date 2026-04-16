@@ -3,6 +3,7 @@ import { AuthProvider } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ScrollToTop from './components/ScrollToTop';
+import usePageTracking from './hooks/usePageTracking';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import Home from './pages/public/Home';
@@ -36,6 +37,7 @@ const FULLSCREEN_PATHS = ['/internal/member-sharing/create'];
 
 function AppShell() {
   const { pathname } = useLocation();
+  usePageTracking();
   const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname.startsWith(p));
 
   return (

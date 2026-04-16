@@ -17,6 +17,7 @@ import {
 import CoverImage from '../../components/CoverImage';
 import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { trackEvent } from '../../lib/analytics';
 import './Home.css';
 
 export default function Home() {
@@ -59,6 +60,12 @@ export default function Home() {
 
   // 点击活动卡片
   const handleEventClick = (event) => {
+    trackEvent('event_click', {
+      event_id: event.id,
+      event_title: event.title,
+      event_category: event.category,
+      has_replay: event.hasReplay,
+    });
     if (event.hasReplay && event.replayUrl) {
       setReplayModal(event);
       setPasswordInput('');
@@ -71,11 +78,19 @@ export default function Home() {
   const handlePasswordSubmit = () => {
     if (!replayModal) return;
     if (passwordInput === replayModal.replayPassword) {
+      trackEvent('replay_unlock', {
+        event_id: replayModal.id,
+        event_title: replayModal.title,
+      });
       window.open(replayModal.replayUrl, '_blank', 'noopener,noreferrer');
       setReplayModal(null);
       setPasswordInput('');
       setPasswordError('');
     } else {
+      trackEvent('replay_unlock_fail', {
+        event_id: replayModal.id,
+        event_title: replayModal.title,
+      });
       setPasswordError('密码不正确，请重试');
     }
   };
@@ -184,6 +199,12 @@ export default function Home() {
                 key={article.id}
                 to={`/article/${article.id}`}
                 className="featured__card"
+                onClick={() => trackEvent('article_click', {
+                  article_id: article.id,
+                  article_title: article.title,
+                  article_category: article.category,
+                  source: 'home',
+                })}
               >
                 {/* 封面图 */}
                 <div className="featured__cover">
@@ -216,7 +237,7 @@ export default function Home() {
             ))}
           </div>
           <div className="featured__more">
-            <Link to="/articles" className="btn btn-secondary">
+            <Link to="/articles" className="btn btn-secondary" onClick={() => trackEvent('nav_click', { link: '/articles', source: 'home' })}>
               查看全部文章 <ArrowRight size={16} />
             </Link>
           </div>

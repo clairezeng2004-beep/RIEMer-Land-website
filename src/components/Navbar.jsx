@@ -3,6 +3,7 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { Menu, X, LogOut, User } from 'lucide-react';
+import { trackEvent } from '../lib/analytics';
 import './Navbar.css';
 
 export default function Navbar() {
@@ -26,6 +27,7 @@ export default function Navbar() {
   }, [location.pathname]);
 
   const handleLogout = async () => {
+    trackEvent('logout');
     await logout();
     navigate('/');
   };
@@ -46,18 +48,21 @@ export default function Navbar() {
           <Link
             to="/"
             className={`navbar__nav-item ${isActive('/') ? 'navbar__nav-item--active' : ''}`}
+            onClick={() => trackEvent('nav_click', { link: '/', label: '首页' })}
           >
             首页
           </Link>
           <Link
             to="/articles"
             className={`navbar__nav-item ${isActive('/articles') || location.pathname.startsWith('/article/') ? 'navbar__nav-item--active' : ''}`}
+            onClick={() => trackEvent('nav_click', { link: '/articles', label: '分享回顾' })}
           >
             分享回顾
           </Link>
           <Link
             to="/timeline"
             className={`navbar__nav-item ${isActive('/timeline') ? 'navbar__nav-item--active' : ''}`}
+            onClick={() => trackEvent('nav_click', { link: '/timeline', label: '关于我们' })}
           >
             关于我们
           </Link>

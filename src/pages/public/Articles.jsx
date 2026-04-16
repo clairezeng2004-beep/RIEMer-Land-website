@@ -8,6 +8,7 @@ import {
   Tag,
   Clock,
 } from 'lucide-react';
+import { trackEvent } from '../../lib/analytics';
 import { articlesData, teamMembers } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
@@ -103,6 +104,12 @@ export default function Articles() {
                 key={article.id}
                 to={`/article/${article.id}`}
                 className="article-card card"
+                onClick={() => trackEvent('article_click', {
+                  article_id: article.id,
+                  article_title: article.title,
+                  article_category: article.category,
+                  source: 'articles_list',
+                })}
               >
                 {/* 封面图 */}
                 <div className="article-card__cover">
