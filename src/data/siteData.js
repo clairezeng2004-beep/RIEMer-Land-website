@@ -17,7 +17,7 @@ export const clubInfo = {
   stats: [
     { label: '活动讲座', value: '10+' },
     { label: '文章分享', value: '30+' },
-    { label: '累计阅读', value: '20000+' },
+    { label: '公众号累计阅读', value: '20000+' },
     { label: '成立时间', value: '2024' },
   ],
   contact: {
