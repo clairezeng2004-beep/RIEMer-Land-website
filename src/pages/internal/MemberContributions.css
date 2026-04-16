@@ -246,11 +246,17 @@
 .mc-table th:nth-child(4),
 .mc-table th:nth-child(5),
 .mc-table th:nth-child(6) {
-  width: 9%;
+  width: 10%;
+}
+
+/* 其他贡献列限制宽度，不让它把总计列推到最右边 */
+.mc-table__th--custom {
+  width: 22%;
 }
 
 .mc-table__th--total {
-  width: 60px;
+  width: 75px;
+  text-align: center;
 }
 
 .mc-table td {
@@ -381,6 +387,7 @@
 /* 总计 */
 .mc-table__td--total {
   text-align: center;
+  padding-right: 18px;
 }
 
 .mc-total {
