@@ -1,8 +1,56 @@
-/* ============ Member Sharing Detail Page ============ */
+/* ============ Member Sharing Detail — Full Screen Page ============ */
 .msd-page {
-  padding-top: 60px;
-  padding-bottom: var(--space-4xl);
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
+  background: var(--color-bg, #f9fafb);
+}
+
+/* ============ Top Bar ============ */
+.msd-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 2rem;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.msd-topbar__back {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0.45rem 1rem;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--color-text-light, #6b7280);
+  font-size: var(--text-sm, 14px);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.msd-topbar__back:hover {
+  border-color: var(--color-primary, #5B8C3E);
+  color: var(--color-primary, #5B8C3E);
+}
+
+/* ============ Content Area ============ */
+.msd-content {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  padding: 1.5rem 2rem;
+}
+
+.msd-content__inner {
+  width: 100%;
+  max-width: none;
 }
 
 /* Not found */
@@ -26,33 +74,9 @@
   margin-bottom: var(--space-lg);
 }
 
-/* Header */
-.msd-header {
-  margin-bottom: var(--space-xl);
-}
-
-.msd-header__back {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0.5rem 1rem;
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  background: transparent;
-  color: var(--color-text-light);
-  font-size: var(--text-sm);
-  cursor: pointer;
-  transition: all var(--transition-fast);
-}
-
-.msd-header__back:hover {
-  border-color: var(--color-primary);
-  color: var(--color-primary);
-}
-
 /* Article */
 .msd-article {
-  max-width: 800px;
+  max-width: 960px;
   margin: 0 auto;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
@@ -398,8 +422,12 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
-  .msd-page {
-    padding-top: var(--space-3xl);
+  .msd-topbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .msd-content {
+    padding: 0.75rem;
   }
 
   .msd-article {
@@ -442,8 +470,8 @@
 }
 
 @media (max-width: 480px) {
-  .msd-page {
-    padding-top: var(--space-xl);
+  .msd-content {
+    padding: 0.5rem;
   }
 
   .msd-article__content {

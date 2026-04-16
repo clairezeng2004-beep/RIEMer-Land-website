@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -554,9 +554,9 @@ export default function MemberSharing() {
                   )}
                 </div>
 
-                <Link to={`/internal/member-sharing/${post.id}`} className="ms-card__title-link">
+                <a href={`/internal/member-sharing/view/${post.id}`} target="_blank" rel="noopener noreferrer" className="ms-card__title-link">
                   <h4 className="ms-card__title">{post.title}</h4>
-                </Link>
+                </a>
 
                 <p className="ms-card__excerpt">{getExcerpt(post)}</p>
 
@@ -599,13 +599,15 @@ export default function MemberSharing() {
                   )}
                 </div>
                 <div className="ms-card__bottom-right">
-                  <Link
-                    to={`/internal/member-sharing/${post.id}`}
+                  <a
+                    href={`/internal/member-sharing/view/${post.id}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="ms-card__action-icon"
                     title="查看全文"
                   >
                     <ExternalLink size={14} />
-                  </Link>
+                  </a>
                   {canModify(post) && (
                     <button
                       className="ms-card__action-icon ms-card__action-icon--danger"

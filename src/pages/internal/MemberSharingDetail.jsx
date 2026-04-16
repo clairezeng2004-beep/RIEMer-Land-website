@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
-import { Navigate, useParams, useNavigate, Link } from 'react-router-dom';
+import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { marked } from 'marked';
 import {
@@ -182,14 +182,19 @@ export default function MemberSharingDetail() {
   if (!post) {
     return (
       <div className="msd-page">
-        <div className="container">
+        <div className="msd-topbar">
+          <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
+            <ChevronLeft size={20} /> 返回列表
+          </button>
+        </div>
+        <div className="msd-content">
           <div className="msd-not-found">
             <Share2 size={48} />
             <h3>找不到该分享</h3>
             <p>内容可能已被删除或链接不正确</p>
-            <Link to="/internal/member-sharing" className="btn btn-secondary">
+            <button className="btn btn-secondary" onClick={() => navigate('/internal/member-sharing')}>
               <ChevronLeft size={16} /> 返回列表
-            </Link>
+            </button>
           </div>
         </div>
       </div>
@@ -218,108 +223,111 @@ export default function MemberSharingDetail() {
 
   return (
     <div className="msd-page">
-      <div className="container">
-        {/* 顶部导航栏 */}
-        <div className="msd-header">
-          <button className="msd-header__back" onClick={() => navigate('/internal/member-sharing')}>
-            <ChevronLeft size={20} /> 返回列表
-          </button>
-        </div>
+      {/* 顶部导航栏 — 类似 MemberSharingCreate */}
+      <div className="msd-topbar">
+        <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
+          <ChevronLeft size={20} /> 返回列表
+        </button>
+      </div>
 
-        {/* 文章主体 */}
-        <article className="msd-article">
-          {/* 文章头部 */}
-          <header className="msd-article__header">
-            <span
-              className="msd-article__badge"
-              style={{
-                color: categoryColors[post.category] || '#6B7280',
-                background: `${categoryColors[post.category] || '#6B7280'}15`,
-              }}
-            >
-              {categoryLabels[post.category] || post.category}
-            </span>
-            <span className="msd-article__format-tag">
-              {post.format === 'markdown' ? <><Code2 size={12} /> Markdown</> : <><FileText size={12} /> Word</>}
-            </span>
+      {/* 全屏内容区域 */}
+      <div className="msd-content">
+        <div className="msd-content__inner">
+          {/* 文章主体 */}
+          <article className="msd-article">
+            {/* 文章头部 */}
+            <header className="msd-article__header">
+              <span
+                className="msd-article__badge"
+                style={{
+                  color: categoryColors[post.category] || '#6B7280',
+                  background: `${categoryColors[post.category] || '#6B7280'}15`,
+                }}
+              >
+                {categoryLabels[post.category] || post.category}
+              </span>
+              <span className="msd-article__format-tag">
+                {post.format === 'markdown' ? <><Code2 size={12} /> Markdown</> : <><FileText size={12} /> Word</>}
+              </span>
 
-            <h1 className="msd-article__title">{post.title}</h1>
+              <h1 className="msd-article__title">{post.title}</h1>
 
-            {post.period && (
-              <div className="msd-article__period">
-                <Clock size={13} /> 时间段：{post.period}
-              </div>
-            )}
-
-            <div className="msd-article__meta">
-              <span><User size={14} /> {post.author}</span>
-              <span><Clock size={14} /> {post.createdAt}</span>
-              <span><Eye size={14} /> {views[post.id] || 0} 次浏览</span>
-            </div>
-          </header>
-
-          {/* 文章内容 */}
-          <div
-            ref={contentRef}
-            className={`msd-article__content ${post.format === 'word' ? 'msd-article__content--word' : 'msd-article__content--markdown'}`}
-            dangerouslySetInnerHTML={{ __html: renderedContent }}
-          />
-
-          {/* 附件列表 */}
-          {post.attachments && post.attachments.length > 0 && (
-            <div className="msd-attachments">
-              <div className="msd-attachments__header">
-                <Paperclip size={16} />
-                <span>附件（{post.attachments.length}）</span>
-              </div>
-              <div className="msd-attachments__list">
-                {post.attachments.map((file) => {
-                  const IconComp = getFileIcon(file.name);
-                  return (
-                    <button
-                      key={file.id}
-                      className="msd-attachments__item"
-                      onClick={() => downloadFile(file)}
-                      title={`下载 ${file.name}`}
-                    >
-                      <IconComp size={20} className="msd-attachments__item-icon" />
-                      <div className="msd-attachments__item-info">
-                        <span className="msd-attachments__item-name">{file.name}</span>
-                        <span className="msd-attachments__item-size">{formatFileSize(file.size)}</span>
-                      </div>
-                      <Download size={16} className="msd-attachments__item-dl" />
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* 底部点赞 */}
-          <footer className="msd-article__footer">
-            <button
-              className={`msd-like-btn ${hasLiked ? 'msd-like-btn--active' : ''}`}
-              onClick={handleLike}
-            >
-              <ThumbsUp size={16} />
-              <span>{hasLiked ? '已赞' : '点赞'}</span>
-            </button>
-            {(post.likes || []).length > 0 && (
-              <div className="msd-like-info">
-                <div className="msd-like-names">
-                  {post.likes.map((l, idx) => (
-                    <span key={l.userId}>
-                      {l.userName}{idx < post.likes.length - 1 ? '、' : ''}
-                    </span>
-                  ))}
+              {post.period && (
+                <div className="msd-article__period">
+                  <Clock size={13} /> 时间段：{post.period}
                 </div>
-                <span className="msd-like-count">
-                  {post.likes.length} 人觉得有用
-                </span>
+              )}
+
+              <div className="msd-article__meta">
+                <span><User size={14} /> {post.author}</span>
+                <span><Clock size={14} /> {post.createdAt}</span>
+                <span><Eye size={14} /> {views[post.id] || 0} 次浏览</span>
+              </div>
+            </header>
+
+            {/* 文章内容 */}
+            <div
+              ref={contentRef}
+              className={`msd-article__content ${post.format === 'word' ? 'msd-article__content--word' : 'msd-article__content--markdown'}`}
+              dangerouslySetInnerHTML={{ __html: renderedContent }}
+            />
+
+            {/* 附件列表 */}
+            {post.attachments && post.attachments.length > 0 && (
+              <div className="msd-attachments">
+                <div className="msd-attachments__header">
+                  <Paperclip size={16} />
+                  <span>附件（{post.attachments.length}）</span>
+                </div>
+                <div className="msd-attachments__list">
+                  {post.attachments.map((file) => {
+                    const IconComp = getFileIcon(file.name);
+                    return (
+                      <button
+                        key={file.id}
+                        className="msd-attachments__item"
+                        onClick={() => downloadFile(file)}
+                        title={`下载 ${file.name}`}
+                      >
+                        <IconComp size={20} className="msd-attachments__item-icon" />
+                        <div className="msd-attachments__item-info">
+                          <span className="msd-attachments__item-name">{file.name}</span>
+                          <span className="msd-attachments__item-size">{formatFileSize(file.size)}</span>
+                        </div>
+                        <Download size={16} className="msd-attachments__item-dl" />
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             )}
-          </footer>
-        </article>
+
+            {/* 底部点赞 */}
+            <footer className="msd-article__footer">
+              <button
+                className={`msd-like-btn ${hasLiked ? 'msd-like-btn--active' : ''}`}
+                onClick={handleLike}
+              >
+                <ThumbsUp size={16} />
+                <span>{hasLiked ? '已赞' : '点赞'}</span>
+              </button>
+              {(post.likes || []).length > 0 && (
+                <div className="msd-like-info">
+                  <div className="msd-like-names">
+                    {post.likes.map((l, idx) => (
+                      <span key={l.userId}>
+                        {l.userName}{idx < post.likes.length - 1 ? '、' : ''}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="msd-like-count">
+                    {post.likes.length} 人觉得有用
+                  </span>
+                </div>
+              )}
+            </footer>
+          </article>
+        </div>
       </div>
     </div>
   );

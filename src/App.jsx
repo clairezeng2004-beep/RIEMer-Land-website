@@ -33,7 +33,7 @@ import Guestbook from './pages/internal/Guestbook';
 import NotificationManagement from './pages/internal/NotificationManagement';
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
-const FULLSCREEN_PATHS = ['/internal/member-sharing/create'];
+const FULLSCREEN_PATHS = ['/internal/member-sharing/create', '/internal/member-sharing/view/'];
 
 function AppShell() {
   const { pathname } = useLocation();
@@ -58,6 +58,7 @@ function AppShell() {
 
           {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
           <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
+          <Route path="/internal/member-sharing/view/:id" element={<MemberSharingDetail />} />
 
           {/* Internal Routes (Protected) — 带侧边栏布局 */}
           <Route path="/internal" element={<InternalLayout />}>
