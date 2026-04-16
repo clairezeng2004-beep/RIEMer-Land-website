@@ -2,7 +2,7 @@
    Internal Articles — 内部文章列表页
    ============================================ */
 .ia-list-page {
-  padding-top: 120px;
+  padding-top: 60px;
   padding-bottom: var(--space-4xl);
   min-height: 100vh;
 }

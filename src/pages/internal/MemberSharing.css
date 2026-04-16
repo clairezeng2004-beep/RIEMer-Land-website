@@ -1,6 +1,6 @@
 /* ============ Member Sharing Page ============ */
 .ms-page {
-  padding-top: 120px;
+  padding-top: 60px;
   padding-bottom: var(--space-4xl);
   min-height: 100vh;
 }

@@ -2,7 +2,7 @@
    Internal Article Detail — 内部文章详情页
    ============================================ */
 .ia-detail-page {
-  padding-top: 120px;
+  padding-top: 60px;
   padding-bottom: var(--space-4xl);
 }
 
