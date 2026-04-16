@@ -319,47 +319,7 @@ export default function NotificationManagement() {
           </div>
         </section>
 
-        {/* ====== 第二部分：已读/未读机制说明 ====== */}
-        <section className="notif-mgmt__section">
-          <div className="notif-mgmt__section-header">
-            <h2><BookOpen size={20} /> 已读/未读机制</h2>
-          </div>
-
-          <div className="notif-mgmt__mechanism card">
-            <div className="notif-mgmt__mechanism-grid">
-              <div className="notif-mgmt__mechanism-item">
-                <div className="notif-mgmt__mechanism-icon" style={{ background: 'rgba(94,173,140,0.1)', color: '#5EAD8C' }}>
-                  <CheckCircle size={20} />
-                </div>
-                <h4>单条标记已读</h4>
-                <p>用户点击通知卡片或点击「标记已读」按钮，该条通知标记为已读</p>
-              </div>
-              <div className="notif-mgmt__mechanism-item">
-                <div className="notif-mgmt__mechanism-icon" style={{ background: 'rgba(91,140,62,0.1)', color: '#5B8C3E' }}>
-                  <Eye size={20} />
-                </div>
-                <h4>全部标记已读</h4>
-                <p>用户点击「全部已读」按钮，批量将所有未读通知标记为已读</p>
-              </div>
-              <div className="notif-mgmt__mechanism-item">
-                <div className="notif-mgmt__mechanism-icon" style={{ background: 'rgba(139,92,246,0.1)', color: '#8B5CF6' }}>
-                  <Users size={20} />
-                </div>
-                <h4>每用户独立状态</h4>
-                <p>每位成员的已读状态独立记录（Supabase 模式下存储在 notification_reads 表中，按 user_id 区分）</p>
-              </div>
-              <div className="notif-mgmt__mechanism-item">
-                <div className="notif-mgmt__mechanism-icon" style={{ background: 'rgba(243,156,18,0.1)', color: '#F39C12' }}>
-                  <Clock size={20} />
-                </div>
-                <h4>自动刷新</h4>
-                <p>Supabase 模式下每 30 秒自动轮询、切换标签页时自动刷新、跨标签页 localStorage 同步</p>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* ====== 第三部分：所有通知列表 ====== */}
+        {/* ====== 第二部分：所有通知列表 ====== */}
         <section className="notif-mgmt__section">
           <div className="notif-mgmt__section-header">
             <h2><FileText size={20} /> 所有通知</h2>
