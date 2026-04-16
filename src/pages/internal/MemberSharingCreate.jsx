@@ -624,7 +624,7 @@ export default function MemberSharingCreate() {
               />
             </div>
 
-            {/* 格式切换 */}
+            {/* 格式切换 + 附件上传（同一行） */}
             <div className="msc-form__field">
               <label>内容格式</label>
               <div className="msc-form__format-toggle">
@@ -642,6 +642,63 @@ export default function MemberSharingCreate() {
                 >
                   <Code2 size={14} /> Markdown
                 </button>
+
+                <div className="msc-form__format-divider" />
+
+                <button
+                  type="button"
+                  className="msc-form__format-btn msc-form__attach-btn"
+                  onClick={() => document.getElementById('msc-attach-input')?.click()}
+                >
+                  <Paperclip size={14} /> 上传附件
+                  {newPost.attachments.length > 0 && (
+                    <span className="msc-form__attach-badge">{newPost.attachments.length}</span>
+                  )}
+                </button>
+                <input
+                  id="msc-attach-input"
+                  type="file"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const files = Array.from(e.target.files);
+                    if (files.length > 0) {
+                      const processFiles = async () => {
+                        const MAX_FILE_SIZE = 5 * 1024 * 1024;
+                        const MAX_FILES = 10;
+                        const newFiles = [];
+                        for (const file of files) {
+                          if (newPost.attachments.length + newFiles.length >= MAX_FILES) {
+                            alert(`最多只能上传 ${MAX_FILES} 个附件`);
+                            break;
+                          }
+                          if (file.size > MAX_FILE_SIZE) {
+                            alert(`文件 "${file.name}" 超过 5MB 限制，已跳过`);
+                            continue;
+                          }
+                          try {
+                            const dataUrl = await fileToDataUrl(file);
+                            newFiles.push({
+                              id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+                              name: file.name,
+                              size: file.size,
+                              type: file.type,
+                              dataUrl,
+                            });
+                          } catch { /* ignore */ }
+                        }
+                        if (newFiles.length > 0) {
+                          setNewPost((prev) => ({
+                            ...prev,
+                            attachments: [...prev.attachments, ...newFiles],
+                          }));
+                        }
+                      };
+                      processFiles();
+                    }
+                    e.target.value = '';
+                  }}
+                />
               </div>
             </div>
 
@@ -706,17 +763,40 @@ export default function MemberSharingCreate() {
               )}
             </div>
 
-            {/* 附件上传区 */}
-            <div className="msc-form__field">
-              <label>
-                <Paperclip size={14} /> 附件
-                <span className="msc-form__hint">选填，支持拖拽或点击上传文件</span>
-              </label>
-              <AttachmentUploader
-                attachments={newPost.attachments}
-                onChange={(attachments) => setNewPost({ ...newPost, attachments })}
-              />
-            </div>
+            {/* 已上传附件列表 */}
+            {newPost.attachments.length > 0 && (
+              <div className="msc-form__field">
+                <label>
+                  <Paperclip size={14} /> 已上传附件
+                  <span className="msc-form__hint">共 {newPost.attachments.length} 个文件</span>
+                </label>
+                <div className="msc-attach__list">
+                  {newPost.attachments.map((file) => {
+                    const IconComp = getFileIcon(file.name);
+                    return (
+                      <div key={file.id} className="msc-attach__item">
+                        <IconComp size={18} className="msc-attach__item-icon" />
+                        <div className="msc-attach__item-info">
+                          <span className="msc-attach__item-name">{file.name}</span>
+                          <span className="msc-attach__item-size">{formatFileSize(file.size)}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="msc-attach__item-remove"
+                          onClick={() => setNewPost((prev) => ({
+                            ...prev,
+                            attachments: prev.attachments.filter((f) => f.id !== file.id),
+                          }))}
+                          title="移除"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
           </form>
         </div>
       </div>
