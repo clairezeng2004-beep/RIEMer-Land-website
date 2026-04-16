@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -98,6 +98,9 @@ export default function InternalArticles() {
   const [newOutlineInput, setNewOutlineInput] = useState('');
   const [showOutlineEditor, setShowOutlineEditor] = useState(true);
   const [showTagsEditor, setShowTagsEditor] = useState(true);
+  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const tagInputRef = useRef(null);
+  const tagSuggestionsRef = useRef(null);
   // 跨模块联动提示
   const [taskPrompt, setTaskPrompt] = useState(null);
 
@@ -109,6 +112,40 @@ export default function InternalArticles() {
     () => [...userArticles, ...articlesData].sort((a, b) => b.date.localeCompare(a.date)),
     [userArticles]
   );
+
+  // 从所有文章中提取已有标签（按频次降序，用于标签建议）
+  const existingTags = useMemo(() => {
+    const tagCount = {};
+    allArticles.forEach((a) => {
+      (a.tags || []).forEach((t) => {
+        tagCount[t] = (tagCount[t] || 0) + 1;
+      });
+    });
+    return Object.entries(tagCount)
+      .sort((a, b) => b[1] - a[1])
+      .map(([tag, count]) => ({ tag, count }));
+  }, [allArticles]);
+
+  // 根据输入过滤标签建议（排除已选中的）
+  const filteredTagSuggestions = useMemo(() => {
+    return existingTags.filter(
+      ({ tag }) => !editTags.includes(tag) && (!newTagInput.trim() || tag.toLowerCase().includes(newTagInput.trim().toLowerCase()))
+    );
+  }, [existingTags, editTags, newTagInput]);
+
+  // 点击外部关闭标签建议下拉
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (
+        tagSuggestionsRef.current && !tagSuggestionsRef.current.contains(e.target) &&
+        tagInputRef.current && !tagInputRef.current.contains(e.target)
+      ) {
+        setShowTagSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // 合并持久化分类 + 文章中动态提取的分类（去重）
   const categories = useMemo(() => {
@@ -656,22 +693,60 @@ export default function InternalArticles() {
                             </span>
                           ))}
                         </div>
-                        <div className="ia-modal__tag-add">
+                        <div className="ia-modal__tag-add" style={{ position: 'relative' }}>
                           <input
+                            ref={tagInputRef}
                             type="text"
                             className="ia-modal__tag-input"
-                            placeholder="添加标签…"
+                            placeholder="输入标签名…"
                             value={newTagInput}
-                            onChange={(e) => setNewTagInput(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && addTag()}
+                            onChange={(e) => {
+                              setNewTagInput(e.target.value);
+                              setShowTagSuggestions(true);
+                            }}
+                            onFocus={() => setShowTagSuggestions(true)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter') {
+                                addTag();
+                                setShowTagSuggestions(false);
+                              }
+                            }}
                           />
                           <button
                             className="btn btn-ghost btn-sm"
-                            onClick={addTag}
+                            onClick={() => {
+                              addTag();
+                              setShowTagSuggestions(false);
+                            }}
                             disabled={!newTagInput.trim()}
                           >
                             <Plus size={14} />
                           </button>
+                          {/* 标签建议下拉 */}
+                          {showTagSuggestions && filteredTagSuggestions.length > 0 && (
+                            <div ref={tagSuggestionsRef} className="ia-modal__tag-suggestions">
+                              <div className="ia-modal__tag-suggestions-header">
+                                已有标签
+                              </div>
+                              {filteredTagSuggestions.map(({ tag, count }) => (
+                                <button
+                                  key={tag}
+                                  className="ia-modal__tag-suggestion-item"
+                                  onClick={() => {
+                                    if (!editTags.includes(tag)) {
+                                      setEditTags((prev) => [...prev, tag]);
+                                    }
+                                    setNewTagInput('');
+                                    setShowTagSuggestions(false);
+                                  }}
+                                >
+                                  <Tag size={12} />
+                                  <span className="ia-modal__tag-suggestion-label">{tag}</span>
+                                  <span className="ia-modal__tag-suggestion-count">{count} 篇</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
                     )}
