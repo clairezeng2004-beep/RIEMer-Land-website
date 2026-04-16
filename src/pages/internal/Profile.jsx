@@ -31,17 +31,6 @@ export default function Profile() {
       return '';
     }
   });
-  const [enrollmentYearLoaded, setEnrollmentYearLoaded] = useState(() => {
-    // 如果本地已有值，直接标记为已加载
-    try {
-      const stored = localStorage.getItem(MEMBER_PROFILES_KEY);
-      const profiles = stored ? JSON.parse(stored) : [];
-      const mp = profiles.find((p) => p.user_id === user?.id);
-      return !!mp?.enrollment_year;
-    } catch {
-      return false;
-    }
-  });
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
   const [avatarFile, setAvatarFile] = useState(null);
   const [saving, setSaving] = useState(false);
@@ -76,8 +65,6 @@ export default function Profile() {
       }
     } catch {
       // ignore
-    } finally {
-      setEnrollmentYearLoaded(true);
     }
   };
 
@@ -100,7 +87,6 @@ export default function Profile() {
             console.warn('[Profile] Supabase 加载入学年份失败:', error.message);
           } else if (data?.enrollment_year) {
             setEnrollmentYear(data.enrollment_year);
-            setEnrollmentYearLoaded(true);
             return;
           }
         } catch (err) {
@@ -329,12 +315,11 @@ export default function Profile() {
                 </label>
                 <input
                   type="text"
-                  className={`profile-page__input${!enrollmentYearLoaded ? ' profile-page__input--disabled' : ''}`}
+                  className="profile-page__input"
                   value={enrollmentYear}
                   onChange={(e) => setEnrollmentYear(e.target.value)}
-                  placeholder={enrollmentYearLoaded ? '如 2023' : '加载中...'}
+                  placeholder="如 2023"
                   maxLength={10}
-                  disabled={!enrollmentYearLoaded}
                 />
               </div>
 
