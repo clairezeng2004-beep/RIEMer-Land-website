@@ -335,6 +335,12 @@
     margin-top: var(--space-xs);
   }
 
+  /* 手机端面板是 fixed 模态框，按钮不需要隐藏 */
+  .footer-guestbook__trigger--hidden {
+    visibility: visible;
+    pointer-events: auto;
+  }
+
   .footer-guestbook__overlay {
     display: block;
     position: fixed;
