@@ -283,7 +283,7 @@ export default function ArticleChat() {
             <div className="article-chat__msg article-chat__msg--assistant">
               <div className="article-chat__msg-bubble article-chat__msg-loading">
                 <Loader2 size={16} className="article-chat__spinner" />
-                <span>正在查找...</span>
+                <span>思考中...</span>
               </div>
             </div>
           )}
