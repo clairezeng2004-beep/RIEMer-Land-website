@@ -15,6 +15,7 @@ import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
 import ProcessTemplates from './pages/internal/ProcessTemplates';
 import MemberSharing from './pages/internal/MemberSharing';
+import MemberSharingCreate from './pages/internal/MemberSharingCreate';
 import MemberSharingDetail from './pages/internal/MemberSharingDetail';
 import Tasks from './pages/internal/Tasks';
 import UserManagement from './pages/internal/UserManagement';
