@@ -39,7 +39,7 @@ export default function MemberSharingCreate() {
   const [newPost, setNewPost] = useState({
     title: '',
     category: 'experience',
-    format: 'markdown',
+    format: 'word',
     content: '',
   });
 
@@ -198,17 +198,17 @@ export default function MemberSharingCreate() {
               <div className="msc-form__format-toggle">
                 <button
                   type="button"
-                  className={`msc-form__format-btn ${newPost.format === 'markdown' ? 'msc-form__format-btn--active' : ''}`}
-                  onClick={() => setNewPost({ ...newPost, format: 'markdown' })}
-                >
-                  <Code2 size={14} /> Markdown
-                </button>
-                <button
-                  type="button"
                   className={`msc-form__format-btn ${newPost.format === 'word' ? 'msc-form__format-btn--active' : ''}`}
                   onClick={() => setNewPost({ ...newPost, format: 'word' })}
                 >
                   <FileText size={14} /> Word (HTML)
+                </button>
+                <button
+                  type="button"
+                  className={`msc-form__format-btn ${newPost.format === 'markdown' ? 'msc-form__format-btn--active' : ''}`}
+                  onClick={() => setNewPost({ ...newPost, format: 'markdown' })}
+                >
+                  <Code2 size={14} /> Markdown
                 </button>
               </div>
             </div>
