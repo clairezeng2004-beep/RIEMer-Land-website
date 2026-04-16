@@ -144,15 +144,18 @@ export default function FooterGuestbook() {
 
   return (
     <div className="footer-guestbook">
-      {!open ? (
-        <button
-          className="footer-guestbook__trigger"
-          onClick={() => setOpen(true)}
-        >
-          <MessageCircle size={15} />
-          <span>给我们留言</span>
-        </button>
-      ) : (
+      {/* 按钮始终渲染，保持固定高度，避免弹窗关闭时高度弹跳 */}
+      <button
+        className={`footer-guestbook__trigger${open ? ' footer-guestbook__trigger--hidden' : ''}`}
+        onClick={() => setOpen(true)}
+        aria-hidden={open}
+        tabIndex={open ? -1 : 0}
+      >
+        <MessageCircle size={15} />
+        <span>给我们留言</span>
+      </button>
+
+      {open && (
         <div className="footer-guestbook__panel">
           <div className="footer-guestbook__header">
             <h4 className="footer-guestbook__title">
