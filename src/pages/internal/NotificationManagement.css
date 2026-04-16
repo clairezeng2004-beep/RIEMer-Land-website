@@ -693,12 +693,14 @@
 
   .notif-mgmt__rule-right {
     flex-wrap: wrap;
+    gap: 4px;
   }
 
   .notif-mgmt__rule-header {
     flex-direction: column;
     align-items: flex-start;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
+    padding: var(--space-md);
   }
 
   .notif-mgmt__form-row {
