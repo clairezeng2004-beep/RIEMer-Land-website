@@ -407,7 +407,7 @@ export default function NotificationManagement() {
               </div>
             )}
             {filteredNotifications.map((notif) => {
-              const config = typeConfig[notif.type] || typeConfig.info;
+              const config = typeConfig[notif.type] || typeConfig.other;
               const Icon = config.icon;
               return (
                 <div
