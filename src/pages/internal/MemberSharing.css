@@ -647,6 +647,18 @@
   border-radius: var(--radius-full);
 }
 
+.ms-card__attach-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  color: var(--color-primary);
+  padding: 0.1rem 0.5rem;
+  background: rgba(91, 140, 62, 0.08);
+  border-radius: var(--radius-full);
+  font-weight: 500;
+}
+
 .ms-card__title-link {
   text-decoration: none;
   color: inherit;

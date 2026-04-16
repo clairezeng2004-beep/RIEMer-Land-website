@@ -22,6 +22,7 @@ import {
   Check,
   Pencil,
   Palette,
+  Paperclip,
 } from 'lucide-react';
 import './MemberSharing.css';
 
@@ -546,6 +547,11 @@ export default function MemberSharing() {
                   <span className="ms-card__format-tag">
                     {post.format === 'markdown' ? <><Code2 size={11} /> Markdown</> : <><FileText size={11} /> Word</>}
                   </span>
+                  {post.attachments && post.attachments.length > 0 && (
+                    <span className="ms-card__attach-tag">
+                      <Paperclip size={11} /> {post.attachments.length} 个附件
+                    </span>
+                  )}
                 </div>
 
                 <Link to={`/internal/member-sharing/${post.id}`} className="ms-card__title-link">

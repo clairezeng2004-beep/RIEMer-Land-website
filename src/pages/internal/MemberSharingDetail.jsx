@@ -11,6 +11,12 @@ import {
   Code2,
   FileText,
   Share2,
+  Paperclip,
+  Download,
+  File,
+  Image,
+  FileSpreadsheet,
+  FileArchive,
 } from 'lucide-react';
 import './MemberSharingDetail.css';
 
@@ -41,6 +47,32 @@ function buildCategoryMaps(cats) {
     colors[c.key] = c.color;
   });
   return { labels, colors };
+}
+
+/* 附件辅助函数 */
+function getFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return Image;
+  if (['pdf'].includes(ext)) return FileText;
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return FileSpreadsheet;
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return FileArchive;
+  if (['doc', 'docx', 'ppt', 'pptx', 'txt', 'md'].includes(ext)) return FileText;
+  return File;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function downloadFile(attachment) {
+  const a = document.createElement('a');
+  a.href = attachment.dataUrl;
+  a.download = attachment.name;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
 }
 
 // 初始示例数据（与 MemberSharing 保持一致）
@@ -232,6 +264,36 @@ export default function MemberSharingDetail() {
             className={`msd-article__content ${post.format === 'word' ? 'msd-article__content--word' : 'msd-article__content--markdown'}`}
             dangerouslySetInnerHTML={{ __html: renderedContent }}
           />
+
+          {/* 附件列表 */}
+          {post.attachments && post.attachments.length > 0 && (
+            <div className="msd-attachments">
+              <div className="msd-attachments__header">
+                <Paperclip size={16} />
+                <span>附件（{post.attachments.length}）</span>
+              </div>
+              <div className="msd-attachments__list">
+                {post.attachments.map((file) => {
+                  const IconComp = getFileIcon(file.name);
+                  return (
+                    <button
+                      key={file.id}
+                      className="msd-attachments__item"
+                      onClick={() => downloadFile(file)}
+                      title={`下载 ${file.name}`}
+                    >
+                      <IconComp size={20} className="msd-attachments__item-icon" />
+                      <div className="msd-attachments__item-info">
+                        <span className="msd-attachments__item-name">{file.name}</span>
+                        <span className="msd-attachments__item-size">{formatFileSize(file.size)}</span>
+                      </div>
+                      <Download size={16} className="msd-attachments__item-dl" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* 底部点赞 */}
           <footer className="msd-article__footer">

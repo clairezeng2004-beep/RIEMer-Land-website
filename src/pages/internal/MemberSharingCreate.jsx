@@ -13,6 +13,13 @@ import {
   Eye,
   Check,
   Calendar,
+  Upload,
+  Paperclip,
+  X,
+  File,
+  Image,
+  FileSpreadsheet,
+  FileArchive,
 } from 'lucide-react';
 import './MemberSharingCreate.css';
 
@@ -226,6 +233,169 @@ function PeriodPicker({ value, onChange }) {
   );
 }
 
+/* ====== 文件类型图标映射 ====== */
+function getFileIcon(name) {
+  const ext = name.split('.').pop().toLowerCase();
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return Image;
+  if (['pdf'].includes(ext)) return FileText;
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return FileSpreadsheet;
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return FileArchive;
+  if (['doc', 'docx', 'ppt', 'pptx', 'txt', 'md'].includes(ext)) return FileText;
+  return File;
+}
+
+function formatFileSize(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+// 将文件转为 base64 Data URL
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ====== 附件拖拽上传组件 ====== */
+function AttachmentUploader({ attachments, onChange }) {
+  const [isDragging, setIsDragging] = useState(false);
+  const fileInputRef = useRef(null);
+  const dragCounterRef = useRef(0);
+
+  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB（localStorage 限制）
+  const MAX_FILES = 10;
+
+  const handleFiles = useCallback(async (files) => {
+    const newFiles = [];
+    for (const file of files) {
+      if (attachments.length + newFiles.length >= MAX_FILES) {
+        alert(`最多只能上传 ${MAX_FILES} 个附件`);
+        break;
+      }
+      if (file.size > MAX_FILE_SIZE) {
+        alert(`文件 "${file.name}" 超过 5MB 限制，已跳过`);
+        continue;
+      }
+      try {
+        const dataUrl = await fileToDataUrl(file);
+        newFiles.push({
+          id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          dataUrl,
+        });
+      } catch {
+        /* 读取失败，跳过 */
+      }
+    }
+    if (newFiles.length > 0) {
+      onChange([...attachments, ...newFiles]);
+    }
+  }, [attachments, onChange]);
+
+  const handleDragEnter = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current += 1;
+    setIsDragging(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    dragCounterRef.current -= 1;
+    if (dragCounterRef.current === 0) {
+      setIsDragging(false);
+    }
+  }, []);
+
+  const handleDragOver = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  }, []);
+
+  const handleDrop = useCallback((e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    dragCounterRef.current = 0;
+    const files = Array.from(e.dataTransfer.files);
+    if (files.length > 0) handleFiles(files);
+  }, [handleFiles]);
+
+  const handleInputChange = useCallback((e) => {
+    const files = Array.from(e.target.files);
+    if (files.length > 0) handleFiles(files);
+    e.target.value = '';
+  }, [handleFiles]);
+
+  const removeFile = useCallback((id) => {
+    onChange(attachments.filter((f) => f.id !== id));
+  }, [attachments, onChange]);
+
+  return (
+    <div className="msc-attach">
+      {/* 拖拽上传区 */}
+      <div
+        className={`msc-attach__dropzone ${isDragging ? 'msc-attach__dropzone--active' : ''}`}
+        onDragEnter={handleDragEnter}
+        onDragLeave={handleDragLeave}
+        onDragOver={handleDragOver}
+        onDrop={handleDrop}
+        onClick={() => fileInputRef.current?.click()}
+      >
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          className="msc-attach__input"
+          onChange={handleInputChange}
+        />
+        <Upload size={28} className="msc-attach__dropzone-icon" />
+        <div className="msc-attach__dropzone-text">
+          <span className="msc-attach__dropzone-main">
+            拖拽文件到此处，或 <span className="msc-attach__dropzone-link">点击浏览</span>
+          </span>
+          <span className="msc-attach__dropzone-hint">
+            支持任意文件格式，单文件最大 5MB，最多 {MAX_FILES} 个附件
+          </span>
+        </div>
+      </div>
+
+      {/* 已上传文件列表 */}
+      {attachments.length > 0 && (
+        <div className="msc-attach__list">
+          {attachments.map((file) => {
+            const IconComp = getFileIcon(file.name);
+            return (
+              <div key={file.id} className="msc-attach__item">
+                <IconComp size={18} className="msc-attach__item-icon" />
+                <div className="msc-attach__item-info">
+                  <span className="msc-attach__item-name">{file.name}</span>
+                  <span className="msc-attach__item-size">{formatFileSize(file.size)}</span>
+                </div>
+                <button
+                  type="button"
+                  className="msc-attach__item-remove"
+                  onClick={() => removeFile(file.id)}
+                  title="移除"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /* ====== 主组件 ====== */
 export default function MemberSharingCreate() {
   const { isAuthenticated, user } = useAuth();
@@ -241,6 +411,7 @@ export default function MemberSharingCreate() {
     format: 'word',
     content: '',
     period: { startYear: null, startMonth: null, endYear: null, endMonth: null },
+    attachments: [],
   });
 
   // 新增分类
@@ -342,7 +513,12 @@ export default function MemberSharingCreate() {
 
   const handleCreate = (e) => {
     e.preventDefault();
-    if (!newPost.title.trim() || !newPost.content.trim()) return;
+    const hasContent = newPost.content.trim().length > 0;
+    const hasAttachments = newPost.attachments.length > 0;
+    if (!newPost.title.trim() || (!hasContent && !hasAttachments)) {
+      alert('请填写标题，并提供正文内容或上传至少一个附件');
+      return;
+    }
 
     // 构建时间段字符串（如果有填写）
     const { startYear, startMonth, endYear, endMonth } = newPost.period || {};
@@ -353,6 +529,15 @@ export default function MemberSharingCreate() {
       periodStr = start && end ? `${start} - ${end}` : start || end;
     }
 
+    // 附件元信息（保留 dataUrl 以支持下载）
+    const attachments = newPost.attachments.map((f) => ({
+      id: f.id,
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      dataUrl: f.dataUrl,
+    }));
+
     const post = {
       id: `sharing-${Date.now()}`,
       title: newPost.title.trim(),
@@ -360,6 +545,7 @@ export default function MemberSharingCreate() {
       format: newPost.format,
       content: newPost.content,
       period: periodStr || null,
+      attachments: attachments.length > 0 ? attachments : null,
       author: user?.nickname || user?.name || 'Unknown',
       authorId: user?.id || null,
       createdAt: new Date().toISOString().split('T')[0],
@@ -480,7 +666,6 @@ export default function MemberSharingCreate() {
                       onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                       placeholder={'# 标题\n\n正文内容...\n\n- 列表项 1\n- 列表项 2'}
                       rows={16}
-                      required
                     />
                   </div>
                   <div className="msc-md-split__pane">
@@ -519,6 +704,18 @@ export default function MemberSharingCreate() {
                   />
                 </div>
               )}
+            </div>
+
+            {/* 附件上传区 */}
+            <div className="msc-form__field">
+              <label>
+                <Paperclip size={14} /> 附件
+                <span className="msc-form__hint">选填，支持拖拽或点击上传文件</span>
+              </label>
+              <AttachmentUploader
+                attachments={newPost.attachments}
+                onChange={(attachments) => setNewPost({ ...newPost, attachments })}
+              />
             </div>
           </form>
         </div>
