@@ -87,8 +87,8 @@ export default function Notifications() {
           <div className="notifications-email-banner">
             <Mail size={18} />
             <div>
-              <strong>本周邮件提醒已触发</strong>
-              <p>系统已检测到未读消息，按周为单位的邮件提醒将自动发送至成员邮箱。</p>
+              <strong>本周的邮件提醒已发出</strong>
+              <p>系统发现你有未读消息，已自动给你的邮箱发了一封提醒邮件，帮你汇总本周的消息。</p>
             </div>
           </div>
         )}
@@ -184,10 +184,10 @@ export default function Notifications() {
 
         {/* 邮件提醒说明 */}
         <div className="notifications-info card">
-          <h4><Mail size={16} /> 邮件提醒机制</h4>
+          <h4><Mail size={16} /> 关于邮件提醒</h4>
           <p>
-            当本周有未读消息时，系统会自动以<strong>周为单位</strong>向成员邮箱发送一封提醒邮件，
-            汇总本周的未读通知。每周最多发送一次，避免打扰。
+            如果你有还没看的消息，系统会<strong>每周最多一次</strong>自动给你的邮箱发一封提醒邮件，
+            帮你汇总本周的未读消息。放心，不会频繁打扰你 😊
           </p>
         </div>
       </div>

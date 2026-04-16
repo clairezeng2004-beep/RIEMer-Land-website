@@ -34,54 +34,54 @@ const typeConfig = {
   other: { icon: Info, color: '#8B5CF6', label: '其他' },
 };
 
-// ====== 通知触发规则定义 ======
+// ====== 什么时候会收到通知 ======
 const TRIGGER_RULES = [
   {
     id: 'doc-upload',
     source: '文档管理',
     sourceIcon: Upload,
-    trigger: '成员上传新文档',
+    trigger: '有人上传了新文档',
     title: '新内部分享',
-    message: '「{上传者}」上传了文档「{文档名}」（{文档类型}）',
+    message: '例：「小明」上传了文档「会议纪要」（流程手册）',
     type: 'sharing',
     autoRead: true,
-    autoReadReason: '上传者自动已读，不打扰操作者本人',
+    autoReadReason: '上传文档的人不会被自己的操作打扰，所以这条对 TA 自己自动标为已读',
     file: 'Documents.jsx',
   },
   {
     id: 'suggestion-new',
     source: '建设建议',
     sourceIcon: MessageSquarePlus,
-    trigger: '成员提交新的建设建议',
+    trigger: '有人提交了新的建设建议',
     title: '新建设建议',
-    message: '「{提议人}」提出了建议：{建议内容前40字}',
+    message: '例：「小红」提出了建议：希望增加暑期实习经验分享板块…',
     type: 'progress',
     autoRead: true,
-    autoReadReason: '建议提交者自动已读，仅作为记录',
+    autoReadReason: '提建议的人不需要再提醒自己，所以这条对 TA 自动标为已读',
     file: 'Suggestions.jsx',
   },
   {
     id: 'suggestion-status',
     source: '建设建议',
     sourceIcon: MessageSquarePlus,
-    trigger: '管理员修改建议的状态',
+    trigger: '建议的处理状态发生了变化',
     title: '建设建议状态变更',
-    message: '建议「{建议内容}」状态：{旧状态} → {新状态}',
+    message: '例：建议「增加实习板块」的状态从"处理中"变为"已完成"',
     type: 'progress',
     autoRead: true,
-    autoReadReason: '状态变更操作者自动已读',
+    autoReadReason: '操作状态的人不需要再提醒自己，所以这条对 TA 自动标为已读',
     file: 'Suggestions.jsx',
   },
   {
     id: 'weekly-email',
     source: '系统自动',
     sourceIcon: Clock,
-    trigger: '本周存在未读消息时（每周最多一次）',
-    title: '—（不创建通知，仅触发邮件提醒）',
-    message: '系统检测到未读消息，自动向成员邮箱发送一封周度汇总提醒',
+    trigger: '每周检查一次，如果你有没看过的消息',
+    title: '不会在页面上显示，只通过邮件提醒',
+    message: '系统会自动给你的邮箱发一封汇总邮件，提醒你本周有未读消息',
     type: 'other',
     autoRead: false,
-    autoReadReason: '非通知，仅控制邮件发送频率',
+    autoReadReason: '这不是页面上的通知，只是一个邮件提醒，每周最多发一次，不会频繁打扰',
     file: 'NotificationContext.jsx',
   },
 ];
@@ -173,7 +173,7 @@ export default function NotificationManagement() {
         <div className="notif-mgmt__header">
           <div>
             <h1><BellRing size={28} /> 通知管理</h1>
-            <p>{isAdmin ? '查看通知触发规则、管理所有通知、发送新通知' : '查看通知触发规则和所有通知'}</p>
+            <p>{isAdmin ? '了解什么时候会收到通知、管理所有通知、发送新通知' : '了解什么时候会收到通知，查看所有通知'}</p>
           </div>
           {isAdmin && (
             <button
@@ -201,15 +201,15 @@ export default function NotificationManagement() {
           </div>
           <div className="notif-mgmt__stat-card notif-mgmt__stat-card--rules">
             <div className="notif-mgmt__stat-value">{TRIGGER_RULES.length}</div>
-            <div className="notif-mgmt__stat-label">触发规则</div>
+            <div className="notif-mgmt__stat-label">通知场景</div>
           </div>
         </div>
 
         {/* ====== 第一部分：通知触发规则 ====== */}
         <section className="notif-mgmt__section">
           <div className="notif-mgmt__section-header">
-            <h2><Zap size={20} /> 通知触发规则</h2>
-            <p>以下是系统内所有自动触发通知的逻辑，点击展开查看详情</p>
+            <h2><Zap size={20} /> 什么时候会收到通知？</h2>
+            <p>以下列出了所有会自动产生通知的场景，点击可以展开看详细说明</p>
           </div>
 
           <div className="notif-mgmt__rules">
@@ -246,11 +246,11 @@ export default function NotificationManagement() {
                       </span>
                       {rule.autoRead ? (
                         <span className="notif-mgmt__rule-badge notif-mgmt__rule-badge--read">
-                          <CheckCircle size={12} /> 自动已读
+                          <CheckCircle size={12} /> 不打扰
                         </span>
                       ) : (
                         <span className="notif-mgmt__rule-badge notif-mgmt__rule-badge--unread">
-                          <Bell size={12} /> 未读
+                          <Bell size={12} /> 需查看
                         </span>
                       )}
                       {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
@@ -265,30 +265,26 @@ export default function NotificationManagement() {
                           <span>{rule.title}</span>
                         </div>
                         <div className="notif-mgmt__rule-detail-item">
-                          <label>消息内容模板</label>
+                          <label>你会看到的消息内容</label>
                           <span className="notif-mgmt__rule-template">{rule.message}</span>
                         </div>
                         <div className="notif-mgmt__rule-detail-item">
-                          <label>初始状态</label>
+                          <label>收到后需要手动查看吗？</label>
                           <span>
                             {rule.autoRead ? (
                               <span className="notif-mgmt__detail-tag notif-mgmt__detail-tag--green">
-                                <CheckCircle size={12} /> 自动标记为已读
+                                <CheckCircle size={12} /> 不需要，系统会帮你自动标为已读
                               </span>
                             ) : (
                               <span className="notif-mgmt__detail-tag notif-mgmt__detail-tag--orange">
-                                <Bell size={12} /> 默认未读，需用户手动标记
+                                <Bell size={12} /> 需要你点开查看后才会标为已读
                               </span>
                             )}
                           </span>
                         </div>
                         <div className="notif-mgmt__rule-detail-item">
-                          <label>设为已读/未读的原因</label>
+                          <label>为什么这样设计？</label>
                           <span>{rule.autoReadReason}</span>
-                        </div>
-                        <div className="notif-mgmt__rule-detail-item">
-                          <label>触发来源文件</label>
-                          <code>{rule.file}</code>
                         </div>
                       </div>
                     </div>
