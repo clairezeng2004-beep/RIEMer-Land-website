@@ -918,6 +918,169 @@
   font-style: italic;
 }
 
+/* ========= 文本形式内容的预览（Markdown / Word-HTML） ========= */
+.doc-preview__text {
+  max-width: 880px;
+  margin: 0 auto;
+  padding: var(--space-xl) var(--space-2xl);
+}
+
+.doc-preview__text-body {
+  color: var(--color-text);
+  font-size: var(--text-base);
+  line-height: 1.8;
+  word-break: break-word;
+}
+
+.doc-preview__text-body h1,
+.doc-preview__text-body h2,
+.doc-preview__text-body h3,
+.doc-preview__text-body h4 {
+  color: var(--color-text);
+  font-weight: 600;
+  margin: 1.6em 0 0.6em;
+  line-height: 1.35;
+}
+.doc-preview__text-body h1 { font-size: 1.8em; }
+.doc-preview__text-body h2 { font-size: 1.45em; }
+.doc-preview__text-body h3 { font-size: 1.2em; }
+
+.doc-preview__text-body p {
+  margin: 0 0 1em;
+}
+
+.doc-preview__text-body ul,
+.doc-preview__text-body ol {
+  margin: 0 0 1em;
+  padding-left: 1.6em;
+}
+.doc-preview__text-body li { margin: 0.3em 0; }
+
+.doc-preview__text-body blockquote {
+  margin: 1em 0;
+  padding: 0.4em 1em;
+  border-left: 3px solid color-mix(in srgb, var(--color-primary, #5EAD8C) 60%, transparent);
+  background: color-mix(in srgb, var(--color-primary, #5EAD8C) 8%, transparent);
+  color: var(--color-text-light);
+  border-radius: 0 6px 6px 0;
+}
+
+.doc-preview__text-body code {
+  padding: 0.15em 0.4em;
+  background: var(--color-bg-subtle, #f3f4f6);
+  border-radius: 4px;
+  font-size: 0.92em;
+  font-family: var(--font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+}
+.doc-preview__text-body pre {
+  padding: 1em;
+  background: var(--color-bg-subtle, #f3f4f6);
+  border-radius: 8px;
+  overflow-x: auto;
+  margin: 1em 0;
+}
+.doc-preview__text-body pre code {
+  padding: 0;
+  background: transparent;
+}
+
+.doc-preview__text-body table {
+  border-collapse: collapse;
+  margin: 1em 0;
+  width: 100%;
+  font-size: 0.95em;
+}
+.doc-preview__text-body th,
+.doc-preview__text-body td {
+  border: 1px solid var(--color-border, #e5e7eb);
+  padding: 0.5em 0.8em;
+  text-align: left;
+}
+.doc-preview__text-body th {
+  background: var(--color-bg-subtle, #f9fafb);
+  font-weight: 600;
+}
+
+.doc-preview__text-body img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+  margin: 0.5em 0;
+}
+
+.doc-preview__text-body a {
+  color: var(--color-primary, #5EAD8C);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* 附件列表（文本形式文档下方） */
+.doc-preview__attachments {
+  margin-top: var(--space-2xl);
+  padding-top: var(--space-lg);
+  border-top: 1px dashed var(--color-border, #e5e7eb);
+}
+
+.doc-preview__attachments-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  margin-bottom: var(--space-sm);
+}
+
+.doc-preview__attachments-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.doc-preview__attachments-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--color-bg-subtle, #f9fafb);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 6px;
+  font-size: var(--text-sm);
+}
+
+.doc-preview__attachments-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--color-text);
+}
+
+.doc-preview__attachments-size {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
+.doc-preview__attachments-download {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  color: var(--color-primary, #5EAD8C);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #5EAD8C) 40%, transparent);
+  border-radius: 4px;
+  text-decoration: none;
+  transition: background 0.15s;
+}
+.doc-preview__attachments-download:hover {
+  background: color-mix(in srgb, var(--color-primary, #5EAD8C) 12%, transparent);
+}
+
 /* 预览弹窗底部点赞栏 */
 .doc-preview__footer {
   display: flex;

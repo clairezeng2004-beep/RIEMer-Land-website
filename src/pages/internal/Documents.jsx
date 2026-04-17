@@ -1,5 +1,6 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
+import { marked } from 'marked';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import {
@@ -25,6 +26,8 @@ import {
   ThumbsUp,
   CheckCircle2,
   Edit3,
+  Paperclip,
+  Code2,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
@@ -384,8 +387,23 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   };
 
   const canPreview = (doc) => {
-    return doc.fileUrl && ['pdf', 'image', 'docx'].includes(doc.fileType);
+    // 1) 外链文件（PDF/图片/Word）可在线预览
+    if (doc.fileUrl && ['pdf', 'image', 'docx'].includes(doc.fileType)) return true;
+    // 2) 以文本形式输入的文档（Word/HTML 或 Markdown）同样可在线预览
+    if (doc.content && String(doc.content).trim().length > 0) return true;
+    return false;
   };
+
+  // 文本形式（content）的渲染：根据 format 决定 Markdown 解析还是原样 HTML
+  const renderedTextContent = useMemo(() => {
+    if (!previewDoc || !previewDoc.content) return '';
+    if (previewDoc.format === 'markdown') {
+      marked.setOptions({ breaks: true, gfm: true });
+      return marked.parse(previewDoc.content);
+    }
+    // word 格式本身就是 HTML，原样返回
+    return previewDoc.content;
+  }, [previewDoc]);
 
   const FileIcon = ({ fileType, size = 24 }) => {
     const Icon = fileTypeIcons[fileType] || FileText;
@@ -795,7 +813,63 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
             {/* 预览内容区 */}
             <div className="doc-preview__content" ref={docContentRef}>
-              {canPreview(previewDoc) ? (
+              {/* 优先：以文本形式输入的正文（Markdown / Word-HTML） */}
+              {previewDoc.content && String(previewDoc.content).trim().length > 0 ? (
+                <div className="doc-preview__text">
+                  <div
+                    className={`doc-preview__text-body ${
+                      previewDoc.format === 'markdown'
+                        ? 'doc-preview__text-body--markdown'
+                        : 'doc-preview__text-body--word'
+                    }`}
+                    dangerouslySetInnerHTML={{ __html: renderedTextContent }}
+                  />
+
+                  {/* 附件列表（有附件时一并展示，仍可下载） */}
+                  {Array.isArray(previewDoc.attachments) && previewDoc.attachments.length > 0 && (
+                    <div className="doc-preview__attachments">
+                      <div className="doc-preview__attachments-header">
+                        <Paperclip size={16} />
+                        <span>附件（{previewDoc.attachments.length}）</span>
+                      </div>
+                      <ul className="doc-preview__attachments-list">
+                        {previewDoc.attachments.map((f) => (
+                          <li key={f.id || f.name} className="doc-preview__attachments-item">
+                            <FileText size={16} />
+                            <span className="doc-preview__attachments-name">{f.name}</span>
+                            {typeof f.size === 'number' && (
+                              <span className="doc-preview__attachments-size">
+                                {f.size < 1024
+                                  ? `${f.size} B`
+                                  : f.size < 1024 * 1024
+                                    ? `${(f.size / 1024).toFixed(1)} KB`
+                                    : `${(f.size / (1024 * 1024)).toFixed(1)} MB`}
+                              </span>
+                            )}
+                            {f.dataUrl && (
+                              <a
+                                className="doc-preview__attachments-download"
+                                href={f.dataUrl}
+                                download={f.name}
+                              >
+                                <Download size={14} /> 下载
+                              </a>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  {/* 文本型文档也提供整体评论 */}
+                  <TextAnnotation
+                    targetType="document"
+                    targetId={previewDoc.id}
+                    contentRef={docContentRef}
+                    disabled
+                  />
+                </div>
+              ) : canPreview(previewDoc) ? (
                 previewDoc.fileType === 'pdf' ? (
                   <>
                     <iframe
