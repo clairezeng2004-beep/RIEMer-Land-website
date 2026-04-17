@@ -137,12 +137,28 @@ export default function ProcessTemplateDetail() {
 
   const doc = useMemo(() => allDocs.find((d) => String(d.id) === String(id)), [allDocs, id]);
 
-  /* 浏览次数：独立存一份（流程模板查看页专用）并在存在 doc.viewCount 时以二者较大值显示 */
+  /* 浏览次数：
+     - 存在 localStorage: riemer_process_template_views （与卡片列表共享）
+     - 同一个会话（同一标签页）内刷新不重复计数，避免"每刷一次就 +1"
+     - 关闭窗口重开 → sessionStorage 清空 → 新会话再计一次
+  */
   useEffect(() => {
     if (!doc) return;
-    const views = loadViews();
-    views[doc.id] = (views[doc.id] || 0) + 1;
-    saveViews(views);
+    try {
+      const SESSION_KEY = 'riemer_ptd_session_viewed';
+      const sessionViewed = new Set(
+        JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
+      );
+      if (sessionViewed.has(String(doc.id))) {
+        // 当前会话内已经计过一次，刷新不再增加
+        return;
+      }
+      const views = loadViews();
+      views[doc.id] = (views[doc.id] || 0) + 1;
+      saveViews(views);
+      sessionViewed.add(String(doc.id));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
+    } catch { /* ignore */ }
   }, [doc?.id]);
 
   /* Markdown / Word-HTML 渲染 */

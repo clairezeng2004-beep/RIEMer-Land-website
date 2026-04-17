@@ -125,6 +125,17 @@ function isUserDoc(doc) {
   return String(doc?.id || '').startsWith('doc-');
 }
 
+// 流程模板 / 文档详情页共享的浏览计数（与 ProcessTemplateDetail 完全一致）
+const PTD_VIEWS_KEY = 'riemer_process_template_views';
+
+function loadDocViews() {
+  try {
+    const stored = localStorage.getItem(PTD_VIEWS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return {};
+}
+
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { addNotification } = useNotifications();
@@ -227,9 +238,14 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         return 0;
       })
     );
+    // 同步刷新浏览计数（与详情页共享同一份 localStorage）
+    setDocViews(loadDocViews());
   }, [filterTypes]);
 
-  // 监听独立发布页（新窗口）发来的刷新消息
+  // 与 ProcessTemplateDetail 共享的浏览计数（在列表卡片上实时展示）
+  const [docViews, setDocViews] = useState(() => loadDocViews());
+
+  // 监听独立发布页（新窗口）发来的刷新消息 + 监听浏览计数变化
   useEffect(() => {
     const handler = (event) => {
       if (event?.data?.type === 'process-template-created') {
@@ -237,12 +253,38 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       }
     };
     window.addEventListener('message', handler);
-    // 兜底：窗口 focus 时也刷新一次（用户手动切回来时）
-    const onFocus = () => refreshDocs();
+
+    // 兜底：窗口 focus 时刷新一次（用户从详情页标签切回来时看到最新浏览数）
+    const onFocus = () => {
+      refreshDocs();
+      setDocViews(loadDocViews());
+    };
     window.addEventListener('focus', onFocus);
+
+    // 跨标签页通信：详情页在另一个标签写 localStorage 会触发 storage 事件
+    const onStorage = (e) => {
+      if (e.key === PTD_VIEWS_KEY) {
+        setDocViews(loadDocViews());
+      }
+      if (e.key === DOCUMENTS_KEY || e.key === DELETED_DEFAULT_IDS_KEY) {
+        refreshDocs();
+      }
+    };
+    window.addEventListener('storage', onStorage);
+
+    // 本页隐藏 → 显示时也兜底刷新一次（部分浏览器对同源新标签回切没有 focus 事件）
+    const onVisibility = () => {
+      if (document.visibilityState === 'visible') {
+        setDocViews(loadDocViews());
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibility);
+
     return () => {
       window.removeEventListener('message', handler);
       window.removeEventListener('focus', onFocus);
+      window.removeEventListener('storage', onStorage);
+      document.removeEventListener('visibilitychange', onVisibility);
     };
   }, [refreshDocs]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -774,7 +816,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                     <User size={12} /> 贡献者：{doc.uploadedBy}
                   </span>
                   <span className="doc-card__stats">
-                    <Eye size={12} /> {doc.viewCount || 0}
+                    <Eye size={12} /> {(docViews[doc.id] || 0) + (doc.viewCount || 0)}
                   </span>
                 </div>
 
@@ -992,7 +1034,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                     <span><Clock size={14} /> 上传日期: {previewDoc.date}</span>
                     <span><User size={14} /> 贡献者：{previewDoc.uploadedBy}</span>
                     <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
-                    <span><BarChart3 size={14} /> 浏览次数: {previewDoc.viewCount || 0}</span>
+                    <span><BarChart3 size={14} /> 浏览次数: {(docViews[previewDoc.id] || 0) + (previewDoc.viewCount || 0)}</span>
                   </div>
                   {previewDoc.fileUrl ? (
                     <p className="doc-preview__no-preview-hint">
