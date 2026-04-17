@@ -10,6 +10,42 @@
   margin-left: 220px;
 }
 
+/* 内部页面在中等宽度（≤1024px）下，扣除 220px 侧栏后可用空间已不足以
+   容纳桌面端 4 列横排，会出现文字重合；强制走单列堆叠布局（与手机端一致），
+   每个模块独占一行。 */
+@media (max-width: 1024px) {
+  .footer--internal .footer__grid {
+    grid-template-columns: 1fr;
+    grid-template-rows: none;
+    grid-template-areas: none;
+    row-gap: var(--space-lg);
+    column-gap: 0;
+    text-align: center;
+  }
+
+  .footer--internal .footer__grid > .footer__nav,
+  .footer--internal .footer__grid > .footer__qrcode {
+    grid-row: auto;
+    grid-column: auto;
+    grid-template-rows: none;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+  }
+
+  .footer--internal .footer__nav-links-row,
+  .footer--internal .footer__about-texts,
+  .footer--internal .footer__contact-list {
+    align-items: center;
+  }
+
+  .footer--internal .footer__contact-item {
+    justify-content: center;
+    white-space: normal;
+  }
+}
+
 .footer__content {
   background: white;
   color: var(--color-text);
@@ -25,6 +61,17 @@
   column-gap: var(--space-xl);
   row-gap: var(--space-2xl);
   align-items: start;
+}
+
+/* 公开页面中等宽度（769–960px）：4 列会挤压文字，降级为 2 列 */
+@media (max-width: 960px) and (min-width: 769px) {
+  .footer__grid {
+    grid-template-columns: repeat(2, 1fr);
+    grid-template-areas:
+      "nav about"
+      "contact qrcode";
+    row-gap: var(--space-xl);
+  }
 }
 
 /* 指派各区块到对应的行列位置 */
