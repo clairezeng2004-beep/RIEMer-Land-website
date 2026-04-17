@@ -255,21 +255,16 @@
 }
 
 .mc-table__th--total {
-  width: 70px;
+  width: 120px;
   text-align: center;
 }
 
-/* 总计表头内图标+文字整体左移 */
-.mc-table__th--total > * {
-  position: relative;
-  transform: translateX(-40px);
+/* 总计表头：图标 + 文字一起整体向左推 */
+.mc-table__th--total .mc-total-head {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-}
-.mc-table__th--total {
-  /* 兜底：如果是直接文本节点（没有 span 包裹），给单元格自身一点右内边距 */
-  padding-right: 40px;
+  transform: translateX(-60px);
 }
 
 .mc-table td {
@@ -400,7 +395,6 @@
 /* 总计 */
 .mc-table__td--total {
   text-align: center;
-  padding-right: 64px;
 }
 
 .mc-total {
@@ -415,6 +409,8 @@
   font-size: var(--text-md);
   color: #fff;
   background: var(--color-primary);
+  /* 整体左移，和表头对齐 */
+  transform: translateX(-60px);
 }
 
 /* 其他贡献 */

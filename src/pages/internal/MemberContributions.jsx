@@ -391,7 +391,7 @@ export default function MemberContributions() {
                 <th><Handshake size={14} /> 协作帮助</th>
                 <th><Upload size={14} /> 内部分享</th>
                 <th className="mc-table__th--custom">其他</th>
-                <th className="mc-table__th--total"><Trophy size={14} /> 总计</th>
+                <th className="mc-table__th--total"><span className="mc-total-head"><Trophy size={14} /> 总计</span></th>
               </tr>
             </thead>
             <tbody>
