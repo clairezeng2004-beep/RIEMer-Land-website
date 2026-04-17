@@ -257,7 +257,7 @@
 .mc-table__th--total {
   width: 70px;
   text-align: center;
-  padding-right: 36px;
+  padding-right: 64px;
 }
 
 .mc-table td {
@@ -388,7 +388,7 @@
 /* 总计 */
 .mc-table__td--total {
   text-align: center;
-  padding-right: 36px;
+  padding-right: 64px;
 }
 
 .mc-total {
