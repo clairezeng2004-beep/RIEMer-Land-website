@@ -313,13 +313,19 @@
 }
 
 /* ============ Countdown Badge (Upcoming Events) ============ */
+/* 即将开始的活动：整张卡片换成暖金色调，和普通白卡形成对比 */
 .featured__card--upcoming {
-  border-color: var(--color-primary);
-  background: linear-gradient(135deg, rgba(var(--color-primary-rgb, 99, 102, 241), 0.03), transparent);
+  border-color: rgba(212, 164, 76, 0.55);
+  background: #FBF5E8;
+}
+
+.featured__card--upcoming:hover {
+  border-color: var(--color-accent, #D4A44C);
+  background: #F8EFD8;
 }
 
 .featured__card--upcoming .featured__card-accent {
-  background: linear-gradient(90deg, var(--color-primary), var(--color-accent, #D4A44C));
+  background: var(--color-accent, #D4A44C);
 }
 
 .featured__countdown-badge {
@@ -329,22 +335,16 @@
   font-size: 11px;
   font-weight: 600;
   color: #8B6B1F;
-  background: rgba(212, 164, 76, 0.14);
-  border: 1px solid rgba(212, 164, 76, 0.28);
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(212, 164, 76, 0.35);
   padding: 2px 8px;
   border-radius: var(--radius-full, 999px);
   margin-left: auto;
   white-space: nowrap;
-  animation: countdown-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes countdown-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.7; }
 }
 
 .featured__meta-item--countdown {
-  color: var(--color-primary) !important;
+  color: #8B6B1F !important;
   font-weight: 500;
 }
 
