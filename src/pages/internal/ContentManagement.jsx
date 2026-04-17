@@ -961,7 +961,7 @@ export default function ContentManagement() {
                         title: '',
                         date: new Date().toISOString().split('T')[0],
                         category: '分享会',
-                        location: '线上',
+                        location: '线上腾讯会议',
                         leaderId: '',
                         excerpt: '',
                         hasReplay: false,
@@ -1032,7 +1032,7 @@ export default function ContentManagement() {
                         value={editingEvent.location}
                         onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
                         className="content-mgmt__input"
-                        placeholder="如：线上 / 西南财经大学"
+                        placeholder="如：线上腾讯会议 / 西南财经大学"
                       />
                     </div>
 
