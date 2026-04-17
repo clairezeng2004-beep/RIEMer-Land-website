@@ -23,6 +23,25 @@ import {
 } from 'lucide-react';
 import './InternalSidebar.css';
 
+// 侧边栏 label key → 对应页面 internalConfig 节 key
+// 改某个 label 时，该节的 pageTitle 会被同步成同样的值，保持侧边栏和页面 h1 一致
+const LABEL_TO_SECTION = {
+  labelNotifications: 'notifications',
+  labelDocuments: 'documents',
+  labelTasks: 'tasks',
+  labelProcessTemplates: 'processTemplates',
+  labelMemberSharing: 'memberSharing',
+  labelArticles: 'internalArticles',
+  labelContributions: 'contributions',
+  labelSuggestions: 'suggestions',
+  labelMemberProfiles: 'memberProfiles',
+  labelGallery: 'gallery',
+  labelProfile: 'profile',
+  labelUsers: 'users',
+  // labelHome / labelGuestbook / labelContent / labelNotificationMgmt 对应的页面
+  // 要么没有 pageTitle 字段，要么标题是硬编码，这里不同步
+};
+
 export default function InternalSidebar() {
   const { unreadCount } = useNotifications();
   const { internalConfig, updateInternalConfig } = useSiteContent();
@@ -30,7 +49,18 @@ export default function InternalSidebar() {
   const sc = internalConfig.sidebar || {};
 
   const updateSidebar = useCallback(
-    (key, val) => updateInternalConfig({ sidebar: { [key]: val } }),
+    (key, val) => {
+      const section = LABEL_TO_SECTION[key];
+      if (section) {
+        // 一次性更新 sidebar.labelXxx + <section>.pageTitle，让标签和页面 h1 保持一致
+        updateInternalConfig({
+          sidebar: { [key]: val },
+          [section]: { pageTitle: val },
+        });
+      } else {
+        updateInternalConfig({ sidebar: { [key]: val } });
+      }
+    },
     [updateInternalConfig]
   );
 
