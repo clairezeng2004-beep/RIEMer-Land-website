@@ -16,23 +16,17 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 
     <!--
-      字体加载策略（关键目标：消除每次刷新都能看到的"字体跳变"）：
-
-      1. 英文字体使用 display=optional：浏览器给字体约 100ms 的超短窗口，
-         如命中缓存就能在首帧直接用上真字体（绝大多数情况），否则本次刷新
-         直接用 fallback 渲染到底、不再中途切换。对已访问过网站的用户，
-         从第 2 次刷新起基本看不到切换。
-      2. 通过 <style> 里的 @font-face "adjusted fallback"（size-adjust +
-         ascent-override + descent-override + line-gap-override）让系统
-         fallback 字体在度量上贴近目标字体，极少数需要用 fallback 渲染时
-         也不会有明显字号/行高落差。
-      3. 中文 LXGW WenKai 改为"按需使用"——不再作为全局中文字体（会在
-         首屏与 PingFang 切换产生强视觉落差）。
+      字体加载策略：
+      - display=swap：字体未到位时先用校准过的 fallback 渲染，字体到位后立即切换到
+        Web 字体（Lora / EB Garamond / DM Serif Display）。相比 optional，能确保
+        用户最终一定看到设计字体，不会因为网络慢 100ms 就整页退化到系统字体。
+      - 配合下方 size-adjust 校准的 "XXX Fallback" 字体，fallback → Web 字体
+        切换时几乎无字号/行高跳变，体验平滑。
     -->
 
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=optional"
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
     />
 
     <!--
