@@ -172,7 +172,7 @@ export default function FooterGuestbook() {
           </div>
 
           <p className="footer-guestbook__desc">
-            欢迎留下你想对我们说的话 ✨
+            欢迎留下你想对我们说的话
           </p>
 
           {submitted ? (
