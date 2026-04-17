@@ -53,6 +53,205 @@
   max-width: none;
 }
 
+/* 当存在目录时，内容区采用两栏布局：文章 + 右侧 TOC */
+.msd-content__inner--with-toc {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 240px;
+  gap: var(--space-xl, 24px);
+  max-width: 1240px;
+  margin: 0 auto;
+  align-items: start;
+}
+
+.msd-content__inner--with-toc .msd-article {
+  max-width: none;
+  margin: 0;
+}
+
+/* ============ 目录（TOC）侧栏 ============ */
+.msd-toc {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  overflow-y: auto;
+  padding: var(--space-md, 16px);
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+}
+
+.msd-toc__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.msd-toc__list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.msd-toc__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  padding: 6px 8px 6px 10px;
+  border: none;
+  background: transparent;
+  border-left: 2px solid transparent;
+  color: var(--color-text-light, #6b7280);
+  font-size: 13px;
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 0 var(--radius-sm, 4px) var(--radius-sm, 4px) 0;
+  transition: all 0.15s;
+}
+
+.msd-toc__item:hover {
+  color: var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.05);
+}
+
+.msd-toc__item--active {
+  color: var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.08);
+  border-left-color: var(--color-primary, #5B8C3E);
+  font-weight: 600;
+}
+
+.msd-toc__item--l1 { padding-left: 10px; font-weight: 600; }
+.msd-toc__item--l2 { padding-left: 22px; }
+.msd-toc__item--l3 { padding-left: 34px; font-size: 12.5px; }
+
+.msd-toc__dot {
+  display: none; /* 预留，当前不使用 */
+}
+
+.msd-toc__text {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* 滚动条美化 */
+.msd-toc::-webkit-scrollbar { width: 6px; }
+.msd-toc::-webkit-scrollbar-thumb {
+  background: var(--color-border, #d1d5db);
+  border-radius: 3px;
+}
+.msd-toc::-webkit-scrollbar-thumb:hover {
+  background: var(--color-text-muted, #9ca3af);
+}
+
+/* 给标题一点 scroll-margin，避免跳转后被顶栏遮挡 */
+.msd-article__content .msd-heading-anchor {
+  scroll-margin-top: 80px;
+}
+
+/* ============ 移动端：浮动按钮 + 抽屉 ============ */
+.msd-toc-fab {
+  display: none;
+  position: fixed;
+  right: 16px;
+  bottom: 24px;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 50%;
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(91, 140, 62, 0.35);
+  cursor: pointer;
+  z-index: 200;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.msd-toc-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(91, 140, 62, 0.45);
+}
+
+.msd-toc-drawer-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.32);
+  z-index: 300;
+  display: flex;
+  justify-content: flex-end;
+  animation: msd-fade-in 0.18s ease;
+}
+
+@keyframes msd-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.msd-toc-drawer {
+  width: min(84vw, 320px);
+  height: 100%;
+  background: var(--color-bg-card, #fff);
+  padding: var(--space-lg, 20px);
+  overflow-y: auto;
+  box-shadow: -4px 0 20px rgba(0, 0, 0, 0.12);
+  animation: msd-slide-in 0.22s ease;
+  font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+}
+
+@keyframes msd-slide-in {
+  from { transform: translateX(40px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+.msd-toc-drawer__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-sm, 8px);
+}
+
+.msd-toc-drawer__header .msd-toc__header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.msd-toc-drawer__close {
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted, #6b7280);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s;
+}
+
+.msd-toc-drawer__close:hover {
+  background: var(--color-bg, #f3f4f6);
+  color: var(--color-text, #1f2937);
+}
+
 /* Not found */
 .msd-not-found {
   text-align: center;
@@ -421,6 +620,20 @@
 }
 
 /* ============ Responsive ============ */
+@media (max-width: 1024px) {
+  /* TOC 侧栏退出两栏布局，改用浮动按钮 */
+  .msd-content__inner--with-toc {
+    display: block;
+    max-width: none;
+  }
+  .msd-toc {
+    display: none;
+  }
+  .msd-toc-fab {
+    display: flex;
+  }
+}
+
 @media (max-width: 768px) {
   .msd-topbar {
     padding: 0.75rem 1rem;

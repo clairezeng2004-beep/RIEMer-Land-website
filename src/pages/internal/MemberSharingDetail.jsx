@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { marked } from 'marked';
@@ -17,6 +17,8 @@ import {
   Image,
   FileSpreadsheet,
   FileArchive,
+  List,
+  X,
 } from 'lucide-react';
 import './MemberSharingDetail.css';
 
@@ -177,6 +179,82 @@ export default function MemberSharingDetail() {
     return post.content;
   }, [post]);
 
+  // ========== 目录导航（TOC） ==========
+  const [toc, setToc] = useState([]);           // [{ id, text, level }]
+  const [activeTocId, setActiveTocId] = useState('');
+  const [tocOpenMobile, setTocOpenMobile] = useState(false);
+
+  // 内容渲染完毕后提取标题，并给每个标题打 id
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const root = contentRef.current;
+    const headings = root.querySelectorAll('h1, h2, h3');
+    const items = [];
+    const slugCount = {};
+    headings.forEach((el, idx) => {
+      const raw = (el.textContent || '').trim();
+      if (!raw) return;
+      // 生成稳定的 id
+      let slug = raw
+        .toLowerCase()
+        .replace(/[\s\u3000]+/g, '-')
+        .replace(/[^\w\u4e00-\u9fa5-]/g, '')
+        .slice(0, 50) || `heading-${idx}`;
+      if (slugCount[slug]) {
+        slugCount[slug] += 1;
+        slug = `${slug}-${slugCount[slug]}`;
+      } else {
+        slugCount[slug] = 1;
+      }
+      el.id = slug;
+      el.classList.add('msd-heading-anchor');
+      items.push({
+        id: slug,
+        text: raw,
+        level: Number(el.tagName.substring(1)), // 1/2/3
+      });
+    });
+    setToc(items);
+    setActiveTocId(items[0]?.id || '');
+  }, [renderedContent]);
+
+  // 滚动时高亮当前章节
+  useEffect(() => {
+    if (!toc.length || !contentRef.current) return;
+    const headings = toc
+      .map((t) => document.getElementById(t.id))
+      .filter(Boolean);
+    if (!headings.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // 所有交叉中的标题，取最接近顶部的那个
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top);
+        if (visible[0]) {
+          setActiveTocId(visible[0].target.id);
+        }
+      },
+      {
+        rootMargin: '-80px 0px -70% 0px',
+        threshold: 0,
+      },
+    );
+    headings.forEach((h) => observer.observe(h));
+    return () => observer.disconnect();
+  }, [toc]);
+
+  const handleTocClick = useCallback((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const offset = 80; // 顶栏高度预留
+    const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+    window.scrollTo({ top, behavior: 'smooth' });
+    setActiveTocId(id);
+    setTocOpenMobile(false);
+  }, []);
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (!post) {
@@ -221,6 +299,8 @@ export default function MemberSharingDetail() {
   const hasLiked = post.likes?.some((l) => l.userId === user?.id);
   const views = loadViews();
 
+  const showToc = toc.length > 0 && (post.format === 'markdown' || post.format === 'word');
+
   return (
     <div className="msd-page">
       {/* 顶部导航栏 — 类似 MemberSharingCreate */}
@@ -232,7 +312,7 @@ export default function MemberSharingDetail() {
 
       {/* 全屏内容区域 */}
       <div className="msd-content">
-        <div className="msd-content__inner">
+        <div className={`msd-content__inner ${showToc ? 'msd-content__inner--with-toc' : ''}`}>
           {/* 文章主体 */}
           <article className="msd-article">
             {/* 文章头部 */}
@@ -327,8 +407,86 @@ export default function MemberSharingDetail() {
               )}
             </footer>
           </article>
+
+          {/* 目录导航（桌面端右侧 sticky） */}
+          {showToc && (
+            <aside className="msd-toc" aria-label="文章目录">
+              <div className="msd-toc__header">
+                <List size={14} />
+                <span>目录</span>
+              </div>
+              <nav className="msd-toc__list">
+                {toc.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`msd-toc__item msd-toc__item--l${item.level} ${activeTocId === item.id ? 'msd-toc__item--active' : ''}`}
+                    onClick={() => handleTocClick(item.id)}
+                    title={item.text}
+                  >
+                    <span className="msd-toc__dot" />
+                    <span className="msd-toc__text">{item.text}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          )}
         </div>
       </div>
+
+      {/* 移动端：浮动目录按钮 + 抽屉 */}
+      {showToc && (
+        <>
+          <button
+            type="button"
+            className="msd-toc-fab"
+            onClick={() => setTocOpenMobile(true)}
+            aria-label="打开目录"
+          >
+            <List size={18} />
+          </button>
+          {tocOpenMobile && (
+            <div
+              className="msd-toc-drawer-mask"
+              onClick={() => setTocOpenMobile(false)}
+            >
+              <div
+                className="msd-toc-drawer"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="msd-toc-drawer__header">
+                  <div className="msd-toc__header">
+                    <List size={14} />
+                    <span>目录</span>
+                  </div>
+                  <button
+                    type="button"
+                    className="msd-toc-drawer__close"
+                    onClick={() => setTocOpenMobile(false)}
+                    aria-label="关闭目录"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+                <nav className="msd-toc__list">
+                  {toc.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className={`msd-toc__item msd-toc__item--l${item.level} ${activeTocId === item.id ? 'msd-toc__item--active' : ''}`}
+                      onClick={() => handleTocClick(item.id)}
+                      title={item.text}
+                    >
+                      <span className="msd-toc__dot" />
+                      <span className="msd-toc__text">{item.text}</span>
+                    </button>
+                  ))}
+                </nav>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
