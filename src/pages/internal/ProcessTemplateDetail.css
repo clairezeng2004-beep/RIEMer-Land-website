@@ -284,6 +284,26 @@
   box-shadow: var(--shadow-md);
 }
 
+/* ============ 文章详情页统一字体 ============ 
+   采用系统无衬线 + LXGW WenKai 中文楷体回退，与整站内部页面基调保持一致，
+   避免 DM Serif Display 未加载时出现 Times 这类不协调的浏览器默认衬线字体。
+*/
+.ptd-article,
+.ptd-article__title,
+.ptd-article__desc,
+.ptd-article__content,
+.ptd-article__content h1,
+.ptd-article__content h2,
+.ptd-article__content h3,
+.ptd-article__content h4,
+.ptd-article__content h5,
+.ptd-article__content h6,
+.ptd-article__content p,
+.ptd-article__content li,
+.ptd-article__content blockquote {
+  font-family: 'Lora', 'LXGW WenKai', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
 /* Article Header */
 .ptd-article__header {
   padding: var(--space-2xl) var(--space-2xl) var(--space-lg);
