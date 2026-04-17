@@ -474,32 +474,90 @@
 
 .msc-md-split__preview {
   flex: 1;
-  padding: 1rem;
+  padding: 1rem 1.25rem;
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--radius-md, 8px);
   font-size: var(--text-sm, 14px);
+  font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   color: var(--color-text, #1f2937);
   background: var(--color-surface, #fafafa);
   overflow-y: auto;
   min-height: 360px;
-  line-height: 1.8;
+  line-height: 1.75;
+  word-wrap: break-word;
 }
 
-/* 预览区域排版 */
-.msc-md-split__preview h1 { font-size: 1.6em; margin: 0.6em 0 0.3em; font-weight: 700; }
-.msc-md-split__preview h2 { font-size: 1.35em; margin: 0.5em 0 0.3em; font-weight: 600; }
-.msc-md-split__preview h3 { font-size: 1.15em; margin: 0.4em 0 0.2em; font-weight: 600; }
-.msc-md-split__preview h4 { font-size: 1.05em; margin: 0.4em 0 0.2em; font-weight: 500; }
+/* 预览区域排版 —— 标题强制使用站内正文字体，呈现清晰的层级 */
+.msc-md-split__preview h1,
+.msc-md-split__preview h2,
+.msc-md-split__preview h3,
+.msc-md-split__preview h4,
+.msc-md-split__preview h5,
+.msc-md-split__preview h6 {
+  font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+  color: var(--color-text, #1f2937);
+  line-height: 1.35;
+}
 
-.msc-md-split__preview p { margin: 0.5em 0; }
+.msc-md-split__preview h1 {
+  font-size: 1.5em;
+  font-weight: 700;
+  margin: 1.2em 0 0.5em;
+  padding-bottom: 0.35em;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+.msc-md-split__preview h2 {
+  font-size: 1.28em;
+  font-weight: 700;
+  margin: 1.1em 0 0.45em;
+  padding-bottom: 0.3em;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+.msc-md-split__preview h3 {
+  font-size: 1.12em;
+  font-weight: 600;
+  margin: 1em 0 0.4em;
+}
+.msc-md-split__preview h4 {
+  font-size: 1.02em;
+  font-weight: 600;
+  margin: 0.9em 0 0.35em;
+}
+.msc-md-split__preview h5,
+.msc-md-split__preview h6 {
+  font-size: 0.95em;
+  font-weight: 600;
+  margin: 0.8em 0 0.3em;
+  color: var(--color-text-light, #6b7280);
+}
+
+.msc-md-split__preview > :first-child { margin-top: 0; }
+.msc-md-split__preview > :last-child { margin-bottom: 0; }
+
+.msc-md-split__preview p { margin: 0.6em 0; }
+
+.msc-md-split__preview strong { font-weight: 700; color: var(--color-text, #1f2937); }
+.msc-md-split__preview em { font-style: italic; }
+.msc-md-split__preview del { color: var(--color-text-light, #9ca3af); }
 
 .msc-md-split__preview ul,
 .msc-md-split__preview ol {
-  margin: 0.5em 0;
-  padding-left: 1.5em;
+  margin: 0.6em 0;
+  padding-left: 1.6em;
 }
 
-.msc-md-split__preview li { margin: 0.25em 0; }
+.msc-md-split__preview ul { list-style: disc; }
+.msc-md-split__preview ol { list-style: decimal; }
+.msc-md-split__preview ul ul { list-style: circle; }
+.msc-md-split__preview ul ul ul { list-style: square; }
+
+.msc-md-split__preview li {
+  margin: 0.25em 0;
+}
+
+.msc-md-split__preview li::marker {
+  color: var(--color-primary, #5B8C3E);
+}
 
 .msc-md-split__preview blockquote {
   margin: 0.6em 0;
