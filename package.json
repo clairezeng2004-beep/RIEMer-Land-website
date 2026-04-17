@@ -5,8 +5,10 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "prebuild": "npm run lint:critical",
     "build": "vite build",
     "lint": "eslint .",
+    "lint:critical": "eslint --config eslint.critical.config.js \"src/**/*.{js,jsx}\"",
     "preview": "vite preview"
   },
   "dependencies": {

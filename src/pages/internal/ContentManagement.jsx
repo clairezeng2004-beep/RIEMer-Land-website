@@ -45,7 +45,7 @@ import {
 import './ContentManagement.css';
 
 export default function ContentManagement() {
-  const { isAuthenticated, isAdmin, getAllUsers, supabaseOk } = useAuth();
+  const { isAuthenticated, isAdmin, user, getAllUsers, supabaseOk } = useAuth();
   const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline, syncTeamMembersFromDB } = useSiteContent();
   const { addNotification } = useNotifications();
 

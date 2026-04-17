@@ -81,6 +81,7 @@ function inferFileType(fileName) {
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user } = useAuth();
+  const { addNotification } = useNotifications();
   const { internalConfig, updateInternalConfig, filterOptions, updateFilterOptions } = useSiteContent();
   const { editing } = useWysiwyg();
   const sectionKey = configSection || 'documents';

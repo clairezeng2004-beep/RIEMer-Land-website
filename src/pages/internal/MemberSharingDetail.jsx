@@ -161,7 +161,7 @@ export default function MemberSharingDetail() {
     const views = loadViews();
     views[post.id] = (views[post.id] || 0) + 1;
     saveViews(views);
-  }, [post?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [post?.id]);
 
   // 配置 marked
   const renderedContent = useMemo(() => {
