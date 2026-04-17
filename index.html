@@ -16,30 +16,66 @@
     <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
 
     <!--
-      字体加载策略（避免手机端首次访问"文字跳变"的割裂感）：
-      1. 英文字体使用 display=optional：浏览器只等 ~100ms；超时本次直接用 fallback
-         渲染，不再中途切换，下次访问（命中缓存）自然生效最终字体。
-      2. 英文字重精简，只加载实际用到的 400/500/600/700。
-      3. 中文 LXGW WenKai 文件较大，在慢网络下最易产生"跳字"感。
-         用 preload+onload 异步加载，不阻塞首屏；未到位时 fallback 到系统中文字体
-         （PingFang SC / Noto Sans SC / 微软雅黑）—— 这些字体在移动端原生存在，
-         用户首帧看到的就是美观、干净的中文，而不是衬线宋体。
+      字体加载策略（消除初次渲染与字体到位后的"跳字/落差"感）：
+
+      1. 英文字体使用 display=swap：不再像 optional 那样"超时后永远放弃"，
+         而是让浏览器立即用 fallback 渲染，字体一到位就升级。
+      2. 通过 <style> 里的 @font-face "adjusted fallback"（size-adjust +
+         ascent-override + descent-override + line-gap-override）让系统
+         fallback 字体（SF Pro / Segoe UI / PingFang SC）在度量上贴近
+         Lora / EB Garamond / DM Serif Display，这样升级瞬间几乎无位移、
+         无行高跳变，肉眼几乎感知不到切换。
+      3. 中文 LXGW WenKai 改为"按需使用"——不再作为全局中文字体（会在
+         首屏与 PingFang 切换产生强视觉落差），只在明确指定的位置使用。
     -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=optional"
+      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
     />
 
-    <!-- LXGW WenKai 异步加载：不阻塞首屏，到位后平滑升级 -->
-    <link
-      rel="preload"
-      as="style"
-      href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css"
-      onload="this.onload=null;this.rel='stylesheet'"
-    />
-    <noscript>
-      <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css" />
-    </noscript>
+    <!--
+      Adjusted fallback @font-face：
+      在 Web 字体到位前，body 用 "Lora Fallback" 渲染，它实际是系统字体
+      但经过 size-adjust 等参数"校准"到与 Lora 相似的视觉尺寸。
+      这样 Lora 一旦到位，字号、基线、行高几乎不变，切换无感。
+
+      度量数据参考 Google Fonts 提供的 fallback matching（
+      https://fonts.google.com/knowledge/using_type/adjusting_fallback_fonts）
+    -->
+    <style>
+      /* Lora（正文） —— fallback 用系统衬线 */
+      @font-face {
+        font-family: 'Lora Fallback';
+        src: local('Georgia'), local('Times New Roman'), local('Times');
+        size-adjust: 106%;
+        ascent-override: 92%;
+        descent-override: 24%;
+        line-gap-override: 0%;
+      }
+      /* EB Garamond（品牌） —— fallback 用系统衬线 */
+      @font-face {
+        font-family: 'EB Garamond Fallback';
+        src: local('Georgia'), local('Times New Roman'), local('Times');
+        size-adjust: 98%;
+        ascent-override: 100%;
+        descent-override: 28%;
+        line-gap-override: 0%;
+      }
+      /* DM Serif Display（大标题） —— fallback 用系统衬线 */
+      @font-face {
+        font-family: 'DM Serif Display Fallback';
+        src: local('Georgia'), local('Times New Roman'), local('Times');
+        size-adjust: 108%;
+        ascent-override: 96%;
+        descent-override: 28%;
+        line-gap-override: 0%;
+      }
+    </style>
+
+    <!--
+      LXGW WenKai 不再默认加载为全局中文字体（会产生强烈的"楷体切换"视觉落差）。
+      如需在特定标题/引用处使用，请在对应 CSS 里按需引入。
+    -->
 
     <!-- Google Analytics (GA4) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>

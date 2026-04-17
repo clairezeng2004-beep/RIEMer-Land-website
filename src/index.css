@@ -35,12 +35,16 @@
   --color-warning: #F39C12;
 
   /* Typography
-     fallback 链中加入系统中文字体（PingFang SC / Noto Sans SC / Microsoft YaHei）。
-     网络字体（LXGW WenKai）异步加载过程中，中文即用系统字体兜底，避免"跳字"感。
+     每条字体栈结构：
+       [Web 字体] → [Adjusted Fallback（size-adjust 校准过的系统衬线）] →
+       [系统中文字体（PingFang / Microsoft YaHei）] → [serif/sans-serif]
+
+     这样 Web 字体到位前后几乎零位移、零行高跳变，消除"落差感/割裂感"。
+     注意：中文已不再使用 LXGW WenKai 作为默认字体（避免楷体-无衬线切换）。
   */
-  --font-display: 'DM Serif Display', 'LXGW WenKai', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', serif;
-  --font-brand: 'EB Garamond', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', serif;
-  --font-body: 'Lora', 'LXGW WenKai', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', serif;
+  --font-display: 'DM Serif Display', 'DM Serif Display Fallback', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', serif;
+  --font-brand: 'EB Garamond', 'EB Garamond Fallback', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', serif;
+  --font-body: 'Lora', 'Lora Fallback', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', serif;
 
   /* Font Size Scale — 统一字号体系 */
   --text-xs: 0.75rem;      /* 12px — 徽章、极小标签 */
