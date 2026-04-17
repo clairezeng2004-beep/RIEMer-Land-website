@@ -17,16 +17,21 @@
 
     <!--
       字体加载策略：
-      - display=swap：字体未到位时先用校准过的 fallback 渲染，字体到位后立即切换到
-        Web 字体（Lora / EB Garamond / DM Serif Display）。相比 optional，能确保
-        用户最终一定看到设计字体，不会因为网络慢 100ms 就整页退化到系统字体。
-      - 配合下方 size-adjust 校准的 "XXX Fallback" 字体，fallback → Web 字体
-        切换时几乎无字号/行高跳变，体验平滑。
+      - 英文衬线：Lora（正文）/ EB Garamond（品牌）/ DM Serif Display（大标题）
+      - 中文楷体：LXGW WenKai 霞鹜文楷（项目原始视觉标识，保留手写衬线感）
+      - display=swap：字体未到位时先用 fallback 渲染，到位后立即切换
+      - 配合下方 size-adjust 校准 "XXX Fallback"，切换几乎无字号/行高跳变
     -->
 
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
+    />
+
+    <!-- LXGW WenKai 霞鹜文楷（全局中文字体，项目原始视觉） -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css"
     />
 
     <!--
