@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
@@ -79,6 +79,26 @@ function inferFileType(fileName) {
   return 'pdf';
 }
 
+// ============ localStorage 持久化 ============
+// 用户通过独立发布页上传的文档（内容+附件）
+const DOCUMENTS_KEY = 'riemer_documents';
+
+function loadUserDocs() {
+  try {
+    const stored = localStorage.getItem(DOCUMENTS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveUserDocs(data) {
+  try {
+    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('localStorage 保存失败', err);
+  }
+}
+
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { addNotification } = useNotifications();
@@ -146,9 +166,54 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     });
     if (selectedType === typeKey) setSelectedType('全部');
   };
-  const [documents, setDocuments] = useState(() =>
-    filterTypes ? documentsData.filter((d) => filterTypes.includes(d.type)) : documentsData
-  );
+  const [documents, setDocuments] = useState(() => {
+    const userDocs = loadUserDocs();
+    const base = filterTypes
+      ? [...documentsData, ...userDocs].filter((d) => filterTypes.includes(d.type))
+      : [...userDocs, ...documentsData];
+    // 用户发布的在前
+    return base.sort((a, b) => {
+      const aIsUser = String(a.id).startsWith('doc-');
+      const bIsUser = String(b.id).startsWith('doc-');
+      if (aIsUser && !bIsUser) return -1;
+      if (!aIsUser && bIsUser) return 1;
+      return 0;
+    });
+  });
+
+  // 刷新函数：重新合并 localStorage 里的数据（被新窗口发布时调用）
+  const refreshDocs = useCallback(() => {
+    const userDocs = loadUserDocs();
+    const base = filterTypes
+      ? [...documentsData, ...userDocs].filter((d) => filterTypes.includes(d.type))
+      : [...userDocs, ...documentsData];
+    setDocuments(
+      base.sort((a, b) => {
+        const aIsUser = String(a.id).startsWith('doc-');
+        const bIsUser = String(b.id).startsWith('doc-');
+        if (aIsUser && !bIsUser) return -1;
+        if (!aIsUser && bIsUser) return 1;
+        return 0;
+      })
+    );
+  }, [filterTypes]);
+
+  // 监听独立发布页（新窗口）发来的刷新消息
+  useEffect(() => {
+    const handler = (event) => {
+      if (event?.data?.type === 'process-template-created') {
+        refreshDocs();
+      }
+    };
+    window.addEventListener('message', handler);
+    // 兜底：窗口 focus 时也刷新一次（用户手动切回来时）
+    const onFocus = () => refreshDocs();
+    window.addEventListener('focus', onFocus);
+    return () => {
+      window.removeEventListener('message', handler);
+      window.removeEventListener('focus', onFocus);
+    };
+  }, [refreshDocs]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
@@ -245,6 +310,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleDelete = (id) => {
     if (window.confirm('确定要删除这个文档吗？')) {
       setDocuments(documents.filter((d) => d.id !== id));
+      // 同步从 localStorage 移除（若是用户发布的文档）
+      if (String(id).startsWith('doc-')) {
+        const userDocs = loadUserDocs().filter((d) => d.id !== id);
+        saveUserDocs(userDocs);
+      }
     }
   };
 
@@ -342,22 +412,40 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
               as="span"
             /></p>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => setShowUpload(!showUpload)}
-          >
-            {showUpload ? <X size={18} /> : <Plus size={18} />}
-            {showUpload ? '取消' : <EditableText
-              value={dc.uploadBtn}
-              onChange={(v) => updateDocs('uploadBtn', v)}
-              configKey="documents.uploadBtn"
-              as="span"
-            />}
-          </button>
+          {configSection === 'processTemplates' ? (
+            // 流程模板：新窗口打开独立发布页（支持 Markdown/Word/附件）
+            <a
+              href="/internal/process-templates/create"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="btn btn-primary"
+            >
+              <Plus size={18} />
+              <EditableText
+                value={dc.uploadBtn}
+                onChange={(v) => updateDocs('uploadBtn', v)}
+                configKey="documents.uploadBtn"
+                as="span"
+              />
+            </a>
+          ) : (
+            <button
+              className="btn btn-primary"
+              onClick={() => setShowUpload(!showUpload)}
+            >
+              {showUpload ? <X size={18} /> : <Plus size={18} />}
+              {showUpload ? '取消' : <EditableText
+                value={dc.uploadBtn}
+                onChange={(v) => updateDocs('uploadBtn', v)}
+                configKey="documents.uploadBtn"
+                as="span"
+              />}
+            </button>
+          )}
         </div>
 
-        {/* Upload Form */}
-        {showUpload && (
+        {/* Upload Form — 仅在行内上传模式下显示 */}
+        {showUpload && configSection !== 'processTemplates' && (
           <div className="documents-upload card">
             <h3>
               <Upload size={18} /> 上传新文档

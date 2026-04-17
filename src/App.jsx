@@ -15,6 +15,7 @@ import ResetPassword from './pages/internal/ResetPassword';
 import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
 import ProcessTemplates from './pages/internal/ProcessTemplates';
+import ProcessTemplateCreate from './pages/internal/ProcessTemplateCreate';
 import MemberSharing from './pages/internal/MemberSharing';
 import MemberSharingCreate from './pages/internal/MemberSharingCreate';
 import MemberSharingDetail from './pages/internal/MemberSharingDetail';
@@ -33,7 +34,11 @@ import Guestbook from './pages/internal/Guestbook';
 import NotificationManagement from './pages/internal/NotificationManagement';
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
-const FULLSCREEN_PATHS = ['/internal/member-sharing/create', '/internal/member-sharing/view/'];
+const FULLSCREEN_PATHS = [
+  '/internal/member-sharing/create',
+  '/internal/member-sharing/view/',
+  '/internal/process-templates/create',
+];
 
 function AppShell() {
   const { pathname } = useLocation();
@@ -59,6 +64,7 @@ function AppShell() {
           {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
           <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
           <Route path="/internal/member-sharing/view/:id" element={<MemberSharingDetail />} />
+          <Route path="/internal/process-templates/create" element={<ProcessTemplateCreate />} />
 
           {/* Internal Routes (Protected) — 带侧边栏布局 */}
           <Route path="/internal" element={<InternalLayout />}>
