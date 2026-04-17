@@ -728,7 +728,7 @@ export function AuthProvider({ children }) {
         try {
           const profileRes = await Promise.race([
             supabase.from('profiles').select('*').eq('id', data.user.id).single(),
-            new Promise((_, reject) => setTimeout(() => reject(new Error('profile 查询超时 (3s)')), 3000)),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('profile 查询超时 (6s)')), 6000)),
           ]);
           profile = profileRes.data;
           profileError = profileRes.error;
