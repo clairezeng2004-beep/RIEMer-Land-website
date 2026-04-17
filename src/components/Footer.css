@@ -24,7 +24,11 @@
   }
 
   .footer--internal .footer__grid > .footer__nav,
+  .footer--internal .footer__grid > .footer__nav:nth-child(1),
+  .footer--internal .footer__grid > .footer__nav:nth-child(2),
+  .footer--internal .footer__grid > .footer__nav--contact,
   .footer--internal .footer__grid > .footer__qrcode {
+    grid-area: auto;
     grid-row: auto;
     grid-column: auto;
     grid-template-rows: none;
@@ -74,11 +78,15 @@
   }
 }
 
-/* 指派各区块到对应的行列位置 */
-.footer__grid > .footer__nav:nth-child(1) { grid-area: nav; }
-.footer__grid > .footer__nav:nth-child(2) { grid-area: about; }
-.footer__grid > .footer__nav--contact    { grid-area: contact; }
-.footer__grid > .footer__qrcode          { grid-area: qrcode; }
+/* 指派各区块到对应的行列位置
+   仅在桌面端 / 中等宽度（≥769px）生效；手机端为单列堆叠，
+   不使用 named area，避免 area 失效时所有子项被塞进同一格导致重叠。 */
+@media (min-width: 769px) {
+  .footer__grid > .footer__nav:nth-child(1) { grid-area: nav; }
+  .footer__grid > .footer__nav:nth-child(2) { grid-area: about; }
+  .footer__grid > .footer__nav--contact    { grid-area: contact; }
+  .footer__grid > .footer__qrcode          { grid-area: qrcode; }
+}
 
 /* 每列独立管理内部布局，不使用 subgrid，避免二维码撑高其他列 */
 .footer__nav,
