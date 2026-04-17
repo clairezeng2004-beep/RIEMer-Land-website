@@ -320,3 +320,19 @@ CREATE POLICY "管理员可删除文章"
     (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
     OR archived_by_id = auth.uid()
   );
+
+-- ========== 修复 12：为 articles 表添加 read_num 列（公众号阅读量） ==========
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'articles'
+      AND column_name = 'read_num'
+  ) THEN
+    ALTER TABLE public.articles ADD COLUMN read_num INTEGER NOT NULL DEFAULT 0;
+    RAISE NOTICE '✅ 已添加 articles.read_num 列';
+  ELSE
+    RAISE NOTICE 'ℹ️  articles.read_num 列已存在，跳过';
+  END IF;
+END $$;

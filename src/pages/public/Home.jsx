@@ -72,13 +72,37 @@ export default function Home() {
     return null;
   };
 
-  // 动态计算统计数据：活动讲座 = events 总数，文章分享 = 所有文章总数
+  // 动态计算统计数据：
+  // - 活动讲座 = events 总数
+  // - 文章分享 = 所有文章总数
+  // - 公众号累计阅读 = 所有文章 readNum 求和（>=1000 时显示 "X.XK+"）
+  const totalReadNum = allArticles.reduce(
+    (sum, a) => sum + (Number(a.readNum) || 0),
+    0,
+  );
+  const formatReadNum = (n) => {
+    if (!n || n <= 0) return '0';
+    if (n >= 10000) {
+      // 1.2w+ 形式，保留一位小数（但若为整数则去小数）
+      const v = n / 10000;
+      return `${v >= 10 ? Math.floor(v) : v.toFixed(1).replace(/\.0$/, '')}w+`;
+    }
+    if (n >= 1000) {
+      const v = n / 1000;
+      return `${v.toFixed(1).replace(/\.0$/, '')}k+`;
+    }
+    return `${n}`;
+  };
+
   const dynamicStats = content.stats.map((stat) => {
     if (stat.label === '活动讲座') {
       return { ...stat, value: `${events.length}` };
     }
     if (stat.label === '文章分享') {
       return { ...stat, value: `${allArticles.length}` };
+    }
+    if (stat.label === '公众号累计阅读') {
+      return { ...stat, value: formatReadNum(totalReadNum) };
     }
     return stat;
   });

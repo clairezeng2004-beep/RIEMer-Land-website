@@ -325,37 +325,84 @@ export default function ContentManagement() {
                 <h3 className="content-mgmt__section-title">数据统计</h3>
                 <p className="content-mgmt__section-desc">首页展示的统计数字</p>
 
-                {form.stats.map((stat, i) => (
-                  <div key={i} className="content-mgmt__inline-group">
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>标签</label>
-                      <input
-                        type="text"
-                        value={stat.label}
-                        onChange={(e) => updateStat(i, 'label', e.target.value)}
-                        className="content-mgmt__input"
-                        placeholder="如：活跃成员"
-                      />
+                {form.stats.map((stat, i) => {
+                  // 自动计算类：标签锁定，数值由系统根据真实数据计算，不允许手动编辑
+                  const AUTO_LABELS = ['公众号累计阅读', '活动讲座', '文章分享'];
+                  const isAuto = AUTO_LABELS.includes(stat.label);
+                  const autoHint = {
+                    公众号累计阅读: '该项由所有归档文章的阅读量自动求和，请在「归档 · 管理阅读量」中录入。',
+                    活动讲座: '该项自动统计为当前活动总数。',
+                    文章分享: '该项自动统计为所有归档文章数。',
+                  }[stat.label];
+
+                  return (
+                    <div key={i} className="content-mgmt__inline-group">
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>
+                          标签
+                          {isAuto && (
+                            <span
+                              className="content-mgmt__badge"
+                              style={{
+                                marginLeft: 6,
+                                padding: '1px 6px',
+                                fontSize: 11,
+                                borderRadius: 4,
+                                background: 'rgba(94, 173, 140, 0.15)',
+                                color: '#3a7a5e',
+                              }}
+                            >
+                              自动
+                            </span>
+                          )}
+                        </label>
+                        <input
+                          type="text"
+                          value={stat.label}
+                          onChange={(e) => updateStat(i, 'label', e.target.value)}
+                          className="content-mgmt__input"
+                          placeholder="如：活跃成员"
+                          disabled={isAuto}
+                          title={isAuto ? '自动计算项，标签已锁定' : undefined}
+                        />
+                      </div>
+                      <div className="content-mgmt__field content-mgmt__field--flex">
+                        <label>数值</label>
+                        <input
+                          type="text"
+                          value={stat.value}
+                          onChange={(e) => updateStat(i, 'value', e.target.value)}
+                          className="content-mgmt__input"
+                          placeholder="如：120+"
+                          disabled={isAuto}
+                          title={isAuto ? autoHint : undefined}
+                        />
+                        {isAuto && (
+                          <small
+                            style={{
+                              display: 'block',
+                              marginTop: 4,
+                              fontSize: 11,
+                              color: '#888',
+                              lineHeight: 1.5,
+                            }}
+                          >
+                            {autoHint}
+                          </small>
+                        )}
+                      </div>
+                      <button
+                        className="content-mgmt__remove-btn"
+                        onClick={() => removeStat(i)}
+                        title={isAuto ? '自动计算项，不可删除' : '删除'}
+                        disabled={isAuto}
+                        style={isAuto ? { opacity: 0.3, cursor: 'not-allowed' } : undefined}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
-                    <div className="content-mgmt__field content-mgmt__field--flex">
-                      <label>数值</label>
-                      <input
-                        type="text"
-                        value={stat.value}
-                        onChange={(e) => updateStat(i, 'value', e.target.value)}
-                        className="content-mgmt__input"
-                        placeholder="如：120+"
-                      />
-                    </div>
-                    <button
-                      className="content-mgmt__remove-btn"
-                      onClick={() => removeStat(i)}
-                      title="删除"
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                ))}
+                  );
+                })}
 
                 <button className="content-mgmt__add-btn" onClick={addStat}>
                   <Plus size={16} /> 添加统计项

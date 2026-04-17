@@ -381,6 +381,7 @@ CREATE TABLE IF NOT EXISTS articles (
   cover_image TEXT DEFAULT NULL,
   archived_by TEXT DEFAULT '未知',
   archived_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  read_num INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

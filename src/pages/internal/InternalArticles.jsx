@@ -16,7 +16,7 @@ import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
   Plus, Link2, Loader2, X, Check, Tag, AlertCircle,
   ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
-  CheckSquare, Sparkles,
+  CheckSquare, Sparkles, Eye,
 } from 'lucide-react';
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
@@ -61,7 +61,7 @@ function buildCategoryMaps(cats) {
 
 export default function InternalArticles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const { userArticles, addArticle, internalConfig, updateInternalConfig } = useSiteContent();
+  const { userArticles, addArticle, updateArticle, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const navigate = useNavigate();
   const ia = internalConfig.internalArticles || {};
@@ -106,6 +106,13 @@ export default function InternalArticles() {
   const tagSuggestionsRef = useRef(null);
   // 跨模块联动提示
   const [taskPrompt, setTaskPrompt] = useState(null);
+
+  // ---- 批量阅读量录入弹窗 ----
+  const [showReadNumModal, setShowReadNumModal] = useState(false);
+  // { [articleId]: string }  保存用户输入的字符串，方便校验
+  const [readNumDraft, setReadNumDraft] = useState({});
+  const [readNumSaving, setReadNumSaving] = useState(false);
+  const [readNumSaved, setReadNumSaved] = useState(false);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -331,6 +338,65 @@ export default function InternalArticles() {
     setTaskPrompt({ articleTitle });
   };
 
+  // ---- 批量录入阅读量 ----
+  const openReadNumModal = () => {
+    // 以"按日期倒序"为默认展示顺序，方便最新文章优先填写
+    const draft = {};
+    allArticles.forEach((a) => {
+      draft[a.id] = a.readNum != null ? String(a.readNum) : '';
+    });
+    setReadNumDraft(draft);
+    setReadNumSaved(false);
+    setShowReadNumModal(true);
+  };
+
+  const closeReadNumModal = () => {
+    if (readNumSaving) return;
+    setShowReadNumModal(false);
+    setReadNumDraft({});
+    setReadNumSaved(false);
+  };
+
+  const handleReadNumChange = (id, val) => {
+    // 仅保留数字
+    const cleaned = val.replace(/[^0-9]/g, '');
+    setReadNumDraft((prev) => ({ ...prev, [id]: cleaned }));
+  };
+
+  const handleSaveReadNums = async () => {
+    setReadNumSaving(true);
+    try {
+      // 仅更新实际发生变化的条目
+      const changes = [];
+      allArticles.forEach((a) => {
+        const next = Number(readNumDraft[a.id] ?? 0) || 0;
+        const prev = Number(a.readNum ?? 0) || 0;
+        if (next !== prev) {
+          changes.push({ id: a.id, readNum: next });
+        }
+      });
+      await Promise.all(
+        changes.map((c) => updateArticle(c.id, { readNum: c.readNum })),
+      );
+      setReadNumSaved(true);
+      // 延迟关闭，给用户短暂反馈
+      setTimeout(() => {
+        setShowReadNumModal(false);
+        setReadNumSaved(false);
+      }, 800);
+    } finally {
+      setReadNumSaving(false);
+    }
+  };
+
+  // 总阅读量（用于弹窗顶部汇总展示）
+  const totalReadNum = useMemo(() => {
+    return Object.values(readNumDraft).reduce(
+      (sum, v) => sum + (Number(v) || 0),
+      0,
+    );
+  }, [readNumDraft]);
+
   return (
     <div className="ia-list-page">
       <div className="container">
@@ -341,9 +407,20 @@ export default function InternalArticles() {
             </h1>
             <EditableText as="p" value={ia.pageDesc || '浏览公众号历史推送内容，回顾与归档'} configKey="internalArticles.pageDesc" onChange={v => updateIA('pageDesc', v)} />
           </div>
-          <button className="btn btn-primary" onClick={openModal}>
-            <Plus size={16} /> 新建归档
-          </button>
+          <div className="ia-list__header-actions">
+            {isAdmin && (
+              <button
+                className="btn btn-ghost"
+                onClick={openReadNumModal}
+                title="批量录入/更新公众号阅读量"
+              >
+                <Eye size={16} /> 管理阅读量
+              </button>
+            )}
+            <button className="btn btn-primary" onClick={openModal}>
+              <Plus size={16} /> 新建归档
+            </button>
+          </div>
         </div>
 
         {/* 筛选 */}
@@ -771,6 +848,111 @@ export default function InternalArticles() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========== 批量录入阅读量弹窗 ========== */}
+      {showReadNumModal && (
+        <div className="ia-modal-overlay" onClick={closeReadNumModal}>
+          <div
+            className="ia-modal ia-modal--readnum"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ia-modal__header">
+              <h2>
+                <Eye size={20} /> 公众号阅读量管理
+              </h2>
+              <button
+                className="ia-modal__close"
+                onClick={closeReadNumModal}
+                disabled={readNumSaving}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ia-modal__body">
+              <p className="ia-modal__hint">
+                录入各篇公众号推送的阅读量。首页"公众号累计阅读"将自动基于所有文章的阅读量求和。
+              </p>
+
+              <div className="ia-readnum-summary">
+                <span className="ia-readnum-summary__label">当前累计：</span>
+                <span className="ia-readnum-summary__value">
+                  {totalReadNum.toLocaleString()}
+                </span>
+                <span className="ia-readnum-summary__sub">
+                  （共 {allArticles.length} 篇）
+                </span>
+              </div>
+
+              <div className="ia-readnum-list">
+                {allArticles.length === 0 ? (
+                  <div className="ia-readnum-empty">
+                    <FileText size={32} />
+                    <p>暂无归档文章</p>
+                  </div>
+                ) : (
+                  allArticles.map((a) => (
+                    <div key={a.id} className="ia-readnum-item">
+                      <div className="ia-readnum-item__info">
+                        <div className="ia-readnum-item__title">{a.title}</div>
+                        <div className="ia-readnum-item__meta">
+                          <Calendar size={12} /> {a.date}
+                          <span className="ia-readnum-item__sep">·</span>
+                          <span>{a.category}</span>
+                        </div>
+                      </div>
+                      <div className="ia-readnum-item__input-wrap">
+                        <Eye size={14} className="ia-readnum-item__input-icon" />
+                        <input
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          className="ia-readnum-item__input"
+                          placeholder="0"
+                          value={readNumDraft[a.id] ?? ''}
+                          onChange={(e) =>
+                            handleReadNumChange(a.id, e.target.value)
+                          }
+                          disabled={readNumSaving}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="ia-modal__footer">
+              <button
+                className="btn btn-ghost"
+                onClick={closeReadNumModal}
+                disabled={readNumSaving}
+              >
+                取消
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveReadNums}
+                disabled={readNumSaving || allArticles.length === 0}
+              >
+                {readNumSaving ? (
+                  <>
+                    <Loader2 size={14} className="ia-modal__spinner" /> 保存中…
+                  </>
+                ) : readNumSaved ? (
+                  <>
+                    <Check size={14} /> 已保存
+                  </>
+                ) : (
+                  <>
+                    <Check size={14} /> 保存
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

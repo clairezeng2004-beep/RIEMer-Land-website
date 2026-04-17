@@ -88,6 +88,7 @@ export async function updateArticleInDb(id, updates) {
     if (updates.date !== undefined) dbUpdates.date = updates.date;
     if (updates.author !== undefined) dbUpdates.author = updates.author;
     if (updates.coverImage !== undefined) dbUpdates.cover_image = updates.coverImage;
+    if (updates.readNum !== undefined) dbUpdates.read_num = Number(updates.readNum) || 0;
     dbUpdates.updated_at = new Date().toISOString();
 
     const { error } = await supabase
@@ -185,6 +186,7 @@ function dbToFrontend(row) {
     outline: Array.isArray(row.outline) ? row.outline : [],
     url: row.url || '',
     content: row.content || '',
+    readNum: typeof row.read_num === 'number' ? row.read_num : Number(row.read_num) || 0,
     archivedBy: row.archived_by || '未知',
     archivedAt: row.created_at || new Date().toISOString(),
     _fromDb: true, // 标记来自数据库
@@ -205,6 +207,7 @@ function frontendToDb(article, userId) {
     url: article.url || '',
     content: article.content || '',
     cover_image: article.coverImage || article.cover_image || null,
+    read_num: Number(article.readNum ?? article.read_num ?? 0) || 0,
     archived_by: article.archivedBy || article.archived_by || '未知',
     archived_by_id: userId || null,
   };
