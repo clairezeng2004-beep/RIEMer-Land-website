@@ -257,7 +257,19 @@
 .mc-table__th--total {
   width: 70px;
   text-align: center;
-  padding-right: 64px;
+}
+
+/* 总计表头内图标+文字整体左移 */
+.mc-table__th--total > * {
+  position: relative;
+  transform: translateX(-40px);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.mc-table__th--total {
+  /* 兜底：如果是直接文本节点（没有 span 包裹），给单元格自身一点右内边距 */
+  padding-right: 40px;
 }
 
 .mc-table td {
