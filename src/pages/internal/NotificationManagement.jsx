@@ -374,8 +374,8 @@ export default function NotificationManagement() {
                     )}
                     <div className="notif-mgmt__notif-meta">
                       <span><Clock size={12} /> {notif.date}</span>
-                      <span className={notif.read ? 'notif-mgmt__notif-status--read' : 'notif-mgmt__notif-status--unread'}>
-                        {notif.read ? <><CheckCircle size={12} /> 已读</> : <><EyeOff size={12} /> 未读</>}
+                      <span className={notif.read ? `notif-mgmt__notif-status--read${notif.autoRead ? ' notif-mgmt__notif-status--auto' : ''}` : 'notif-mgmt__notif-status--unread'}>
+                        {notif.read ? <><CheckCircle size={12} /> {notif.autoRead ? '自动已读' : '已读'}</> : <><EyeOff size={12} /> 未读</>}
                       </span>
                     </div>
                   </div>

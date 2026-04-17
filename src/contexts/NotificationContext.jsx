@@ -8,6 +8,25 @@ const NotificationContext = createContext(null);
 
 const NOTIFICATIONS_KEY = 'riemer_notifications';
 const LAST_EMAIL_KEY = 'riemer_last_email_reminder';
+// 记录「系统自动已读」的通知 ID（区别于用户手动点击已读），列表里会显示为"自动已读"
+const AUTO_READ_IDS_KEY = 'riemer_auto_read_ids';
+
+function loadAutoReadIds() {
+  try {
+    const raw = localStorage.getItem(AUTO_READ_IDS_KEY);
+    if (!raw) return new Set();
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? new Set(arr.map(String)) : new Set();
+  } catch { return new Set(); }
+}
+
+function addAutoReadId(id) {
+  try {
+    const set = loadAutoReadIds();
+    set.add(String(id));
+    localStorage.setItem(AUTO_READ_IDS_KEY, JSON.stringify([...set]));
+  } catch { /* ignore */ }
+}
 
 // 清理历史遗留的冗余缓存 key（曾导致初始加载与刷新后数据不一致）
 try {
@@ -140,6 +159,7 @@ export function NotificationProvider({ children }) {
         });
 
         // 转换为前端格式
+        const autoReadSet = loadAutoReadIds();
         const mapped = filtered.map((n) => ({
           id: n.id,
           title: n.title,
@@ -147,6 +167,7 @@ export function NotificationProvider({ children }) {
           type: n.type,
           date: n.date,
           read: readSet.has(n.id),
+          autoRead: autoReadSet.has(String(n.id)),
         }));
 
         // 只有数据真正变化时才更新 state，避免轮询/可见性变化导致列表重渲染闪动
@@ -377,6 +398,8 @@ export function NotificationProvider({ children }) {
             await supabase
               .from('notification_reads')
               .upsert({ notification_id: data.id, user_id: user.id });
+            // 本地记录此 ID 为「自动已读」，列表显示时与手动已读区分
+            addAutoReadId(data.id);
           }
         }
 
@@ -397,6 +420,8 @@ export function NotificationProvider({ children }) {
       date: new Date().toISOString().split('T')[0],
       read: false,
       ...notification,
+      // 如果发通知时就带 read: true，说明是系统自动已读（发起人自己不打扰）
+      autoRead: notification.read === true,
     };
     // 直接更新 localStorage（保留完整列表）
     try {
