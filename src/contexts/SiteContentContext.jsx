@@ -274,6 +274,9 @@ export function SiteContentProvider({ children }) {
   const [userArticles, setUserArticles] = useState([]);
   const [articlesLoaded, setArticlesLoaded] = useState(false);
 
+  // 内部空间配置持久化开关：true 时暂停自动写 localStorage（编辑模式下使用）
+  const [internalConfigPersistPaused, setInternalConfigPersistPaused] = useState(false);
+
   // 内部空间配置
   const [internalConfig, setInternalConfig] = useState(() => {
     const stored = localStorage.getItem(INTERNAL_CONFIG_KEY);
@@ -369,8 +372,9 @@ export function SiteContentProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (internalConfigPersistPaused) return;
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(internalConfig));
-  }, [internalConfig]);
+  }, [internalConfig, internalConfigPersistPaused]);
 
   useEffect(() => {
     localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions));
@@ -412,6 +416,23 @@ export function SiteContentProvider({ children }) {
         next[key] = { ...(prev[key] || {}), ...updates[key] };
       }
       return next;
+    });
+  };
+
+  /**
+   * 直接用整个 config 替换当前 internalConfig（用于"取消编辑"回滚到快照）
+   */
+  const replaceInternalConfig = (cfg) => {
+    setInternalConfig(cfg);
+  };
+
+  /**
+   * 手动将当前 internalConfig 写入 localStorage（用于"保存编辑"显式落盘）
+   */
+  const flushInternalConfig = () => {
+    setInternalConfig((cur) => {
+      localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(cur));
+      return cur;
     });
   };
 
@@ -568,6 +589,8 @@ export function SiteContentProvider({ children }) {
       filterOptions, updateFilterOptions, resetFilterOptions,
       userArticles, addArticle, updateArticle, deleteArticle, refreshArticles, articlesLoaded,
       internalConfig, updateInternalConfig, resetInternalConfig,
+      replaceInternalConfig, flushInternalConfig,
+      internalConfigPersistPaused, setInternalConfigPersistPaused,
       suggestions, addSuggestion, updateSuggestion, deleteSuggestion,
       events, addEvent, updateEvent, deleteEvent,
       timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline,

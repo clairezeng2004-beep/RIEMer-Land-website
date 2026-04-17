@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useSiteContent } from '../contexts/SiteContentContext';
 import { useWysiwyg } from '../contexts/WysiwygContext';
@@ -14,30 +14,56 @@ import './WysiwygToolbar.css';
 
 export default function WysiwygToolbar() {
   const { isAdmin } = useAuth();
-  const { internalConfig, updateInternalConfig, resetInternalConfig } = useSiteContent();
-  const { editing, enterEdit, exitEdit, changedKeys } = useWysiwyg();
+  const {
+    internalConfig,
+    replaceInternalConfig,
+    flushInternalConfig,
+    setInternalConfigPersistPaused,
+    resetInternalConfig,
+  } = useSiteContent();
+  const { editing, enterEdit, saveEdit, cancelEdit, changedKeys } = useWysiwyg();
   const [saved, setSaved] = useState(false);
+
+  // 进入编辑模式时，快照当前 internalConfig，用于"取消"时回滚
+  const snapshotRef = useRef(null);
 
   // 仅管理员可见
   if (!isAdmin) return null;
 
+  const handleEnterEdit = () => {
+    // 深拷贝快照，避免引用泄漏
+    snapshotRef.current = JSON.parse(JSON.stringify(internalConfig));
+    // 暂停 internalConfig 自动持久化 —— 编辑期间改内存，不落盘
+    setInternalConfigPersistPaused(true);
+    enterEdit({
+      onSave: () => {
+        // 解除暂停并落盘
+        flushInternalConfig();
+        setInternalConfigPersistPaused(false);
+        snapshotRef.current = null;
+      },
+      onCancel: () => {
+        // 把 internalConfig 还原到进入编辑前的快照
+        if (snapshotRef.current) {
+          replaceInternalConfig(snapshotRef.current);
+        }
+        setInternalConfigPersistPaused(false);
+        snapshotRef.current = null;
+      },
+    });
+  };
+
   const handleSave = () => {
-    // internalConfig 已在各页面通过 onChange 实时更新，此处只需触发持久化提示
-    updateInternalConfig(internalConfig);
+    saveEdit(); // 触发 onSave -> flushInternalConfig + 解除暂停
     setSaved(true);
     setTimeout(() => setSaved(false), 2500);
-    exitEdit();
   };
 
   const handleCancel = () => {
-    // 取消编辑——需要刷新页面恢复到 localStorage 的状态
     if (changedKeys.size > 0) {
-      if (window.confirm('有未保存的修改，确定放弃吗？')) {
-        window.location.reload();
-      }
-    } else {
-      exitEdit();
+      if (!window.confirm('有未保存的修改，确定放弃吗？')) return;
     }
+    cancelEdit(); // 触发 onCancel -> replaceInternalConfig(snapshot) + 解除暂停
   };
 
   const handleReset = () => {
@@ -52,7 +78,7 @@ export default function WysiwygToolbar() {
       <>
         <button
           className="wysiwyg-fab"
-          onClick={enterEdit}
+          onClick={handleEnterEdit}
           title="进入管理者编辑模式"
         >
           <Pencil size={20} />
