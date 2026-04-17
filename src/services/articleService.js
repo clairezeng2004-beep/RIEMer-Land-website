@@ -171,10 +171,16 @@ export function generateSummaryLocal(content, maxLength = 100) {
   if (!content) return '';
 
   // 清洗：去除常见公众号铺垫
-  const cleaned = content
+  let cleaned = content
     .replace(/^.{0,40}(大家好|hello|hi,|各位|同学们)[，,：:\s]/i, '')
     .replace(/点击上方.*?关注/g, '')
     .replace(/扫码关注.*?公众号/g, '')
+    // 去除"注："/"写在前面"/"阅读指引"等铺垫段
+    .replace(/注[:：][^。！？\n]{5,200}[。！？]/g, '')
+    .replace(/写在前面[:：]?[^。！？\n]{5,300}[。！？]/g, '')
+    .replace(/阅读指引[:：]?[^。！？\n]{5,300}[。！？]/g, '')
+    // 去除"本文适合xx读者/建议xx阅读"这类元信息
+    .replace(/[^。！？\n]{0,30}(适合|建议|推荐)[^。！？\n]{0,30}(读者|阅读|人群)[^。！？\n]{0,30}[。！？]/g, '')
     .trim();
 
   // 按句子切分
