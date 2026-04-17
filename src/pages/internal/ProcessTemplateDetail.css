@@ -843,6 +843,14 @@
   padding: 1.5rem 1.75rem;
 }
 
+/* 编辑态下 header 的左右 padding 归零，避免标题/描述框比正文 textarea 窄；
+   article 本身已经有 1.75rem 左右 padding，无需 header 再叠加。*/
+.ptd-article--editing .ptd-article__header {
+  padding-left: 0;
+  padding-right: 0;
+  padding-top: 0;
+}
+
 .ptd-edit__title-input {
   width: 100%;
   margin: 0.5rem 0 0.75rem;
