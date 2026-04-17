@@ -722,6 +722,32 @@
   margin-left: var(--space-xs);
 }
 
+/* AI 生成按钮（摘要字段右侧） */
+.ia-modal__ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--color-primary, #5EAD8C);
+  background: color-mix(in srgb, var(--color-primary, #5EAD8C) 10%, transparent);
+  border: 1px solid color-mix(in srgb, var(--color-primary, #5EAD8C) 30%, transparent);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.ia-modal__ai-btn:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-primary, #5EAD8C) 18%, transparent);
+  border-color: color-mix(in srgb, var(--color-primary, #5EAD8C) 55%, transparent);
+}
+
+.ia-modal__ai-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .ia-modal__text-input {
   padding: 0.55rem 0.85rem;
   border: 1px solid var(--color-border);

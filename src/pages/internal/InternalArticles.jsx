@@ -8,6 +8,7 @@ import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
 import {
   fetchAndParseArticle,
+  generateSummaryAI,
   inferCategory,
   inferTags,
 } from '../../services/articleService';
@@ -15,7 +16,7 @@ import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
   Plus, Link2, Loader2, X, Check, Tag, AlertCircle,
   ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
-  CheckSquare,
+  CheckSquare, Sparkles,
 } from 'lucide-react';
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
@@ -80,9 +81,16 @@ export default function InternalArticles() {
 
   // ---- 新建归档弹窗状态 ----
   const [showModal, setShowModal] = useState(false);
-  const [step, setStep] = useState('input'); // 'input' | 'loading' | 'confirm'
+  // 流程：'input'（输入链接 + 抓取中）→ 'confirm'（确认信息）
+  // 抓取阶段不再用独立 step，按钮自身 loading 即可
+  const [step, setStep] = useState('input'); // 'input' | 'confirm'
   const [urlInput, setUrlInput] = useState('');
   const [fetchError, setFetchError] = useState('');
+  const [fetching, setFetching] = useState(false);
+
+  // AI 摘要生成状态（仅在确认页使用）
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
 
   // 抓取后的文章数据（待确认）
   const [draft, setDraft] = useState(null);
@@ -224,9 +232,16 @@ export default function InternalArticles() {
     setDraft(null);
     setEditTags([]);
     setNewTagInput('');
+    setFetching(false);
+    setAiLoading(false);
+    setAiError('');
   };
 
   // ---- 抓取文章 ----
+  // 改动要点：
+  // 1. 不再切到独立的 'loading' step，按钮自身 loading 即可
+  // 2. 抓取不再在后端拉 AI 摘要（articleService 中已移除）
+  // 3. 抓取成功 → 直接进入 confirm 弹窗；摘要留空由用户手动点「AI 生成」
   const handleFetch = async () => {
     const url = urlInput.trim();
     if (!url) {
@@ -235,7 +250,7 @@ export default function InternalArticles() {
     }
 
     setFetchError('');
-    setStep('loading');
+    setFetching(true);
 
     try {
       const parsed = await fetchAndParseArticle(url);
@@ -243,11 +258,34 @@ export default function InternalArticles() {
       setEditTitle(parsed.title);
       setEditCategory(parsed.category);
       setEditTags([...parsed.tags]);
-      setEditExcerpt(parsed.excerpt);
+      setEditExcerpt(parsed.excerpt || '');
+      setAiError('');
       setStep('confirm');
     } catch (err) {
       setFetchError(err.message || '抓取失败，请检查链接');
-      setStep('input');
+    } finally {
+      setFetching(false);
+    }
+  };
+
+  // ---- 手动触发 AI 生成摘要 ----
+  // 严格走 AI，不做本地兜底；失败显示错误提示
+  const handleGenerateSummary = async () => {
+    if (!draft) return;
+    const content = draft.content || '';
+    if (content.trim().length < 20) {
+      setAiError('正文内容过短，无法生成摘要');
+      return;
+    }
+    setAiLoading(true);
+    setAiError('');
+    try {
+      const summary = await generateSummaryAI(editTitle || draft.title, content);
+      setEditExcerpt(summary);
+    } catch (err) {
+      setAiError(err.message || 'AI 生成失败，请稍后重试');
+    } finally {
+      setAiLoading(false);
     }
   };
 
@@ -515,7 +553,6 @@ export default function InternalArticles() {
             <div className="ia-modal__header">
               <h2>
                 {step === 'input' && '新建文章归档'}
-                {step === 'loading' && '正在提取文章…'}
                 {step === 'confirm' && '确认归档信息'}
               </h2>
               <button className="ia-modal__close" onClick={closeModal}>
@@ -528,7 +565,8 @@ export default function InternalArticles() {
               {step === 'input' && (
                 <div className="ia-modal__step-input">
                   <p className="ia-modal__hint">
-                    请输入微信公众号文章链接，系统将自动提取标题、生成大纲和标签。
+                    请输入微信公众号文章链接，系统将自动提取标题、分类、日期和标签。
+                    摘要需在下一步手动点击「AI 生成」。
                   </p>
                   <div className="ia-modal__url-row">
                     <div className="ia-modal__url-input-wrap">
@@ -539,16 +577,23 @@ export default function InternalArticles() {
                         placeholder="粘贴微信公众号文章链接…"
                         value={urlInput}
                         onChange={(e) => setUrlInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleFetch()}
+                        onKeyDown={(e) => e.key === 'Enter' && !fetching && handleFetch()}
                         autoFocus
+                        disabled={fetching}
                       />
                     </div>
                     <button
                       className="btn btn-primary"
                       onClick={handleFetch}
-                      disabled={!urlInput.trim()}
+                      disabled={!urlInput.trim() || fetching}
                     >
-                      提取文章
+                      {fetching ? (
+                        <>
+                          <Loader2 size={14} className="ia-modal__spinner" /> 提取中…
+                        </>
+                      ) : (
+                        '提取文章'
+                      )}
                     </button>
                   </div>
                   {fetchError && (
@@ -559,15 +604,7 @@ export default function InternalArticles() {
                 </div>
               )}
 
-              {/* Step 2: 加载中 */}
-              {step === 'loading' && (
-                <div className="ia-modal__step-loading">
-                  <Loader2 size={36} className="ia-modal__spinner" />
-                  <p>正在抓取并分析文章内容，请稍候…</p>
-                </div>
-              )}
-
-              {/* Step 3: 确认 */}
+              {/* Step 2: 确认 */}
               {step === 'confirm' && draft && (
                 <div className="ia-modal__step-confirm">
                   {/* 标题 */}
@@ -594,13 +631,38 @@ export default function InternalArticles() {
 
                   {/* 摘要 */}
                   <div className="ia-modal__field">
-                    <label className="ia-modal__label">摘要</label>
+                    <div className="ia-modal__label-row">
+                      <label className="ia-modal__label">摘要</label>
+                      <button
+                        type="button"
+                        className="ia-modal__ai-btn"
+                        onClick={handleGenerateSummary}
+                        disabled={aiLoading || !(draft.content && draft.content.trim().length >= 20)}
+                        title="把全文喂给 AI，生成卡片摘要"
+                      >
+                        {aiLoading ? (
+                          <>
+                            <Loader2 size={12} className="ia-modal__spinner" /> 生成中…
+                          </>
+                        ) : (
+                          <>
+                            <Sparkles size={12} /> AI 生成
+                          </>
+                        )}
+                      </button>
+                    </div>
                     <textarea
                       className="ia-modal__textarea"
                       value={editExcerpt}
                       onChange={(e) => setEditExcerpt(e.target.value)}
+                      placeholder="点击上方「AI 生成」按钮，由 AI 根据文章全文生成摘要。也可手动编辑。"
                       rows={3}
                     />
+                    {aiError && (
+                      <div className="ia-modal__error" style={{ marginTop: 6 }}>
+                        <AlertCircle size={14} /> {aiError}
+                      </div>
+                    )}
                   </div>
 
                   {/* 标签 */}

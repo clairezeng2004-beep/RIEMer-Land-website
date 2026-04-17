@@ -249,27 +249,27 @@ export function generateSummaryLocal(content, maxLength = 100) {
 
 /**
  * AI 智能摘要（走专用的 /api/summarize 接口）
- * 失败时降级为本地提取
  *
- * 改进点：
- * 1. 前端主动加 35s 超时（Vercel Pro 默认 30s，本地开发无上限；避免浏览器无限等）
- * 2. 失败时重试 1 次（DeepSeek 偶发 502/504/429 很常见）
- * 3. 最终失败才降级为本地提取，并在控制台明确提示
+ * 严格模式：只使用 AI 输出，失败直接抛错，不降级到本地兜底。
+ * - 把完整正文喂给后端（后端内部再做 sampleContent 抽样）
+ * - 35s 超时；失败重试 1 次
+ * - 两次都失败抛异常，由调用方显示错误提示
  */
 export async function generateSummaryAI(title, content) {
-  if (!content) return '';
+  if (!content || content.trim().length < 20) {
+    throw new Error('正文内容过短，无法生成摘要');
+  }
 
-  const callOnce = async (attempt) => {
+  const callOnce = async () => {
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 35000);
     try {
       const response = await fetch('/api/summarize', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, content }),
+        body: JSON.stringify({ title, content }), // 喂全文给后端
         signal: controller.signal,
       });
-      clearTimeout(timeoutId);
 
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
@@ -279,7 +279,7 @@ export async function generateSummaryAI(title, content) {
       const data = await response.json();
       const summary = (data.summary || '').trim();
 
-      // 校验：15-250 字之间 且 不含第一人称（防止 AI 兜底清洗漏网）
+      // 校验：15-250 字之间 且 不含第一人称
       const hasFirstPerson = /(^|[^己自])(我|我们|本人|笔者)(?![要命国族])/.test(summary);
       if (summary && summary.length >= 15 && summary.length <= 250 && !hasFirstPerson) {
         return summary;
@@ -293,18 +293,12 @@ export async function generateSummaryAI(title, content) {
   };
 
   try {
-    return await callOnce(1);
+    return await callOnce();
   } catch (err1) {
     console.warn(`[articleService] AI 摘要第 1 次失败，1 秒后重试：${err1.message}`);
     await new Promise((r) => setTimeout(r, 1000));
-    try {
-      return await callOnce(2);
-    } catch (err2) {
-      console.error(
-        `[articleService] AI 摘要第 2 次仍失败，降级为本地提取：${err2.message}`,
-      );
-      return generateSummaryLocal(content);
-    }
+    // 第二次失败直接向上抛错，不降级到本地
+    return await callOnce();
   }
 }
 
@@ -434,9 +428,9 @@ export async function fetchAndParseArticle(url) {
   const titleForInfer = parsed.title || parsed.rawTitle;
   const contentText = parsed.content;
 
-  // 使用 AI 生成摘要（失败时自动降级为本地提取）
-  const excerpt = await generateSummaryAI(titleForInfer, contentText);
-
+  // 注意：摘要不在抓取阶段自动生成，
+  // 用户在确认弹窗手动点击「AI 生成」按钮触发（generateSummaryAI）。
+  // 这样可以让弹窗立即展示，而不必先等 AI。
   return {
     rawTitle: parsed.rawTitle,
     title: titleForInfer,
@@ -444,7 +438,7 @@ export async function fetchAndParseArticle(url) {
     author: parsed.author,
     category: inferCategory(titleForInfer, contentText),
     tags: inferTags(titleForInfer, contentText),
-    excerpt,
+    excerpt: '',
     outline: [],
     url,
     content: contentText,
