@@ -193,11 +193,36 @@ export default function Tasks() {
         if (error) throw error;
         const remote = (data || []).map(rowToTask);
         console.log('[Tasks] Supabase 返回', remote.length, '条数据');
-        // 仅当远端确有数据时才覆盖本地；远端为空时保留本地（避免新表误清空用户本地数据）
-        if (remote.length > 0) {
-          setTasks(remote);
+
+        // --- 合并策略（避免"云端覆盖本地"导致的数据丢失） ---
+        // 读取"此刻"的本地缓存（不依赖 state，避免闭包）
+        const local = readLocalTasks() || [];
+        console.log('[Tasks] 本地缓存当前有', local.length, '条数据');
+
+        const remoteIds = new Set(remote.map((t) => t.id));
+        // 本地独有的事项：云端没有，需要补传
+        const localOnly = local.filter((t) => t.id && !remoteIds.has(t.id));
+
+        if (localOnly.length > 0) {
+          console.log('[Tasks] 🆙 检测到', localOnly.length, '条本地独有事项，自动补传到 Supabase');
+          try {
+            const rows = localOnly.map(taskToRow);
+            const { error: upErr } = await supabase.from('tasks').upsert(rows);
+            if (upErr) throw upErr;
+            console.log('[Tasks] ✅ 本地独有事项补传成功');
+          } catch (upErr) {
+            console.warn('[Tasks] ⚠️ 本地独有事项补传失败（继续用合并结果显示）:', upErr);
+          }
+        }
+
+        // 合并后的完整列表：云端优先 + 本地独有在后
+        const merged = [...remote, ...localOnly];
+        console.log('[Tasks] 合并后共', merged.length, '条数据');
+
+        if (merged.length > 0) {
+          setTasks(merged);
         } else {
-          console.log('[Tasks] 远端无数据，保留本地缓存');
+          console.log('[Tasks] 远端和本地都无数据，保留当前 state');
         }
       } catch (err) {
         // 表可能未创建 / 网络失败 —— 静默，继续使用本地数据
