@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import CustomSelect from '../../components/CustomSelect';
 import {
   Users,
   Pencil,
@@ -460,31 +461,33 @@ export default function MemberProfiles() {
                         {isEditing && col.editable ? (
                           col.inputType === 'yearMonth' ? (
                             <div className="member-profiles-table__year-month">
-                              <select
+                              <CustomSelect
+                                size="sm"
                                 className="member-profiles-table__select"
-                                value={editData._joined_year || ''}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, _joined_year: e.target.value ? Number(e.target.value) : '' })
+                                placeholder="年"
+                                value={editData._joined_year ? String(editData._joined_year) : ''}
+                                onChange={(v) =>
+                                  setEditData({ ...editData, _joined_year: v ? Number(v) : '' })
                                 }
-                              >
-                                <option value="">年</option>
-                                {YEAR_OPTIONS.map((y) => (
-                                  <option key={y} value={y}>{y}</option>
-                                ))}
-                              </select>
+                                options={[
+                                  { value: '', label: '年' },
+                                  ...YEAR_OPTIONS.map((y) => ({ value: String(y), label: String(y) })),
+                                ]}
+                              />
                               <span className="member-profiles-table__year-month-sep">年</span>
-                              <select
+                              <CustomSelect
+                                size="sm"
                                 className="member-profiles-table__select"
-                                value={editData._joined_month || ''}
-                                onChange={(e) =>
-                                  setEditData({ ...editData, _joined_month: e.target.value ? Number(e.target.value) : '' })
+                                placeholder="月"
+                                value={editData._joined_month ? String(editData._joined_month) : ''}
+                                onChange={(v) =>
+                                  setEditData({ ...editData, _joined_month: v ? Number(v) : '' })
                                 }
-                              >
-                                <option value="">月</option>
-                                {MONTH_OPTIONS.map((m) => (
-                                  <option key={m} value={m}>{m}</option>
-                                ))}
-                              </select>
+                                options={[
+                                  { value: '', label: '月' },
+                                  ...MONTH_OPTIONS.map((m) => ({ value: String(m), label: String(m) })),
+                                ]}
+                              />
                               <span className="member-profiles-table__year-month-sep">月</span>
                             </div>
                           ) : (

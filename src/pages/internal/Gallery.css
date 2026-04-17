@@ -89,8 +89,6 @@
 .gallery-create__select {
   flex: 1;
   min-width: 0;
-  cursor: pointer;
-  appearance: auto;
 }
 
 /* ============ Album Grid ============ */

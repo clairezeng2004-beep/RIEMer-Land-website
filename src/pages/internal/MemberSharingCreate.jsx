@@ -187,46 +187,46 @@ function PeriodPicker({ value, onChange }) {
     <div className="msc-period">
       <div className="msc-period__group">
         <span className="msc-period__label">从</span>
-        <select
+        <CustomSelect
+          size="sm"
           className="msc-period__select"
-          value={startYear || ''}
-          onChange={(e) => update('startYear', e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">年份</option>
-          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+          placeholder="年份"
+          value={startYear ? String(startYear) : ''}
+          onChange={(v) => update('startYear', v ? Number(v) : null)}
+          options={[{ value: '', label: '年份' }, ...YEARS.map((y) => ({ value: String(y), label: String(y) }))]}
+        />
         <span className="msc-period__sep">年</span>
-        <select
+        <CustomSelect
+          size="sm"
           className="msc-period__select"
-          value={startMonth || ''}
-          onChange={(e) => update('startMonth', e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">月份</option>
-          {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+          placeholder="月份"
+          value={startMonth ? String(startMonth) : ''}
+          onChange={(v) => update('startMonth', v ? Number(v) : null)}
+          options={[{ value: '', label: '月份' }, ...MONTHS.map((m) => ({ value: String(m), label: String(m) }))]}
+        />
         <span className="msc-period__sep">月</span>
       </div>
 
       <span className="msc-period__to">至</span>
 
       <div className="msc-period__group">
-        <select
+        <CustomSelect
+          size="sm"
           className="msc-period__select"
-          value={endYear || ''}
-          onChange={(e) => update('endYear', e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">年份</option>
-          {YEARS.map((y) => <option key={y} value={y}>{y}</option>)}
-        </select>
+          placeholder="年份"
+          value={endYear ? String(endYear) : ''}
+          onChange={(v) => update('endYear', v ? Number(v) : null)}
+          options={[{ value: '', label: '年份' }, ...YEARS.map((y) => ({ value: String(y), label: String(y) }))]}
+        />
         <span className="msc-period__sep">年</span>
-        <select
+        <CustomSelect
+          size="sm"
           className="msc-period__select"
-          value={endMonth || ''}
-          onChange={(e) => update('endMonth', e.target.value ? Number(e.target.value) : null)}
-        >
-          <option value="">月份</option>
-          {MONTHS.map((m) => <option key={m} value={m}>{m}</option>)}
-        </select>
+          placeholder="月份"
+          value={endMonth ? String(endMonth) : ''}
+          onChange={(v) => update('endMonth', v ? Number(v) : null)}
+          options={[{ value: '', label: '月份' }, ...MONTHS.map((m) => ({ value: String(m), label: String(m) }))]}
+        />
         <span className="msc-period__sep">月</span>
       </div>
     </div>

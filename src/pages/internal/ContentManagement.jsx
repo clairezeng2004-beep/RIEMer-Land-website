@@ -42,6 +42,7 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+import CustomSelect from '../../components/CustomSelect';
 import './ContentManagement.css';
 
 export default function ContentManagement() {
@@ -1185,16 +1186,17 @@ export default function ContentManagement() {
                               </div>
                               <div className="content-mgmt__field content-mgmt__field--flex">
                                 <label>分类</label>
-                                <select
-                                  value={editingEvent.category}
-                                  onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                                <CustomSelect
                                   className="content-mgmt__input"
-                                >
-                                  <option value="分享会">分享会</option>
-                                  <option value="经验分享">经验分享</option>
-                                  <option value="团队招新">团队招新</option>
-                                  <option value="校园活动">校园活动</option>
-                                </select>
+                                  value={editingEvent.category}
+                                  onChange={(v) => setEditingEvent({ ...editingEvent, category: v })}
+                                  options={[
+                                    { value: '分享会', label: '分享会' },
+                                    { value: '经验分享', label: '经验分享' },
+                                    { value: '团队招新', label: '团队招新' },
+                                    { value: '校园活动', label: '校园活动' },
+                                  ]}
+                                />
                               </div>
                             </div>
                             <div className="content-mgmt__field">

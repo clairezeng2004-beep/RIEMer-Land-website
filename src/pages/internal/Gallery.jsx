@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import CustomSelect from '../../components/CustomSelect';
 import {
   Camera,
   Plus,
@@ -312,25 +313,26 @@ export default function Gallery() {
                 <div className="gallery-create__field">
                   <label>时间</label>
                   <div className="gallery-create__date-row">
-                    <select
-                      value={newAlbum.year}
-                      onChange={(e) => setNewAlbum({ ...newAlbum, year: e.target.value })}
-                      className="gallery-create__input gallery-create__select"
-                    >
-                      {Array.from({ length: 10 }, (_, i) => {
+                    <CustomSelect
+                      size="sm"
+                      className="gallery-create__select"
+                      value={String(newAlbum.year)}
+                      onChange={(v) => setNewAlbum({ ...newAlbum, year: v })}
+                      options={Array.from({ length: 10 }, (_, i) => {
                         const y = new Date().getFullYear() - i;
-                        return <option key={y} value={y}>{y} 年</option>;
+                        return { value: String(y), label: `${y} 年` };
                       })}
-                    </select>
-                    <select
-                      value={newAlbum.month}
-                      onChange={(e) => setNewAlbum({ ...newAlbum, month: e.target.value })}
-                      className="gallery-create__input gallery-create__select"
-                    >
-                      {Array.from({ length: 12 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>{i + 1} 月</option>
-                      ))}
-                    </select>
+                    />
+                    <CustomSelect
+                      size="sm"
+                      className="gallery-create__select"
+                      value={String(newAlbum.month)}
+                      onChange={(v) => setNewAlbum({ ...newAlbum, month: v })}
+                      options={Array.from({ length: 12 }, (_, i) => ({
+                        value: String(i + 1),
+                        label: `${i + 1} 月`,
+                      }))}
+                    />
                   </div>
                 </div>
                 <div className="gallery-create__field">

@@ -141,6 +141,15 @@
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
 }
 
+/* 当 content-mgmt__input 作用在 CustomSelect 上时，去除双重 padding/border，
+   让 CustomSelect 组件自带的视觉样式生效 */
+.custom-select.content-mgmt__input {
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
 .content-mgmt__textarea {
   resize: vertical;
   line-height: 1.6;
