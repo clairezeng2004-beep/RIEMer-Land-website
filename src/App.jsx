@@ -16,6 +16,7 @@ import InternalLayout from './components/InternalLayout';
 import Documents from './pages/internal/Documents';
 import ProcessTemplates from './pages/internal/ProcessTemplates';
 import ProcessTemplateCreate from './pages/internal/ProcessTemplateCreate';
+import ProcessTemplateDetail from './pages/internal/ProcessTemplateDetail';
 import MemberSharing from './pages/internal/MemberSharing';
 import MemberSharingCreate from './pages/internal/MemberSharingCreate';
 import MemberSharingDetail from './pages/internal/MemberSharingDetail';
@@ -39,6 +40,7 @@ const FULLSCREEN_PATHS = [
   '/internal/member-sharing/create',
   '/internal/member-sharing/view/',
   '/internal/process-templates/create',
+  '/internal/process-templates/view/',
 ];
 
 function AppShell() {
@@ -66,6 +68,7 @@ function AppShell() {
           <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
           <Route path="/internal/member-sharing/view/:id" element={<MemberSharingDetail />} />
           <Route path="/internal/process-templates/create" element={<ProcessTemplateCreate />} />
+          <Route path="/internal/process-templates/view/:id" element={<ProcessTemplateDetail />} />
 
           {/* Internal Routes (Protected) — 带侧边栏布局 */}
           <Route path="/internal" element={<InternalLayout />}>
