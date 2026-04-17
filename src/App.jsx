@@ -32,6 +32,7 @@ import Profile from './pages/internal/Profile';
 import Suggestions from './pages/internal/Suggestions';
 import Guestbook from './pages/internal/Guestbook';
 import NotificationManagement from './pages/internal/NotificationManagement';
+import EventDistribution from './pages/internal/EventDistribution';
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
 const FULLSCREEN_PATHS = [
@@ -87,6 +88,7 @@ function AppShell() {
             <Route path="guestbook" element={<Guestbook />} />
             <Route path="profile" element={<Profile />} />
             <Route path="member-profiles" element={<MemberProfiles />} />
+            <Route path="event-distribution" element={<EventDistribution />} />
           </Route>
         </Routes>
       </main>

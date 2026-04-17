@@ -20,6 +20,7 @@ import {
   Share2,
   Contact,
   UserCircle,
+  CalendarRange,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -36,6 +37,7 @@ const LABEL_TO_SECTION = {
   labelSuggestions: 'suggestions',
   labelMemberProfiles: 'memberProfiles',
   labelGallery: 'gallery',
+  labelEventDistribution: 'eventDistribution',
   labelProfile: 'profile',
   labelUsers: 'users',
   // labelHome / labelGuestbook / labelContent / labelNotificationMgmt 对应的页面
@@ -81,6 +83,7 @@ export default function InternalSidebar() {
     { to: '/internal/guestbook', icon: MessageCircle, configKey: 'labelGuestbook', label: sc.labelGuestbook },
     { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
+    { to: '/internal/event-distribution', icon: CalendarRange, configKey: 'labelEventDistribution', label: sc.labelEventDistribution },
     { to: '/internal/profile', icon: UserCircle, configKey: 'labelProfile', label: sc.labelProfile },
   ];
 
