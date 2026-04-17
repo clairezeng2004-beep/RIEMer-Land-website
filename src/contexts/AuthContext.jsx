@@ -387,10 +387,9 @@ export function AuthProvider({ children }) {
         // 如果 Supabase 已标记不可达，跳过
         if (getReachable() === false) return;
         if (session?.user) {
-          // 如果 login 函数已经设置了 user，跳过重复查询
-          // 只在 SIGNED_IN 以外的事件（如 TOKEN_REFRESHED）或初始加载时查询
+          // SIGNED_IN: login() 可能已经 setUser（真 profile 或 _fallback 降级 profile）
+          // 如果是 _fallback，后台仍需尝试一次 fetchProfile 补真；login() 里已经有 setTimeout 兜底了，这里不重复。
           if (event === 'SIGNED_IN') {
-            // login() 里已经 setUser 了，不需要重复 fetchProfile
             return;
           }
           await fetchProfile(session.user);
@@ -720,8 +719,10 @@ export function AuthProvider({ children }) {
         // 检查 authorized 状态
         // 注意：profile 查询走独立的 3s 超时，不让它拖垮整个登录流程。
         // 如果 PostgREST 卡住（可能 RLS 策略或连接问题），已经成功登录的用户
-        // 仍然视为登录成功，onAuthStateChange 稍后会再次拿到 profile。
-        console.time('[Auth] profile 查询');
+        // 仍然视为登录成功，并用 auth user + 缓存构造降级 profile 立即进站，
+        // 后台 onAuthStateChange / 下次会话再补真 profile。
+        const profileTimeLabel = `[Auth] profile 查询 ${Date.now()}`;
+        console.time(profileTimeLabel);
         let profile = null;
         let profileError = null;
         try {
@@ -731,12 +732,37 @@ export function AuthProvider({ children }) {
           ]);
           profile = profileRes.data;
           profileError = profileRes.error;
+          console.timeEnd(profileTimeLabel);
         } catch (e) {
-          console.warn('[Auth] profile 查询超时或异常，按已登录处理:', e.message);
-          // 已成功 signIn，profile 晚点拿到也没关系
+          console.warn('[Auth] profile 查询超时或异常，用降级 profile 放行:', e.message);
+          // 构造降级 profile：优先用上次缓存（必须是同一个 user），否则用 auth user 里的最小信息
+          const cachedProfile = getCachedProfile(data.user.id);
+          const fallbackProfile = cachedProfile
+            ? { ...cachedProfile, authorized: true }
+            : {
+                id: data.user.id,
+                email: data.user.email,
+                role: 'user',
+                authorized: true,           // profile 查询失败时默认放行，避免把合法用户卡住
+                name: data.user.email?.split('@')[0] || '用户',
+                _fallback: true,            // 标记是降级 profile，稍后可以刷新
+              };
+          setUser(fallbackProfile);
+          cacheProfile(fallbackProfile);
+          // 后台异步重试一次 profile 查询（不阻塞登录流程）
+          setTimeout(() => {
+            supabase.from('profiles').select('*').eq('id', data.user.id).single()
+              .then(({ data: realProfile }) => {
+                if (realProfile) {
+                  console.log('[Auth] 后台补拿到真 profile，刷新 user 状态');
+                  setUser(realProfile);
+                  cacheProfile(realProfile);
+                }
+              })
+              .catch(() => { /* ignore */ });
+          }, 500);
           return { success: true };
         }
-        console.timeEnd('[Auth] profile 查询');
 
         console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
 
