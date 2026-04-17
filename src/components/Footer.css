@@ -12,10 +12,20 @@
 
 .footer__grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-areas:
+    "nav    about"
+    "contact qrcode";
   column-gap: var(--space-xl);
+  row-gap: var(--space-2xl);
   align-items: start;
 }
+
+/* 指派各区块到对应的行列位置 */
+.footer__grid > .footer__nav:nth-child(1) { grid-area: nav; }
+.footer__grid > .footer__nav:nth-child(2) { grid-area: about; }
+.footer__grid > .footer__nav--contact    { grid-area: contact; }
+.footer__grid > .footer__qrcode          { grid-area: qrcode; }
 
 /* 每列独立管理内部布局，不使用 subgrid，避免二维码撑高其他列 */
 .footer__nav,
@@ -45,7 +55,7 @@
 }
 
 .footer__qrcode {
-  align-items: center;
+  align-items: flex-start;
 }
 
 /* 二维码图片 */
@@ -68,10 +78,7 @@
   color: var(--color-text-muted);
 }
 
-/* 二维码列 */
-.footer__qrcode {
-  grid-column: 4;
-}
+/* 二维码列（桌面端位于第二行右侧） */
 
 /* 联系方式内嵌的"给我们留言"按钮：作为第三行，与其他栏第三行高度对齐 */
 .footer__contact-guestbook {
@@ -235,6 +242,7 @@
   .footer__grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
+    grid-template-areas: none;
     row-gap: 0;
     column-gap: 0;
     text-align: center;
