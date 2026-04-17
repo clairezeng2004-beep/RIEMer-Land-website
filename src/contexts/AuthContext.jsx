@@ -694,12 +694,24 @@ export function AuthProvider({ children }) {
         });
 
         // 检查 authorized 状态
+        // 注意：profile 查询走独立的 3s 超时，不让它拖垮整个登录流程。
+        // 如果 PostgREST 卡住（可能 RLS 策略或连接问题），已经成功登录的用户
+        // 仍然视为登录成功，onAuthStateChange 稍后会再次拿到 profile。
         console.time('[Auth] profile 查询');
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('*')
-          .eq('id', data.user.id)
-          .single();
+        let profile = null;
+        let profileError = null;
+        try {
+          const profileRes = await Promise.race([
+            supabase.from('profiles').select('*').eq('id', data.user.id).single(),
+            new Promise((_, reject) => setTimeout(() => reject(new Error('profile 查询超时 (3s)')), 3000)),
+          ]);
+          profile = profileRes.data;
+          profileError = profileRes.error;
+        } catch (e) {
+          console.warn('[Auth] profile 查询超时或异常，按已登录处理:', e.message);
+          // 已成功 signIn，profile 晚点拿到也没关系
+          return { success: true };
+        }
         console.timeEnd('[Auth] profile 查询');
 
         console.log('[Auth] 登录用户 profile 查询结果:', { profile, profileError });
@@ -762,6 +774,18 @@ export function AuthProvider({ children }) {
       return await Promise.race([loginPromise, timeoutPromise]);
     } catch (err) {
       console.error('[Auth] Supabase 登录异常:', err);
+
+      // 关键：如果此时 Supabase 其实已经登录成功（session 存在），
+      // 说明只是后续的业务查询（如 profiles）超时/失败，不应该降级到离线模式，
+      // 也不应该返回"登录失败"，否则用户输入的正确密码会被错误提示。
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          console.warn('[Auth] 登录异常但 session 已存在，按已登录处理:', session.user.email);
+          return { success: true };
+        }
+      } catch { /* ignore */ }
+
       // 任何异常（超时、网络错误等）都回退到本地模式
       console.warn('[Auth] Supabase 登录异常，降级到本地模式重试');
       setSupabaseOk(false);
