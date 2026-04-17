@@ -34,10 +34,13 @@
   --color-success: #27AE60;
   --color-warning: #F39C12;
 
-  /* Typography */
-  --font-display: 'DM Serif Display', 'LXGW WenKai', serif;
-  --font-brand: 'EB Garamond', serif;
-  --font-body: 'Lora', 'LXGW WenKai', serif;
+  /* Typography
+     fallback 链中加入系统中文字体（PingFang SC / Noto Sans SC / Microsoft YaHei）。
+     网络字体（LXGW WenKai）异步加载过程中，中文即用系统字体兜底，避免"跳字"感。
+  */
+  --font-display: 'DM Serif Display', 'LXGW WenKai', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', serif;
+  --font-brand: 'EB Garamond', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', serif;
+  --font-body: 'Lora', 'LXGW WenKai', 'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', serif;
 
   /* Font Size Scale — 统一字号体系 */
   --text-xs: 0.75rem;      /* 12px — 徽章、极小标签 */
@@ -102,6 +105,10 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  /* 禁止浏览器给缺失字重合成伪粗体/伪斜体，避免字体到位前后字形跳变 */
+  font-synthesis: none;
+  /* 文本渲染优化：优先清晰度，减少回流 */
+  text-rendering: optimizeLegibility;
 }
 
 main {
