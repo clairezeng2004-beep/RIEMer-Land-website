@@ -187,7 +187,11 @@ export function generateSummaryLocal(content, maxLength = 100) {
   const sentences = cleaned
     .split(/[。！？；\n]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 10 && s.length <= 120);
+    .filter((s) => s.length >= 10 && s.length <= 120)
+    // 过滤含第一人称和典型谦辞的句子（本地兜底也要尽量不露怯）
+    .filter((s) => !/^(我|我们|自己|本人|笔者)/.test(s))
+    .filter((s) => !/(幸运之神|幸运女神|运气|不值一提|鸣谢|感谢大家|感谢各位)/.test(s))
+    .filter((s) => !/^(相信|大家|各位|同学们)/.test(s));
 
   if (sentences.length === 0) {
     return cleaned.slice(0, maxLength) + (cleaned.length > maxLength ? '…' : '');
@@ -205,6 +209,9 @@ export function generateSummaryLocal(content, maxLength = 100) {
     // 关键词分
     if (/分享|介绍|探讨|总结|经验|方法|建议|讲述|回顾|采访|专访|心得/.test(s)) score += 4;
     if (/保研|考研|留学|求职|实习|课程|活动|竞赛|辩论/.test(s)) score += 2;
+    // 第一人称/谦辞 重罚（万一漏过 filter）
+    if (/(我|我们|自己|本人|笔者)/.test(s)) score -= 6;
+    if (/(幸运|运气|不值一提|眷顾|鸣谢)/.test(s)) score -= 8;
     // 数字密度惩罚：超过 4 个数字的句子通常是罗列，不适合做摘要首句
     const numCount = (s.match(/\d/g) || []).length;
     if (numCount > 6) score -= 3;
@@ -243,33 +250,61 @@ export function generateSummaryLocal(content, maxLength = 100) {
 /**
  * AI 智能摘要（走专用的 /api/summarize 接口）
  * 失败时降级为本地提取
+ *
+ * 改进点：
+ * 1. 前端主动加 35s 超时（Vercel Pro 默认 30s，本地开发无上限；避免浏览器无限等）
+ * 2. 失败时重试 1 次（DeepSeek 偶发 502/504/429 很常见）
+ * 3. 最终失败才降级为本地提取，并在控制台明确提示
  */
 export async function generateSummaryAI(title, content) {
   if (!content) return '';
 
+  const callOnce = async (attempt) => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 35000);
+    try {
+      const response = await fetch('/api/summarize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, content }),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `API 返回 ${response.status}`);
+      }
+
+      const data = await response.json();
+      const summary = (data.summary || '').trim();
+
+      // 校验：15-250 字之间 且 不含第一人称（防止 AI 兜底清洗漏网）
+      const hasFirstPerson = /(^|[^己自])(我|我们|本人|笔者)(?![要命国族])/.test(summary);
+      if (summary && summary.length >= 15 && summary.length <= 250 && !hasFirstPerson) {
+        return summary;
+      }
+      throw new Error(
+        `AI 返回不合规（len=${summary.length}, firstPerson=${hasFirstPerson}）`,
+      );
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
   try {
-    const response = await fetch('/api/summarize', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, content }),
-    });
-
-    if (!response.ok) {
-      const err = await response.json().catch(() => ({}));
-      throw new Error(err.error || `API 返回 ${response.status}`);
+    return await callOnce(1);
+  } catch (err1) {
+    console.warn(`[articleService] AI 摘要第 1 次失败，1 秒后重试：${err1.message}`);
+    await new Promise((r) => setTimeout(r, 1000));
+    try {
+      return await callOnce(2);
+    } catch (err2) {
+      console.error(
+        `[articleService] AI 摘要第 2 次仍失败，降级为本地提取：${err2.message}`,
+      );
+      return generateSummaryLocal(content);
     }
-
-    const data = await response.json();
-    const summary = (data.summary || '').trim();
-
-    // 校验长度：15-250 字之间才算合理
-    if (summary && summary.length >= 15 && summary.length <= 250) {
-      return summary;
-    }
-    throw new Error(`AI 返回内容长度异常: ${summary.length} 字`);
-  } catch (err) {
-    console.warn('[articleService] AI 摘要生成失败，降级为本地提取:', err.message);
-    return generateSummaryLocal(content);
   }
 }
 

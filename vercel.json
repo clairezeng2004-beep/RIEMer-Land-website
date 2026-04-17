@@ -5,6 +5,17 @@
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ],
+  "functions": {
+    "api/summarize.js": {
+      "maxDuration": 60
+    },
+    "api/fetch-article.js": {
+      "maxDuration": 30
+    },
+    "api/chat.js": {
+      "maxDuration": 60
+    }
+  },
   "crons": [
     {
       "path": "/api/keep-alive",
