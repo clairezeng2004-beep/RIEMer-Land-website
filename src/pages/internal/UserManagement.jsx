@@ -166,6 +166,30 @@ export default function UserManagement() {
     }
   };
 
+  const handleDelete = async (targetUser) => {
+    const msg = `确定要彻底删除用户「${targetUser.name || targetUser.email}」吗？\n\n` +
+      '此操作会同时清理：\n' +
+      '  • Supabase 认证账号（auth.users）\n' +
+      '  • 个人档案（profiles）\n' +
+      '  • 预授权邮箱（pre_authorized_emails）\n' +
+      '  • 本地用户缓存\n\n' +
+      '删除后，该邮箱可以重新注册。此操作不可撤销。';
+    if (!window.confirm(msg)) return;
+    const result = await deleteUser(targetUser.id, targetUser.email);
+    if (result?.success) {
+      alert(result.message || '删除成功');
+    } else {
+      const warn = Array.isArray(result?.warnings) && result.warnings.length
+        ? '\n\n详情：\n' + result.warnings.join('\n')
+        : '';
+      alert((result?.message || '删除失败') + warn);
+    }
+    setRefreshKey((k) => k + 1);
+    if (isAdmin) {
+      getPreAuthorizedEmails().then(setPreAuthList);
+    }
+  };
+
   const handleRoleChange = async (userId, newRole) => {
     await changeUserRole(userId, newRole);
     setRefreshKey((k) => k + 1);

@@ -1224,6 +1224,78 @@ export function AuthProvider({ children }) {
     }
   }, [user, logout, supabaseOk]);
 
+  // ---- 彻底删除用户 ----
+  // 会同时清理：Supabase auth.users（需要服务端 Admin API）、profiles、pre_authorized_emails、本地 localStorage
+  // 只能由管理员调用；不允许删除自己。
+  const deleteUser = useCallback(async (userId, emailHint) => {
+    if (!userId && !emailHint) {
+      return { success: false, message: '缺少 userId 或 email' };
+    }
+    if (user?.id && userId && user.id === userId) {
+      return { success: false, message: '不能删除自己' };
+    }
+
+    // 先从本地用户数据库中查一次，拿到 email（用于兜底清预授权）
+    const localUsers = getLocalUsers();
+    const localMatch = localUsers.find((u) => u.id === userId) || (emailHint
+      ? localUsers.find((u) => (u.email || '').toLowerCase() === emailHint.trim().toLowerCase())
+      : null);
+    const targetEmail = (emailHint || localMatch?.email || '').trim().toLowerCase();
+
+    // 1) 调服务端 Admin 接口（优先）
+    let serverOk = false;
+    let serverWarnings = [];
+    try {
+      const resp = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: userId || undefined, email: targetEmail || undefined }),
+      });
+      const data = await resp.json().catch(() => ({}));
+      if (resp.ok && data?.success) {
+        serverOk = true;
+        if (Array.isArray(data.warnings)) serverWarnings = data.warnings;
+      } else {
+        serverWarnings.push(data?.error || `服务端删除失败（HTTP ${resp.status}）`);
+      }
+    } catch (err) {
+      serverWarnings.push('服务端删除接口不可用：' + err.message);
+    }
+
+    // 2) 无论服务端结果如何，都同步清理客户端可感知的本地状态
+    try {
+      const updated = localUsers.filter((u) => {
+        if (userId && u.id === userId) return false;
+        if (targetEmail && (u.email || '').toLowerCase() === targetEmail) return false;
+        return true;
+      });
+      if (updated.length !== localUsers.length) saveLocalUsers(updated);
+    } catch (err) {
+      console.warn('[Auth] 清理本地 users 失败:', err.message);
+    }
+    if (targetEmail) {
+      try { removePreAuthEmail(targetEmail); } catch { /* ignore */ }
+    }
+    // 若当前登录的正是被删的账号，则注销
+    if (user?.id && userId && user.id === userId) {
+      try { await logout(); } catch { /* ignore */ }
+    }
+
+    if (serverOk) {
+      return {
+        success: true,
+        message: '已删除该用户（auth / profile / 预授权 均已同步清理）',
+        warnings: serverWarnings,
+      };
+    }
+    // 服务端没成功，但本地已尽力清理 —— 提示管理员去 Supabase 后台确认
+    return {
+      success: false,
+      message: '服务端删除失败，Supabase 侧可能仍保留记录，请前往 Supabase Dashboard 手动检查 auth.users。',
+      warnings: serverWarnings,
+    };
+  }, [user, logout]);
+
   // ---- 更改用户角色 ----
   const changeUserRole = useCallback(async (userId, newRole) => {
     if (!ROLES.includes(newRole)) return;
@@ -1527,6 +1599,7 @@ export function AuthProvider({ children }) {
         getAllUsers,
         authorizeUser,
         revokeUser,
+        deleteUser,
         changeUserRole,
         preAuthorizeByEmail,
         getPreAuthorizedEmails,

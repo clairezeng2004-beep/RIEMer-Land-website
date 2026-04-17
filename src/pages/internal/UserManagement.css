@@ -377,6 +377,15 @@
   font-size: var(--text-sm);
 }
 
+.users-table__delete-btn {
+  color: #c0392b;
+}
+.users-table__delete-btn:hover {
+  color: #fff;
+  background: #c0392b;
+  border-color: #c0392b;
+}
+
 @media (max-width: 768px) {
   .users-page { padding-top: var(--space-3xl); }
   .users-stats {
