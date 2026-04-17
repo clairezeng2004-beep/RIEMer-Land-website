@@ -124,6 +124,19 @@
   margin-bottom: var(--space-sm);
 }
 
+/* 字段下方的辅助提示 */
+.content-mgmt__field-hint {
+  margin: var(--space-xs) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  line-height: 1.5;
+}
+
+.content-mgmt__field-hint strong {
+  color: var(--color-primary);
+  font-weight: 600;
+}
+
 .content-mgmt__input {
   width: 100%;
   padding: 0.65rem 0.9rem;

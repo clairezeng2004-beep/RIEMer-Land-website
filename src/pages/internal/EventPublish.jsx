@@ -414,14 +414,14 @@ export default function EventPublish() {
                       onChange={(e) => setDraft({ ...draft, hasReplay: e.target.checked })}
                       style={{ marginRight: 6 }}
                     />
-                    <Video size={14} /> 有回放（点击卡片需输入密码访问）
+                    <Video size={14} /> 提供活动回放（需设置链接与访问密码）
                   </label>
                 </div>
 
                 {draft.hasReplay && (
                   <>
                     <div className="ia-modal__field">
-                      <label className="ia-modal__label">回放链接 *</label>
+                      <label className="ia-modal__label">设置回放链接 *</label>
                       <input
                         type="url"
                         className="ia-modal__text-input"
@@ -431,11 +431,11 @@ export default function EventPublish() {
                       />
                     </div>
                     <div className="ia-modal__field">
-                      <label className="ia-modal__label">访问密码</label>
+                      <label className="ia-modal__label">设置访问密码</label>
                       <input
                         type="text"
                         className="ia-modal__text-input"
-                        placeholder="留空表示不验证密码即可访问"
+                        placeholder="为回放设置访问密码，留空则无需密码即可访问"
                         value={draft.replayPassword}
                         onChange={(e) => setDraft({ ...draft, replayPassword: e.target.value })}
                       />

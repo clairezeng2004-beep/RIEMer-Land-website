@@ -1114,24 +1114,27 @@ export default function ContentManagement() {
                       {editingEvent.hasReplay && (
                         <>
                           <div className="content-mgmt__field">
-                            <label><Link2 size={14} /> 回放链接</label>
+                            <label><Link2 size={14} /> 设置回放链接</label>
                             <input
                               type="text"
                               value={editingEvent.replayUrl}
                               onChange={(e) => setEditingEvent({ ...editingEvent, replayUrl: e.target.value })}
                               className="content-mgmt__input"
-                              placeholder="粘贴回放视频链接…"
+                              placeholder="粘贴回放视频链接，例如腾讯会议 / 腾讯微云 / B 站等"
                             />
                           </div>
                           <div className="content-mgmt__field">
-                            <label><Lock size={14} /> 回放密码（用户需输入密码才能查看回放）</label>
+                            <label><Lock size={14} /> 设置回放密码</label>
                             <input
                               type="text"
                               value={editingEvent.replayPassword}
                               onChange={(e) => setEditingEvent({ ...editingEvent, replayPassword: e.target.value })}
                               className="content-mgmt__input"
-                              placeholder="设置回放访问密码"
+                              placeholder="为该活动回放设置访问密码（留空则无需密码）"
                             />
+                            <p className="content-mgmt__field-hint">
+                              此处为你<strong>设置</strong>的密码，成员在前台点击活动卡片时需要输入此密码才能查看回放。
+                            </p>
                           </div>
                         </>
                       )}
@@ -1347,7 +1350,7 @@ export default function ContentManagement() {
 
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
-                  <span>添加的活动会自动展示在首页「最新活动」区域，有回放的活动用户点击后需输入密码才能访问回放链接。</span>
+                  <span>添加的活动会自动展示在首页「最新活动」区域；开启回放并<strong>设置链接</strong>和<strong>设置密码</strong>后，成员在前台点击卡片需输入你设置的密码才能查看回放。</span>
                 </div>
               </div>
             )}
