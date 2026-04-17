@@ -47,6 +47,8 @@ function AppShell() {
   const { pathname } = useLocation();
   usePageTracking();
   const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname.startsWith(p));
+  // 内部页面（/internal/**）桌面端带固定侧边栏，Footer 需相应让出左侧空间
+  const isInternal = pathname.startsWith('/internal');
 
   return (
     <>
@@ -95,7 +97,7 @@ function AppShell() {
           </Route>
         </Routes>
       </main>
-      {!isFullscreen && <Footer />}
+      {!isFullscreen && <Footer isInternal={isInternal} />}
     </>
   );
 }

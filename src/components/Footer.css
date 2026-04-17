@@ -3,6 +3,13 @@
   margin-top: var(--space-4xl);
 }
 
+/* 内部页面（/internal/**）：桌面端侧边栏宽 220px（position: fixed），
+   Footer 须让出对应左侧空间，避免被侧栏遮挡。
+   手机端侧栏隐藏 → 通过 media query 恢复全宽。 */
+.footer--internal {
+  margin-left: 220px;
+}
+
 .footer__content {
   background: white;
   color: var(--color-text);
@@ -236,6 +243,11 @@
 @media (max-width: 768px) {
   .footer {
     margin-top: var(--space-2xl);
+  }
+
+  /* 手机端内部侧栏隐藏，Footer 恢复全宽 */
+  .footer--internal {
+    margin-left: 0;
   }
 
   .footer__grid {

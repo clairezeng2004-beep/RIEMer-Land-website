@@ -6,7 +6,7 @@ import { useSiteContent } from '../contexts/SiteContentContext';
 import FooterGuestbook from './FooterGuestbook';
 import './Footer.css';
 
-export default function Footer() {
+export default function Footer({ isInternal = false }) {
   const { content } = useSiteContent();
   const [emailCopied, setEmailCopied] = useState(false);
   const [qrExpanded, setQrExpanded] = useState(false);
@@ -28,7 +28,7 @@ export default function Footer() {
   };
 
   return (
-    <footer className="footer">
+    <footer className={`footer${isInternal ? ' footer--internal' : ''}`}>
 
       <div className="footer__content">
         <div className="container">
