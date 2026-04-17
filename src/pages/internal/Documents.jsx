@@ -85,6 +85,8 @@ function inferFileType(fileName) {
 // ============ localStorage 持久化 ============
 // 用户通过独立发布页上传的文档（内容+附件）
 const DOCUMENTS_KEY = 'riemer_documents';
+// 被删除的默认（示例/模拟）文档 id 列表，避免刷新后又出现
+const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
 
 function loadUserDocs() {
   try {
@@ -100,6 +102,27 @@ function saveUserDocs(data) {
   } catch (err) {
     console.error('localStorage 保存失败', err);
   }
+}
+
+function loadDeletedDefaultIds() {
+  try {
+    const stored = localStorage.getItem(DELETED_DEFAULT_IDS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveDeletedDefaultIds(ids) {
+  try {
+    localStorage.setItem(DELETED_DEFAULT_IDS_KEY, JSON.stringify(ids));
+  } catch (err) {
+    console.error('localStorage 保存失败', err);
+  }
+}
+
+// 判断是否为用户发布的文档（而非默认模拟数据）
+function isUserDoc(doc) {
+  return String(doc?.id || '').startsWith('doc-');
 }
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
@@ -171,13 +194,16 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   };
   const [documents, setDocuments] = useState(() => {
     const userDocs = loadUserDocs();
+    const deletedIds = new Set(loadDeletedDefaultIds());
+    // 过滤掉被管理员删除过的默认模拟文档
+    const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
     const base = filterTypes
-      ? [...documentsData, ...userDocs].filter((d) => filterTypes.includes(d.type))
-      : [...userDocs, ...documentsData];
+      ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
+      : [...userDocs, ...defaults];
     // 用户发布的在前
     return base.sort((a, b) => {
-      const aIsUser = String(a.id).startsWith('doc-');
-      const bIsUser = String(b.id).startsWith('doc-');
+      const aIsUser = isUserDoc(a);
+      const bIsUser = isUserDoc(b);
       if (aIsUser && !bIsUser) return -1;
       if (!aIsUser && bIsUser) return 1;
       return 0;
@@ -187,13 +213,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   // 刷新函数：重新合并 localStorage 里的数据（被新窗口发布时调用）
   const refreshDocs = useCallback(() => {
     const userDocs = loadUserDocs();
+    const deletedIds = new Set(loadDeletedDefaultIds());
+    const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
     const base = filterTypes
-      ? [...documentsData, ...userDocs].filter((d) => filterTypes.includes(d.type))
-      : [...userDocs, ...documentsData];
+      ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
+      : [...userDocs, ...defaults];
     setDocuments(
       base.sort((a, b) => {
-        const aIsUser = String(a.id).startsWith('doc-');
-        const bIsUser = String(b.id).startsWith('doc-');
+        const aIsUser = isUserDoc(a);
+        const bIsUser = isUserDoc(b);
         if (aIsUser && !bIsUser) return -1;
         if (!aIsUser && bIsUser) return 1;
         return 0;
@@ -312,12 +340,26 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
   const handleDelete = (id) => {
     if (window.confirm('确定要删除这个文档吗？')) {
-      setDocuments(documents.filter((d) => d.id !== id));
-      // 同步从 localStorage 移除（若是用户发布的文档）
+      setDocuments((prev) => prev.filter((d) => d.id !== id));
       if (String(id).startsWith('doc-')) {
+        // 用户发布的文档：直接从 localStorage 移除
         const userDocs = loadUserDocs().filter((d) => d.id !== id);
         saveUserDocs(userDocs);
+      } else {
+        // 默认模拟数据：记录到"已删除 id 列表"，防止刷新/重新合并后又出现
+        const deletedIds = loadDeletedDefaultIds();
+        const sid = String(id);
+        if (!deletedIds.includes(sid)) {
+          deletedIds.push(sid);
+          saveDeletedDefaultIds(deletedIds);
+        }
       }
+      addNotification({
+        title: '文档已删除',
+        message: '文档已从列表中移除。',
+        type: 'system',
+        read: true,
+      });
     }
   };
 
