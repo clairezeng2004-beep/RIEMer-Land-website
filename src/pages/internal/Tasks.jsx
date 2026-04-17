@@ -146,20 +146,32 @@ export default function Tasks() {
   // 初始值优先读本地缓存；若无缓存且从未初始化过，则用示例数据 seeds 一次
   const [tasks, setTasks] = useState(() => {
     const cached = readLocalTasks();
-    if (cached) return cached;
-    // 首次使用：种下示例数据，之后本地就有记录
+    if (cached && cached.length > 0) {
+      console.log('[Tasks] 从本地缓存恢复', cached.length, '条数据');
+      return cached;
+    }
+    // 首次使用 或 本地为空：种下示例数据
     if (!localStorage.getItem(TASKS_SEEDED_KEY)) {
       try {
         localStorage.setItem(TASKS_SEEDED_KEY, '1');
         writeLocalTasks(initialTasks);
       } catch { /* ignore */ }
+      console.log('[Tasks] 首次使用，载入示例数据', initialTasks.length, '条');
       return initialTasks;
     }
+    console.log('[Tasks] 本地缓存为空（已 seeded 过）');
     return [];
   });
 
   // 每次 tasks 变化都同步写回 localStorage（作为所有写操作的兜底）
+  // ⚠️ 避免把空数组写入覆盖真实数据：仅当长度 > 0 或明确是用户清空动作时才写
+  const hasInitializedRef = useRef(false);
   useEffect(() => {
+    // 初次挂载时不写（已在 useState 初始化里写过）
+    if (!hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      return;
+    }
     writeLocalTasks(tasks);
   }, [tasks]);
 
@@ -173,19 +185,23 @@ export default function Tasks() {
 
     (async () => {
       try {
+        console.log('[Tasks] 开始从 Supabase 拉取 tasks...');
         const { data, error } = await supabase
           .from('tasks')
           .select('*')
           .order('created_at', { ascending: false });
         if (error) throw error;
         const remote = (data || []).map(rowToTask);
+        console.log('[Tasks] Supabase 返回', remote.length, '条数据');
         // 仅当远端确有数据时才覆盖本地；远端为空时保留本地（避免新表误清空用户本地数据）
         if (remote.length > 0) {
           setTasks(remote);
+        } else {
+          console.log('[Tasks] 远端无数据，保留本地缓存');
         }
       } catch (err) {
         // 表可能未创建 / 网络失败 —— 静默，继续使用本地数据
-        console.warn('[Tasks] 从 Supabase 加载失败，使用本地数据:', err.message);
+        console.warn('[Tasks] ❌ 从 Supabase 加载失败:', err);
       }
     })();
   }, [isAuthenticated, supabaseOk]);
@@ -246,11 +262,17 @@ export default function Tasks() {
     // 异步同步到 Supabase
     if (canUseSupabase) {
       try {
-        const { error } = await supabase.from('tasks').insert(taskToRow(task));
+        const row = taskToRow(task);
+        console.log('[Tasks] 向 Supabase 插入新事项:', row);
+        const { data, error } = await supabase.from('tasks').insert(row).select();
         if (error) throw error;
+        console.log('[Tasks] ✅ Supabase 插入成功:', data);
       } catch (err) {
-        console.warn('[Tasks] 新增同步到 Supabase 失败（已保留在本地）:', err.message);
+        console.error('[Tasks] ❌ 新增同步到 Supabase 失败（已保留在本地）:', err.message, err);
       }
+    } else {
+      console.log('[Tasks] Supabase 不可用，仅本地保存。canUseSupabase=', canUseSupabase,
+        ' isSupabaseConfigured=', isSupabaseConfigured, ' supabaseOk=', supabaseOk);
     }
   };
 
@@ -285,13 +307,15 @@ export default function Tasks() {
     }
     if (canUseSupabase) {
       try {
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('tasks')
           .update({ status: newStatus, status_history: nextHistory })
-          .eq('id', id);
+          .eq('id', id)
+          .select();
         if (error) throw error;
+        console.log('[Tasks] ✅ 状态更新已同步到 Supabase:', data);
       } catch (err) {
-        console.warn('[Tasks] 更新状态同步到 Supabase 失败:', err.message);
+        console.error('[Tasks] ❌ 更新状态同步到 Supabase 失败:', err.message, err);
       }
     }
   };
@@ -307,8 +331,9 @@ export default function Tasks() {
       try {
         const { error } = await supabase.from('tasks').delete().eq('id', id);
         if (error) throw error;
+        console.log('[Tasks] ✅ 删除已同步到 Supabase:', id);
       } catch (err) {
-        console.warn('[Tasks] 删除同步到 Supabase 失败:', err.message);
+        console.error('[Tasks] ❌ 删除同步到 Supabase 失败:', err.message, err);
       }
     }
   };
