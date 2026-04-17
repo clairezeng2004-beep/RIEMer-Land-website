@@ -262,47 +262,71 @@ export default function Home() {
             )}
           </div>
           <div className="featured__grid">
-            {recentArticles.map((article) => (
-              <Link
-                key={article.id}
-                to={`/article/${article.id}`}
-                className="featured__card"
-                onClick={() => trackEvent('article_click', {
+            {recentArticles.map((article) => {
+              const hasUrl = !!article.url;
+              const trackClick = () =>
+                trackEvent('article_click', {
                   article_id: article.id,
                   article_title: article.title,
                   article_category: article.category,
                   source: 'home',
-                })}
-              >
-                {/* 封面图 */}
-                <div className="featured__cover">
-                  {article.coverImage ? (
-                    <CoverImage
-                      src={article.coverImage}
-                      alt={article.title}
-                      className="featured__cover-img"
-                    />
-                  ) : (
-                    <div className="featured__cover-placeholder">
-                      <FileText size={28} />
+                  target: hasUrl ? 'wechat' : 'detail',
+                });
+
+              const cardInner = (
+                <>
+                  {/* 封面图 */}
+                  <div className="featured__cover">
+                    {article.coverImage ? (
+                      <CoverImage
+                        src={article.coverImage}
+                        alt={article.title}
+                        className="featured__cover-img"
+                      />
+                    ) : (
+                      <div className="featured__cover-placeholder">
+                        <FileText size={28} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="featured__card-body">
+                    <div className="featured__card-top">
+                      <span className="featured__category">{article.category}</span>
                     </div>
-                  )}
-                </div>
-                <div className="featured__card-body">
-                  <div className="featured__card-top">
-                    <span className="featured__category">{article.category}</span>
+                    <h3 className="featured__title">{article.title}</h3>
+                    <p className="featured__excerpt">{article.excerpt}</p>
+                    <div className="featured__meta">
+                      <span className="featured__meta-item">
+                        <Clock size={14} />
+                        {article.date}
+                      </span>
+                    </div>
                   </div>
-                  <h3 className="featured__title">{article.title}</h3>
-                  <p className="featured__excerpt">{article.excerpt}</p>
-                  <div className="featured__meta">
-                    <span className="featured__meta-item">
-                      <Clock size={14} />
-                      {article.date}
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </>
+              );
+
+              return hasUrl ? (
+                <a
+                  key={article.id}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="featured__card"
+                  onClick={trackClick}
+                >
+                  {cardInner}
+                </a>
+              ) : (
+                <Link
+                  key={article.id}
+                  to={`/article/${article.id}`}
+                  className="featured__card"
+                  onClick={trackClick}
+                >
+                  {cardInner}
+                </Link>
+              );
+            })}
           </div>
           <div className="featured__more">
             <Link to="/articles" className="btn btn-secondary" onClick={() => trackEvent('nav_click', { link: '/articles', source: 'home' })}>

@@ -134,54 +134,78 @@ export default function Articles() {
             共 {filtered.length} 篇文章
           </div>
           <div className="articles-list__grid">
-            {filtered.map((article) => (
-              <Link
-                key={article.id}
-                to={`/article/${article.id}`}
-                className="article-card card"
-                onClick={() => trackEvent('article_click', {
+            {filtered.map((article) => {
+              const hasUrl = !!article.url;
+              const trackClick = () =>
+                trackEvent('article_click', {
                   article_id: article.id,
                   article_title: article.title,
                   article_category: article.category,
                   source: 'articles_list',
-                })}
-              >
-                {/* 封面图 */}
-                <div className="article-card__cover">
-                  {article.coverImage ? (
-                    <CoverImage
-                      src={article.coverImage}
-                      alt={article.title}
-                      className="article-card__cover-img"
-                    />
-                  ) : (
-                    <div className="article-card__cover-placeholder">
-                      <FileText size={28} />
+                  target: hasUrl ? 'wechat' : 'detail',
+                });
+
+              const cardInner = (
+                <>
+                  {/* 封面图 */}
+                  <div className="article-card__cover">
+                    {article.coverImage ? (
+                      <CoverImage
+                        src={article.coverImage}
+                        alt={article.title}
+                        className="article-card__cover-img"
+                      />
+                    ) : (
+                      <div className="article-card__cover-placeholder">
+                        <FileText size={28} />
+                      </div>
+                    )}
+                  </div>
+                  <div className="article-card__body">
+                    <h3 className="article-card__title">{article.title}</h3>
+                    <p className="article-card__excerpt">{article.excerpt}</p>
+                    <div className="article-card__tags">
+                      {article.tags.map((tag) => (
+                        <span key={tag} className="article-card__tag">
+                          <Tag size={12} /> {tag}
+                        </span>
+                      ))}
                     </div>
-                  )}
-                </div>
-                <div className="article-card__body">
-                  <h3 className="article-card__title">{article.title}</h3>
-                  <p className="article-card__excerpt">{article.excerpt}</p>
-                  <div className="article-card__tags">
-                    {article.tags.map((tag) => (
-                      <span key={tag} className="article-card__tag">
-                        <Tag size={12} /> {tag}
+                    <div className="article-card__bottom">
+                      <span className="article-card__meta">
+                        <Clock size={14} />
+                        <span>{article.date}</span>
                       </span>
-                    ))}
+                      <span className="article-card__link">
+                        阅读全文 <ArrowRight size={14} />
+                      </span>
+                    </div>
                   </div>
-                  <div className="article-card__bottom">
-                    <span className="article-card__meta">
-                      <Clock size={14} />
-                      <span>{article.date}</span>
-                    </span>
-                    <span className="article-card__link">
-                      阅读全文 <ArrowRight size={14} />
-                    </span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </>
+              );
+
+              return hasUrl ? (
+                <a
+                  key={article.id}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="article-card card"
+                  onClick={trackClick}
+                >
+                  {cardInner}
+                </a>
+              ) : (
+                <Link
+                  key={article.id}
+                  to={`/article/${article.id}`}
+                  className="article-card card"
+                  onClick={trackClick}
+                >
+                  {cardInner}
+                </Link>
+              );
+            })}
           </div>
 
           {filtered.length === 0 && (
