@@ -679,10 +679,9 @@ export default function Login() {
                     value={resetCode}
                     onChange={(e) => setResetCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
                     placeholder="请输入 6 位数字验证码"
-                    className="login-card__input"
+                    className="login-card__input login-card__input--code"
                     maxLength={6}
                     autoComplete="one-time-code"
-                    style={{ letterSpacing: '4px', fontSize: '18px', textAlign: 'center' }}
                   />
                 </div>
 

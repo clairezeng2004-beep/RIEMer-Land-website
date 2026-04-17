@@ -155,6 +155,35 @@
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
 }
 
+/* ===== 6 位验证码输入框 ===== */
+/* 有内容时：大字 + 宽字距 + 居中，凸显验证码 */
+.login-card__input--code {
+  font-family: 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 20px;
+  font-weight: 600;
+  letter-spacing: 8px;
+  text-align: center;
+  padding-left: calc(1rem + 8px); /* 补偿 letter-spacing 造成的整体右偏 */
+}
+
+/* 显示 placeholder 时：恢复正常文字样式，和其他输入框保持一致 */
+.login-card__input--code:placeholder-shown {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: normal;
+  text-align: left;
+  padding-left: 1rem;
+}
+
+.login-card__input--code::placeholder {
+  font-family: inherit;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  letter-spacing: normal;
+  color: var(--color-text-muted);
+}
+
 .login-card__password-wrapper {
   position: relative;
 }

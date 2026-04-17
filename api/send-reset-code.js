@@ -75,7 +75,7 @@ export default async function handler(req, res) {
       console.warn('[send-reset-code] RESEND_API_KEY 未配置，直接返回验证码（仅限开发环境）');
       return res.status(200).json({
         success: true,
-        message: '验证码已生成（开发模式，API Key 未配置）',
+        message: '验证码已生成，请使用下方验证码继续操作',
         devCode: resetCode, // 仅开发环境返回
       });
     }
@@ -111,12 +111,11 @@ export default async function handler(req, res) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[send-reset-code] Resend API 错误:', response.status, errorData);
-        // Resend 发送失败
-        // 回退：直接返回验证码，让前端显示
+        // Resend 发送失败 → 回退：直接返回验证码，让前端显示
         console.warn('[send-reset-code] Resend 发送失败，回退为直接返回验证码');
         return res.status(200).json({
           success: true,
-          message: '验证码已生成（邮件服务暂不可用，请使用下方验证码）',
+          message: '验证码已生成，请使用下方验证码继续操作',
           devCode: resetCode,
         });
       }
@@ -130,7 +129,7 @@ export default async function handler(req, res) {
       // 网络异常也回退为直接返回验证码
       return res.status(200).json({
         success: true,
-        message: '验证码已生成（邮件服务异常，请使用下方验证码）',
+        message: '验证码已生成，请使用下方验证码继续操作',
         devCode: resetCode,
       });
     }
