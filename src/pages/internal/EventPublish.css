@@ -1,0 +1,62 @@
+/* ============================================================
+   活动发布 (EventPublish) 页面样式
+   - 主体复用 InternalArticles.css 的 ia- 系类（不再重复定义）
+   - 复用 EventDistribution.css 的 replay-modal-* 样式
+   - 这里只定义 ep- 前缀的少量增量
+   ============================================================ */
+
+@import './EventDistribution.css';
+
+.ep-card {
+  position: relative;
+}
+
+.ep-card--clickable:hover {
+  cursor: pointer;
+}
+
+.ep-card__top {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs, 6px);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-sm, 10px);
+}
+
+.ep-card__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.ep-card__badge--upcoming {
+  background: rgba(91, 140, 62, 0.12);
+  color: var(--color-primary, #5b8c3e);
+}
+
+.ep-card__badge--replay {
+  background: rgba(79, 191, 196, 0.15);
+  color: #2c8c8f;
+}
+
+.ep-card__meta--lock {
+  color: #c89020;
+}
+
+/* 弹窗内：日期 + 分类同行 */
+.ep-modal__row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md, 14px);
+}
+
+@media (max-width: 480px) {
+  .ep-modal__row {
+    grid-template-columns: 1fr;
+  }
+}

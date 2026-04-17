@@ -38,6 +38,7 @@ const LABEL_TO_SECTION = {
   labelMemberProfiles: 'memberProfiles',
   labelGallery: 'gallery',
   labelEventDistribution: 'eventDistribution',
+  labelEventPublish: 'eventPublish',
   labelProfile: 'profile',
   labelUsers: 'users',
   // labelHome / labelGuestbook / labelContent / labelNotificationMgmt 对应的页面
@@ -84,6 +85,7 @@ export default function InternalSidebar() {
     { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
     { to: '/internal/event-distribution', icon: CalendarRange, configKey: 'labelEventDistribution', label: sc.labelEventDistribution },
+    { to: '/internal/event-publish', icon: CalendarRange, configKey: 'labelEventPublish', label: sc.labelEventPublish },
     { to: '/internal/profile', icon: UserCircle, configKey: 'labelProfile', label: sc.labelProfile },
   ];
 
