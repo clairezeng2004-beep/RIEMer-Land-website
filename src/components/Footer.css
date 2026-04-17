@@ -297,11 +297,13 @@
     margin-left: 0;
   }
 
+  /* 手机端：四个模块（导航 / 关于我们 / 联系方式 / 关注公众号）
+     各自独占一行，垂直堆叠，互相之间留出明确间距。 */
   .footer__grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
     grid-template-areas: none;
-    row-gap: 0;
+    row-gap: var(--space-xl);
     column-gap: 0;
     text-align: center;
   }
@@ -309,29 +311,78 @@
   .footer__grid > .footer__nav,
   .footer__grid > .footer__qrcode {
     grid-row: auto;
+    grid-column: auto;
     grid-template-rows: none;
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: var(--space-md) 0;
-    border-bottom: 1px solid var(--color-border-light);
-    justify-content: flex-start;
-    gap: var(--space-xs);
-  }
-
-  .footer__grid > .footer__qrcode {
+    padding: 0;
     border-bottom: none;
-    padding-bottom: 0;
-    gap: var(--space-xs);
-    grid-column: auto;
-    grid-row: auto;
+    justify-content: flex-start;
+    gap: var(--space-sm);
+    width: 100%;
   }
 
+  /* 标题显示回来（之前"关于我们"标题被 display:none 隐藏，现在统一恢复） */
+  .footer__nav-title {
+    display: block;
+    margin-bottom: 0;
+    padding-bottom: 0;
+  }
+
+  /* 导航链接列表：每个链接一行，居中 */
+  .footer__nav-links-row {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+  }
+
+  .footer__nav-links-row .footer__nav-link {
+    display: block;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* "关于我们"三行文字：居中堆叠 */
+  .footer__about-texts {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+    border-top: none;
+    padding-top: 0;
+  }
+
+  .footer__about-texts .footer__nav-text {
+    display: block;
+  }
+
+  /* 联系方式内容 */
+  .footer__contact-list {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-xs);
+    width: 100%;
+  }
+
+  .footer__contact-item {
+    justify-content: center;
+    white-space: normal;
+    flex-wrap: nowrap;
+  }
+
+  /* "给我们留言"按钮：居中、胶囊样式 */
   .footer__contact-guestbook {
-    padding: var(--space-xs) 0 var(--space-md);
-    border-bottom: 1px solid var(--color-border-light);
+    margin-top: var(--space-xs);
+    padding: 0;
+    border-bottom: none;
     display: flex;
     justify-content: center;
+    width: 100%;
   }
 
   .footer__contact-guestbook .footer-guestbook {
@@ -353,80 +404,6 @@
     border: 1px dashed var(--color-primary);
   }
 
-  .footer__nav-title {
-    margin-bottom: 0;
-    padding-bottom: var(--space-xs);
-  }
-
-  /* 导航链接改为水平一行 */
-  .footer__grid > .footer__nav:first-child {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-xs);
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  .footer__grid > .footer__nav:first-child .footer__nav-title {
-    margin-bottom: 0;
-  }
-
-  .footer__grid > .footer__nav:first-child .footer__nav-link {
-    display: block;
-    margin-bottom: 0;
-  }
-
-  /* 导航链接行容器：垂直排列，每个链接独占一行 */
-  .footer__nav-links-row {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  .footer__nav-links-row .footer__nav-link {
-    display: block;
-    width: 100%;
-    text-align: center;
-  }
-
-  /* "关于我们"区块：三行文字合并为一行 */
-  .footer__grid > .footer__nav:nth-child(2) {
-    flex-direction: column;
-    align-items: center;
-    padding-top: var(--space-md);
-    border-top: none;
-    border-bottom: none;
-  }
-
-  .footer__grid > .footer__nav:nth-child(2) .footer__nav-title {
-    display: none;
-  }
-
-  .footer__grid > .footer__nav:nth-child(2) .footer__about-texts {
-    border-top: 1px solid var(--color-border-light);
-    padding-top: var(--space-md);
-    width: 100%;
-  }
-
-  .footer__about-texts {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: var(--space-xs);
-  }
-
-  .footer__about-texts .footer__nav-text {
-    display: block;
-  }
-
-  .footer__contact-item {
-    justify-content: center;
-    white-space: normal;
-    flex-wrap: nowrap;
-  }
-
   /* 手机端：复制成功提示紧跟按钮右侧，不换行 */
   .footer__copy-toast {
     position: static;
@@ -438,10 +415,15 @@
     margin-top: 0;
   }
 
+  /* 二维码 */
+  .footer__qrcode {
+    align-items: center;
+  }
+
   .footer__qrcode-img {
     grid-row: auto;
-    width: 100px;
-    height: 100px;
+    width: 120px;
+    height: 120px;
     margin-bottom: 0;
   }
 
