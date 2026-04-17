@@ -128,11 +128,12 @@ export default function ProcessTemplateDetail() {
   // 使用 state + 版本号 让"保存"后重新加载数据，而不是永远锁死在首次 mount 快照
   const [docsVersion, setDocsVersion] = useState(0);
   const allDocs = useMemo(() => {
+    // 依赖 docsVersion：编辑保存后递增，强制重算；loadUserDocs/loadDeletedDefaultIds 是直接读 localStorage 的纯函数
+    void docsVersion;
     const userDocs = loadUserDocs();
     const deletedIds = new Set(loadDeletedDefaultIds());
     const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
     return [...userDocs, ...defaults];
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [docsVersion]);
 
   const doc = useMemo(() => allDocs.find((d) => String(d.id) === String(id)), [allDocs, id]);
