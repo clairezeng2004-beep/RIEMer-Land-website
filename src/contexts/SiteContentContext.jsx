@@ -121,7 +121,6 @@ const getDefaultInternalConfig = () => ({
     labelGuestbook: '访客留言板',
     labelMemberProfiles: '成员通讯录',
     labelGallery: '活动相册',
-    labelEventDistribution: '活动分布',
     labelEventPublish: '活动发布',
     labelProfile: '个人主页',
     labelUsers: '用户管理',
@@ -214,15 +213,7 @@ const getDefaultInternalConfig = () => ({
     pageTitle: '个人主页',
     pageDesc: '设置你的昵称、头像和个性签名',
   },
-  // 活动分布页（与首页「最新活动」共享 events 数据源）
-  eventDistribution: {
-    pageTitle: '活动分布',
-    pageDesc: '查看所有活动的时间分布与分类概览，数据与首页「最新活动」实时同步',
-    sectionUpcoming: '即将开始',
-    sectionPast: '已结束',
-    emptyText: '暂无活动，可前往「内容管理 → 活动管理」添加',
-  },
-  // 活动发布页（同样与首页「最新活动」共享 events 数据源，CRUD 入口之一）
+  // 活动发布页（与首页「最新活动」共享 events 数据源，CRUD 入口之一）
   eventPublish: {
     pageTitle: '活动发布',
     pageDesc: '发布与维护团队活动，数据与首页「最新活动」实时同步',

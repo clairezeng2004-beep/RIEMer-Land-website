@@ -37,7 +37,6 @@ const LABEL_TO_SECTION = {
   labelSuggestions: 'suggestions',
   labelMemberProfiles: 'memberProfiles',
   labelGallery: 'gallery',
-  labelEventDistribution: 'eventDistribution',
   labelEventPublish: 'eventPublish',
   labelProfile: 'profile',
   labelUsers: 'users',
@@ -79,13 +78,12 @@ export default function InternalSidebar() {
     { to: '/internal/process-templates', icon: FolderOpen, configKey: 'labelProcessTemplates', label: sc.labelProcessTemplates },
     { to: '/internal/member-sharing', icon: Share2, configKey: 'labelMemberSharing', label: sc.labelMemberSharing },
     { to: '/internal/articles', icon: BookOpen, configKey: 'labelArticles', label: sc.labelArticles },
+    { to: '/internal/event-publish', icon: CalendarRange, configKey: 'labelEventPublish', label: sc.labelEventPublish },
     { to: '/internal/contributions', icon: BarChart3, configKey: 'labelContributions', label: sc.labelContributions },
     { to: '/internal/suggestions', icon: MessageSquarePlus, configKey: 'labelSuggestions', label: sc.labelSuggestions },
     { to: '/internal/guestbook', icon: MessageCircle, configKey: 'labelGuestbook', label: sc.labelGuestbook },
     { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
-    { to: '/internal/event-distribution', icon: CalendarRange, configKey: 'labelEventDistribution', label: sc.labelEventDistribution },
-    { to: '/internal/event-publish', icon: CalendarRange, configKey: 'labelEventPublish', label: sc.labelEventPublish },
     { to: '/internal/profile', icon: UserCircle, configKey: 'labelProfile', label: sc.labelProfile },
   ];
 

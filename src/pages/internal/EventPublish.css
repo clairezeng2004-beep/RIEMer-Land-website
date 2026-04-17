@@ -1,11 +1,8 @@
 /* ============================================================
    活动发布 (EventPublish) 页面样式
    - 主体复用 InternalArticles.css 的 ia- 系类（不再重复定义）
-   - 复用 EventDistribution.css 的 replay-modal-* 样式
-   - 这里只定义 ep- 前缀的少量增量
+   - 这里定义 ep- 前缀的少量增量 + 回放密码弹窗 replay-modal-*
    ============================================================ */
-
-@import './EventDistribution.css';
 
 .ep-card {
   position: relative;
@@ -59,4 +56,175 @@
   .ep-modal__row {
     grid-template-columns: 1fr;
   }
+}
+
+/* ============================================================
+   回放密码弹窗
+   ============================================================ */
+.replay-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: var(--space-lg);
+  animation: ep-fade-in 0.2s ease;
+}
+
+@keyframes ep-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.replay-modal {
+  background: var(--color-bg);
+  border-radius: var(--radius-lg);
+  padding: var(--space-xl);
+  max-width: 440px;
+  width: 100%;
+  position: relative;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+  animation: ep-slide-up 0.25s ease;
+}
+
+@keyframes ep-slide-up {
+  from { transform: translateY(20px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.replay-modal__close {
+  position: absolute;
+  top: var(--space-md);
+  right: var(--space-md);
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.replay-modal__close:hover {
+  background: var(--color-bg-alt, #f1f3ef);
+  color: var(--color-text);
+}
+
+.replay-modal__icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--color-bg-alt, #f1f3ef);
+  color: var(--color-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto var(--space-lg);
+}
+
+.replay-modal__title {
+  text-align: center;
+  font-size: var(--text-lg);
+  font-weight: 600;
+  margin: 0 0 var(--space-xs);
+  color: var(--color-text);
+}
+
+.replay-modal__desc {
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-lg);
+}
+
+.replay-modal__event-info {
+  background: var(--color-bg-alt, #f8faf5);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin-bottom: var(--space-lg);
+}
+
+.replay-modal__event-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  margin-bottom: 4px;
+}
+
+.replay-modal__event-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.replay-modal__field {
+  margin-bottom: var(--space-lg);
+}
+
+.replay-modal__input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.replay-modal__input {
+  width: 100%;
+  padding: 10px 44px 10px 14px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  font-size: var(--text-sm);
+  background: var(--color-bg);
+  color: var(--color-text);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.replay-modal__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.12);
+}
+
+.replay-modal__eye-btn {
+  position: absolute;
+  right: 8px;
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 6px;
+  border-radius: var(--radius-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.replay-modal__eye-btn:hover {
+  color: var(--color-text);
+  background: var(--color-bg-alt, #f1f3ef);
+}
+
+.replay-modal__error {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #D9534F;
+  font-size: var(--text-xs);
+  margin-top: 6px;
+}
+
+.replay-modal__actions {
+  display: flex;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.replay-modal__actions .btn {
+  flex: 1;
+  justify-content: center;
 }

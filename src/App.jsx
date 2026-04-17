@@ -32,7 +32,6 @@ import Profile from './pages/internal/Profile';
 import Suggestions from './pages/internal/Suggestions';
 import Guestbook from './pages/internal/Guestbook';
 import NotificationManagement from './pages/internal/NotificationManagement';
-import EventDistribution from './pages/internal/EventDistribution';
 import EventPublish from './pages/internal/EventPublish';
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
@@ -89,7 +88,6 @@ function AppShell() {
             <Route path="guestbook" element={<Guestbook />} />
             <Route path="profile" element={<Profile />} />
             <Route path="member-profiles" element={<MemberProfiles />} />
-            <Route path="event-distribution" element={<EventDistribution />} />
             <Route path="event-publish" element={<EventPublish />} />
           </Route>
         </Routes>
