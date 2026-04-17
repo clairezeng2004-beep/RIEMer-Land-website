@@ -162,85 +162,109 @@ function formatDate(d) {
 
 /**
  * 本地提取摘要（降级方案）
- * 提取前几个有意义的句子，去除太短的句子
+ * 策略：挑选"有信息量"的句子，而不是单纯取前 N 字
+ *  - 优先跳过开头的问候/梗概铺垫
+ *  - 避免纯数字罗列的句子作为开头（如"绩点3.9/5.0 专业排名24/158"）
+ *  - 选择包含动词/转折/关键词的句子
  */
-export function generateSummaryLocal(content, maxLength = 120) {
+export function generateSummaryLocal(content, maxLength = 100) {
   if (!content) return '';
 
+  // 清洗：去除常见公众号铺垫
+  const cleaned = content
+    .replace(/^.{0,40}(大家好|hello|hi,|各位|同学们)[，,：:\s]/i, '')
+    .replace(/点击上方.*?关注/g, '')
+    .replace(/扫码关注.*?公众号/g, '')
+    .trim();
+
   // 按句子切分
-  const sentences = content
+  const sentences = cleaned
     .split(/[。！？；\n]+/)
     .map((s) => s.trim())
-    .filter((s) => s.length >= 6);
+    .filter((s) => s.length >= 10 && s.length <= 120);
 
-  if (sentences.length === 0) return content.slice(0, maxLength);
+  if (sentences.length === 0) {
+    return cleaned.slice(0, maxLength) + (cleaned.length > maxLength ? '…' : '');
+  }
 
-  // 拼接前几个句子直到达到摘要长度
+  // 给每个句子打分，挑选信息量高的
+  const scored = sentences.map((s, idx) => {
+    let score = 0;
+    // 位置分：越靠前越高，但不是第一句（第一句通常是问候）
+    if (idx >= 1 && idx <= 4) score += 5;
+    else if (idx <= 8) score += 2;
+    // 长度分：25-60 字最佳
+    if (s.length >= 20 && s.length <= 60) score += 3;
+    else if (s.length >= 15) score += 1;
+    // 关键词分
+    if (/分享|介绍|探讨|总结|经验|方法|建议|讲述|回顾|采访|专访|心得/.test(s)) score += 4;
+    if (/保研|考研|留学|求职|实习|课程|活动|竞赛|辩论/.test(s)) score += 2;
+    // 数字密度惩罚：超过 4 个数字的句子通常是罗列，不适合做摘要首句
+    const numCount = (s.match(/\d/g) || []).length;
+    if (numCount > 6) score -= 3;
+    // 避免以纯数据开头
+    if (/^[\d.、,，/]+/.test(s)) score -= 2;
+    return { s, score, idx };
+  });
+
+  // 排序：按分数降序，但保持原文顺序展开
+  const topSentences = [...scored]
+    .sort((a, b) => b.score - a.score)
+    .slice(0, 4)
+    .sort((a, b) => a.idx - b.idx)
+    .map((x) => x.s);
+
+  // 拼接直到达到摘要长度
   let summary = '';
-  for (const sent of sentences) {
-    if (summary.length + sent.length > maxLength) break;
-    summary += sent + '，';
+  for (const sent of topSentences) {
+    if (summary.length + sent.length > maxLength) {
+      if (!summary) summary = sent.slice(0, maxLength);
+      break;
+    }
+    summary += (summary ? '；' : '') + sent;
   }
 
-  // 去掉末尾逗号，加省略号
-  summary = summary.replace(/，$/, '');
-  if (summary.length < content.length * 0.8) {
-    summary += '…';
+  if (!summary) {
+    summary = sentences[0].slice(0, maxLength);
   }
 
-  return summary || content.slice(0, maxLength) + '…';
+  // 结尾加句号
+  if (!/[。！？]$/.test(summary)) summary += '。';
+
+  return summary;
 }
 
 /**
- * AI 智能摘要（通过已有的 DeepSeek API）
- * 将文章正文发送给 AI，让其生成一段简洁、有吸引力的中文摘要
+ * AI 智能摘要（走专用的 /api/summarize 接口）
  * 失败时降级为本地提取
  */
 export async function generateSummaryAI(title, content) {
   if (!content) return '';
 
-  // 截取正文前2000字，避免 token 过多
-  const truncated = content.slice(0, 2000);
-
   try {
-    const response = await fetch('/api/chat', {
+    const response = await fetch('/api/summarize', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages: [
-          {
-            role: 'user',
-            content: `请为以下公众号文章生成一段50-100字的中文摘要，要求：
-1. 用第三人称客观描述，概括文章核心内容和亮点
-2. 语言简洁有吸引力，适合作为文章卡片的预览文字
-3. 不要使用"本文"开头，直接切入主题
-4. 只输出摘要文字，不要任何标注或解释
-
-文章标题：${title}
-
-文章正文：
-${truncated}`,
-          },
-        ],
-      }),
+      body: JSON.stringify({ title, content }),
     });
 
     if (!response.ok) {
-      throw new Error(`API 返回 ${response.status}`);
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || `API 返回 ${response.status}`);
     }
 
     const data = await response.json();
-    const reply = data.reply?.trim();
+    const summary = (data.summary || '').trim();
 
-    if (reply && reply.length >= 10 && reply.length <= 200) {
-      return reply;
+    // 校验长度：15-250 字之间才算合理
+    if (summary && summary.length >= 15 && summary.length <= 250) {
+      return summary;
     }
+    throw new Error(`AI 返回内容长度异常: ${summary.length} 字`);
   } catch (err) {
     console.warn('[articleService] AI 摘要生成失败，降级为本地提取:', err.message);
+    return generateSummaryLocal(content);
   }
-
-  // 降级：本地提取
-  return generateSummaryLocal(content);
 }
 
 // 保持向后兼容的别名
