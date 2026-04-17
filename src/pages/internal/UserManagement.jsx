@@ -43,6 +43,7 @@ export default function UserManagement() {
     authorizeUser,
     revokeUser,
     changeUserRole,
+    deleteUser,
     preAuthorizeByEmail,
     getPreAuthorizedEmails,
     removePreAuthorizedEmail,
