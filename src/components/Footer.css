@@ -116,7 +116,8 @@
 }
 
 .footer__qrcode {
-  align-items: flex-start;
+  align-items: flex-end;
+  text-align: right;
 }
 
 /* 二维码图片 */
