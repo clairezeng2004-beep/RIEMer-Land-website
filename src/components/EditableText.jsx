@@ -29,21 +29,27 @@ export default function EditableText({
   const ref = useRef(null);
   const lastValue = useRef(value);
 
-  // 同步外部 value 到 DOM（仅当外部值确实变了，且不在用户正编辑时）
-  // 编辑模式下：DOM 是 source of truth，不可反向用 value 覆盖，否则会清空光标位置
+  // 同步外部 value 到 DOM
+  // - 非编辑模式：正常回写
+  // - 编辑模式：仅当该节点当前「不是焦点」时才回写；如果用户正在里面打字，
+  //   该节点就是 document.activeElement，此时跳过，避免光标被重置；
+  //   但其他「联动的」EditableText（如 sidebar 改字时 pageTitle h1 也要同步变）
+  //   不是焦点，会走到这里 —— 从而实现"所见即所得的联动实时更新"。
   useEffect(() => {
-    if (ref.current && !editing) {
-      ref.current.textContent = value;
+    if (!ref.current) return;
+    const isActive = typeof document !== 'undefined' && document.activeElement === ref.current;
+    if (!editing || !isActive) {
+      if (ref.current.textContent !== value) {
+        ref.current.textContent = value ?? '';
+      }
     }
     lastValue.current = value;
   }, [value, editing]);
 
-  // 进入编辑模式时，做一次性的 DOM 初始化（仅依赖 editing，不依赖 value）
-  // 依赖里放 value 会导致：每次 onChange -> 外部 state 更新 -> value 变 -> 这里重写 textContent
-  // -> contentEditable 光标被重置到开头。所以绝对不能依赖 value。
+  // 进入编辑模式时，做一次性的 DOM 初始化
   useEffect(() => {
     if (editing && ref.current) {
-      ref.current.textContent = lastValue.current;
+      ref.current.textContent = lastValue.current ?? '';
     }
   }, [editing]);
 
