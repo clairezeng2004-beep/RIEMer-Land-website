@@ -46,6 +46,7 @@ const EMPTY_EVENT = {
   category: '分享会',
   location: '',
   excerpt: '',
+  officialUrl: '',
   hasReplay: false,
   replayUrl: '',
   replayPassword: '',
@@ -147,14 +148,22 @@ export default function EventPublish() {
       title: draft.title.trim(),
       location: draft.location.trim(),
       excerpt: draft.excerpt.trim(),
+      officialUrl: draft.officialUrl.trim(),
       replayUrl: draft.replayUrl.trim(),
       replayPassword: draft.replayPassword.trim(),
     });
     closeModal();
   };
 
-  // ---- 卡片点击：有回放才弹密码框 ----
+  // ---- 卡片点击：
+  //   1. 优先跳转公众号推文链接（officialUrl）
+  //   2. 其次：如果有回放 → 弹密码框
+  //   3. 否则不响应
   const handleCardClick = (event) => {
+    if (event.officialUrl && /^https?:\/\//i.test(event.officialUrl)) {
+      window.open(event.officialUrl, '_blank', 'noopener,noreferrer');
+      return;
+    }
     if (event.hasReplay && event.replayUrl) {
       setReplayModal(event);
       setPasswordInput('');
@@ -245,7 +254,8 @@ export default function EventPublish() {
         <div className="ia-list__grid">
           {filtered.map((event) => {
             const countdownDays = getCountdownDays(event.date);
-            const clickable = event.hasReplay && event.replayUrl;
+            const hasOfficial = !!(event.officialUrl && /^https?:\/\//i.test(event.officialUrl));
+            const clickable = hasOfficial || (event.hasReplay && event.replayUrl);
             return (
               <div
                 key={event.id}
@@ -378,6 +388,20 @@ export default function EventPublish() {
                     value={draft.excerpt}
                     onChange={(e) => setDraft({ ...draft, excerpt: e.target.value })}
                     rows={3}
+                  />
+                </div>
+
+                {/* 公众号推文链接 */}
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <ExternalLink size={14} /> 公众号推文链接
+                  </label>
+                  <input
+                    type="url"
+                    className="ia-modal__text-input"
+                    placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
+                    value={draft.officialUrl}
+                    onChange={(e) => setDraft({ ...draft, officialUrl: e.target.value })}
                   />
                 </div>
 

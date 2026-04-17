@@ -452,30 +452,48 @@ export default function InternalArticles() {
         <div className="ia-list__grid">
           {filtered.map((article) => {
             const commentCount = getCommentCount('article', article.id);
+            // 归档文章卡片：优先跳转公众号原链接；如无原链接则回退站内详情页
+            const hasExternal = !!(article.url && /^https?:\/\//i.test(article.url));
+            const commonInner = (
+              <div className="ia-card__body">
+                <span className="ia-card__category">{article.category}</span>
+                <h3 className="ia-card__title">{article.title}</h3>
+                <p className="ia-card__excerpt">{article.excerpt}</p>
+                <div className="ia-card__footer">
+                  <span className="ia-card__meta">
+                    <Calendar size={13} /> {article.date}
+                  </span>
+                  {commentCount > 0 && (
+                    <span className="ia-card__comments">
+                      <MessageSquare size={13} /> {commentCount}
+                    </span>
+                  )}
+                  <span className="ia-card__arrow">
+                    <ArrowRight size={14} />
+                  </span>
+                </div>
+              </div>
+            );
+            if (hasExternal) {
+              return (
+                <a
+                  key={article.id}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ia-card card"
+                >
+                  {commonInner}
+                </a>
+              );
+            }
             return (
               <Link
                 key={article.id}
                 to={`/internal/article/${article.id}`}
                 className="ia-card card"
               >
-                <div className="ia-card__body">
-                  <span className="ia-card__category">{article.category}</span>
-                  <h3 className="ia-card__title">{article.title}</h3>
-                  <p className="ia-card__excerpt">{article.excerpt}</p>
-                  <div className="ia-card__footer">
-                    <span className="ia-card__meta">
-                      <Calendar size={13} /> {article.date}
-                    </span>
-                    {commentCount > 0 && (
-                      <span className="ia-card__comments">
-                        <MessageSquare size={13} /> {commentCount}
-                      </span>
-                    )}
-                    <span className="ia-card__arrow">
-                      <ArrowRight size={14} />
-                    </span>
-                  </div>
-                </div>
+                {commonInner}
               </Link>
             );
           })}
