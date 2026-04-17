@@ -272,8 +272,10 @@ export function AuthProvider({ children }) {
 
       try {
         // 2. 尝试获取 session（独立 5 秒超时，不依赖全局 fetch 超时）
+        // 用两个明确状态区分：sessionTimedOut = 真正超时/网络错误；sessionMissing = 明确返回空 session
         let session = null;
         let sessionUser = null;
+        let sessionTimedOut = false;
         try {
           const { data, error: sessionError } = await withTimeout(
             supabase.auth.getSession(), 5000, 'getSession'
@@ -285,6 +287,7 @@ export function AuthProvider({ children }) {
           sessionUser = session?.user;
         } catch (e) {
           console.warn('[Auth] getSession 失败:', e.message);
+          sessionTimedOut = true; // 区分超时 vs 明确返回 null
         }
 
         if (sessionUser) {
@@ -301,6 +304,7 @@ export function AuthProvider({ children }) {
 
         // 3. session 为空或失败，尝试刷新 token（独立 5 秒超时）
         console.log('[Auth] getSession 返回空 session，尝试 refreshSession...');
+        let refreshTimedOut = false;
         try {
           const { data: refreshData, error: refreshError } = await withTimeout(
             supabase.auth.refreshSession(), 5000, 'refreshSession'
@@ -321,20 +325,40 @@ export function AuthProvider({ children }) {
           }
         } catch (e) {
           console.warn('[Auth] refreshSession 失败:', e.message);
+          refreshTimedOut = true;
         }
 
-        // 4. session 和 refresh 都失败了 → 用户需要重新登录
-        console.warn('[Auth] Session 恢复和刷新均失败，需重新登录。总耗时:', Date.now() - startTime, 'ms');
+        // 4. session 和 refresh 都没拿到用户
+        // 关键区分：
+        //   - 如果是「超时/网络错误」→ 不能判定 session 失效，保留当前用户（避免误踢）
+        //   - 只有「明确返回空/明确返回错误但无超时」→ 才认定 session 已过期
+        const bothTimedOut = sessionTimedOut && refreshTimedOut;
+        const definitelyInvalid = !sessionTimedOut && !refreshTimedOut; // 两次都明确返回但都没拿到 user
+
+        console.warn('[Auth] Session 恢复和刷新均未拿到 user。',
+          'sessionTimedOut:', sessionTimedOut, 'refreshTimedOut:', refreshTimedOut,
+          '总耗时:', Date.now() - startTime, 'ms');
+
         if (!sessionResolved) {
           sessionResolved = true;
-          setSupabaseOk(true); // 服务可达，只是 session 失效
+          setSupabaseOk(true); // 服务可达
+
           if (isBgMode) {
-            // 后台验证失败 → session 已过期，需要清除用户状态让用户重新登录
-            console.warn('[Auth] 后台验证：session 已失效，需重新登录');
-            setUser(null);
-            localStorage.removeItem(AUTH_KEY);
-            clearProfileCache();
+            if (bothTimedOut) {
+              // 网络抖动导致两次都超时 —— 不清用户，本地缓存的 user 继续可用
+              console.warn('[Auth] 后台验证：两次都超时，保留当前用户（下次请求会再次尝试刷新 token）');
+            } else if (definitelyInvalid) {
+              // 服务端明确告诉我们 session 无效 → 登出
+              console.warn('[Auth] 后台验证：session 明确失效，需重新登录');
+              setUser(null);
+              localStorage.removeItem(AUTH_KEY);
+              clearProfileCache();
+            } else {
+              // 一次超时一次明确 —— 保守：保留用户
+              console.warn('[Auth] 后台验证：结果不一致（一次超时一次明确），保守保留当前用户');
+            }
           } else {
+            // 非后台模式（首次加载，无缓存用户），可以正常走降级流程
             restoreLocalAuth();
           }
           setLoading(false);
