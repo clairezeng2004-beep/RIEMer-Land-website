@@ -432,6 +432,59 @@ CREATE POLICY "管理员可删除文章"
   );
 
 -- ============================================
+-- 19. 创建 tasks 表（事项追踪）
+-- ============================================
+-- 内部空间"事项追踪"模块使用，存储所有团队任务。
+-- 前端代码：src/pages/internal/Tasks.jsx
+CREATE TABLE IF NOT EXISTS tasks (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL,
+  description TEXT NOT NULL DEFAULT '',
+  category TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT '待启动',
+  assignee JSONB NOT NULL DEFAULT '[]'::jsonb,
+  helpers JSONB NOT NULL DEFAULT '[]'::jsonb,
+  status_history JSONB NOT NULL DEFAULT '[]'::jsonb,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
+
+ALTER TABLE tasks ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看事项" ON tasks;
+DROP POLICY IF EXISTS "认证用户可新增事项" ON tasks;
+DROP POLICY IF EXISTS "认证用户可更新事项" ON tasks;
+DROP POLICY IF EXISTS "认证用户可删除事项" ON tasks;
+
+-- 所有已认证用户可查看
+CREATE POLICY "认证用户可查看事项"
+  ON tasks FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 所有已认证用户可插入（团队协作，任何成员都能新建事项）
+CREATE POLICY "认证用户可新增事项"
+  ON tasks FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- 所有已认证用户可更新（如改状态、补备注）
+CREATE POLICY "认证用户可更新事项"
+  ON tasks FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- 所有已认证用户可删除（如需更严可改成仅 admin）
+CREATE POLICY "认证用户可删除事项"
+  ON tasks FOR DELETE
+  TO authenticated
+  USING (true);
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，

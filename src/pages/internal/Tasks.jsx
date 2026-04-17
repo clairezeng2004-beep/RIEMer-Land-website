@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import {
   CheckSquare,
@@ -24,8 +25,56 @@ const statusColors = {
   '已取消': '#C0392B',
 };
 
+// 持久化键：本地缓存 + 是否已初始化示例数据的标记
+const TASKS_LS_KEY = 'riemer_tasks';
+const TASKS_SEEDED_KEY = 'riemer_tasks_seeded';
+
+/** 从 localStorage 读取 tasks（解析失败返回 null） */
+const readLocalTasks = () => {
+  try {
+    const raw = localStorage.getItem(TASKS_LS_KEY);
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeLocalTasks = (list) => {
+  try {
+    localStorage.setItem(TASKS_LS_KEY, JSON.stringify(list));
+  } catch (err) {
+    console.warn('[Tasks] 写入本地缓存失败:', err.message);
+  }
+};
+
+/** Supabase 行 → 前端 task（兼容历史字段） */
+const rowToTask = (r) => ({
+  id: r.id,
+  title: r.title || '',
+  description: r.description || '',
+  category: r.category || '',
+  status: r.status || '待启动',
+  assignee: Array.isArray(r.assignee) ? r.assignee : [],
+  helpers: Array.isArray(r.helpers) ? r.helpers : [],
+  statusHistory: Array.isArray(r.status_history) ? r.status_history : [],
+  createdAt: r.created_at ? String(r.created_at).slice(0, 10) : '',
+});
+
+const taskToRow = (t) => ({
+  id: t.id,
+  title: t.title || '',
+  description: t.description || '',
+  category: t.category || '',
+  status: t.status || '待启动',
+  assignee: Array.isArray(t.assignee) ? t.assignee : (t.assignee ? [t.assignee] : []),
+  helpers: Array.isArray(t.helpers) ? t.helpers : [],
+  status_history: Array.isArray(t.statusHistory) ? t.statusHistory : [],
+});
+
 export default function Tasks() {
-  const { isAuthenticated, user, getAllUsers } = useAuth();
+  const { isAuthenticated, user, getAllUsers, supabaseOk } = useAuth();
   const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const navigate = useNavigate();
@@ -93,7 +142,54 @@ export default function Tasks() {
     return map;
   }, [teamMembers, authorizedMembers]);
 
-  const [tasks, setTasks] = useState(initialTasks);
+  // ---- Tasks 状态（持久化） ----
+  // 初始值优先读本地缓存；若无缓存且从未初始化过，则用示例数据 seeds 一次
+  const [tasks, setTasks] = useState(() => {
+    const cached = readLocalTasks();
+    if (cached) return cached;
+    // 首次使用：种下示例数据，之后本地就有记录
+    if (!localStorage.getItem(TASKS_SEEDED_KEY)) {
+      try {
+        localStorage.setItem(TASKS_SEEDED_KEY, '1');
+        writeLocalTasks(initialTasks);
+      } catch { /* ignore */ }
+      return initialTasks;
+    }
+    return [];
+  });
+
+  // 每次 tasks 变化都同步写回 localStorage（作为所有写操作的兜底）
+  useEffect(() => {
+    writeLocalTasks(tasks);
+  }, [tasks]);
+
+  // 启动后异步尝试从 Supabase 拉取最新数据（如配置且可用）
+  const loadedFromServerRef = useRef(false);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!(isSupabaseConfigured && supabaseOk === true)) return;
+    if (loadedFromServerRef.current) return;
+    loadedFromServerRef.current = true;
+
+    (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('tasks')
+          .select('*')
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+        const remote = (data || []).map(rowToTask);
+        // 仅当远端确有数据时才覆盖本地；远端为空时保留本地（避免新表误清空用户本地数据）
+        if (remote.length > 0) {
+          setTasks(remote);
+        }
+      } catch (err) {
+        // 表可能未创建 / 网络失败 —— 静默，继续使用本地数据
+        console.warn('[Tasks] 从 Supabase 加载失败，使用本地数据:', err.message);
+      }
+    })();
+  }, [isAuthenticated, supabaseOk]);
+
   const [showForm, setShowForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState('全部');
   const [filterCategory, setFilterCategory] = useState('全部');
@@ -113,21 +209,30 @@ export default function Tasks() {
     return <Navigate to="/login" replace />;
   }
 
+  const canUseSupabase = isSupabaseConfigured && supabaseOk === true;
+
   const filtered = tasks.filter((task) => {
     const matchesStatus = filterStatus === '全部' || task.status === filterStatus;
     const matchesCategory = filterCategory === '全部' || task.category === filterCategory;
     return matchesStatus && matchesCategory;
   });
 
-  const handleAddTask = (e) => {
+  const handleAddTask = async (e) => {
     e.preventDefault();
     if (!newTask.title) return;
+    // 生成 UUID（Supabase id 列是 uuid；localStorage 也兼容）
+    const genId = () => (
+      (typeof crypto !== 'undefined' && crypto.randomUUID)
+        ? crypto.randomUUID()
+        : Date.now().toString() + Math.random().toString(36).slice(2, 8)
+    );
     const task = {
       ...newTask,
-      id: Date.now().toString(),
+      id: genId(),
       createdAt: new Date().toISOString().split('T')[0],
     };
-    setTasks([task, ...tasks]);
+    // 乐观更新 UI + 本地缓存
+    setTasks((prev) => [task, ...prev]);
     setNewTask({
       title: '',
       description: '',
@@ -137,27 +242,33 @@ export default function Tasks() {
       helpers: [],
     });
     setShowForm(false);
+
+    // 异步同步到 Supabase
+    if (canUseSupabase) {
+      try {
+        const { error } = await supabase.from('tasks').insert(taskToRow(task));
+        if (error) throw error;
+      } catch (err) {
+        console.warn('[Tasks] 新增同步到 Supabase 失败（已保留在本地）:', err.message);
+      }
+    }
   };
 
-  const updateTaskStatus = (id, newStatus) => {
+  const updateTaskStatus = async (id, newStatus) => {
     const note = notes[id] || '';
     const targetTask = tasks.find((t) => t.id === id);
-    setTasks(
-      tasks.map((t) => {
-        if (t.id !== id) return t;
-        const record = {
-          from: t.status,
-          to: newStatus,
-          reason: note,
-          date: new Date().toISOString().split('T')[0],
-        };
-        return {
-          ...t,
-          status: newStatus,
-          statusHistory: [...(t.statusHistory || []), record],
-        };
-      })
-    );
+    if (!targetTask) return;
+    const record = {
+      from: targetTask.status,
+      to: newStatus,
+      reason: note,
+      date: new Date().toISOString().split('T')[0],
+    };
+    const nextHistory = [...(targetTask.statusHistory || []), record];
+    setTasks((prev) => prev.map((t) => (t.id === id
+      ? { ...t, status: newStatus, statusHistory: nextHistory }
+      : t
+    )));
     // 清空该任务的备注
     setNotes((prev) => {
       const next = { ...prev };
@@ -166,12 +277,22 @@ export default function Tasks() {
     });
     // 公众号文章分类的事项标记为"已完成"时，提示用户是否去归档页面
     if (
-      targetTask &&
       targetTask.category === '公众号文章' &&
       newStatus === '已完成' &&
       targetTask.status !== '已完成'
     ) {
       setArchivePrompt({ taskTitle: targetTask.title });
+    }
+    if (canUseSupabase) {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ status: newStatus, status_history: nextHistory })
+          .eq('id', id);
+        if (error) throw error;
+      } catch (err) {
+        console.warn('[Tasks] 更新状态同步到 Supabase 失败:', err.message);
+      }
     }
   };
 
@@ -179,9 +300,16 @@ export default function Tasks() {
     setNotes((prev) => ({ ...prev, [id]: value }));
   };
 
-  const deleteTask = (id) => {
-    if (window.confirm('确定要删除这个事项吗？')) {
-      setTasks(tasks.filter((t) => t.id !== id));
+  const deleteTask = async (id) => {
+    if (!window.confirm('确定要删除这个事项吗？')) return;
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+    if (canUseSupabase) {
+      try {
+        const { error } = await supabase.from('tasks').delete().eq('id', id);
+        if (error) throw error;
+      } catch (err) {
+        console.warn('[Tasks] 删除同步到 Supabase 失败:', err.message);
+      }
     }
   };
 
