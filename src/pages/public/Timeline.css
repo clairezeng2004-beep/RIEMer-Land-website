@@ -93,7 +93,14 @@
   -ms-overflow-style: none;
   scrollbar-width: none;
   user-select: none;
-  touch-action: pan-y pinch-zoom;
+  /* 允许横向手势滑动 + 双指缩放。
+     之前写成 pan-y pinch-zoom 会禁用水平手势，导致手机端左右滑不动。
+     pan-x 让浏览器识别横向滑动；垂直方向不声明 → 默认交给父级/页面滚动。 */
+  touch-action: pan-x pinch-zoom;
+  /* iOS Safari 惯性滚动 */
+  -webkit-overflow-scrolling: touch;
+  /* 横向边界避免把整页一起带偏 */
+  overscroll-behavior-x: contain;
 }
 
 .timeline__track::-webkit-scrollbar {

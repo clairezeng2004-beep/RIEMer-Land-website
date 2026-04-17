@@ -180,8 +180,13 @@ export default function Timeline() {
     el.scrollBy({ left: direction === 'left' ? -amount : amount, behavior: 'smooth' });
   };
 
-  // 鼠标拖拽
+  // 鼠标拖拽（仅桌面端；触屏设备完全交给浏览器原生横向滚动，避免干扰）
+  const isTouchDevice =
+    typeof window !== 'undefined' &&
+    (('ontouchstart' in window) || (navigator.maxTouchPoints || 0) > 0);
+
   const handleMouseDown = (e) => {
+    if (isTouchDevice) return;
     const el = trackRef.current;
     if (!el) return;
     setIsDragging(true);
@@ -192,6 +197,7 @@ export default function Timeline() {
   };
 
   const handleMouseMove = (e) => {
+    if (isTouchDevice) return;
     if (!isDragging) return;
     e.preventDefault();
     const el = trackRef.current;
@@ -201,6 +207,7 @@ export default function Timeline() {
   };
 
   const handleMouseUp = () => {
+    if (isTouchDevice) return;
     setIsDragging(false);
     if (trackRef.current) trackRef.current.style.cursor = 'grab';
     document.body.style.userSelect = '';
