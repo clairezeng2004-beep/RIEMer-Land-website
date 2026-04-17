@@ -339,7 +339,13 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('确定要删除这个文档吗？')) {
+    // 先找到被删除的文档，用于在通知中显示详细信息
+    const target = documents.find((d) => d.id === id);
+    if (!target) return;
+
+    const typeLabel = typeLabels[target.type] || '文档';
+    const confirmMsg = `确定要删除文档「${target.title}」吗？`;
+    if (window.confirm(confirmMsg)) {
       setDocuments((prev) => prev.filter((d) => d.id !== id));
       if (String(id).startsWith('doc-')) {
         // 用户发布的文档：直接从 localStorage 移除
@@ -354,9 +360,19 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           saveDeletedDefaultIds(deletedIds);
         }
       }
+      // 通知中显示原文档的详细信息：名称 / 类型 / 上传者 / 操作人
+      const operator = user?.nickname || user?.name || '管理员';
+      const uploader = target.uploadedBy || '未知';
+      const parts = [
+        `分类：${typeLabel}`,
+        `上传者：${uploader}`,
+      ];
+      if (target.date) parts.push(`上传时间：${target.date}`);
+      parts.push(`操作人：${operator}`);
+
       addNotification({
-        title: '文档已删除',
-        message: '文档已从列表中移除。',
+        title: `文档已删除：${target.title}`,
+        message: `文档「${target.title}」已从列表中移除。${parts.join('｜')}`,
         type: 'system',
         read: true,
       });
