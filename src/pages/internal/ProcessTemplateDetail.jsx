@@ -20,6 +20,9 @@ import {
   List,
   X,
   HardDrive,
+  Pencil,
+  Save,
+  Clipboard,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
@@ -116,18 +119,21 @@ function isUserDoc(doc) {
 
 /* ========== 主组件 ========== */
 export default function ProcessTemplateDetail() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, isAdmin } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const contentRef = useRef(null);
 
   // 合并数据源：localStorage（用户发布） + siteData.documentsData（默认模拟，排除被删除的）
+  // 使用 state + 版本号 让"保存"后重新加载数据，而不是永远锁死在首次 mount 快照
+  const [docsVersion, setDocsVersion] = useState(0);
   const allDocs = useMemo(() => {
     const userDocs = loadUserDocs();
     const deletedIds = new Set(loadDeletedDefaultIds());
     const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
     return [...userDocs, ...defaults];
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [docsVersion]);
 
   const doc = useMemo(() => allDocs.find((d) => String(d.id) === String(id)), [allDocs, id]);
 
@@ -244,6 +250,61 @@ export default function ProcessTemplateDetail() {
     }
   }, [doc, user, liked, likes]);
 
+  /* ========== 编辑模式 ========== */
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editContent, setEditContent] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const startEdit = useCallback(() => {
+    if (!doc) return;
+    setEditTitle(doc.title || '');
+    setEditDescription(doc.description || '');
+    setEditContent(doc.content || '');
+    setIsEditing(true);
+  }, [doc]);
+
+  const cancelEdit = useCallback(() => {
+    setIsEditing(false);
+  }, []);
+
+  const saveEdit = useCallback(() => {
+    if (!doc) return;
+    const title = editTitle.trim();
+    if (!title) {
+      alert('标题不能为空');
+      return;
+    }
+    setSaving(true);
+    try {
+      const userDocs = loadUserDocs();
+      const idx = userDocs.findIndex((d) => String(d.id) === String(doc.id));
+      if (idx === -1) {
+        alert('仅支持编辑用户发布的文档');
+        setSaving(false);
+        return;
+      }
+      userDocs[idx] = {
+        ...userDocs[idx],
+        title,
+        description: editDescription,
+        content: editContent,
+        // 保留旧的 format：markdown / word
+        lastEditedAt: new Date().toISOString().split('T')[0],
+        lastEditedBy: user?.nickname || user?.name || user?.email || 'Unknown',
+      };
+      saveUserDocs(userDocs);
+      setDocsVersion((v) => v + 1);
+      setIsEditing(false);
+    } catch (err) {
+      console.error('[ProcessTemplateDetail] 保存失败:', err);
+      alert('保存失败，请重试');
+    } finally {
+      setSaving(false);
+    }
+  }, [doc, editTitle, editDescription, editContent, user]);
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (!doc) {
@@ -278,6 +339,9 @@ export default function ProcessTemplateDetail() {
 
   const showToc = toc.length > 0 && hasTextContent && (doc.format === 'markdown' || doc.format === 'word');
 
+  /* ========== 编辑权限：用户发布的文档 + （管理员 或 发布者本人） ========== */
+  const canEdit = isUserDoc(doc) && (isAdmin || (user?.id && String(user.id) === String(doc.uploadedById)));
+
   return (
     <div className="ptd-page">
       {/* 顶部导航栏 */}
@@ -285,13 +349,43 @@ export default function ProcessTemplateDetail() {
         <button className="ptd-topbar__back" onClick={() => navigate('/internal/process-templates')}>
           <ChevronLeft size={20} /> 返回列表
         </button>
+        {canEdit && !isEditing && (
+          <button
+            type="button"
+            className="ptd-topbar__edit"
+            onClick={startEdit}
+            title="编辑此文档"
+          >
+            <Pencil size={16} /> 编辑
+          </button>
+        )}
+        {canEdit && isEditing && (
+          <div className="ptd-topbar__edit-actions">
+            <button
+              type="button"
+              className="ptd-topbar__cancel"
+              onClick={cancelEdit}
+              disabled={saving}
+            >
+              <X size={16} /> 取消
+            </button>
+            <button
+              type="button"
+              className="ptd-topbar__save"
+              onClick={saveEdit}
+              disabled={saving}
+            >
+              <Save size={16} /> {saving ? '保存中…' : '保存'}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* 全屏内容区域 */}
       <div className="ptd-content">
         <div className={`ptd-content__inner ${showToc ? 'ptd-content__inner--with-toc' : ''}`}>
           {/* 文章主体 */}
-          <article className="ptd-article">
+          <article className={`ptd-article ${isEditing ? 'ptd-article--editing' : ''}`}>
             {/* 文章头部 */}
             <header className="ptd-article__header">
               <span
@@ -310,10 +404,32 @@ export default function ProcessTemplateDetail() {
                 </span>
               )}
 
-              <h1 className="ptd-article__title">{doc.title}</h1>
+              {isEditing ? (
+                <input
+                  type="text"
+                  className="ptd-edit__title-input"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  placeholder="文档标题"
+                  maxLength={120}
+                />
+              ) : (
+                <h1 className="ptd-article__title">{doc.title}</h1>
+              )}
 
-              {doc.description && (
-                <p className="ptd-article__desc">{doc.description}</p>
+              {isEditing ? (
+                <textarea
+                  className="ptd-edit__desc-input"
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="简介（可选，支持多行）"
+                  rows={2}
+                  maxLength={300}
+                />
+              ) : (
+                doc.description && (
+                  <p className="ptd-article__desc">{doc.description}</p>
+                )
               )}
 
               <div className="ptd-article__meta">
@@ -323,16 +439,54 @@ export default function ProcessTemplateDetail() {
                 {doc.size && doc.size !== '—' && (
                   <span><HardDrive size={14} /> {doc.size}</span>
                 )}
+                {doc.lastEditedAt && !isEditing && (
+                  <span title={`由 ${doc.lastEditedBy || 'Unknown'} 编辑`}>
+                    <Pencil size={14} /> 最后编辑 {doc.lastEditedAt}
+                  </span>
+                )}
               </div>
             </header>
 
-            {/* 正文（Markdown / Word-HTML） */}
-            {hasTextContent && (
-              <div
-                ref={contentRef}
-                className={`ptd-article__content ${doc.format === 'word' ? 'ptd-article__content--word' : 'ptd-article__content--markdown'}`}
-                dangerouslySetInnerHTML={{ __html: renderedContent }}
-              />
+            {/* 正文（Markdown / Word-HTML）—— 编辑模式下显示 textarea；非编辑态按原渲染 */}
+            {isEditing ? (
+              hasTextContent || doc.format === 'markdown' || doc.format === 'word' ? (
+                <div className="ptd-edit__content">
+                  <div className="ptd-edit__content-hint">
+                    <Clipboard size={12} />
+                    <span>
+                      {doc.format === 'markdown'
+                        ? '当前文档为 Markdown 格式，支持 Markdown 语法'
+                        : doc.format === 'word'
+                          ? '当前文档为 Word 富文本格式，HTML 标签将被保留'
+                          : '纯文本编辑'}
+                    </span>
+                  </div>
+                  <textarea
+                    className="ptd-edit__content-textarea"
+                    value={editContent}
+                    onChange={(e) => setEditContent(e.target.value)}
+                    placeholder={
+                      doc.format === 'markdown'
+                        ? '# 标题\n\n正文内容…'
+                        : '正文内容…'
+                    }
+                    spellCheck={false}
+                  />
+                </div>
+              ) : (
+                <div className="ptd-edit__content-empty">
+                  <p>该文档为附件/文件型，暂不支持在线编辑正文内容。</p>
+                  <p>如需更换文件，请删除后重新发布。</p>
+                </div>
+              )
+            ) : (
+              hasTextContent && (
+                <div
+                  ref={contentRef}
+                  className={`ptd-article__content ${doc.format === 'word' ? 'ptd-article__content--word' : 'ptd-article__content--markdown'}`}
+                  dangerouslySetInnerHTML={{ __html: renderedContent }}
+                />
+              )
             )}
 
             {/* 当没有 content 但有主文件 fileUrl 时：PDF / 图片 / Word 嵌入预览 */}
