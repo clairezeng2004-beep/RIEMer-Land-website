@@ -68,6 +68,29 @@
   margin: 0;
 }
 
+/* 编辑态：评论栏不渲染，第三列的 340px 应当收回，让正文区（含 md 左右预览分栏）获得足够宽度 */
+.ptd-content__inner--with-toc.ptd-content__inner--editing {
+  grid-template-columns: 220px minmax(0, 1fr);
+}
+
+/* 编辑态下的 Markdown 左右分栏：拉满高度，匹配原单 textarea 的高度基线 */
+.ptd-edit__md-split {
+  min-height: 520px;
+}
+
+.ptd-edit__md-split .msc-md-split__editor,
+.ptd-edit__md-split .msc-md-split__preview {
+  min-height: 480px;
+}
+
+@media (max-width: 640px) {
+  .ptd-edit__md-split,
+  .ptd-edit__md-split .msc-md-split__editor,
+  .ptd-edit__md-split .msc-md-split__preview {
+    min-height: 320px;
+  }
+}
+
 /* 右侧：划线评论栏（inline TextAnnotation 面板的外壳） */
 .ptd-comments {
   position: sticky;

@@ -35,6 +35,8 @@ import {
   canUseSupabase,
 } from '../../lib/documentsService';
 import './ProcessTemplateDetail.css';
+// 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
+import './MemberSharingCreate.css';
 
 const DOCUMENTS_KEY = 'riemer_documents';
 const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
@@ -334,6 +336,14 @@ export default function ProcessTemplateDetail() {
     setIsEditing(false);
   }, []);
 
+  /* Markdown 编辑态的实时预览（仅当 doc.format === 'markdown' 时使用） */
+  const editMarkdownPreview = useMemo(() => {
+    if (!doc || doc.format !== 'markdown') return '';
+    if (!editContent || !editContent.trim()) return '';
+    marked.setOptions({ breaks: true, gfm: true });
+    return marked.parse(editContent);
+  }, [editContent, doc?.format, doc]);
+
   const saveEdit = useCallback(async () => {
     if (!doc) return;
     const title = editTitle.trim();
@@ -478,7 +488,7 @@ export default function ProcessTemplateDetail() {
 
       {/* 全屏内容区域 */}
       <div className="ptd-content">
-        <div className={`ptd-content__inner ${showToc ? 'ptd-content__inner--with-toc' : ''}`}>
+        <div className={`ptd-content__inner ${showToc ? 'ptd-content__inner--with-toc' : ''} ${isEditing ? 'ptd-content__inner--editing' : ''}`}>
           {/* 左侧目录 */}
           {showToc && (
             <aside className="ptd-toc ptd-toc--left" aria-label="文档目录">
@@ -580,17 +590,43 @@ export default function ProcessTemplateDetail() {
                           : '纯文本编辑'}
                     </span>
                   </div>
-                  <textarea
-                    className="ptd-edit__content-textarea"
-                    value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
-                    placeholder={
-                      doc.format === 'markdown'
-                        ? '# 标题\n\n正文内容…'
-                        : '正文内容…'
-                    }
-                    spellCheck={false}
-                  />
+                  {doc.format === 'markdown' ? (
+                    <div className="msc-md-split ptd-edit__md-split">
+                      <div className="msc-md-split__pane">
+                        <div className="msc-md-split__label">
+                          <Code2 size={14} /> 编辑
+                        </div>
+                        <textarea
+                          className="msc-md-split__editor"
+                          value={editContent}
+                          onChange={(e) => setEditContent(e.target.value)}
+                          placeholder={'# 文档标题\n\n## 一、xxx\n\n正文内容…'}
+                          spellCheck={false}
+                        />
+                      </div>
+                      <div className="msc-md-split__pane">
+                        <div className="msc-md-split__label">
+                          <Eye size={14} /> 预览
+                        </div>
+                        <div
+                          className="msc-md-split__preview"
+                          dangerouslySetInnerHTML={{
+                            __html:
+                              editMarkdownPreview ||
+                              '<p class="msc-md-split__empty">在左侧输入 Markdown 内容后，这里会显示实时预览</p>',
+                          }}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <textarea
+                      className="ptd-edit__content-textarea"
+                      value={editContent}
+                      onChange={(e) => setEditContent(e.target.value)}
+                      placeholder={'正文内容…'}
+                      spellCheck={false}
+                    />
+                  )}
                 </div>
               ) : (
                 <div className="ptd-edit__content-empty">
