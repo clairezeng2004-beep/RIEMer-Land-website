@@ -680,6 +680,7 @@ export default function Gallery() {
                       title="下载原图"
                     >
                       <Download size={14} />
+                      <span>下载原图</span>
                     </button>
                     {canModifyPhoto(photo) && (
                       <button

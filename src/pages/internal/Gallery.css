@@ -472,18 +472,32 @@
 
 .photo-card__download,
 .photo-card__delete {
-  width: 28px;
   height: 28px;
   border-radius: 50%;
   border: none;
   background: rgba(0, 0, 0, 0.5);
   color: white;
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: background var(--transition-fast);
   flex-shrink: 0;
+}
+
+/* 仅图标的删除按钮保持 28x28 圆形 */
+.photo-card__delete {
+  width: 28px;
+}
+
+/* 下载按钮：图标 + 文案"下载原图"，胶囊形 */
+.photo-card__download {
+  gap: 4px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .photo-card__download:hover {
