@@ -254,7 +254,12 @@
 
 /* ============ Cell ============ */
 .member-profiles-table__cell {
-  display: inline-block;
+  /* 使用 -webkit-box 实现"最多 4 行"文本截断 */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  overflow: hidden;
   line-height: 1.6;
   /* 长文本自动换行，保留用户输入的手动换行 */
   white-space: pre-wrap;
@@ -262,6 +267,8 @@
   overflow-wrap: anywhere;
   max-width: 100%;
   vertical-align: top;
+  /* 鼠标悬停时显示完整内容（由 title 属性提供） */
+  cursor: default;
 }
 
 .member-profiles-table__cell--empty {
@@ -270,7 +277,12 @@
 }
 
 .member-profiles-table__cell--nowrap {
+  /* 覆盖上面的 -webkit-box 多行截断，回到单行 */
+  display: inline-block;
+  -webkit-line-clamp: unset;
+  line-clamp: unset;
   white-space: nowrap;
+  overflow: visible;
 }
 
 .member-profiles-table__name-cell {
