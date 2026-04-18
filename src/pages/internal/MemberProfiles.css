@@ -158,6 +158,7 @@
 
 /* 普通行 hover 时 sticky 列也要不透明背景 */
 .member-profiles-table tbody tr:hover .member-profiles-table__sticky-col,
+.member-profiles-table tbody tr:hover .member-profiles-table__name-col,
 .member-profiles-table tbody tr:hover .member-profiles-table__action-col {
   background: #f8faf6;  /* 不透明：等价于 rgba(91,140,62,0.02) on #FFFFFF */
 }
@@ -174,6 +175,21 @@
 }
 
 .member-profiles-table thead .member-profiles-table__sticky-col {
+  background: var(--color-bg);
+  z-index: 3;
+}
+
+/* ============ Sticky Name Column（紧贴在 # 列右侧） ============ */
+.member-profiles-table__name-col {
+  position: sticky;
+  left: 44px; /* 等于 # 列宽度 */
+  z-index: 2;
+  background: var(--color-bg-card);
+  /* 右侧加一条淡淡的分隔阴影，提示被冻结 */
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.06);
+}
+
+.member-profiles-table thead .member-profiles-table__name-col {
   background: var(--color-bg);
   z-index: 3;
 }
@@ -208,6 +224,7 @@
 }
 
 .member-profiles-table__row--self .member-profiles-table__sticky-col,
+.member-profiles-table__row--self .member-profiles-table__name-col,
 .member-profiles-table__row--self .member-profiles-table__action-col {
   background: #f5f9f2;  /* 不透明：等价于 rgba(91,140,62,0.04) on #FFFFFF */
 }
@@ -217,6 +234,7 @@
 }
 
 .member-profiles-table__row--self:hover .member-profiles-table__sticky-col,
+.member-profiles-table__row--self:hover .member-profiles-table__name-col,
 .member-profiles-table__row--self:hover .member-profiles-table__action-col {
   background: #f1f6ed;  /* 不透明：等价于 rgba(91,140,62,0.07) on #FFFFFF */
 }
@@ -226,6 +244,7 @@
 }
 
 .member-profiles-table__row--editing .member-profiles-table__sticky-col,
+.member-profiles-table__row--editing .member-profiles-table__name-col,
 .member-profiles-table__row--editing .member-profiles-table__action-col {
   background: #f4fbfb;  /* 不透明：等价于 rgba(79,191,196,0.04) on #FFFFFF */
 }

@@ -443,7 +443,11 @@ export default function MemberProfiles() {
               <tr>
                 <th className="member-profiles-table__sticky-col">#</th>
                 {COLUMNS.map((col) => (
-                  <th key={col.key} style={{ minWidth: col.width }}>
+                  <th
+                    key={col.key}
+                    style={{ minWidth: col.width }}
+                    className={col.key === 'name' ? 'member-profiles-table__name-col' : undefined}
+                  >
                     {col.label}
                   </th>
                 ))}
@@ -467,7 +471,10 @@ export default function MemberProfiles() {
                       {idx + 1}
                     </td>
                     {COLUMNS.map((col) => (
-                      <td key={col.key}>
+                      <td
+                        key={col.key}
+                        className={col.key === 'name' ? 'member-profiles-table__name-col' : undefined}
+                      >
                         {isEditing && col.editable ? (
                           col.inputType === 'yearMonth' ? (
                             <div className="member-profiles-table__year-month">
