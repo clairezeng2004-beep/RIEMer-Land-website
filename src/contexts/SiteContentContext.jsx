@@ -204,7 +204,7 @@ const getDefaultInternalConfig = () => ({
   // 成员通讯录页
   memberProfiles: {
     pageTitle: '成员通讯录',
-    pageDesc: '了解每位成员的基本信息、去向与兴趣，促进彼此交流',
+    pageDesc: '了解每位成员的基本信息、去向与兴趣，促进彼此交流。可以直接在养老院校友群内添加具体校友',
   },
   // 公众号历史文章页
   internalArticles: {
