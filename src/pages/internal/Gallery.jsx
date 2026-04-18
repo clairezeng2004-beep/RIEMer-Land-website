@@ -20,7 +20,8 @@ import {
   Download,
 } from 'lucide-react';
 import {
-  fetchAllAlbums,
+  fetchAlbumList,
+  fetchAlbumPhotos,
   createAlbum as svcCreateAlbum,
   deleteAlbum as svcDeleteAlbum,
   addPhotosToAlbum as svcAddPhotos,
@@ -92,6 +93,7 @@ export default function Gallery() {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
+  const [albumDetailLoading, setAlbumDetailLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
   const [showAddPhoto, setShowAddPhoto] = useState(false);
@@ -109,12 +111,12 @@ export default function Gallery() {
   const albumFileInputRef = useRef(null);
   const createAlbumFileRef = useRef(null);
 
-  /* ---- 初次加载：从 Supabase 拉取相册（失败时本地缓存兜底） ---- */
+  /* ---- 初次加载：只拉相册列表 + 封面（不拉全部照片，避免卡顿） ---- */
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const list = await fetchAllAlbums();
+        const list = await fetchAlbumList();
         if (alive) setAlbums(list);
       } catch (err) {
         console.warn('[Gallery] 加载相册失败：', err);
@@ -125,6 +127,30 @@ export default function Gallery() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  /* ---- 打开相册详情：若当前是 _partial 数据，懒加载全部照片 ---- */
+  const openAlbum = useCallback(async (album) => {
+    setSelectedAlbum(album);
+    if (!album?._partial) return;
+    setAlbumDetailLoading(true);
+    try {
+      const photos = await fetchAlbumPhotos(album.id);
+      // 同时更新列表和当前详情
+      setAlbums((prev) =>
+        prev.map((a) =>
+          a.id === album.id ? { ...a, photos, _partial: false } : a
+        )
+      );
+      setSelectedAlbum((prev) =>
+        prev && prev.id === album.id ? { ...prev, photos, _partial: false } : prev
+      );
+    } catch (err) {
+      console.warn('[Gallery] 打开相册失败：', err);
+      alert('加载相册照片失败：' + (err.message || '未知错误'));
+    } finally {
+      setAlbumDetailLoading(false);
+    }
   }, []);
 
   if (!isAuthenticated) {
@@ -503,11 +529,11 @@ export default function Gallery() {
                   <div
                     key={album.id}
                     className="album-card card"
-                    onClick={() => setSelectedAlbum(album)}
+                    onClick={() => openAlbum(album)}
                   >
                     <div className="album-card__cover">
                       {cover ? (
-                        <img src={getDisplayUrl(cover)} alt={album.title} loading="lazy" />
+                        <img src={getDisplayUrl(cover)} alt={album.title} loading="lazy" decoding="async" />
                       ) : (
                         <div className="album-card__cover-empty">
                           <Images size={40} />
@@ -516,7 +542,7 @@ export default function Gallery() {
                       )}
                       <div className="album-card__cover-overlay">
                         <span className="album-card__photo-count">
-                          <ImageIcon size={14} /> {album.photos.length} 张
+                          <ImageIcon size={14} /> {album.photoCount ?? album.photos.length} 张
                         </span>
                       </div>
                     </div>
@@ -584,7 +610,7 @@ export default function Gallery() {
               <p className="gallery-detail__desc">{selectedAlbum.description}</p>
             )}
             <span className="gallery-detail__meta">
-              <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photos.length} 张照片
+              <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photoCount ?? selectedAlbum.photos.length} 张照片
             </span>
           </div>
           <button
@@ -657,7 +683,12 @@ export default function Gallery() {
         )}
 
         {/* 照片网格 */}
-        {selectedAlbum.photos.length > 0 ? (
+        {albumDetailLoading ? (
+          <div className="gallery-empty">
+            <Images size={48} />
+            <h3>加载中...</h3>
+          </div>
+        ) : selectedAlbum.photos.length > 0 ? (
           <div className="photo-grid">
             {selectedAlbum.photos.map((photo, index) => (
               <div
@@ -665,7 +696,7 @@ export default function Gallery() {
                 className="photo-card"
                 onClick={() => openLightbox(index)}
               >
-                <img src={getDisplayUrl(photo)} alt={photo.caption} loading="lazy" />
+                <img src={getDisplayUrl(photo)} alt={photo.caption} loading="lazy" decoding="async" />
                 <div className="photo-card__overlay">
                   {photo.caption && (
                     <span className="photo-card__caption">{photo.caption}</span>

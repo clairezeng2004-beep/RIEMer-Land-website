@@ -52,6 +52,8 @@ function rowToPhoto(row) {
 
 /* ============================================
  * 查询所有相册（含照片）
+ * ⚠️ 性能注意：只在"本地模式"或需要全量数据时使用。
+ * 列表页请优先使用 fetchAlbumList() 只拉封面 + 数量，避免一次性下载全站照片。
  * ============================================ */
 export async function fetchAllAlbums() {
   if (!hasRemote()) return getLocalAlbums();
@@ -84,6 +86,92 @@ export async function fetchAllAlbums() {
   } catch (err) {
     console.warn('[AlbumService] 获取相册失败，回退本地：', err.message);
     return getLocalAlbums();
+  }
+}
+
+/* ============================================
+ * 列表页专用：只拉相册 + 每相册首张照片作为封面 + 总张数
+ * 不把所有照片一次性拉回来，大幅提升相册 Tab 加载速度。
+ * ============================================ */
+export async function fetchAlbumList() {
+  if (!hasRemote()) {
+    // 本地模式直接返回（数据量小）
+    return getLocalAlbums().map((a) => ({
+      ...a,
+      photoCount: (a.photos || []).length,
+    }));
+  }
+
+  try {
+    const { data: albums, error: e1 } = await supabase
+      .from('albums')
+      .select('*')
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (e1) throw e1;
+    if (!albums || albums.length === 0) return [];
+
+    const ids = albums.map((a) => a.id);
+
+    // 1) 拉每个相册"排序最前"的一张照片作为封面
+    //    只取必要字段，减小载荷
+    const { data: covers, error: e2 } = await supabase
+      .from('album_photos')
+      .select('id,album_id,url,storage_path,thumb_url,thumb_path,original_name,caption,sort_index')
+      .in('album_id', ids)
+      .order('sort_index', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (e2) throw e2;
+
+    // 2) 每个相册：第一张作封面 + 总数
+    const firstByAlbum = {};
+    const countByAlbum = {};
+    (covers || []).forEach((p) => {
+      countByAlbum[p.album_id] = (countByAlbum[p.album_id] || 0) + 1;
+      if (!firstByAlbum[p.album_id]) firstByAlbum[p.album_id] = p;
+    });
+
+    return albums.map((a) => {
+      const cover = firstByAlbum[a.id];
+      const photos = cover ? [rowToPhoto(cover)] : [];
+      return {
+        ...rowToAlbum(a, []),
+        // 保持 photos 形状，列表页用 photos[0] 作为封面
+        photos,
+        coverIndex: 0,
+        photoCount: countByAlbum[a.id] || 0,
+        _partial: true, // 标记为部分数据，进详情时需再拉全部照片
+      };
+    });
+  } catch (err) {
+    console.warn('[AlbumService] 获取相册列表失败，回退本地：', err.message);
+    return getLocalAlbums().map((a) => ({
+      ...a,
+      photoCount: (a.photos || []).length,
+    }));
+  }
+}
+
+/* ============================================
+ * 懒加载单个相册的全部照片（用于打开相册详情页时）
+ * ============================================ */
+export async function fetchAlbumPhotos(albumId) {
+  if (!hasRemote()) {
+    const album = getLocalAlbums().find((a) => String(a.id) === String(albumId));
+    return album ? album.photos || [] : [];
+  }
+  try {
+    const { data, error } = await supabase
+      .from('album_photos')
+      .select('*')
+      .eq('album_id', albumId)
+      .order('sort_index', { ascending: true })
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map(rowToPhoto);
+  } catch (err) {
+    console.warn('[AlbumService] 加载相册照片失败：', err.message);
+    throw err;
   }
 }
 
