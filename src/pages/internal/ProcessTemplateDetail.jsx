@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useSiteContent } from '../../contexts/SiteContentContext';
 import { marked } from 'marked';
 import {
   ChevronLeft,
@@ -134,6 +135,7 @@ function isUserDoc(doc) {
 /* ========== 主组件 ========== */
 export default function ProcessTemplateDetail() {
   const { isAuthenticated, user, isAdmin } = useAuth();
+  const { filterOptions } = useSiteContent();
   const { id } = useParams();
   const navigate = useNavigate();
   const contentRef = useRef(null);
@@ -534,6 +536,13 @@ export default function ProcessTemplateDetail() {
 
   const typeLabel = DEFAULT_TYPE_LABELS[doc.type] || doc.type;
   const typeColor = DEFAULT_TYPE_COLORS[doc.type] || '#6B7280';
+  // 合并用户自定义分类配置：Documents 页支持管理员自定义分类 label/color，
+  // 这里优先使用动态配置，回退到内置默认值
+  const customType = (filterOptions?.documentTypes || []).find(
+    (t) => t.key === doc.type
+  );
+  const finalTypeLabel = customType?.label || typeLabel;
+  const finalTypeColor = customType?.color || typeColor;
   const views = loadViews();
 
   const hasTextContent = doc.content && String(doc.content).trim().length > 0;
@@ -641,9 +650,9 @@ export default function ProcessTemplateDetail() {
             <header className="ptd-article__header">
               <span
                 className="ptd-article__badge"
-                style={{ color: typeColor, background: `${typeColor}15` }}
+                style={{ color: finalTypeColor, background: `${finalTypeColor}15` }}
               >
-                {typeLabel}
+                {finalTypeLabel}
               </span>
               {doc.format && (
                 <span className="ptd-article__format-tag">

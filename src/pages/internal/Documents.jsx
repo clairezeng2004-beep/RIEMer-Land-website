@@ -899,18 +899,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         {/* Documents Grid */}
         <div className="documents-grid">
           {filtered.map((doc) => {
-            const isProcessTemplate = configSection === 'processTemplates';
             const handleCardClick = () => {
-              if (isProcessTemplate) {
-                // 流程模板：新窗口跳转全屏查看页（与"成员内部分享"一致）
-                window.open(
-                  `/internal/process-templates/view/${doc.id}`,
-                  '_blank',
-                  'noopener,noreferrer'
-                );
-              } else {
-                openPreview(doc);
-              }
+              // 统一所有文档（流程模板 + 普通文档）都用新窗口全屏查看页，
+              // 不再使用悬浮 Modal。ProcessTemplateDetail 页内部已通过 canEdit
+              // 控制编辑权限（管理员或本人上传的用户文档可编辑，其余只读）。
+              window.open(
+                `/internal/process-templates/view/${doc.id}`,
+                '_blank',
+                'noopener,noreferrer'
+              );
             };
             return (
             <div
