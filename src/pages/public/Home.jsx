@@ -58,9 +58,12 @@ export default function Home() {
   }, [allArticles, selectedTag]);
 
   const recentArticles = filteredArticles.slice(0, 6);
-  // 最新活动：按日期从新到旧排序后取前 4 条
+  // 最新活动：按日期从新到旧排序后完整展示
+  //（此前曾用 .slice(0, 4) 只展示 4 条，但首页统计区的"活动讲座"数字来自 events.length，
+  //  会出现"统计显示 10 条，首页实际只看到 4 条"的不一致观感。
+  //  现在让下方展示与统计数字保持一致：统计多少，就展示多少。）
   const recentEvents = useMemo(
-    () => [...events].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4),
+    () => [...events].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
     [events],
   );
 
