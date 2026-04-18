@@ -36,6 +36,52 @@ import './SyncDiagnostic.css';
 
 const LOCAL_ARTICLES_KEY = 'riemer_user_articles';
 
+/** 给任意 Promise 加超时保护：timeoutMs 后自动 reject，避免单项卡死拖累整体 */
+function withTimeout(promise, timeoutMs, label = '操作') {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(
+      () => reject(new Error(`${label} 超时（> ${timeoutMs / 1000}s）`)),
+      timeoutMs
+    );
+    promise.then(
+      (val) => { clearTimeout(t); resolve(val); },
+      (err) => { clearTimeout(t); reject(err); }
+    );
+  });
+}
+
+/** 统一的"查某张表行数"逻辑：优先 estimated（O(1)），失败回退 exact */
+async function countTable(tableName, timeoutMs = 8000) {
+  // 先尝试 estimated（从查询计划读估算值，速度最快）
+  try {
+    const res = await withTimeout(
+      supabase.from(tableName).select('*', { count: 'estimated', head: true }),
+      timeoutMs,
+      `${tableName} 计数`
+    );
+    if (!res.error) return { count: res.count ?? 0, error: null };
+    // estimated 不支持则回退（部分旧版 PostgREST）
+  } catch (err) {
+    if (!/超时/.test(err.message)) {
+      // 非超时错误，直接返回
+      return { count: null, error: err };
+    }
+    // 超时就不再回退，直接报超时
+    return { count: null, error: err };
+  }
+  // 回退 exact（兼容老 PostgREST）
+  try {
+    const res = await withTimeout(
+      supabase.from(tableName).select('*', { count: 'exact', head: true }),
+      timeoutMs,
+      `${tableName} 计数`
+    );
+    return { count: res.count ?? 0, error: res.error || null };
+  } catch (err) {
+    return { count: null, error: err };
+  }
+}
+
 /** 状态标签 */
 function StatusBadge({ status }) {
   // status: 'ok' | 'fail' | 'warn' | 'pending' | 'idle'
@@ -143,7 +189,11 @@ export default function SyncDiagnostic() {
 
     // ---- 3. 登录态 ----
     try {
-      const { data: { session }, error } = await supabase.auth.getSession();
+      const { data: { session }, error } = await withTimeout(
+        supabase.auth.getSession(),
+        6000,
+        'getSession'
+      );
       if (error) {
         r.auth = {
           status: 'fail',
@@ -173,29 +223,50 @@ export default function SyncDiagnostic() {
       r.auth = {
         status: 'fail',
         detail: `getSession 抛异常：${err.message}`,
-        note: '',
+        note: /超时/.test(err.message)
+          ? 'auth 接口未响应。多半是浏览器扩展拦截了 supabase.co 的请求，或 token refresh 卡死。试试：1) 关掉广告拦截/代理 2) 清除站点 localStorage 后重登'
+          : '',
         uid: null,
         email: null,
       };
     }
     setResults({ ...r });
 
-    // ---- 4a. documents 表 ----
+    // ---- 4. 四张表可读性（并行，每张独立 8s 超时） ----
+    // 读本地缓存（同步，秒完成）
     r.documents.localCount = loadLocalDocs().length;
-    try {
-      const { count, error } = await supabase
-        .from('documents')
-        .select('*', { count: 'exact', head: true });
+    const localArticles = (() => {
+      try { return JSON.parse(localStorage.getItem(LOCAL_ARTICLES_KEY) || '[]'); }
+      catch { return []; }
+    })();
+    r.articles.localCount = localArticles.length;
+    r.deletedDefaults.localCount = loadLocalDeletedIds().length;
+    r.documentViews.localCount = Object.keys(loadLocalViews()).length;
+    setResults({ ...r });
+
+    // 并行查 4 张表
+    const [docRes, artRes, delRes, viewRes] = await Promise.all([
+      countTable('documents'),
+      countTable('articles'),
+      countTable('documents_deleted_defaults'),
+      countTable('document_views'),
+    ]);
+
+    // ---- 4a. documents ----
+    {
+      const { count, error } = docRes;
       if (error) {
         r.documents = {
           ...r.documents,
           status: 'fail',
           detail: `读取失败：${error.message} (${error.code || ''})`,
-          note: error.code === '42P01'
-            ? '表不存在 → 重新执行 supabase-setup.sql'
-            : error.code === 'PGRST301' || error.message?.includes('permission')
-              ? 'RLS 策略拒绝 → 检查 Supabase 控制台 documents 表的 Policies'
-              : '',
+          note: /超时/.test(error.message)
+            ? '查询超时（> 8s）。RLS 策略过于复杂或网络抖动。去 Supabase 检查 documents 表的 RLS policy 是否含昂贵子查询。'
+            : error.code === '42P01'
+              ? '表不存在 → 重新执行 supabase-setup.sql'
+              : error.code === 'PGRST301' || error.message?.includes('permission')
+                ? 'RLS 策略拒绝 → 检查 Supabase 控制台 documents 表的 Policies'
+                : '',
           cloudCount: null,
         };
       } else {
@@ -207,7 +278,6 @@ export default function SyncDiagnostic() {
           status = 'warn';
           note = `本地有 ${local} 条但云端 0 条 — 说明之前的写入没落到云端（多半是登录/RLS 问题）`;
         } else if (Math.abs(cloud - local) > 0) {
-          // 差异正常（其他设备/其他用户可能写了云端），但给提示
           status = 'ok';
           note = cloud > local ? '云端比本地多（正常，其他设备有写入）' : '本地比云端多（可能离线时写了本地）';
         }
@@ -219,37 +289,23 @@ export default function SyncDiagnostic() {
           cloudCount: cloud,
         };
       }
-    } catch (err) {
-      r.documents = {
-        ...r.documents,
-        status: 'fail',
-        detail: `查询异常：${err.message}`,
-        note: '',
-      };
     }
-    setResults({ ...r });
 
-    // ---- 4b. articles 表 ----
-    try {
-      const localArticles = (() => {
-        try { return JSON.parse(localStorage.getItem(LOCAL_ARTICLES_KEY) || '[]'); }
-        catch { return []; }
-      })();
-      r.articles.localCount = localArticles.length;
-
-      const { count, error } = await supabase
-        .from('articles')
-        .select('*', { count: 'exact', head: true });
+    // ---- 4b. articles ----
+    {
+      const { count, error } = artRes;
       if (error) {
         r.articles = {
           ...r.articles,
           status: 'fail',
           detail: `读取失败：${error.message} (${error.code || ''})`,
-          note: error.code === '42P01'
-            ? '表不存在 → 重新执行 supabase-setup.sql'
-            : error.code === 'PGRST301' || error.message?.includes('permission')
-              ? 'RLS 策略拒绝 → 检查 Supabase 控制台 articles 表的 Policies'
-              : '',
+          note: /超时/.test(error.message)
+            ? '查询超时（> 8s）。检查 articles 表 RLS 策略或网络。'
+            : error.code === '42P01'
+              ? '表不存在 → 重新执行 supabase-setup.sql'
+              : error.code === 'PGRST301' || error.message?.includes('permission')
+                ? 'RLS 策略拒绝 → 检查 Supabase 控制台 articles 表的 Policies'
+                : '',
           cloudCount: null,
         };
       } else {
@@ -271,28 +327,19 @@ export default function SyncDiagnostic() {
           cloudCount: cloud,
         };
       }
-    } catch (err) {
-      r.articles = {
-        ...r.articles,
-        status: 'fail',
-        detail: `查询异常：${err.message}`,
-        note: '',
-      };
     }
-    setResults({ ...r });
 
     // ---- 4c. documents_deleted_defaults ----
-    r.deletedDefaults.localCount = loadLocalDeletedIds().length;
-    try {
-      const { count, error } = await supabase
-        .from('documents_deleted_defaults')
-        .select('*', { count: 'exact', head: true });
+    {
+      const { count, error } = delRes;
       if (error) {
         r.deletedDefaults = {
           ...r.deletedDefaults,
           status: error.code === '42P01' ? 'fail' : 'warn',
           detail: `读取失败：${error.message}`,
-          note: error.code === '42P01' ? '该表不存在（不影响主流程，删除默认模板数据才需要）' : '',
+          note: error.code === '42P01'
+            ? '该表不存在（不影响主流程，删除默认模板数据才需要）'
+            : /超时/.test(error.message) ? '查询超时，可忽略' : '',
         };
       } else {
         r.deletedDefaults = {
@@ -303,28 +350,19 @@ export default function SyncDiagnostic() {
           cloudCount: count ?? 0,
         };
       }
-    } catch (err) {
-      r.deletedDefaults = {
-        ...r.deletedDefaults,
-        status: 'warn',
-        detail: `查询异常：${err.message}`,
-        note: '',
-      };
     }
-    setResults({ ...r });
 
     // ---- 4d. document_views ----
-    r.documentViews.localCount = Object.keys(loadLocalViews()).length;
-    try {
-      const { count, error } = await supabase
-        .from('document_views')
-        .select('*', { count: 'exact', head: true });
+    {
+      const { count, error } = viewRes;
       if (error) {
         r.documentViews = {
           ...r.documentViews,
           status: error.code === '42P01' ? 'fail' : 'warn',
           detail: `读取失败：${error.message}`,
-          note: error.code === '42P01' ? '该表不存在（浏览计数跨设备同步不可用）' : '',
+          note: error.code === '42P01'
+            ? '该表不存在（浏览计数跨设备同步不可用）'
+            : /超时/.test(error.message) ? '查询超时，可忽略' : '',
         };
       } else {
         r.documentViews = {
@@ -335,14 +373,8 @@ export default function SyncDiagnostic() {
           cloudCount: count ?? 0,
         };
       }
-    } catch (err) {
-      r.documentViews = {
-        ...r.documentViews,
-        status: 'warn',
-        detail: `查询异常：${err.message}`,
-        note: '',
-      };
     }
+
     setResults({ ...r });
 
     // ---- 5. Realtime 订阅实测 ----
