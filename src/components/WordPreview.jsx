@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import mammoth from 'mammoth';
 import { FileText, Loader, AlertCircle } from 'lucide-react';
 import TextAnnotation from './TextAnnotation';
+import { stripUnderline } from '../utils/stripUnderline';
 import './WordPreview.css';
 
 /**
@@ -65,7 +66,7 @@ export default function WordPreview({ fileUrl, docId, title }) {
         );
 
         if (!cancelled) {
-          setHtml(result.value);
+          setHtml(stripUnderline(result.value));
 
           // 如果有转换警告，只在控制台输出
           if (result.messages.length > 0) {

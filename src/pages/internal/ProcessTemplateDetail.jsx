@@ -3,6 +3,7 @@ import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { marked } from 'marked';
+import { stripUnderline } from '../../utils/stripUnderline';
 import {
   ChevronLeft,
   Clock,
@@ -493,9 +494,9 @@ export default function ProcessTemplateDetail() {
     if (!doc || !doc.content) return '';
     if (doc.format === 'markdown') {
       marked.setOptions({ breaks: true, gfm: true });
-      return marked.parse(doc.content);
+      return stripUnderline(marked.parse(stripUnderline(doc.content)));
     }
-    return doc.content; // word 格式：已是 HTML
+    return stripUnderline(doc.content); // word 格式：已是 HTML
   }, [doc]);
 
   /* ========== 目录（TOC） ========== */
@@ -841,7 +842,7 @@ export default function ProcessTemplateDetail() {
     if (!doc || doc.format !== 'markdown') return '';
     if (!editContent || !editContent.trim()) return '';
     marked.setOptions({ breaks: true, gfm: true });
-    return marked.parse(editContent);
+    return stripUnderline(marked.parse(stripUnderline(editContent)));
   }, [editContent, doc?.format, doc]);
 
   const saveEdit = useCallback(async () => {
@@ -851,6 +852,7 @@ export default function ProcessTemplateDetail() {
       alert('标题不能为空');
       return;
     }
+    const cleanContent = stripUnderline(editContent);
     setSaving(true);
     try {
       const userDocs = loadUserDocs();
@@ -871,14 +873,14 @@ export default function ProcessTemplateDetail() {
       const changes = diffDocFields(prev, {
         title,
         description: editDescription,
-        content: editContent,
+        content: cleanContent,
       });
 
       const updated = {
         ...prev,
         title,
         description: editDescription,
-        content: editContent,
+        content: cleanContent,
         lastEditedAt: nowDate,
         lastEditedBy: editor,
       };
@@ -916,7 +918,7 @@ export default function ProcessTemplateDetail() {
         cloudUpdateDoc(doc.id, {
           title,
           description: editDescription,
-          content: editContent,
+          content: cleanContent,
           lastEditedAt: nowDate,
           lastEditedBy: editor,
         })
@@ -935,7 +937,7 @@ export default function ProcessTemplateDetail() {
                   ...prev,
                   userDocs: prev.userDocs.map((d) =>
                     String(d.id) === String(doc.id)
-                      ? { ...d, title, description: editDescription, content: editContent, lastEditedAt: nowDate, lastEditedBy: editor }
+                      ? { ...d, title, description: editDescription, content: cleanContent, lastEditedAt: nowDate, lastEditedBy: editor }
                       : d
                   ),
                 };

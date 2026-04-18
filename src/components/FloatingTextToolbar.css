@@ -66,44 +66,6 @@
   margin: 0 2px;
 }
 
-/* 颜色按钮下拉面板 */
-.ftt__color-wrap {
-  position: relative;
-  display: inline-flex;
-}
-
-.ftt__color-panel {
-  position: absolute;
-  top: calc(100% + 6px);
-  left: 50%;
-  transform: translateX(-50%);
-  display: grid;
-  grid-template-columns: repeat(5, 22px);
-  gap: 6px;
-  padding: 8px;
-  background: var(--color-bg-card, #ffffff);
-  border: 1px solid var(--color-border-light, #e5e7eb);
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
-  z-index: 1;
-}
-
-.ftt__color-swatch {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid #ffffff;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
-  cursor: pointer;
-  padding: 0;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-
-.ftt__color-swatch:hover {
-  transform: scale(1.12);
-  box-shadow: 0 0 0 2px var(--color-primary, #5B8C3E);
-}
-
 @media (max-width: 480px) {
   .ftt {
     gap: 0;

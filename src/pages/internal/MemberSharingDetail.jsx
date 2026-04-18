@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { marked } from 'marked';
+import { stripUnderline } from '../../utils/stripUnderline';
 import {
   ChevronLeft,
   Clock,
@@ -226,10 +227,10 @@ export default function MemberSharingDetail() {
         breaks: true,
         gfm: true,
       });
-      return marked.parse(post.content);
+      return stripUnderline(marked.parse(stripUnderline(post.content)));
     }
-    // word (HTML) 格式直接返回
-    return post.content;
+    // word (HTML) 格式直接返回（清掉下划线）
+    return stripUnderline(post.content);
   }, [post]);
 
   // ========== 目录导航（TOC） ==========

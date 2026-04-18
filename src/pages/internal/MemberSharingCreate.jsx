@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
+import { stripUnderline } from '../../utils/stripUnderline';
 import './MemberSharingCreate.css';
 
 const SHARING_KEY = 'riemer_member_sharing';
@@ -595,7 +596,7 @@ export default function MemberSharingCreate() {
       title: newPost.title.trim(),
       category: newPost.category,
       format: newPost.format,
-      content: newPost.content,
+      content: stripUnderline(newPost.content),
       period: periodStr || null,
       attachments: attachments.length > 0 ? attachments : null,
       author: user?.nickname || user?.name || 'Unknown',

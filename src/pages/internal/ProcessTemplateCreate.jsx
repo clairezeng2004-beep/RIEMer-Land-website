@@ -23,6 +23,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { createDoc, canUseSupabase } from '../../lib/documentsService';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
+import { stripUnderline } from '../../utils/stripUnderline';
 import './MemberSharingCreate.css';
 
 const DEFAULT_TYPE_LABELS = {
@@ -353,7 +354,7 @@ export default function ProcessTemplateCreate() {
         }
       })(),
       format: newDoc.format,
-      content: newDoc.content,
+      content: stripUnderline(newDoc.content),
       attachments: newDoc.attachments.map((f) => ({
         id: f.id,
         name: f.name,

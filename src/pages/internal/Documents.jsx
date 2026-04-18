@@ -35,6 +35,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import { pinyinMatch } from '../../utils/pinyinSearch';
+import { stripUnderline } from '../../utils/stripUnderline';
 import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
 import {
@@ -685,10 +686,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (!previewDoc || !previewDoc.content) return '';
     if (previewDoc.format === 'markdown') {
       marked.setOptions({ breaks: true, gfm: true });
-      return marked.parse(previewDoc.content);
+      return stripUnderline(marked.parse(stripUnderline(previewDoc.content)));
     }
-    // word 格式本身就是 HTML，原样返回
-    return previewDoc.content;
+    // word 格式本身就是 HTML，原样返回（清掉下划线）
+    return stripUnderline(previewDoc.content);
   }, [previewDoc]);
 
   const FileIcon = ({ fileType, size = 24 }) => {

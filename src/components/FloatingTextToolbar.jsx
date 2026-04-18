@@ -1,51 +1,31 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import {
-  Heading1,
-  Heading2,
-  Heading3,
-  Quote,
-  Bold,
-  Italic,
-  Underline,
-  Eraser,
-  List,
-  ListOrdered,
-  Link as LinkIcon,
-  Palette,
-  AlignLeft,
-  AlignCenter,
-  AlignRight,
-} from 'lucide-react';
+import { Heading1, Heading2, Heading3, Quote, Bold } from 'lucide-react';
 import './FloatingTextToolbar.css';
 
 /**
  * FloatingTextToolbar
  * 两种模式：
  *   - mode="rich" (默认)：在 contentEditable 编辑器上根据选区弹工具栏，走 document.execCommand
- *   - mode="markdown"：在 <textarea> 上根据选区弹工具栏，对选中区间插入 Markdown/HTML 语法
+ *   - mode="markdown"：在 <textarea> 上根据选区弹工具栏，对选中区间插入 Markdown 语法
+ *
+ * 仅保留以下五个格式化能力：
+ *   一级标题 / 二级标题 / 三级标题 / 引用 / 加粗
  *
  * Props:
  *   mode        — 'rich' | 'markdown'，默认 'rich'
  *   editorRef   — rich: contentEditable 容器 ref；markdown: textarea ref
- *   value       — markdown 模式下 textarea 当前值（必填）
+ *   value       — markdown 模式下 textarea 当前值（仅用于 applyMarkdown 读取，可省略）
  *   onChange    — rich: (html) => void；markdown: (nextValue, selection) => void
  */
-
-const PRESET_COLORS = [
-  '#111827', '#4b5563', '#ef4444', '#f97316', '#f59e0b',
-  '#10b981', '#3b82f6', '#6366f1', '#8b5cf6', '#ec4899',
-];
 
 export default function FloatingTextToolbar({
   editorRef,
   onChange,
   mode = 'rich',
-  value = '',
 }) {
   const [visible, setVisible] = useState(false);
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const [active, setActive] = useState({});
-  const [showColor, setShowColor] = useState(false);
   const toolbarRef = useRef(null);
   const isMarkdown = mode === 'markdown';
 
@@ -54,7 +34,7 @@ export default function FloatingTextToolbar({
    * ================================================================= */
   const placeAt = useCallback((rect) => {
     if (!rect || (rect.width === 0 && rect.height === 0)) return;
-    const tbWidth = toolbarRef.current?.offsetWidth || 360;
+    const tbWidth = toolbarRef.current?.offsetWidth || 240;
     const tbHeight = toolbarRef.current?.offsetHeight || 40;
     const gap = 8;
     let top = rect.top - tbHeight - gap;
@@ -87,13 +67,6 @@ export default function FloatingTextToolbar({
   const detectActiveRich = useCallback(() => {
     const next = {
       bold: document.queryCommandState('bold'),
-      italic: document.queryCommandState('italic'),
-      underline: document.queryCommandState('underline'),
-      ul: document.queryCommandState('insertUnorderedList'),
-      ol: document.queryCommandState('insertOrderedList'),
-      alignLeft: document.queryCommandState('justifyLeft'),
-      alignCenter: document.queryCommandState('justifyCenter'),
-      alignRight: document.queryCommandState('justifyRight'),
       h1: false,
       h2: false,
       h3: false,
@@ -144,9 +117,8 @@ export default function FloatingTextToolbar({
   const textareaHasSelection = useCallback(() => {
     const ta = editorRef.current;
     if (!ta) return false;
-    // 仅在 textarea 确实聚焦（或刚失焦）时才处理
-    const active = document.activeElement;
-    const isFocused = active === ta;
+    const activeEl = document.activeElement;
+    const isFocused = activeEl === ta;
     if (!isFocused) return false;
     return ta.selectionStart !== ta.selectionEnd;
   }, [editorRef]);
@@ -158,7 +130,6 @@ export default function FloatingTextToolbar({
     const end = ta.selectionEnd;
     if (start === end) return null;
 
-    // 用镜像 div 复制 textarea 样式，在对应偏移处放一个 span，测它的位置
     const style = window.getComputedStyle(ta);
     const mirror = document.createElement('div');
     const propsToCopy = [
@@ -180,7 +151,6 @@ export default function FloatingTextToolbar({
     const before = ta.value.substring(0, start);
     const middle = ta.value.substring(start, end);
 
-    // 用 textContent 避免 HTML 注入
     const beforeNode = document.createTextNode(before);
     const midSpan = document.createElement('span');
     midSpan.textContent = middle || '\u200b';
@@ -195,7 +165,6 @@ export default function FloatingTextToolbar({
     const spanRect = midSpan.getBoundingClientRect();
     const mirrorRect = mirror.getBoundingClientRect();
 
-    // 选区在 viewport 的坐标 = textarea 在 viewport 的位置 + (span 相对镜像的偏移) - 滚动
     const top = taRect.top + (spanRect.top - mirrorRect.top) - ta.scrollTop;
     const left = taRect.left + (spanRect.left - mirrorRect.left) - ta.scrollLeft;
     const width = spanRect.width;
@@ -203,12 +172,10 @@ export default function FloatingTextToolbar({
 
     document.body.removeChild(mirror);
 
-    // 多行选区时镜像里 span 可能被折行：取 span 的 clientRects 第一行即可，前面已拿到其第一行 top/left
     return { top, left, width, height, right: left + width, bottom: top + height };
   }, [editorRef]);
 
   const detectActiveMarkdown = useCallback(() => {
-    // markdown 模式按钮基本不需要 active 态；列表等靠 applyLine 自行判定
     setActive({});
   }, []);
 
@@ -224,7 +191,6 @@ export default function FloatingTextToolbar({
     if (isMarkdown) {
       if (!textareaHasSelection()) {
         setVisible(false);
-        setShowColor(false);
         return;
       }
       setVisible(true);
@@ -233,7 +199,6 @@ export default function FloatingTextToolbar({
     } else {
       if (!selectionInsideEditor()) {
         setVisible(false);
-        setShowColor(false);
         return;
       }
       setVisible(true);
@@ -258,14 +223,12 @@ export default function FloatingTextToolbar({
     window.addEventListener('scroll', onScrollOrResize, true);
     window.addEventListener('resize', onScrollOrResize);
 
-    // textarea 的 selectionchange 事件并不是所有浏览器都派发，额外监听 select/keyup/mouseup
     const ta = isMarkdown ? editorRef.current : null;
     if (ta) {
       ta.addEventListener('select', onSelectionChange);
       ta.addEventListener('keyup', onSelectionChange);
       ta.addEventListener('mouseup', onSelectionChange);
       ta.addEventListener('blur', () => {
-        // 用户点击工具栏会先触发 blur，推迟判断
         setTimeout(() => {
           const act = document.activeElement;
           if (!toolbarRef.current || !toolbarRef.current.contains(act)) {
@@ -319,29 +282,6 @@ export default function FloatingTextToolbar({
     fireChangeRich();
   }, [active, detectActiveRich, fireChangeRich]);
 
-  const clearFormatRich = useCallback(() => {
-    document.execCommand('removeFormat', false);
-    document.execCommand('formatBlock', false, '<p>');
-    detectActiveRich();
-    fireChangeRich();
-  }, [detectActiveRich, fireChangeRich]);
-
-  const insertLinkRich = useCallback(() => {
-    const url = window.prompt('请输入链接地址（以 http:// 或 https:// 开头）', 'https://');
-    if (!url) return;
-    const safe = /^(https?:)?\/\//i.test(url) ? url : `https://${url}`;
-    document.execCommand('createLink', false, safe);
-    // 给新插入的链接加 target=_blank
-    try {
-      const editor = editorRef.current;
-      editor?.querySelectorAll('a[href]').forEach((a) => {
-        a.setAttribute('target', '_blank');
-        a.setAttribute('rel', 'noopener noreferrer');
-      });
-    } catch { /* noop */ }
-    fireChangeRich();
-  }, [editorRef, fireChangeRich]);
-
   /* =================================================================
    * Markdown 模式命令：对 textarea 的选区做文本变换
    * ================================================================= */
@@ -361,14 +301,13 @@ export default function FloatingTextToolbar({
 
     if (onChange) onChange(nextValue, { start: nextStart, end: nextEnd });
 
-    // 保持选中 & 焦点
     requestAnimationFrame(() => {
       ta.focus();
       try { ta.setSelectionRange(nextStart, nextEnd); } catch { /* noop */ }
     });
   }, [editorRef, onChange]);
 
-  // 包裹型：**x**、*x*、<u>x</u>、[x](url)、<span style="color:red">x</span>
+  // 包裹型：**x**
   const wrap = (pre, post) => (text) => ({ text, prefix: pre, suffix: post });
 
   // 行首添加/切换 Markdown 前缀（支持多行）
@@ -378,7 +317,6 @@ export default function FloatingTextToolbar({
     const start = ta.selectionStart;
     const end = ta.selectionEnd;
     const value = ta.value;
-    // 扩展到整行
     const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
     const lineEndRaw = value.indexOf('\n', end);
     const lineEnd = lineEndRaw === -1 ? value.length : lineEndRaw;
@@ -390,7 +328,7 @@ export default function FloatingTextToolbar({
     const lines = block.split('\n');
     const stripMd = (line) => line.replace(/^(#{1,6}\s|>\s|[-*+]\s|\d+\.\s)/, '');
 
-    const nextLines = lines.map((line, i) => {
+    const nextLines = lines.map((line) => {
       switch (kind) {
         case 'h1':
           return line.startsWith('# ') ? line.substring(2) : `# ${stripMd(line)}`;
@@ -400,10 +338,6 @@ export default function FloatingTextToolbar({
           return line.startsWith('### ') ? line.substring(4) : `### ${stripMd(line)}`;
         case 'quote':
           return line.startsWith('> ') ? line.substring(2) : `> ${stripMd(line)}`;
-        case 'ul':
-          return line.startsWith('- ') ? line.substring(2) : `- ${stripMd(line)}`;
-        case 'ol':
-          return /^\d+\.\s/.test(line) ? line.replace(/^\d+\.\s/, '') : `${i + 1}. ${stripMd(line)}`;
         default:
           return line;
       }
@@ -418,47 +352,6 @@ export default function FloatingTextToolbar({
       try { ta.setSelectionRange(nextStart, nextEnd); } catch { /* noop */ }
     });
   }, [editorRef, onChange]);
-
-  const applyAlignMarkdown = useCallback((align) => {
-    // 用 HTML div 对齐块（marked 在 gfm 下支持内嵌 HTML）
-    applyMarkdown((selected) => {
-      if (!selected) return { text: '', prefix: `<div align="${align}">`, suffix: `</div>` };
-      return { text: selected, prefix: `<div align="${align}">\n`, suffix: `\n</div>` };
-    });
-  }, [applyMarkdown]);
-
-  const applyColorMarkdown = useCallback((color) => {
-    applyMarkdown((selected) => {
-      if (!selected) return { text: '', prefix: `<span style="color:${color}">`, suffix: '</span>' };
-      return { text: selected, prefix: `<span style="color:${color}">`, suffix: '</span>' };
-    });
-  }, [applyMarkdown]);
-
-  const insertLinkMarkdown = useCallback(() => {
-    const url = window.prompt('请输入链接地址（以 http:// 或 https:// 开头）', 'https://');
-    if (!url) return;
-    const safe = /^(https?:)?\/\//i.test(url) ? url : `https://${url}`;
-    applyMarkdown((selected) => ({
-      text: selected || '链接文字',
-      prefix: '[',
-      suffix: `](${safe})`,
-    }));
-  }, [applyMarkdown]);
-
-  const clearFormatMarkdown = useCallback(() => {
-    applyMarkdown((selected) => {
-      // 移除常见 md 标记
-      const t = selected
-        .replace(/\*\*([^*]+)\*\*/g, '$1')
-        .replace(/\*([^*]+)\*/g, '$1')
-        .replace(/__([^_]+)__/g, '$1')
-        .replace(/~~([^~]+)~~/g, '$1')
-        .replace(/`([^`]+)`/g, '$1')
-        .replace(/<\/?(u|span|div)[^>]*>/gi, '')
-        .replace(/^(#{1,6}\s|>\s|[-*+]\s|\d+\.\s)/gm, '');
-      return { text: t, prefix: '', suffix: '' };
-    });
-  }, [applyMarkdown]);
 
   /* =================================================================
    * 渲染
@@ -484,30 +377,9 @@ export default function FloatingTextToolbar({
   const onH2 = isMarkdown ? () => applyLinePrefixV2('h2') : () => applyBlockRich('h2');
   const onH3 = isMarkdown ? () => applyLinePrefixV2('h3') : () => applyBlockRich('h3');
   const onQuote = isMarkdown ? () => applyLinePrefixV2('quote') : () => applyBlockRich('blockquote');
-  const onUL = isMarkdown ? () => applyLinePrefixV2('ul') : () => applyInlineRich('insertUnorderedList');
-  const onOL = isMarkdown ? () => applyLinePrefixV2('ol') : () => applyInlineRich('insertOrderedList');
   const onBold = isMarkdown
     ? () => applyMarkdown(wrap('**', '**'))
     : () => applyInlineRich('bold');
-  const onItalic = isMarkdown
-    ? () => applyMarkdown(wrap('*', '*'))
-    : () => applyInlineRich('italic');
-  const onUnderline = isMarkdown
-    ? () => applyMarkdown(wrap('<u>', '</u>'))
-    : () => applyInlineRich('underline');
-  const onLink = isMarkdown ? insertLinkMarkdown : insertLinkRich;
-  const onClear = isMarkdown ? clearFormatMarkdown : clearFormatRich;
-  const onAlign = (a) =>
-    isMarkdown
-      ? applyAlignMarkdown(a)
-      : applyInlineRich(
-          a === 'left' ? 'justifyLeft' : a === 'right' ? 'justifyRight' : 'justifyCenter',
-        );
-  const onColor = (c) => {
-    if (isMarkdown) applyColorMarkdown(c);
-    else applyInlineRich('foreColor', c);
-    setShowColor(false);
-  };
 
   return (
     <div
@@ -530,69 +402,8 @@ export default function FloatingTextToolbar({
       <Btn onClick={onQuote} title="引用" activeFlag={active.blockquote}>
         <Quote size={16} />
       </Btn>
-      <Btn onClick={onUL} title="无序列表" activeFlag={active.ul}>
-        <List size={16} />
-      </Btn>
-      <Btn onClick={onOL} title="有序列表" activeFlag={active.ol}>
-        <ListOrdered size={16} />
-      </Btn>
-      <span className="ftt__sep" />
-
       <Btn onClick={onBold} title="加粗 (Ctrl/Cmd+B)" activeFlag={active.bold}>
         <Bold size={16} />
-      </Btn>
-      <Btn onClick={onItalic} title="斜体 (Ctrl/Cmd+I)" activeFlag={active.italic}>
-        <Italic size={16} />
-      </Btn>
-      <Btn onClick={onUnderline} title="下划线 (Ctrl/Cmd+U)" activeFlag={active.underline}>
-        <Underline size={16} />
-      </Btn>
-      <span className="ftt__sep" />
-
-      {/* 文字颜色：点开色板 */}
-      <div className="ftt__color-wrap">
-        <Btn
-          onClick={() => setShowColor((v) => !v)}
-          title="文字颜色"
-          activeFlag={showColor}
-        >
-          <Palette size={16} />
-        </Btn>
-        {showColor && (
-          <div className="ftt__color-panel" onMouseDown={stop}>
-            {PRESET_COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                className="ftt__color-swatch"
-                style={{ background: c }}
-                title={c}
-                onMouseDown={stop}
-                onClick={() => onColor(c)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-
-      <Btn onClick={onLink} title="插入链接">
-        <LinkIcon size={16} />
-      </Btn>
-      <span className="ftt__sep" />
-
-      <Btn onClick={() => onAlign('left')} title="左对齐" activeFlag={active.alignLeft}>
-        <AlignLeft size={16} />
-      </Btn>
-      <Btn onClick={() => onAlign('center')} title="居中" activeFlag={active.alignCenter}>
-        <AlignCenter size={16} />
-      </Btn>
-      <Btn onClick={() => onAlign('right')} title="右对齐" activeFlag={active.alignRight}>
-        <AlignRight size={16} />
-      </Btn>
-      <span className="ftt__sep" />
-
-      <Btn onClick={onClear} title="清除格式">
-        <Eraser size={16} />
       </Btn>
     </div>
   );
