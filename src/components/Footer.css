@@ -116,8 +116,11 @@
 }
 
 .footer__qrcode {
-  align-items: flex-end;
-  text-align: right;
+  /* 桌面端：标题 / 二维码 / 说明文字 三者水平居中对齐，
+     使文字中心线与二维码中心线对齐（此前 flex-end + right 会让
+     120px 宽的二维码与几十 px 宽的文字各自靠右缘，视觉上偏移）。 */
+  align-items: center;
+  text-align: center;
 }
 
 /* 二维码图片 */
