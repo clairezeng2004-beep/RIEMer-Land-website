@@ -66,7 +66,8 @@ export default function InternalSidebar() {
     [updateInternalConfig]
   );
 
-  const navItems = [
+  // 日常管理：常规业务/协作/内容类
+  const dailyItems = [
     { to: '/internal/tasks', icon: CheckSquare, configKey: 'labelTasks', label: sc.labelTasks },
     {
       to: '/internal/notifications',
@@ -76,15 +77,19 @@ export default function InternalSidebar() {
       badge: unreadCount > 0 ? unreadCount : null,
     },
     { to: '/internal/process-templates', icon: FolderOpen, configKey: 'labelProcessTemplates', label: sc.labelProcessTemplates },
-    { to: '/internal/member-sharing', icon: Share2, configKey: 'labelMemberSharing', label: sc.labelMemberSharing },
     { to: '/internal/articles', icon: BookOpen, configKey: 'labelArticles', label: sc.labelArticles },
     { to: '/internal/event-publish', icon: CalendarRange, configKey: 'labelEventPublish', label: sc.labelEventPublish },
     { to: '/internal/contributions', icon: BarChart3, configKey: 'labelContributions', label: sc.labelContributions },
-    { to: '/internal/suggestions', icon: MessageSquarePlus, configKey: 'labelSuggestions', label: sc.labelSuggestions },
     { to: '/internal/guestbook', icon: MessageCircle, configKey: 'labelGuestbook', label: sc.labelGuestbook },
+  ];
+
+  // 成员：成员个人信息/互动/分享类
+  const memberItems = [
     { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
-    { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
     { to: '/internal/profile', icon: UserCircle, configKey: 'labelProfile', label: sc.labelProfile },
+    { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, configKey: 'labelSuggestions', label: sc.labelSuggestions },
+    { to: '/internal/member-sharing', icon: Share2, configKey: 'labelMemberSharing', label: sc.labelMemberSharing },
   ];
 
   // 管理菜单项（所有成员可见，仅管理员可编辑）
@@ -94,38 +99,62 @@ export default function InternalSidebar() {
     { to: '/internal/notification-management', icon: BellRing, configKey: 'labelNotificationMgmt', label: sc.labelNotificationMgmt },
   ];
 
+  // 渲染一组菜单项的辅助函数
+  const renderItem = (item) => (
+    <NavLink
+      key={item.to}
+      to={item.to}
+      end={item.end}
+      className={({ isActive }) =>
+        `internal-sidebar__item ${isActive ? 'internal-sidebar__item--active' : ''}`
+      }
+      onClick={(e) => editing && e.preventDefault()}
+    >
+      <item.icon size={18} className="internal-sidebar__icon" />
+      {item.configKey ? (
+        <EditableText
+          value={item.label}
+          onChange={(v) => updateSidebar(item.configKey, v)}
+          configKey={`sidebar.${item.configKey}`}
+          as="span"
+          className="internal-sidebar__label"
+        />
+      ) : (
+        <span className="internal-sidebar__label">{item.label}</span>
+      )}
+      {item.badge && (
+        <span className="internal-sidebar__badge">{item.badge}</span>
+      )}
+    </NavLink>
+  );
+
   return (
     <aside className="internal-sidebar">
+      {/* 日常管理 */}
       <div className="internal-sidebar__section">
-        {navItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            className={({ isActive }) =>
-              `internal-sidebar__item ${isActive ? 'internal-sidebar__item--active' : ''}`
-            }
-            onClick={(e) => editing && e.preventDefault()}
-          >
-            <item.icon size={18} className="internal-sidebar__icon" />
-            {item.configKey ? (
-              <EditableText
-                value={item.label}
-                onChange={(v) => updateSidebar(item.configKey, v)}
-                configKey={`sidebar.${item.configKey}`}
-                as="span"
-                className="internal-sidebar__label"
-              />
-            ) : (
-              <span className="internal-sidebar__label">{item.label}</span>
-            )}
-            {item.badge && (
-              <span className="internal-sidebar__badge">{item.badge}</span>
-            )}
-          </NavLink>
-        ))}
+        <EditableText
+          value={sc.sectionLabelDaily}
+          onChange={(v) => updateSidebar('sectionLabelDaily', v)}
+          configKey="sidebar.sectionLabelDaily"
+          as="div"
+          className="internal-sidebar__section-label"
+        />
+        {dailyItems.map(renderItem)}
       </div>
 
+      {/* 成员 */}
+      <div className="internal-sidebar__section">
+        <EditableText
+          value={sc.sectionLabelMembers}
+          onChange={(v) => updateSidebar('sectionLabelMembers', v)}
+          configKey="sidebar.sectionLabelMembers"
+          as="div"
+          className="internal-sidebar__section-label"
+        />
+        {memberItems.map(renderItem)}
+      </div>
+
+      {/* 管理 */}
       <div className="internal-sidebar__section">
         <EditableText
           value={sc.sectionLabelAdmin}
@@ -134,29 +163,7 @@ export default function InternalSidebar() {
           as="div"
           className="internal-sidebar__section-label"
         />
-        {adminItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              `internal-sidebar__item ${isActive ? 'internal-sidebar__item--active' : ''}`
-            }
-            onClick={(e) => editing && e.preventDefault()}
-          >
-            <item.icon size={18} className="internal-sidebar__icon" />
-            {item.configKey ? (
-              <EditableText
-                value={item.label}
-                onChange={(v) => updateSidebar(item.configKey, v)}
-                configKey={`sidebar.${item.configKey}`}
-                as="span"
-                className="internal-sidebar__label"
-              />
-            ) : (
-              <span className="internal-sidebar__label">{item.label}</span>
-            )}
-          </NavLink>
-        ))}
+        {adminItems.map(renderItem)}
       </div>
     </aside>
   );

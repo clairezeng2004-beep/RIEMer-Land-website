@@ -10,7 +10,7 @@ import ErrorBoundary from './ErrorBoundary';
 import {
   Bell, BellRing, FolderOpen, Share2, BookOpen, CheckSquare,
   Camera, BarChart3, MessageSquarePlus, MessageCircle, UserCircle, Contact,
-  Users, Settings,
+  Users, Settings, CalendarRange,
 } from 'lucide-react';
 import './InternalLayout.css';
 
@@ -23,17 +23,21 @@ function MobileInternalNav() {
   const location = useLocation();
 
   const navItems = [
+    // 日常管理
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
     { to: '/internal/notifications', icon: Bell, label: sc.labelNotifications, badge: unreadCount > 0 ? unreadCount : null },
     { to: '/internal/process-templates', icon: FolderOpen, label: sc.labelProcessTemplates },
-    { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
     { to: '/internal/articles', icon: BookOpen, label: sc.labelArticles },
+    { to: '/internal/event-publish', icon: CalendarRange, label: sc.labelEventPublish },
     { to: '/internal/contributions', icon: BarChart3, label: sc.labelContributions },
-    { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
     { to: '/internal/guestbook', icon: MessageCircle, label: sc.labelGuestbook },
+    // 成员
     { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
-    { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
     { to: '/internal/profile', icon: UserCircle, label: sc.labelProfile },
+    { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
+    { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
+    // 管理
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
     { to: '/internal/notification-management', icon: BellRing, label: sc.labelNotificationMgmt },

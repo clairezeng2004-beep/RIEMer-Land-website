@@ -108,6 +108,8 @@ const getDefaultInternalConfig = () => ({
   // 侧边栏
   sidebar: {
     sectionLabelNav: '',
+    sectionLabelDaily: '日常管理',
+    sectionLabelMembers: '成员',
     sectionLabelAdmin: '管理',
     labelHome: '快捷导航',
     labelNotifications: '消息通知',
