@@ -37,7 +37,6 @@ export default function Login() {
   const [resetStep, setResetStep] = useState('email'); // email → code → password
   const [resetCode, setResetCode] = useState('');
   const [countdown, setCountdown] = useState(0);
-  const [devCode, setDevCode] = useState(''); // 开发模式下显示的验证码
 
   const { login, register, resetPassword, changePassword, sendResetCode, verifyResetCode, isAuthenticated, supabaseOk } = useAuth();
   const navigate = useNavigate();
@@ -142,7 +141,6 @@ export default function Login() {
       setConfirmPassword('');
       setResetStep('email');
       setResetCode('');
-      setDevCode('');
     }
     if (newView === 'changePassword') {
       setCurrentPassword('');
@@ -230,9 +228,6 @@ export default function Login() {
         setSuccess(result.message);
         setResetStep('code');
         setCountdown(60);
-        if (result.devCode) {
-          setDevCode(result.devCode);
-        }
       } else {
         setError(result.message);
       }
@@ -684,12 +679,6 @@ export default function Login() {
                     autoComplete="one-time-code"
                   />
                 </div>
-
-                {devCode && (
-                  <div className="login-card__message login-card__message--success" style={{ fontSize: '12px' }}>
-                    <CheckCircle size={14} /> 开发模式验证码：<strong>{devCode}</strong>
-                  </div>
-                )}
 
                 <div style={{ display: 'flex', gap: '8px' }}>
                   <button type="submit" className="btn btn-primary btn-lg login-card__submit" disabled={submitting} style={{ flex: 1 }}>

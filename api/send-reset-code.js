@@ -69,14 +69,18 @@ export default async function handler(req, res) {
     });
 
     // 使用 Resend 发送邮件
+    // ⚠️ 安全原则：除非邮件成功送达用户邮箱，否则绝不能把验证码返回给前端，
+    //    否则任何人只要在登录页输入目标邮箱就能看到验证码并改别人密码。
+    //    以下所有失败分支一律清除已生成的验证码并返回错误。
     const resendApiKey = process.env.RESEND_API_KEY;
+    const fromAddress = process.env.RESEND_FROM || 'RIEMer Land <onboarding@resend.dev>';
+
     if (!resendApiKey) {
-      // 没有配置 Resend API Key → 返回验证码（仅供开发调试，生产环境必须配置）
-      console.warn('[send-reset-code] RESEND_API_KEY 未配置，直接返回验证码（仅限开发环境）');
-      return res.status(200).json({
-        success: true,
-        message: '验证码已生成，请使用下方验证码继续操作',
-        devCode: resetCode, // 仅开发环境返回
+      console.error('[send-reset-code] RESEND_API_KEY 未配置，无法发送验证码');
+      codeStore.delete(normalizedEmail); // 清除已生成但无法送达的验证码
+      return res.status(503).json({
+        error:
+          '邮件服务未配置（管理员未设置 RESEND_API_KEY 环境变量），暂时无法发送验证码，请联系管理员。',
       });
     }
 
@@ -88,7 +92,7 @@ export default async function handler(req, res) {
           Authorization: `Bearer ${resendApiKey}`,
         },
         body: JSON.stringify({
-          from: 'RIEMer Land <noreply@riemerland.org>',
+          from: fromAddress,
           to: [normalizedEmail],
           subject: '【RIEMer Land】密码重置验证码',
           html: `
@@ -111,26 +115,27 @@ export default async function handler(req, res) {
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
         console.error('[send-reset-code] Resend API 错误:', response.status, errorData);
-        // Resend 发送失败 → 回退：直接返回验证码，让前端显示
-        console.warn('[send-reset-code] Resend 发送失败，回退为直接返回验证码');
-        return res.status(200).json({
-          success: true,
-          message: '验证码已生成，请使用下方验证码继续操作',
-          devCode: resetCode,
+        codeStore.delete(normalizedEmail); // 未送达就清除
+        // 把 Resend 的详细错误透传给前端（含 "domain not verified" 等常见提示），
+        // 便于管理员在页面上直接看到问题原因。
+        const detail =
+          errorData?.message ||
+          errorData?.error ||
+          `Resend 返回 HTTP ${response.status}`;
+        return res.status(502).json({
+          error: `邮件发送失败：${detail}`,
         });
       }
 
       return res.status(200).json({
         success: true,
-        message: '验证码已发送到你的邮箱，请查收',
+        message: '验证码已发送到你的邮箱，请查收（注意检查垃圾邮件）',
       });
     } catch (err) {
       console.error('[send-reset-code] 发送异常:', err);
-      // 网络异常也回退为直接返回验证码
-      return res.status(200).json({
-        success: true,
-        message: '验证码已生成，请使用下方验证码继续操作',
-        devCode: resetCode,
+      codeStore.delete(normalizedEmail);
+      return res.status(502).json({
+        error: `邮件发送失败：${err.message || '网络异常'}`,
       });
     }
   }

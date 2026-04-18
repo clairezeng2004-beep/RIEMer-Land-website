@@ -994,8 +994,8 @@ export function AuthProvider({ children }) {
       if (!res.ok) {
         return { success: false, message: data.error || '发送失败' };
       }
-      // 开发模式下 API 会返回 devCode，用于调试
-      return { success: true, message: data.message, devCode: data.devCode || null };
+      // 验证码只会通过邮件送达用户邮箱，前端绝不持有验证码明文（安全基线）
+      return { success: true, message: data.message };
     } catch (err) {
       return { success: false, message: '网络错误：' + err.message };
     }
