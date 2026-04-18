@@ -101,6 +101,12 @@ html {
   font-size: 16px;
   overflow-x: hidden;
   overflow-y: scroll;
+  /* 关键：给 html 也设置底色，
+     这样在移动端浏览器（Safari / Chrome 等）半透明地址栏下方、
+     以及过度滚动（橡皮筋）时，都不会透出浏览器默认的白色。 */
+  background-color: var(--color-bg);
+  /* 禁止整体页面向上/向下橡皮筋式过度滚动，减少"透出"观感 */
+  overscroll-behavior-y: none;
 }
 
 body {
@@ -111,6 +117,7 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
+  overscroll-behavior-y: none;
   /* 禁止浏览器给缺失字重合成伪粗体/伪斜体，避免字体到位前后字形跳变 */
   font-synthesis: none;
   /* 文本渲染优化：优先清晰度，减少回流 */
