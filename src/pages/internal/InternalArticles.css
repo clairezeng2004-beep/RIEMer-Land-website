@@ -376,6 +376,27 @@
   color: white;
 }
 
+/* 所有成员可用的"新增筛选"按钮 */
+.ia-list__cat--add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-primary);
+  border-style: dashed;
+  border-color: var(--color-primary);
+  background: transparent;
+  opacity: 0.85;
+}
+.ia-list__cat--add:hover {
+  background: rgba(91, 140, 62, 0.08);
+  opacity: 1;
+}
+
+/* 快速新增分类弹窗 */
+.ia-modal--quick-cat {
+  max-width: 440px;
+}
+
 /* 文章网格 */
 .ia-list__grid {
   display: grid;

@@ -24,6 +24,7 @@ export const SITE_KEYS = {
   SUGGESTIONS: 'suggestions',         // 网站建设建议列表
   EVENTS: 'events',                   // 活动管理
   TIMELINE: 'timeline',               // 时间轴
+  ARTICLE_CATEGORIES: 'article_categories', // 公众号归档的筛选分类（所有成员可新增）
 };
 
 /**

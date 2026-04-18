@@ -20,6 +20,8 @@ import {
 } from 'lucide-react';
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
+import { fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../../services/siteSettingsService';
+import { isSupabaseConfigured } from '../../lib/supabase';
 
 // ---- 分类管理 ----
 const ARTICLE_CATEGORIES_KEY = 'riemer_article_categories';
@@ -47,6 +49,19 @@ function loadArticleCategories() {
 
 function saveArticleCategories(data) {
   localStorage.setItem(ARTICLE_CATEGORIES_KEY, JSON.stringify(data));
+}
+
+// 双写：本地 + 云端（site_settings.article_categories），便于跨设备同步
+// lastSyncRef 用于记录最近一次自己 push 的 updated_at，订阅回流时可据此跳过
+async function persistCategories(data, lastSyncRef) {
+  saveArticleCategories(data);
+  if (!isSupabaseConfigured) return;
+  const res = await saveSetting(SITE_KEYS.ARTICLE_CATEGORIES, data);
+  if (res.success && lastSyncRef) {
+    lastSyncRef.current = res.updatedAt;
+  } else if (!res.success) {
+    console.warn('[InternalArticles] 分类云端同步失败:', res.error);
+  }
 }
 
 function buildCategoryMaps(cats) {
@@ -78,6 +93,42 @@ export default function InternalArticles() {
   const [editingCatKey, setEditingCatKey] = useState(null);
   const [editCatLabel, setEditCatLabel] = useState('');
   const [editCatColor, setEditCatColor] = useState('');
+  // 普通成员"新增筛选"弹窗
+  const [showAddCatModal, setShowAddCatModal] = useState(false);
+  const [quickCatLabel, setQuickCatLabel] = useState('');
+  const [quickCatColor, setQuickCatColor] = useState(PRESET_COLORS[0]);
+  const [quickCatError, setQuickCatError] = useState('');
+
+  // 记录本设备最近一次 push 的 updated_at，避免 realtime 回流覆盖自己
+  const lastCatSyncRef = useRef(null);
+
+  // 挂载时从云端拉取一次，并订阅变更（跨设备同步）
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+
+    fetchSetting(SITE_KEYS.ARTICLE_CATEGORIES).then(({ value, updatedAt, error }) => {
+      if (cancelled || error) return;
+      if (Array.isArray(value) && value.length > 0) {
+        lastCatSyncRef.current = updatedAt;
+        setCategoryList(value);
+        saveArticleCategories(value);
+      }
+    });
+
+    const unsub = subscribeSetting(SITE_KEYS.ARTICLE_CATEGORIES, (value, updatedAt) => {
+      if (updatedAt && lastCatSyncRef.current === updatedAt) return; // 自己的回流，跳过
+      if (!Array.isArray(value)) return;
+      lastCatSyncRef.current = updatedAt;
+      setCategoryList(value);
+      saveArticleCategories(value);
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, []);
 
   // ---- 新建归档弹窗状态 ----
   const [showModal, setShowModal] = useState(false);
@@ -203,7 +254,7 @@ export default function InternalArticles() {
     const key = 'acat_' + Date.now();
     const updated = [...categoryList, { key, label, color: newCatColor }];
     setCategoryList(updated);
-    saveArticleCategories(updated);
+    persistCategories(updated, lastCatSyncRef);
     setNewCatLabel('');
     setNewCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
   };
@@ -220,7 +271,7 @@ export default function InternalArticles() {
       c.key === editingCatKey ? { ...c, label: editCatLabel.trim(), color: editCatColor } : c,
     );
     setCategoryList(updated);
-    saveArticleCategories(updated);
+    persistCategories(updated, lastCatSyncRef);
     setEditingCatKey(null);
   };
 
@@ -230,8 +281,40 @@ export default function InternalArticles() {
     if (!window.confirm(`确定要删除分类「${cat.label}」吗？该分类下的文章不会被删除。`)) return;
     const updated = categoryList.filter((c) => c.key !== key);
     setCategoryList(updated);
-    saveArticleCategories(updated);
+    persistCategories(updated, lastCatSyncRef);
     if (selectedCategory === cat.label) setSelectedCategory('全部');
+  };
+
+  // ---- 普通成员快速新增分类（所有登录成员可用） ----
+  const openAddCatModal = () => {
+    setQuickCatLabel('');
+    setQuickCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
+    setQuickCatError('');
+    setShowAddCatModal(true);
+  };
+
+  const closeAddCatModal = () => {
+    setShowAddCatModal(false);
+    setQuickCatError('');
+  };
+
+  const handleQuickAddCategory = () => {
+    const label = quickCatLabel.trim();
+    if (!label) {
+      setQuickCatError('请输入分类名称');
+      return;
+    }
+    // 同时查"已管理"和"动态派生（来自文章 category）"，避免重复
+    if (categoryList.some((c) => c.label === label) || categories.includes(label)) {
+      setQuickCatError('该分类名称已存在');
+      return;
+    }
+    const key = 'acat_' + Date.now();
+    const updated = [...categoryList, { key, label, color: quickCatColor }];
+    setCategoryList(updated);
+    persistCategories(updated, lastCatSyncRef);
+    setSelectedCategory(label); // 新增后自动选中
+    closeAddCatModal();
   };
 
   const filtered = useMemo(() => {
@@ -470,6 +553,14 @@ export default function InternalArticles() {
                   {cat}
                 </button>
               ))}
+              {/* 所有成员：快速新增筛选分类 */}
+              <button
+                className="ia-list__cat ia-list__cat--add"
+                onClick={openAddCatModal}
+                title="新增筛选分类（所有成员可用）"
+              >
+                <Plus size={14} /> 新增筛选
+              </button>
             </div>
             {editing && (
               <button
@@ -976,6 +1067,82 @@ export default function InternalArticles() {
                     <Check size={14} /> 保存
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 普通成员快速新增分类弹窗 ========== */}
+      {showAddCatModal && (
+        <div className="ia-modal-overlay" onClick={closeAddCatModal}>
+          <div
+            className="ia-modal ia-modal--quick-cat"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ia-modal__header">
+              <h2>
+                <Palette size={18} /> 新增筛选分类
+              </h2>
+              <button className="ia-modal__close" onClick={closeAddCatModal}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="ia-modal__body">
+              <p className="ia-modal__hint">
+                所有成员都可以新增筛选分类，新增后立即同步到所有设备，大家都能看到。
+              </p>
+              <div className="ia-modal__field">
+                <label className="ia-modal__label">分类名称</label>
+                <div className="ia-cat-manager__add-row">
+                  <span
+                    className="ia-cat-item__color-dot"
+                    style={{ background: quickCatColor }}
+                  />
+                  <input
+                    type="text"
+                    className="ia-modal__text-input"
+                    placeholder="例如：学习笔记、求职经验…"
+                    value={quickCatLabel}
+                    onChange={(e) => {
+                      setQuickCatLabel(e.target.value);
+                      setQuickCatError('');
+                    }}
+                    onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()}
+                    autoFocus
+                    maxLength={20}
+                  />
+                </div>
+              </div>
+              <div className="ia-modal__field">
+                <label className="ia-modal__label">分类颜色</label>
+                <div className="ia-cat-item__colors">
+                  {PRESET_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      className={`ia-cat-item__color-btn ${quickCatColor === c ? 'ia-cat-item__color-btn--active' : ''}`}
+                      style={{ background: c }}
+                      onClick={() => setQuickCatColor(c)}
+                    />
+                  ))}
+                </div>
+              </div>
+              {quickCatError && (
+                <div className="ia-modal__error">
+                  <AlertCircle size={14} /> {quickCatError}
+                </div>
+              )}
+            </div>
+            <div className="ia-modal__footer">
+              <button className="btn btn-ghost" onClick={closeAddCatModal}>
+                取消
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleQuickAddCategory}
+                disabled={!quickCatLabel.trim()}
+              >
+                <Plus size={16} /> 新增
               </button>
             </div>
           </div>
