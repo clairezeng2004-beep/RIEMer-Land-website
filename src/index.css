@@ -99,14 +99,15 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  /* 关键：只锁横向溢出，纵向必须可滚
+     用 overflow-y: auto 而不是 scroll —— scroll 在某些移动端浏览器上会与
+     overscroll-behavior-y: none 联动，导致页面被视为"不可滚动容器"而无法下滑。 */
   overflow-x: hidden;
-  overflow-y: scroll;
+  overflow-y: auto;
   /* 关键：给 html 也设置底色，
      这样在移动端浏览器（Safari / Chrome 等）半透明地址栏下方、
      以及过度滚动（橡皮筋）时，都不会透出浏览器默认的白色。 */
   background-color: var(--color-bg);
-  /* 禁止整体页面向上/向下橡皮筋式过度滚动，减少"透出"观感 */
-  overscroll-behavior-y: none;
 }
 
 body {
@@ -116,12 +117,28 @@ body {
   line-height: 1.8;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* 只限制横向溢出，纵向必须 visible/auto 才能让页面滚动 */
   overflow-x: hidden;
-  overscroll-behavior-y: none;
   /* 禁止浏览器给缺失字重合成伪粗体/伪斜体，避免字体到位前后字形跳变 */
   font-synthesis: none;
   /* 文本渲染优化：优先清晰度，减少回流 */
   text-rendering: optimizeLegibility;
+  /* 兜底：确保最小可滚动高度（避免某些 flex 布局里 body 被压成 0 导致滚动条消失） */
+  min-height: 100vh;
+}
+
+/* ============================================
+   滚动兜底规则 —— 必须放在所有 reset/组件 CSS 之后
+   避免任何组件 CSS 意外把 html/body 锁住，导致整站无法下滑
+   ============================================ */
+html, body {
+  /* !important 是最后一道防线，保证任何后来的规则都不能把纵向滚动锁死 */
+  overflow-y: visible !important;
+}
+
+html {
+  /* html 层必须能滚动：用 auto 而非 scroll/hidden */
+  overflow-y: auto !important;
 }
 
 main {
