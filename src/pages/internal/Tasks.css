@@ -306,7 +306,8 @@
   white-space: nowrap;
 }
 
-/* 备注 + 删除按钮行 */
+/* 亮点总结 / 经验复盘 单元格：输入框横向填满，
+   末尾那一列还需要并排放一个行级的「删除任务」×按钮。*/
 .tasks-table__note-cell {
   display: flex;
   align-items: center;
@@ -390,10 +391,11 @@
   background: rgba(192, 57, 43, 0.08);
 }
 
-/* Change reason input */
+/* 亮点总结 / 经验复盘 输入框（也曾用作早期的「备注/变更原因」，
+   类名沿用 __reason-input 保持不破坏性，只是语义上承载更宽广）。*/
 .tasks-table__reason-input {
   flex: 1;
-  min-width: 100px;
+  min-width: 80px;
   padding: 0.3rem 0.6rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);

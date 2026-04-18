@@ -447,9 +447,16 @@ CREATE TABLE IF NOT EXISTS tasks (
   assignee JSONB NOT NULL DEFAULT '[]'::jsonb,
   helpers JSONB NOT NULL DEFAULT '[]'::jsonb,
   status_history JSONB NOT NULL DEFAULT '[]'::jsonb,
+  -- 亮点总结 / 经验复盘：随任务持久化，非状态切换时的一次性 reason
+  highlights TEXT NOT NULL DEFAULT '',
+  reflections TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- 老库增量迁移：v3 新增 highlights / reflections
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS highlights TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reflections TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);

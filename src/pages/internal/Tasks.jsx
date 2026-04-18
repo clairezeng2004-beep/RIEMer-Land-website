@@ -82,7 +82,10 @@ const writeLocalTasks = (list) => {
   }
 };
 
-/** Supabase 行 → 前端 task（兼容历史字段） */
+/** Supabase 行 → 前端 task（兼容历史字段）
+ * highlights / reflections 是 v3 新增字段（亮点总结 / 经验复盘），
+ * 老数据里不存在时统一补成空串，防止 input 的 value 从 undefined 切到 '' 触发受控/非受控切换警告。
+ */
 const rowToTask = (r) => ({
   id: r.id,
   title: r.title || '',
@@ -92,6 +95,8 @@ const rowToTask = (r) => ({
   assignee: Array.isArray(r.assignee) ? r.assignee : [],
   helpers: Array.isArray(r.helpers) ? r.helpers : [],
   statusHistory: Array.isArray(r.status_history) ? r.status_history : [],
+  highlights: r.highlights || '',
+  reflections: r.reflections || '',
   createdAt: r.created_at ? String(r.created_at).slice(0, 10) : '',
 });
 
@@ -104,6 +109,8 @@ const taskToRow = (t) => ({
   assignee: Array.isArray(t.assignee) ? t.assignee : (t.assignee ? [t.assignee] : []),
   helpers: Array.isArray(t.helpers) ? t.helpers : [],
   status_history: Array.isArray(t.statusHistory) ? t.statusHistory : [],
+  highlights: t.highlights || '',
+  reflections: t.reflections || '',
 });
 
 export default function Tasks() {
@@ -268,7 +275,18 @@ export default function Tasks() {
     assignee: [],
     helpers: [],
   });
-  const [notes, setNotes] = useState({});
+  // 亮点总结 / 经验复盘 的 Supabase 写入防抖计时器
+  // 结构：{ [taskId]: { [field]: number(timerId) } }
+  const writeTimersRef = useRef({});
+  // 组件卸载时清理所有未触发的防抖定时器，避免 setState on unmounted 或孤儿请求
+  useEffect(() => {
+    const timers = writeTimersRef.current;
+    return () => {
+      Object.values(timers).forEach((perTask) => {
+        Object.values(perTask || {}).forEach((tid) => clearTimeout(tid));
+      });
+    };
+  }, []);
   // 跨模块联动提示
   const [archivePrompt, setArchivePrompt] = useState(null);
 
@@ -296,6 +314,10 @@ export default function Tasks() {
     const task = {
       ...newTask,
       id: genId(),
+      // 新任务的"亮点总结 / 经验复盘"初始化为空串（而不是 undefined），
+      // 避免受控 input 的 value 在首次输入时从 undefined 变成 '' 触发 React 警告。
+      highlights: '',
+      reflections: '',
       createdAt: new Date().toISOString().split('T')[0],
     };
     // 乐观更新 UI + 本地缓存
@@ -341,13 +363,14 @@ export default function Tasks() {
   };
 
   const updateTaskStatus = async (id, newStatus) => {
-    const note = notes[id] || '';
     const targetTask = tasks.find((t) => t.id === id);
     if (!targetTask) return;
     const record = {
       from: targetTask.status,
       to: newStatus,
-      reason: note,
+      // reason 字段保留，供后续扩展（如弹窗填写状态变更原因）。
+      // 当前的"亮点总结 / 经验复盘"是任务级持久字段，不在状态切换时消费。
+      reason: '',
       date: new Date().toISOString().split('T')[0],
     };
     const nextHistory = [...(targetTask.statusHistory || []), record];
@@ -355,12 +378,6 @@ export default function Tasks() {
       ? { ...t, status: newStatus, statusHistory: nextHistory }
       : t
     )));
-    // 清空该任务的备注
-    setNotes((prev) => {
-      const next = { ...prev };
-      delete next[id];
-      return next;
-    });
     // 公众号文章分类的事项标记为"已完成"时，提示用户是否去归档页面
     if (
       targetTask.category === '公众号文章' &&
@@ -375,7 +392,7 @@ export default function Tasks() {
         const operator = user?.nickname || user?.name || '某成员';
         addNotification({
           title: '事项状态变更',
-          message: `${operator} 将事项「${targetTask.title}」状态：${targetTask.status} → ${newStatus}${note ? '｜备注：' + note : ''}`,
+          message: `${operator} 将事项「${targetTask.title}」状态：${targetTask.status} → ${newStatus}`,
           type: 'progress',
           read: true,
         });
@@ -398,8 +415,31 @@ export default function Tasks() {
     }
   };
 
-  const updateNote = (id, value) => {
-    setNotes((prev) => ({ ...prev, [id]: value }));
+  /** 更新任务的"亮点总结 / 经验复盘"（或将来其它纯文本字段）。
+   *  - 本地 state 立刻更新（受控 input 不卡顿）；
+   *  - 向 Supabase 的同步按 (taskId, field) 维度做 500ms 防抖，避免连续打字产生大量 UPDATE。
+   *  - 出错时仅告警，不回滚本地（本地缓存会被 tasks useEffect 持久化，用户下次刷新仍能看到）。
+   */
+  const updateTaskField = (id, field, value) => {
+    setTasks((prev) => prev.map((t) => (t.id === id ? { ...t, [field]: value } : t)));
+
+    if (!canUseSupabase) return;
+    const timers = writeTimersRef.current;
+    if (!timers[id]) timers[id] = {};
+    if (timers[id][field]) clearTimeout(timers[id][field]);
+    timers[id][field] = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ [field]: value })
+          .eq('id', id);
+        if (error) throw error;
+      } catch (err) {
+        console.error(`[Tasks] ❌ 同步 ${field} 到 Supabase 失败:`, err.message, err);
+      } finally {
+        if (timers[id]) delete timers[id][field];
+      }
+    }, 500);
   };
 
   const deleteTask = async (id) => {
@@ -627,7 +667,8 @@ export default function Tasks() {
                 <th>标题</th>
                 <th>负责人</th>
                 <th>协助人</th>
-                <th>备注</th>
+                <th>亮点总结</th>
+                <th>经验复盘</th>
               </tr>
             </thead>
             <tbody>
@@ -725,9 +766,20 @@ export default function Tasks() {
                       <input
                         type="text"
                         className="tasks-table__reason-input"
-                        placeholder="备注…"
-                        value={notes[task.id] || ''}
-                        onChange={(e) => updateNote(task.id, e.target.value)}
+                        placeholder="亮点总结…"
+                        value={task.highlights || ''}
+                        onChange={(e) => updateTaskField(task.id, 'highlights', e.target.value)}
+                      />
+                    </div>
+                  </td>
+                  <td>
+                    <div className="tasks-table__note-cell">
+                      <input
+                        type="text"
+                        className="tasks-table__reason-input"
+                        placeholder="经验复盘…"
+                        value={task.reflections || ''}
+                        onChange={(e) => updateTaskField(task.id, 'reflections', e.target.value)}
                       />
                       <button
                         onClick={() => deleteTask(task.id)}
