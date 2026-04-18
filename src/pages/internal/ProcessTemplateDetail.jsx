@@ -23,6 +23,8 @@ import {
   Pencil,
   Save,
   Clipboard,
+  Check,
+  AlertTriangle,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
@@ -323,6 +325,10 @@ export default function ProcessTemplateDetail() {
   const [editDescription, setEditDescription] = useState('');
   const [editContent, setEditContent] = useState('');
   const [saving, setSaving] = useState(false);
+  // 保存结果的轻提示：'saved' | 'cloud-failed' | null
+  // 'saved'：本地已保存、云端同步已发起/完成
+  // 'cloud-failed'：本地已保存但云端同步失败（不阻塞，提示用户）
+  const [saveHint, setSaveHint] = useState(null);
 
   const startEdit = useCallback(() => {
     if (!doc) return;
@@ -362,7 +368,7 @@ export default function ProcessTemplateDetail() {
       }
       const nowDate = new Date().toISOString().split('T')[0];
       const editor = user?.nickname || user?.name || user?.email || 'Unknown';
-      userDocs[idx] = {
+      const updated = {
         ...userDocs[idx],
         title,
         description: editDescription,
@@ -370,42 +376,62 @@ export default function ProcessTemplateDetail() {
         lastEditedAt: nowDate,
         lastEditedBy: editor,
       };
+      userDocs[idx] = updated;
       saveUserDocs(userDocs);
 
-      // 云端同步
+      // —— 本地已保存成功，立即给用户反馈 ——
+      // 关闭编辑态 + 显示"已保存"提示，不再阻塞在云端同步上
+      setDocsVersion((v) => v + 1);
+      setIsEditing(false);
+      setSaving(false);
+      setSaveHint('saved');
+      // 2.5s 后自动消失
+      setTimeout(() => {
+        setSaveHint((h) => (h === 'saved' ? null : h));
+      }, 2500);
+
+      // —— 云端异步同步（不阻塞 UI） ——
       if (canUseSupabase()) {
-        const result = await cloudUpdateDoc(doc.id, {
+        cloudUpdateDoc(doc.id, {
           title,
           description: editDescription,
           content: editContent,
           lastEditedAt: nowDate,
           lastEditedBy: editor,
-        });
-        if (!result.remote) {
-          console.warn('[ProcessTemplateDetail] 云端编辑同步失败，其他设备暂不可见', result.error);
-          // 不阻塞用户，编辑已本地保存
-        } else {
-          // 云端成功后同步刷新 cloudData，避免下次重新进入页面读到旧版
-          setCloudData((prev) => {
-            if (!prev) return prev;
-            return {
-              ...prev,
-              userDocs: prev.userDocs.map((d) =>
-                String(d.id) === String(doc.id)
-                  ? { ...d, title, description: editDescription, content: editContent, lastEditedAt: nowDate, lastEditedBy: editor }
-                  : d
-              ),
-            };
+        })
+          .then((result) => {
+            if (!result.remote) {
+              console.warn('[ProcessTemplateDetail] 云端编辑同步失败，其他设备暂不可见', result.error);
+              setSaveHint('cloud-failed');
+              setTimeout(() => {
+                setSaveHint((h) => (h === 'cloud-failed' ? null : h));
+              }, 4000);
+            } else {
+              // 云端成功后同步刷新 cloudData，避免下次重新进入页面读到旧版
+              setCloudData((prev) => {
+                if (!prev) return prev;
+                return {
+                  ...prev,
+                  userDocs: prev.userDocs.map((d) =>
+                    String(d.id) === String(doc.id)
+                      ? { ...d, title, description: editDescription, content: editContent, lastEditedAt: nowDate, lastEditedBy: editor }
+                      : d
+                  ),
+                };
+              });
+            }
+          })
+          .catch((err) => {
+            console.error('[ProcessTemplateDetail] 云端同步异常:', err);
+            setSaveHint('cloud-failed');
+            setTimeout(() => {
+              setSaveHint((h) => (h === 'cloud-failed' ? null : h));
+            }, 4000);
           });
-        }
       }
-
-      setDocsVersion((v) => v + 1);
-      setIsEditing(false);
     } catch (err) {
       console.error('[ProcessTemplateDetail] 保存失败:', err);
       alert('保存失败，请重试');
-    } finally {
       setSaving(false);
     }
   }, [doc, editTitle, editDescription, editContent, user]);
@@ -482,6 +508,23 @@ export default function ProcessTemplateDetail() {
             >
               <Save size={16} /> {saving ? '保存中…' : '保存'}
             </button>
+          </div>
+        )}
+        {saveHint && (
+          <div
+            className={`ptd-topbar__save-hint ptd-topbar__save-hint--${saveHint}`}
+            role="status"
+            aria-live="polite"
+          >
+            {saveHint === 'saved' ? (
+              <>
+                <Check size={14} /> 已保存
+              </>
+            ) : (
+              <>
+                <AlertTriangle size={14} /> 已本地保存，云端同步失败
+              </>
+            )}
           </div>
         )}
       </div>

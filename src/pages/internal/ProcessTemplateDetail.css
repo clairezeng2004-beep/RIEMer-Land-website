@@ -877,6 +877,33 @@
   cursor: not-allowed;
 }
 
+/* 保存结果轻提示（成功 / 云端失败） */
+.ptd-topbar__save-hint {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 10px;
+  padding: 0.35rem 0.7rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: 13px;
+  font-weight: 500;
+  animation: ptd-hint-fade-in 0.25s ease-out;
+}
+.ptd-topbar__save-hint--saved {
+  background: rgba(91, 140, 62, 0.12);
+  color: #4a7632;
+  border: 1px solid rgba(91, 140, 62, 0.3);
+}
+.ptd-topbar__save-hint--cloud-failed {
+  background: rgba(217, 119, 6, 0.1);
+  color: #b45309;
+  border: 1px solid rgba(217, 119, 6, 0.3);
+}
+@keyframes ptd-hint-fade-in {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 /* 编辑态下 article 高亮一条左边框，视觉提示 */
 .ptd-article--editing {
   box-shadow: 0 0 0 1px rgba(91, 140, 62, 0.18), 0 8px 24px rgba(0, 0, 0, 0.04);
