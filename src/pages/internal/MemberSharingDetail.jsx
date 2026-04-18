@@ -314,6 +314,30 @@ export default function MemberSharingDetail() {
       {/* 全屏内容区域 */}
       <div className="msd-content">
         <div className={`msd-content__inner ${showToc ? 'msd-content__inner--with-toc' : ''}`}>
+          {/* 目录导航（桌面端左侧 sticky） —— 放在 article 之前，确保 grid 顺序：左目录 | 中文章 */}
+          {showToc && (
+            <aside className="msd-toc" aria-label="文章目录">
+              <div className="msd-toc__header">
+                <List size={14} />
+                <span>目录</span>
+              </div>
+              <nav className="msd-toc__list">
+                {toc.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`msd-toc__item msd-toc__item--l${item.level} ${activeTocId === item.id ? 'msd-toc__item--active' : ''}`}
+                    onClick={() => handleTocClick(item.id)}
+                    title={item.text}
+                  >
+                    <span className="msd-toc__dot" />
+                    <span className="msd-toc__text">{item.text}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          )}
+
           {/* 文章主体 */}
           <article className="msd-article">
             {/* 文章头部 */}
@@ -408,30 +432,6 @@ export default function MemberSharingDetail() {
               )}
             </footer>
           </article>
-
-          {/* 目录导航（桌面端右侧 sticky） */}
-          {showToc && (
-            <aside className="msd-toc" aria-label="文章目录">
-              <div className="msd-toc__header">
-                <List size={14} />
-                <span>目录</span>
-              </div>
-              <nav className="msd-toc__list">
-                {toc.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`msd-toc__item msd-toc__item--l${item.level} ${activeTocId === item.id ? 'msd-toc__item--active' : ''}`}
-                    onClick={() => handleTocClick(item.id)}
-                    title={item.text}
-                  >
-                    <span className="msd-toc__dot" />
-                    <span className="msd-toc__text">{item.text}</span>
-                  </button>
-                ))}
-              </nav>
-            </aside>
-          )}
         </div>
       </div>
 

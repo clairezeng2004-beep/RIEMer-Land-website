@@ -53,12 +53,12 @@
   max-width: none;
 }
 
-/* 当存在目录时，内容区采用三栏布局：左目录 + 文章 + 右评论 */
+/* 当存在目录时，内容区采用两栏布局：左目录 + 文章 */
 .msd-content__inner--with-toc {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 340px;
+  grid-template-columns: 220px minmax(0, 1fr);
   gap: var(--space-xl, 24px);
-  max-width: 1480px;
+  max-width: 1200px;
   margin: 0 auto;
   align-items: start;
 }
