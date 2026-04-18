@@ -422,14 +422,42 @@
   align-items: center;
   gap: var(--space-lg);
   flex-wrap: wrap;
+  /* 统一设置在父级，让 span / button(.views-trigger) 都能继承，
+     避免 button 元素默认的黑色文字导致"访问记录"颜色突兀。 */
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
-.ptd-article__meta span {
-  display: flex;
+.ptd-article__meta span,
+.ptd-article__meta .views-trigger {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* 访问记录按钮：与其他 meta 项视觉一致，仅在 hover 时给出轻微交互反馈 */
+.ptd-article__meta .views-trigger {
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ptd-article__meta .views-trigger:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--color-primary, #4f46e5);
+}
+
+.ptd-article__meta .views-trigger:focus-visible {
+  outline: 2px solid var(--color-primary, #6366f1);
+  outline-offset: 1px;
 }
 
 /* Article Content — 通用排版 */
