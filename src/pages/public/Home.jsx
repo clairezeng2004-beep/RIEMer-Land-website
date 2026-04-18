@@ -58,7 +58,11 @@ export default function Home() {
   }, [allArticles, selectedTag]);
 
   const recentArticles = filteredArticles.slice(0, 6);
-  const recentEvents = events.slice(0, 4);
+  // 最新活动：按日期从新到旧排序后取前 4 条
+  const recentEvents = useMemo(
+    () => [...events].sort((a, b) => (b.date || '').localeCompare(a.date || '')).slice(0, 4),
+    [events],
+  );
 
   // 计算活动倒计时天数（活动日期比当前晚则返回天数，否则返回 null）
   const getCountdownDays = (eventDate) => {
