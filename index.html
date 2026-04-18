@@ -14,28 +14,58 @@
     <!-- 预加载 Logo，避免首屏闪动 -->
     <link rel="preload" as="image" href="/logo.png" />
 
-    <!-- 预连接字体服务器（并行解析 DNS+TLS，减少字体请求耗时） -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <!--
+      预连接字体服务器（并行解析 DNS+TLS，减少字体请求耗时）
+      - fonts.loli.net / gstatic.loli.net：Google Fonts 的中科大镜像，国内稳定直连
+      - gcore.jsdelivr.net：jsDelivr 的 Gcore 节点（国内直连比主站稳得多）
+      - unpkg.com：备用 CDN，异源容错
+    -->
+    <link rel="preconnect" href="https://fonts.loli.net" />
+    <link rel="preconnect" href="https://gstatic.loli.net" crossorigin />
+    <link rel="preconnect" href="https://gcore.jsdelivr.net" crossorigin />
+    <link rel="dns-prefetch" href="https://unpkg.com" />
 
     <!--
-      字体加载策略：
+      字体加载策略（优化版 2026-04）：
       - 英文衬线：Lora（正文）/ EB Garamond（品牌）/ DM Serif Display（大标题）
+        → 走 Google Fonts 中科大镜像 fonts.loli.net（国内直连，不被墙）
       - 中文楷体：LXGW WenKai 霞鹜文楷（项目原始视觉标识，保留手写衬线感）
+        → 主源 gcore.jsdelivr.net（Gcore CDN 在国内有边缘节点，比 cdn.jsdelivr.net 稳）
+        → 只加载"regular"字重子 CSS（不拉 light/bold/mono，省 5 个 HTTP 请求）
+        → preload 这份子 CSS，让浏览器尽早发请求、尽早解析 @font-face
+        → 字体本身已按 unicode-range 分 100+ 片，浏览器只下载页面用到的那几片
       - display=swap：字体未到位时先用 fallback 渲染，到位后立即切换
       - 配合下方 size-adjust 校准 "XXX Fallback"，切换几乎无字号/行高跳变
     -->
 
+    <!-- Google Fonts 英文字体（走中科大镜像，国内稳） -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
+      href="https://fonts.loli.net/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
     />
 
-    <!-- LXGW WenKai 霞鹜文楷（全局中文字体，项目原始视觉） -->
+    <!--
+      LXGW WenKai 霞鹜文楷（全局中文字体，项目原始视觉）
+      主源：gcore.jsdelivr.net（jsDelivr 的 Gcore 国内加速节点）
+
+      包结构说明：style.css 是聚合入口，内部通过 @import 引入 6 个子 CSS（常规/细/粗 × 普通/等宽），
+      每个子 CSS 又按 unicode-range 分 116 个 woff2 分片。浏览器会根据页面实际出现的字符
+      **只下载用到的 2~5 个分片**（每片约 30~80KB），不是一次性 6MB。
+    -->
+
+    <!-- 先 preload CSS 本身，让浏览器尽早发请求、尽早解析出 @font-face -->
+    <link
+      rel="preload"
+      as="style"
+      href="https://gcore.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkai-regular.css"
+    />
+    <!--
+      只加载"常规字重"子 CSS（不加载 light/bold/mono，减少 6 个请求 → 1 个请求）
+      全站 CSS 里 font-family 用 'LXGW WenKai'，对应的就是这个 regular 字重
+    -->
     <link
       rel="stylesheet"
-      href="https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/style.css"
+      href="https://gcore.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkai-regular.css"
     />
 
     <!--
@@ -76,11 +106,6 @@
         line-gap-override: 0%;
       }
     </style>
-
-    <!--
-      LXGW WenKai 不再默认加载为全局中文字体（会产生强烈的"楷体切换"视觉落差）。
-      如需在特定标题/引用处使用，请在对应 CSS 里按需引入。
-    -->
 
     <!-- Google Analytics (GA4) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
