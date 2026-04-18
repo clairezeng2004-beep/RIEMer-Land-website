@@ -78,6 +78,12 @@ export default function ProcessTemplateCreate() {
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
   const mdEditorRef = useRef(null);
+  const mdPreviewRef = useRef(null);
+
+  // 同步滚动开关（默认 false：编辑和预览各自独立滚动）
+  const [syncScroll, setSyncScroll] = useState(false);
+  const syncScrollLockRef = useRef(null);
+
   const { filterOptions } = useSiteContent();
 
   // 动态类型（从 siteContent 中读取，兼容管理员自定义）+ 默认的流程/规章类型
@@ -299,6 +305,39 @@ export default function ProcessTemplateCreate() {
     marked.setOptions({ breaks: true, gfm: true });
     return marked.parse(newDoc.content);
   }, [newDoc.format, newDoc.content]);
+
+  /* ============ Markdown 同步滚动（可关闭） ============
+   * 默认关闭，两侧可各自独立滚动；开启后按滚动百分比联动。
+   * ========================================================= */
+  const handleEditorScroll = useCallback(() => {
+    if (!syncScroll) return;
+    const src = mdEditorRef.current;
+    const dst = mdPreviewRef.current;
+    if (!src || !dst) return;
+    if (syncScrollLockRef.current === 'preview') return;
+    syncScrollLockRef.current = 'editor';
+    const srcMax = src.scrollHeight - src.clientHeight;
+    const dstMax = dst.scrollHeight - dst.clientHeight;
+    if (srcMax > 0 && dstMax > 0) {
+      dst.scrollTop = (src.scrollTop / srcMax) * dstMax;
+    }
+    requestAnimationFrame(() => { syncScrollLockRef.current = null; });
+  }, [syncScroll]);
+
+  const handlePreviewScroll = useCallback(() => {
+    if (!syncScroll) return;
+    const src = mdPreviewRef.current;
+    const dst = mdEditorRef.current;
+    if (!src || !dst) return;
+    if (syncScrollLockRef.current === 'editor') return;
+    syncScrollLockRef.current = 'preview';
+    const srcMax = src.scrollHeight - src.clientHeight;
+    const dstMax = dst.scrollHeight - dst.clientHeight;
+    if (srcMax > 0 && dstMax > 0) {
+      dst.scrollTop = (src.scrollTop / srcMax) * dstMax;
+    }
+    requestAnimationFrame(() => { syncScrollLockRef.current = null; });
+  }, [syncScroll]);
 
   /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 ============ */
   const imageApiRef = useRef(null);
@@ -584,12 +623,22 @@ export default function ProcessTemplateCreate() {
                   <div className="msc-md-split__pane">
                     <div className="msc-md-split__label">
                       <Code2 size={14} /> 编辑
+                      <button
+                        type="button"
+                        className={`msc-md-split__sync-btn ${syncScroll ? 'msc-md-split__sync-btn--on' : ''}`}
+                        onClick={() => setSyncScroll((v) => !v)}
+                        title={syncScroll ? '已开启同步滚动：编辑与预览一起滚动。点击关闭后可分别滚动。' : '未开启同步滚动：编辑与预览可分别滚动。点击开启同步。'}
+                      >
+                        <span className="msc-md-split__sync-dot" />
+                        同步滚动{syncScroll ? '（已开启）' : '（已关闭）'}
+                      </button>
                     </div>
                     <textarea
                       ref={mdEditorRef}
                       className="msc-md-split__editor"
                       value={newDoc.content}
                       onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
+                      onScroll={handleEditorScroll}
                       placeholder={'# 文档标题\n\n## 适用范围\n\n说明文档用途...\n\n## 操作步骤\n\n1. 第一步\n2. 第二步'}
                       rows={16}
                     />
@@ -605,7 +654,9 @@ export default function ProcessTemplateCreate() {
                       <Eye size={14} /> 预览
                     </div>
                     <div
+                      ref={mdPreviewRef}
                       className="msc-md-split__preview"
+                      onScroll={handlePreviewScroll}
                       dangerouslySetInnerHTML={{
                         __html: markdownPreview || '<p class="msc-md-split__empty">在左侧输入 Markdown 内容后，这里会显示实时预览</p>',
                       }}
