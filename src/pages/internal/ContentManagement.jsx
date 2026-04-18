@@ -98,7 +98,7 @@ export default function ContentManagement() {
 
         const { data: memberProfiles } = await supabase
           .from('member_profiles')
-          .select('user_id, enrollment_year, bio, willing_to_share, want_to_learn, hobbies, dream_city, other, joined_at');
+          .select('user_id, enrollment_year, bio, willing_to_share, want_to_learn, career_interest, hobbies, dream_city, other, joined_at');
 
         if (profiles) {
           const mpMap = {};
@@ -119,6 +119,7 @@ export default function ContentManagement() {
                 bio: mp.bio || '',
                 willing_to_share: mp.willing_to_share || '',
                 want_to_learn: mp.want_to_learn || '',
+                career_interest: mp.career_interest || '',
                 hobbies: mp.hobbies || '',
                 dream_city: mp.dream_city || '',
                 other: mp.other || '',
@@ -153,6 +154,7 @@ export default function ContentManagement() {
             bio: mp.bio || '',
             willing_to_share: mp.willing_to_share || '',
             want_to_learn: mp.want_to_learn || '',
+            career_interest: mp.career_interest || '',
             hobbies: mp.hobbies || '',
             dream_city: mp.dream_city || '',
             other: mp.other || '',
@@ -1560,8 +1562,9 @@ export default function ContentManagement() {
                             <th className="content-mgmt__member-th" style={{ minWidth: 110 }}>加入时间</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 180 }}>我愿意分享什么</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 180 }}>我想和大家请教什么</th>
+                            <th className="content-mgmt__member-th" style={{ minWidth: 180 }}>感兴趣的职业方向/生活模式</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 150 }}>爱好</th>
-                            <th className="content-mgmt__member-th" style={{ minWidth: 150 }}>未来想定居的城市</th>
+                            <th className="content-mgmt__member-th" style={{ minWidth: 160 }}>喜爱向往的城市与地区</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 180 }}>其他</th>
                           </tr>
                         </thead>
@@ -1590,6 +1593,9 @@ export default function ContentManagement() {
                               </td>
                               <td className="content-mgmt__member-td">
                                 {member.want_to_learn || '—'}
+                              </td>
+                              <td className="content-mgmt__member-td">
+                                {member.career_interest || '—'}
                               </td>
                               <td className="content-mgmt__member-td">
                                 {member.hobbies || '—'}

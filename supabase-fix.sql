@@ -4,6 +4,7 @@
 -- 修复问题：
 --   1. profiles 表缺少 signature 列
 --   2. member_profiles 表不存在
+--   3. member_profiles 表缺少 career_interest 列
 --
 -- 在 Supabase 控制台 → SQL Editor 中运行此脚本
 -- 所有语句都使用 IF NOT EXISTS / IF EXISTS 保护，可安全重复执行
@@ -34,6 +35,7 @@ CREATE TABLE IF NOT EXISTS public.member_profiles (
   career TEXT DEFAULT '',
   willing_to_share TEXT DEFAULT '',
   want_to_learn TEXT DEFAULT '',
+  career_interest TEXT DEFAULT '',
   hobbies TEXT DEFAULT '',
   hometown TEXT DEFAULT '',
   dream_city TEXT DEFAULT '',
@@ -41,6 +43,23 @@ CREATE TABLE IF NOT EXISTS public.member_profiles (
   joined_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+-- ========== 修复 2.5：为已存在的 member_profiles 表补齐 career_interest 列 ==========
+-- （CREATE TABLE IF NOT EXISTS 不会给已有表加列，需要单独 ALTER）
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'member_profiles'
+      AND column_name = 'career_interest'
+  ) THEN
+    ALTER TABLE public.member_profiles ADD COLUMN career_interest TEXT DEFAULT '';
+    RAISE NOTICE '✅ 已添加 member_profiles.career_interest 列';
+  ELSE
+    RAISE NOTICE 'ℹ️  member_profiles.career_interest 列已存在，跳过';
+  END IF;
+END $$;
 
 -- ========== 修复 3：启用 member_profiles 的 RLS ==========
 ALTER TABLE public.member_profiles ENABLE ROW LEVEL SECURITY;
