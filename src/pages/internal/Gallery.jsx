@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
 import {
@@ -96,6 +97,7 @@ export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
+  const { addNotification } = useNotifications();
   const gc = internalConfig.gallery || {};
 
   const updateGallery = useCallback(
@@ -211,6 +213,22 @@ export default function Gallery() {
       );
       setAlbums((prev) => [album, ...prev]);
 
+      // 发送"相册新增照片"通知（上传者自己自动已读）。
+      // 仅当本次创建确实带了照片时才发，纯建空相册不打扰其他人。
+      if (filesPayload.length > 0) {
+        try {
+          const uploader = user?.nickname || user?.name || '某成员';
+          addNotification({
+            title: '相册新增照片',
+            message: `${uploader} 向相册「${album.title}」上传了 ${filesPayload.length} 张照片`,
+            type: 'sharing',
+            read: true,
+          });
+        } catch (err) {
+          console.warn('[Gallery] 发送上传通知失败:', err?.message || err);
+        }
+      }
+
       const resetNow = new Date();
       setNewAlbum({
         title: '',
@@ -313,6 +331,23 @@ export default function Gallery() {
         ...prev,
         photos: [...prev.photos, ...newPhotos],
       }));
+
+      // 发送"相册新增照片"通知（上传者自己自动已读）。
+      // 以实际成功写入的 newPhotos 数量为准，避免中途失败时数字对不上。
+      if (Array.isArray(newPhotos) && newPhotos.length > 0) {
+        try {
+          const uploader = user?.nickname || user?.name || '某成员';
+          addNotification({
+            title: '相册新增照片',
+            message: `${uploader} 向相册「${selectedAlbum.title}」上传了 ${newPhotos.length} 张照片`,
+            type: 'sharing',
+            read: true,
+          });
+        } catch (err) {
+          console.warn('[Gallery] 发送上传通知失败:', err?.message || err);
+        }
+      }
+
       // 释放 blob URL
       selectedFiles.forEach((f) => URL.revokeObjectURL(f.url));
       setSelectedFiles([]);

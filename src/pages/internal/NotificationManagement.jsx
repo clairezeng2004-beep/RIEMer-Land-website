@@ -27,6 +27,7 @@ import {
   CheckSquare,
   Share2,
   BookMarked,
+  Image as ImageIcon,
 } from 'lucide-react';
 import './NotificationManagement.css';
 
@@ -122,6 +123,18 @@ const TRIGGER_RULES = [
     autoRead: true,
     autoReadReason: '归档文章的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
     file: 'InternalArticles.jsx',
+  },
+  {
+    id: 'gallery-upload',
+    source: '相册',
+    sourceIcon: ImageIcon,
+    trigger: '有人向相册上传了新照片（无论是新建相册时带照片、还是在已有相册里追加）',
+    title: '相册新增照片',
+    message: '例：「小红」向相册「2024 年度纪念」上传了 8 张照片',
+    type: 'sharing',
+    autoRead: true,
+    autoReadReason: '上传照片的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
+    file: 'Gallery.jsx',
   },
   {
     id: 'weekly-email',
