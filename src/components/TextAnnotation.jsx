@@ -189,7 +189,7 @@ export default function TextAnnotation({
     if (!commentInput.trim() || !user || submitting) return;
     setSubmitting(true);
     try {
-      await addComment({
+      const newComment = await addComment({
         targetType,
         targetId,
         selectedText: selection.text,
@@ -197,15 +197,20 @@ export default function TextAnnotation({
         user,
         anchorData: selection.anchorData,
       });
+      // 乐观更新：先把新评论塞进列表，即便 loadComments 之后再刷新一次也不会闪
+      if (newComment) {
+        setComments((prev) => [newComment, ...prev]);
+      }
       setCommentInput('');
       setIsCommenting(false);
       setToolbar({ visible: false, x: 0, y: 0 });
       window.getSelection()?.removeAllRanges();
-      await loadComments();
       if (!inline) setShowPanel(true);
+      // 异步对齐远端数据（失败也无所谓，乐观插入已经生效）
+      loadComments().catch(() => {});
     } catch (err) {
       console.error('[TextAnnotation] 提交评论失败:', err);
-      alert('评论提交失败，请稍后再试');
+      alert(`评论提交失败：${err?.message || '未知错误'}\n请检查网络或稍后再试`);
     } finally {
       setSubmitting(false);
     }
@@ -216,7 +221,7 @@ export default function TextAnnotation({
     if (!commentInput.trim() || !user || submitting) return;
     setSubmitting(true);
     try {
-      await addComment({
+      const newComment = await addComment({
         targetType,
         targetId,
         selectedText: '',
@@ -224,11 +229,14 @@ export default function TextAnnotation({
         user,
         anchorData: null,
       });
+      if (newComment) {
+        setComments((prev) => [newComment, ...prev]);
+      }
       setCommentInput('');
-      await loadComments();
+      loadComments().catch(() => {});
     } catch (err) {
       console.error('[TextAnnotation] 提交整体评论失败:', err);
-      alert('评论提交失败，请稍后再试');
+      alert(`评论提交失败：${err?.message || '未知错误'}\n请检查网络或稍后再试`);
     } finally {
       setSubmitting(false);
     }
@@ -238,13 +246,22 @@ export default function TextAnnotation({
   const handleSubmitReply = async (commentId) => {
     if (!replyInput.trim() || !user) return;
     try {
-      await replyToComment(commentId, { content: replyInput.trim(), user });
+      const newReply = await replyToComment(commentId, { content: replyInput.trim(), user });
+      if (newReply) {
+        setComments((prev) =>
+          prev.map((c) =>
+            c.id === commentId
+              ? { ...c, replies: [...(c.replies || []), newReply] }
+              : c,
+          ),
+        );
+      }
       setReplyInput('');
       setReplyingTo(null);
-      await loadComments();
+      loadComments().catch(() => {});
     } catch (err) {
       console.error('[TextAnnotation] 回复失败:', err);
-      alert('回复提交失败，请稍后再试');
+      alert(`回复提交失败：${err?.message || '未知错误'}\n请检查网络或稍后再试`);
     }
   };
 

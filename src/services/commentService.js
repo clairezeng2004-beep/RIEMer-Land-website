@@ -128,30 +128,32 @@ export async function addComment({
   if (!user?.id) throw new Error('addComment: missing user');
 
   if (shouldUseRemote()) {
-    try {
-      const { data, error } = await supabase
-        .from('annotations')
-        .insert({
-          target_type: targetType,
-          target_id: String(targetId),
-          selected_text: selectedText || '',
-          anchor_data: anchorData || null,
-          content,
-          user_id: user.id,
-          user_name: user.nickname || user.name || '',
-          user_avatar: user.avatar || null,
-        })
-        .select()
-        .single();
+    // 远端优先：写失败时直接抛错，让 UI 能感知并提示用户。
+    // 不再静默降级到 localStorage —— 因为读路径只从 Supabase 取，
+    // 写本地但读远端会导致"点发送没反应"的错觉。
+    const { data, error } = await supabase
+      .from('annotations')
+      .insert({
+        target_type: targetType,
+        target_id: String(targetId),
+        selected_text: selectedText || '',
+        anchor_data: anchorData || null,
+        content,
+        user_id: user.id,
+        user_name: user.nickname || user.name || '',
+        user_avatar: user.avatar || null,
+      })
+      .select()
+      .single();
 
-      if (error) throw error;
-      return rowToComment(data, []);
-    } catch (err) {
-      console.warn('[commentService] Supabase 写入失败，降级 localStorage：', err);
+    if (error) {
+      console.error('[commentService] Supabase 写入评论失败:', error);
+      throw new Error(error.message || '评论写入失败');
     }
+    return rowToComment(data, []);
   }
 
-  // 本地降级
+  // Supabase 未配置时才走本地降级
   const all = getLocalAll();
   const comment = {
     id: 'comment_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
@@ -179,24 +181,23 @@ export async function replyToComment(commentId, { content, user }) {
   if (!user?.id) throw new Error('replyToComment: missing user');
 
   if (shouldUseRemote()) {
-    try {
-      const { data, error } = await supabase
-        .from('annotation_replies')
-        .insert({
-          annotation_id: commentId,
-          content,
-          user_id: user.id,
-          user_name: user.nickname || user.name || '',
-          user_avatar: user.avatar || null,
-        })
-        .select()
-        .single();
+    const { data, error } = await supabase
+      .from('annotation_replies')
+      .insert({
+        annotation_id: commentId,
+        content,
+        user_id: user.id,
+        user_name: user.nickname || user.name || '',
+        user_avatar: user.avatar || null,
+      })
+      .select()
+      .single();
 
-      if (error) throw error;
-      return rowToReply(data);
-    } catch (err) {
-      console.warn('[commentService] Supabase 回复失败，降级 localStorage：', err);
+    if (error) {
+      console.error('[commentService] Supabase 写入回复失败:', error);
+      throw new Error(error.message || '回复写入失败');
     }
+    return rowToReply(data);
   }
 
   const all = getLocalAll();
