@@ -6,6 +6,11 @@
   display: flex;
   min-height: calc(100vh - 72px);
   background: var(--color-bg);
+  /* 禁用内部空间的"左右横滑到底切换 tab / 浏览器前进后退"手势：
+     - overscroll-behavior-x: none：即使子容器横向滚到尽头，也不把剩余的横向滑动交给浏览器
+     - touch-action: pan-y：触摸设备上仅允许纵向 pan，禁止水平 pan 触发浏览器级手势（iOS Safari 两指/边缘滑动切页等） */
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 .internal-layout__content {
@@ -15,6 +20,8 @@
   overflow-x: hidden;
   background: var(--color-bg);
   margin-left: 220px;
+  overscroll-behavior-x: none;
+  touch-action: pan-y;
 }
 
 /* 内部空间的 .container 左侧留出适当间距 */
@@ -56,6 +63,9 @@
     overflow-y: hidden;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    /* 横向 tab 条滑到最左/最右后不要把滑动手势冒泡给浏览器，避免触发系统级"滑动切页"当作切 tab */
+    overscroll-behavior-x: contain;
+    touch-action: pan-x;
   }
 
   .internal-mobile-nav::-webkit-scrollbar {
