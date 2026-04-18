@@ -815,7 +815,7 @@ export default function MemberSharingCreate() {
                       onClick={() => imageApiRef.current?.pickImage()}
                       title="插入图片（也支持拖拽/粘贴；插入后点击图片可拖动 8 个手柄调整大小，按住 Shift 自由缩放）"
                     >
-                      <Image size={14} /> 插入图片
+                      <Image size={14} /> 插入图片（也支持拖拽插入）
                     </button>
                   </div>
                   <div
