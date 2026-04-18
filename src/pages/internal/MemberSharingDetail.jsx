@@ -556,6 +556,13 @@ export default function MemberSharingDetail() {
         fetchLog={() => fetchViewLog(String(post.id))}
         resolveName={resolveVisitorName}
       />
+
+      {/* 划线评论 — 对 Markdown / Word 正文都生效（浮动按钮 + 右侧抽屉） */}
+      <TextAnnotation
+        targetType="sharing"
+        targetId={post.id}
+        contentRef={contentRef}
+      />
     </div>
   );
 }
