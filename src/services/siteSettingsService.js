@@ -15,6 +15,17 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 export const SITE_SETTINGS_TABLE = 'site_settings';
 export const INTERNAL_CONFIG_KEY = 'internal_config';
 
+// 所有"站点级可编辑配置"统一 key 常量，避免各处硬编码
+// 新增 key 时在这里登记一下即可
+export const SITE_KEYS = {
+  INTERNAL_CONFIG: 'internal_config', // 内部空间配置（侧边栏 Tab 名称等）
+  PUBLIC_CONTENT: 'public_content',   // 首页 Hero / Footer / 使命等公开内容
+  FILTER_OPTIONS: 'filter_options',   // 筛选分类选项
+  SUGGESTIONS: 'suggestions',         // 网站建设建议列表
+  EVENTS: 'events',                   // 活动管理
+  TIMELINE: 'timeline',               // 时间轴
+};
+
 /**
  * 从云端拉取 internalConfig。
  * 返回：{ value: object|null, updatedAt: string|null, error: string|null }
@@ -79,20 +90,88 @@ export async function saveInternalConfig(config) {
  * （或执行 ALTER PUBLICATION supabase_realtime ADD TABLE site_settings;）
  */
 export function subscribeInternalConfig(onChange) {
+  return subscribeSetting(INTERNAL_CONFIG_KEY, onChange);
+}
+
+// ============================================
+// 通用版：按任意 key 读/写/订阅 site_settings
+// ============================================
+
+/**
+ * 读取某个 key 的 value + updated_at
+ * @param {string} key
+ * @returns {{value: any|null, updatedAt: string|null, error: string|null}}
+ */
+export async function fetchSetting(key) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { value: null, updatedAt: null, error: 'supabase-not-configured' };
+  }
+  try {
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select('value, updated_at')
+      .eq('key', key)
+      .maybeSingle();
+    if (error) return { value: null, updatedAt: null, error: error.message };
+    return {
+      value: data?.value ?? null,
+      updatedAt: data?.updated_at ?? null,
+      error: null,
+    };
+  } catch (err) {
+    return { value: null, updatedAt: null, error: err.message };
+  }
+}
+
+/**
+ * upsert 任意 key 的 value
+ * @param {string} key
+ * @param {any} value
+ * @returns {{success: boolean, updatedAt: string|null, error: string|null}}
+ */
+export async function saveSetting(key, value) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, updatedAt: null, error: 'supabase-not-configured' };
+  }
+  try {
+    const payload = {
+      key,
+      value,
+      updated_at: new Date().toISOString(),
+    };
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .upsert(payload, { onConflict: 'key' })
+      .select('updated_at')
+      .maybeSingle();
+    if (error) return { success: false, updatedAt: null, error: error.message };
+    return { success: true, updatedAt: data?.updated_at ?? null, error: null };
+  } catch (err) {
+    return { success: false, updatedAt: null, error: err.message };
+  }
+}
+
+/**
+ * 订阅任意 key 的变更
+ * @param {string} key
+ * @param {(value:any, updatedAt:string)=>void} onChange
+ * @returns {()=>void} 解除订阅
+ */
+export function subscribeSetting(key, onChange) {
   if (!isSupabaseConfigured || !supabase) return () => {};
   const channel = supabase
-    .channel('site_settings_internal_config')
+    .channel(`site_settings_${key}`)
     .on(
       'postgres_changes',
       {
         event: '*',
         schema: 'public',
         table: SITE_SETTINGS_TABLE,
-        filter: `key=eq.${INTERNAL_CONFIG_KEY}`,
+        filter: `key=eq.${key}`,
       },
       (payload) => {
         const newValue = payload?.new?.value;
-        if (newValue) onChange(newValue, payload?.new?.updated_at);
+        if (newValue !== undefined) onChange(newValue, payload?.new?.updated_at);
       }
     )
     .subscribe();

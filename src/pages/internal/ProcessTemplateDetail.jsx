@@ -35,6 +35,8 @@ import {
   incrementView,
   updateDoc as cloudUpdateDoc,
   canUseSupabase,
+  subscribeDocuments,
+  subscribeDeletedDefaults,
 } from '../../lib/documentsService';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
@@ -156,6 +158,31 @@ export default function ProcessTemplateDetail() {
       await fetchViewsFromCloud();
     })();
     return () => { cancelled = true; };
+  }, []);
+
+  // ---- 订阅 documents / documents_deleted_defaults 变更：当前文档被其它设备编辑或删除时自动刷新 ----
+  // 用 ref 持有 isEditing，避免闭包陷阱 + 编辑态下不强制刷新（防止覆盖用户输入）
+  const isEditingRef = useRef(false);
+  useEffect(() => {
+    if (!canUseSupabase()) return;
+    let timer = null;
+    const refetch = () => {
+      if (isEditingRef.current) return; // 编辑态下不要刷新
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const cloud = await fetchAllFromCloud();
+        if (!cloud) return;
+        const userDocs = cloud.docs.filter((d) => String(d.id).startsWith('doc-'));
+        setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
+      }, 200);
+    };
+    const unsubDocs = subscribeDocuments(() => refetch());
+    const unsubDeleted = subscribeDeletedDefaults(() => refetch());
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubDocs();
+      unsubDeleted();
+    };
   }, []);
 
   const allDocs = useMemo(() => {
@@ -321,6 +348,10 @@ export default function ProcessTemplateDetail() {
 
   /* ========== 编辑模式 ========== */
   const [isEditing, setIsEditing] = useState(false);
+  // 同步 isEditing 到 ref，realtime 订阅回调需要读最新值（避免闭包陷阱）
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editContent, setEditContent] = useState('');

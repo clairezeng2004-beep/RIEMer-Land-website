@@ -247,3 +247,29 @@ function deleteLocalArticle(id) {
   const articles = getLocalArticles().filter((a) => a.id !== id);
   saveLocalArticles(articles);
 }
+
+// ========== Realtime 订阅 ==========
+/**
+ * 订阅 articles 表变更：任一设备新增/更新/删除文章时，其它设备会收到通知。
+ * @param {(payload:{type:'INSERT'|'UPDATE'|'DELETE', newItem:any|null, oldItem:any|null})=>void} onChange
+ * @returns {()=>void} 解除订阅
+ */
+export function subscribeArticles(onChange) {
+  if (!isSupabaseConfigured || !supabase) return () => {};
+  const channel = supabase
+    .channel('articles_realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'articles' },
+      (payload) => {
+        const type = payload.eventType || payload.type;
+        const newItem = payload.new ? dbToFrontend(payload.new) : null;
+        const oldItem = payload.old ? { id: payload.old.id } : null;
+        onChange({ type, newItem, oldItem });
+      }
+    )
+    .subscribe();
+  return () => {
+    try { supabase.removeChannel(channel); } catch { /* ignore */ }
+  };
+}

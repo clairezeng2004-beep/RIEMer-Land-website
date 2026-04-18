@@ -44,6 +44,8 @@ import {
   markDefaultDeleted,
   updateDoc as cloudUpdateDoc,
   canUseSupabase,
+  subscribeDocuments,
+  subscribeDeletedDefaults,
 } from '../../lib/documentsService';
 import './Documents.css';
 
@@ -296,6 +298,54 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     })();
 
     return () => { cancelled = true; };
+  }, [isProcessTemplateMode, filterTypes]);
+
+  // ---- 订阅 documents / documents_deleted_defaults 表的 realtime 变更 ----
+  // 其它设备新增/编辑/删除文档、或删除默认模拟数据时，本设备自动刷新
+  useEffect(() => {
+    if (!isProcessTemplateMode) return;
+    if (!canUseSupabase()) return;
+
+    // 简单策略：收到任何变更 → 重新从云端拉一次 + 本地 state 替换
+    // 这样能保证和 fetchAllFromCloud 的合并逻辑完全一致，避免重复维护
+    let timer = null;
+    const refetch = () => {
+      // 200ms 节流，避免批量写入时频繁刷
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(async () => {
+        const cloud = await fetchAllFromCloud();
+        if (!cloud) return;
+        const { docs: cloudDocs, deletedIds: cloudDeletedIds } = cloud;
+        const deletedSet = new Set(cloudDeletedIds.map(String));
+        const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
+        const userDocs = cloudDocs.filter((d) => String(d.id).startsWith('doc-'));
+        const base = filterTypes
+          ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
+          : [...userDocs, ...defaults];
+        const sorted = base.sort((a, b) => {
+          const aIsUser = isUserDoc(a);
+          const bIsUser = isUserDoc(b);
+          if (aIsUser && !bIsUser) return -1;
+          if (!aIsUser && bIsUser) return 1;
+          return 0;
+        });
+        setDocuments(sorted);
+        // 同时更新本地缓存，供其它组件及下次打开时的首屏使用
+        try {
+          saveUserDocs(userDocs);
+          localStorage.setItem(DELETED_DEFAULT_IDS_KEY, JSON.stringify(cloudDeletedIds));
+        } catch { /* ignore */ }
+      }, 200);
+    };
+
+    const unsubDocs = subscribeDocuments(() => refetch());
+    const unsubDeleted = subscribeDeletedDefaults(() => refetch());
+
+    return () => {
+      if (timer) clearTimeout(timer);
+      unsubDocs();
+      unsubDeleted();
+    };
   }, [isProcessTemplateMode, filterTypes]);
 
   // 监听独立发布页（新窗口）发来的刷新消息 + 监听浏览计数变化

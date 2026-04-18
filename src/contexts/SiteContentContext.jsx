@@ -1,8 +1,8 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { fetchArticles as fetchArticlesFromDb, addArticleToDb, updateArticleInDb, deleteArticleFromDb, migrateLocalArticlesToDb } from '../services/articleDbService';
-import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig } from '../services/siteSettingsService';
+import { fetchArticles as fetchArticlesFromDb, addArticleToDb, updateArticleInDb, deleteArticleFromDb, migrateLocalArticlesToDb, subscribeArticles } from '../services/articleDbService';
+import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig, fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../services/siteSettingsService';
 
 const SiteContentContext = createContext(null);
 
@@ -379,6 +379,29 @@ export function SiteContentProvider({ children }) {
     return () => { cancelled = true; };
   }, []);
 
+  // ---- 订阅 articles 表实时变更：任一设备归档/编辑/删除文章后，所有设备立即同步 ----
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const unsubscribe = subscribeArticles(({ type, newItem, oldItem }) => {
+      if (type === 'INSERT' && newItem) {
+        setUserArticles((prev) => {
+          // 避免本设备刚 insert 的条目重复（按 id 去重）
+          if (prev.some((a) => String(a.id) === String(newItem.id))) return prev;
+          const next = [newItem, ...prev];
+          // 按日期倒序维持一致顺序
+          return next.sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')));
+        });
+      } else if (type === 'UPDATE' && newItem) {
+        setUserArticles((prev) =>
+          prev.map((a) => (String(a.id) === String(newItem.id) ? { ...a, ...newItem } : a))
+        );
+      } else if (type === 'DELETE' && oldItem) {
+        setUserArticles((prev) => prev.filter((a) => String(a.id) !== String(oldItem.id)));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   useEffect(() => {
     if (internalConfigPersistPaused) return;
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(internalConfig));
@@ -452,6 +475,95 @@ export function SiteContentProvider({ children }) {
   useEffect(() => {
     localStorage.setItem(TIMELINE_KEY, JSON.stringify(timeline));
   }, [timeline]);
+
+  // ============================================
+  // 通用：把"仅存在本地"的站点 state 也统一同步到 Supabase site_settings
+  // 这样 content / filterOptions / suggestions / events / timeline 等管理员编辑
+  // 全部可以跨设备可见，A 设备改完 B 设备实时刷新
+  // ============================================
+  // 为每条 state 维护一个 lastSyncedAt，用于避免 realtime 回流被自己覆盖
+  const siteSyncRefs = useRef({});
+  // 每条 state 的 setter + 默认值生成器 + 是否为合并型（对象）或替换型（数组）
+  const syncDefs = [
+    { key: SITE_KEYS.PUBLIC_CONTENT, setter: setContent,        fallback: getDefaultContent,  kind: 'object' },
+    { key: SITE_KEYS.FILTER_OPTIONS, setter: setFilterOptions,  fallback: getDefaultFilters,  kind: 'object' },
+    { key: SITE_KEYS.SUGGESTIONS,    setter: setSuggestions,    fallback: getDefaultSuggestions, kind: 'array'  },
+    { key: SITE_KEYS.EVENTS,         setter: setEvents,         fallback: () => [...defaultEventsData],   kind: 'array'  },
+    { key: SITE_KEYS.TIMELINE,       setter: setTimeline,       fallback: () => [...defaultTimelineData], kind: 'array'  },
+  ];
+
+  // 初始化拉云 + 订阅（挂载一次）
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+    const unsubs = [];
+
+    syncDefs.forEach(({ key, setter, fallback, kind }) => {
+      // 首次拉云
+      fetchSetting(key).then(({ value, updatedAt, error }) => {
+        if (cancelled) return;
+        if (error) {
+          // 表不存在或权限问题：安静降级，只用本地
+          return;
+        }
+        if (value == null) return;
+        siteSyncRefs.current[key] = updatedAt;
+        setter((prev) => {
+          if (kind === 'object') {
+            // 对象合并默认值，保证新增字段存在默认
+            return { ...fallback(), ...value };
+          }
+          // 数组直接使用云端值
+          if (Array.isArray(value)) return value;
+          return prev;
+        });
+      });
+
+      // 订阅变更
+      const unsub = subscribeSetting(key, (value, updatedAt) => {
+        // 本地刚写入的回流，跳过
+        if (updatedAt && siteSyncRefs.current[key] === updatedAt) return;
+        siteSyncRefs.current[key] = updatedAt;
+        setter((prev) => {
+          if (kind === 'object') {
+            return { ...fallback(), ...value };
+          }
+          if (Array.isArray(value)) return value;
+          return prev;
+        });
+      });
+      unsubs.push(unsub);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubs.forEach((u) => u && u());
+    };
+    // 挂载时建立一次，数据流由订阅驱动
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // 去抖写云端：state 变化后 400ms 再 upsert，避免连续编辑刷爆 DB
+  const pushDebouncedRef = useRef({});
+  const pushToCloud = useCallback((key, value) => {
+    if (!isSupabaseConfigured) return;
+    if (pushDebouncedRef.current[key]) clearTimeout(pushDebouncedRef.current[key]);
+    pushDebouncedRef.current[key] = setTimeout(async () => {
+      const res = await saveSetting(key, value);
+      if (res.success) {
+        siteSyncRefs.current[key] = res.updatedAt;
+      } else {
+        console.warn(`[SiteContent] ${key} 云端同步失败:`, res.error);
+      }
+    }, 400);
+  }, []);
+
+  // state 变化 → 去抖 push 云端
+  useEffect(() => { pushToCloud(SITE_KEYS.PUBLIC_CONTENT, content);       }, [content, pushToCloud]);
+  useEffect(() => { pushToCloud(SITE_KEYS.FILTER_OPTIONS, filterOptions); }, [filterOptions, pushToCloud]);
+  useEffect(() => { pushToCloud(SITE_KEYS.SUGGESTIONS, suggestions);      }, [suggestions, pushToCloud]);
+  useEffect(() => { pushToCloud(SITE_KEYS.EVENTS, events);                }, [events, pushToCloud]);
+  useEffect(() => { pushToCloud(SITE_KEYS.TIMELINE, timeline);            }, [timeline, pushToCloud]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));

@@ -785,3 +785,22 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN
   NULL;
 END $$;
+
+-- 其它跨设备数据表的 realtime 发布
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE articles;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE documents;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE documents_deleted_defaults;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

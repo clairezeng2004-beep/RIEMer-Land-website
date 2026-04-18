@@ -383,3 +383,53 @@ export async function incrementView(documentId) {
 export function isUserDoc(doc) {
   return String(doc?.id || '').startsWith('doc-');
 }
+
+/* ============ Realtime 订阅 ============ */
+/**
+ * 订阅 documents 表的实时变更（跨设备同步）
+ * @param {(payload:{type:'INSERT'|'UPDATE'|'DELETE', newItem:any|null, oldItem:any|null})=>void} onChange
+ * @returns {()=>void} 解除订阅
+ */
+export function subscribeDocuments(onChange) {
+  if (!isSupabaseConfigured || !supabase) return () => {};
+  const channel = supabase
+    .channel('documents_realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'documents' },
+      (payload) => {
+        const type = payload.eventType || payload.type;
+        const newItem = payload.new ? rowToDoc(payload.new) : null;
+        const oldItem = payload.old ? { id: payload.old.id } : null;
+        onChange({ type, newItem, oldItem });
+      }
+    )
+    .subscribe();
+  return () => {
+    try { supabase.removeChannel(channel); } catch { /* ignore */ }
+  };
+}
+
+/**
+ * 订阅 documents_deleted_defaults 表（管理员删除了默认数据时，其它设备同步隐藏）
+ * @param {(payload:{type:'INSERT'|'DELETE', defaultId:string|null})=>void} onChange
+ * @returns {()=>void} 解除订阅
+ */
+export function subscribeDeletedDefaults(onChange) {
+  if (!isSupabaseConfigured || !supabase) return () => {};
+  const channel = supabase
+    .channel('documents_deleted_defaults_realtime')
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'documents_deleted_defaults' },
+      (payload) => {
+        const type = payload.eventType || payload.type;
+        const defaultId = payload.new?.default_id || payload.old?.default_id || null;
+        onChange({ type, defaultId });
+      }
+    )
+    .subscribe();
+  return () => {
+    try { supabase.removeChannel(channel); } catch { /* ignore */ }
+  };
+}

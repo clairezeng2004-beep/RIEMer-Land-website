@@ -373,3 +373,32 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN
   RAISE NOTICE 'ℹ️  site_settings 已在 realtime 发布中，跳过';
 END $$;
+
+
+-- ========== 修复 N+1：把其它跨设备数据表也加入 realtime 发布 ==========
+-- articles：公众号历史文章归档（A 设备归档后 B 设备实时出现）
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.articles;
+  RAISE NOTICE '✅ articles 已加入 realtime 发布';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'ℹ️  articles 已在 realtime 发布中，跳过';
+END $$;
+
+-- documents：流程模板文件（编辑/新增/删除实时同步）
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.documents;
+  RAISE NOTICE '✅ documents 已加入 realtime 发布';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'ℹ️  documents 已在 realtime 发布中，跳过';
+END $$;
+
+-- documents_deleted_defaults：默认模拟文档的删除记录（避免一端删了另一端又看到）
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.documents_deleted_defaults;
+  RAISE NOTICE '✅ documents_deleted_defaults 已加入 realtime 发布';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'ℹ️  documents_deleted_defaults 已在 realtime 发布中，跳过';
+END $$;
