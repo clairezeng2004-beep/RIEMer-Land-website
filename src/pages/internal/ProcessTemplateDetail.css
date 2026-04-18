@@ -1066,3 +1066,177 @@
     font-size: 14px;
   }
 }
+
+/* ============ 编辑历史小矩形（目录下方） ============ */
+/* 位于 .ptd-toc 里的 .ptd-toc__list 之后，作为独立嵌入卡片展示最近编辑记录。 */
+.ptd-edit-history {
+  margin-top: 14px;
+  padding: 10px;
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: rgba(91, 140, 62, 0.04); /* 与主色同系低饱和底 */
+}
+
+.ptd-edit-history__header {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--color-text-muted, #6b7280);
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.ptd-edit-history__count {
+  margin-left: auto;
+  padding: 0 6px;
+  min-width: 18px;
+  height: 16px;
+  line-height: 16px;
+  text-align: center;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+  border-radius: 9999px;
+  letter-spacing: 0;
+}
+
+.ptd-edit-history__empty {
+  padding: 14px 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--color-text-muted, #9ca3af);
+  line-height: 1.6;
+}
+
+.ptd-edit-history__empty-hint {
+  font-size: 11px;
+  color: #b8bcc3;
+}
+
+.ptd-edit-history__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ptd-edit-history__item {
+  padding: 7px 8px;
+  background: #fff;
+  border: 1px solid rgba(229, 231, 235, 0.8);
+  border-radius: var(--radius-sm, 6px);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.ptd-edit-history__item:hover {
+  border-color: rgba(91, 140, 62, 0.35);
+  box-shadow: 0 1px 3px rgba(91, 140, 62, 0.08);
+}
+
+.ptd-edit-history__meta {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--color-text-muted, #6b7280);
+  margin-bottom: 4px;
+}
+
+.ptd-edit-history__editor {
+  font-weight: 600;
+  color: var(--color-text, #374151);
+  max-width: 70px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ptd-edit-history__time {
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--color-text-muted, #9ca3af);
+  cursor: help;
+}
+
+.ptd-edit-history__changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.ptd-edit-history__changes li {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--color-text, #374151);
+}
+
+.ptd-edit-history__field {
+  flex-shrink: 0;
+  padding: 1px 5px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(107, 114, 128, 0.1);
+  color: var(--color-text-muted, #6b7280);
+}
+
+.ptd-edit-history__field--title {
+  background: rgba(212, 164, 76, 0.15);
+  color: #a37914;
+}
+
+.ptd-edit-history__field--description {
+  background: rgba(79, 191, 196, 0.15);
+  color: #0e8a8f;
+}
+
+.ptd-edit-history__field--content {
+  background: rgba(91, 140, 62, 0.14);
+  color: var(--color-primary, #5B8C3E);
+}
+
+.ptd-edit-history__summary {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text, #374151);
+  word-break: break-word;
+}
+
+.ptd-edit-history__toggle {
+  width: 100%;
+  margin-top: 6px;
+  padding: 5px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--color-primary, #5B8C3E);
+  background: transparent;
+  border: none;
+  border-top: 1px dashed rgba(91, 140, 62, 0.25);
+  cursor: pointer;
+  transition: color 0.15s;
+}
+
+.ptd-edit-history__toggle:hover {
+  color: #4a7533;
+}
+
+/* 移动端 drawer 里的编辑历史卡不要 sticky 过多，留余量 */
+.ptd-toc-drawer .ptd-edit-history {
+  margin-top: 12px;
+}

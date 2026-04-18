@@ -26,6 +26,9 @@ import {
   Clipboard,
   Check,
   AlertTriangle,
+  History,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
@@ -36,6 +39,9 @@ import {
   incrementView,
   recordViewLog,
   fetchViewLog,
+  recordEditLog,
+  fetchEditLog,
+  subscribeEditLog,
   updateDoc as cloudUpdateDoc,
   canUseSupabase,
   subscribeDocuments,
@@ -93,6 +99,93 @@ function downloadFile({ dataUrl, url, name }) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+/* ========== 编辑日志工具 ========== */
+// 把富文本/Markdown 字符串粗略地还原成纯文本，用于字数统计与摘要展示
+function stripToPlain(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/<[^>]+>/g, ' ')        // 去 HTML 标签
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+// 把一个文本按长度截断，两端都留一点上下文
+function ellipsize(str, max = 80) {
+  const s = stripToPlain(str);
+  if (s.length <= max) return s;
+  return s.slice(0, max) + '…';
+}
+
+// 比较编辑前后三个字段，返回 changes[]
+// 每条 { field, before, after, summary }
+// 其中 content 用"字数变化 +X / -Y（旧首段 → 新首段）"替代长正文，避免膨胀
+export function diffDocFields(prevDoc, nextDoc) {
+  const changes = [];
+  const FIELD_LABEL = { title: '标题', description: '简介', content: '正文' };
+
+  for (const field of ['title', 'description', 'content']) {
+    const before = prevDoc?.[field] ?? '';
+    const after = nextDoc?.[field] ?? '';
+    if (String(before) === String(after)) continue;
+
+    if (field === 'content') {
+      const prevLen = stripToPlain(before).length;
+      const nextLen = stripToPlain(after).length;
+      const delta = nextLen - prevLen;
+      const deltaText = delta > 0 ? `+${delta} 字` : delta < 0 ? `${delta} 字` : '字数不变';
+      const summary = `修改正文（${deltaText}）`;
+      changes.push({
+        field,
+        label: FIELD_LABEL[field],
+        before: ellipsize(before, 120),
+        after: ellipsize(after, 120),
+        prevLength: prevLen,
+        nextLength: nextLen,
+        summary,
+      });
+    } else {
+      changes.push({
+        field,
+        label: FIELD_LABEL[field],
+        before: ellipsize(before, 120),
+        after: ellipsize(after, 120),
+        summary: `${FIELD_LABEL[field]}由"${ellipsize(before, 20) || '（空）'}"改为"${ellipsize(after, 20) || '（空）'}"`,
+      });
+    }
+  }
+  return changes;
+}
+
+// 相对时间，跟 ViewLogPopover 风格保持一致
+function formatRelativeTime(iso) {
+  if (!iso) return '';
+  const t = new Date(iso).getTime();
+  if (Number.isNaN(t)) return '';
+  const diff = Date.now() - t;
+  const m = Math.floor(diff / 60000);
+  if (m < 1) return '刚刚';
+  if (m < 60) return `${m} 分钟前`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h} 小时前`;
+  const d = Math.floor(h / 24);
+  if (d < 30) return `${d} 天前`;
+  const mo = Math.floor(d / 30);
+  if (mo < 12) return `${mo} 个月前`;
+  return `${Math.floor(mo / 12)} 年前`;
+}
+
+function formatAbsoluteTime(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
 function loadUserDocs() {
@@ -182,6 +275,12 @@ export default function ProcessTemplateDetail() {
 
   // 访问记录弹层：点击浏览数小眼睛时打开，展示谁在什么时候看过这篇文档
   const [viewLogOpen, setViewLogOpen] = useState(false);
+
+  // 编辑历史：每次保存会写一条 { editorId, editorName, editedAt, changes[] }
+  // 在目录下方的小矩形里展示，支持折叠 / 展开更多
+  const [editLog, setEditLog] = useState([]);
+  const [editLogExpanded, setEditLogExpanded] = useState(false);
+  const [editLogLoading, setEditLogLoading] = useState(false);
 
   // 合并数据源：
   // - 挂载时先用 localStorage 渲染（避免白屏），随后异步从 Supabase 拉取最新数据
@@ -282,6 +381,36 @@ export default function ProcessTemplateDetail() {
         console.warn('[ProcessTemplateDetail] 访问日志写入失败:', err);
       });
     } catch { /* ignore */ }
+  }, [doc?.id]);
+
+  /* 编辑历史：拉取 + 订阅实时新增 */
+  useEffect(() => {
+    if (!doc?.id) return undefined;
+    let cancelled = false;
+    setEditLogLoading(true);
+    fetchEditLog(String(doc.id))
+      .then((list) => {
+        if (cancelled) return;
+        setEditLog(list || []);
+      })
+      .finally(() => {
+        if (!cancelled) setEditLogLoading(false);
+      });
+    // 实时订阅：其它设备保存后当前设备自动追加一条
+    const unsubscribe = subscribeEditLog(String(doc.id), (entry) => {
+      setEditLog((prev) => {
+        // 去重：同 editedAt 同 editorId 视为同一条（本地乐观插入 + realtime 回流）
+        const exists = prev.some(
+          (p) => p.editedAt === entry.editedAt && p.editorId === entry.editorId
+        );
+        if (exists) return prev;
+        return [entry, ...prev];
+      });
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
   }, [doc?.id]);
 
   /* Markdown / Word-HTML 渲染 */
@@ -395,6 +524,75 @@ export default function ProcessTemplateDetail() {
     setTocOpenMobile(false);
   }, []);
 
+  /* 编辑历史小矩形：展示在目录下方。默认折叠显示最近 3 条，点击"更多"展开全部。
+     折叠时不隐藏整卡片，只限制展示条数，保证入口始终可见。 */
+  const renderEditHistoryCard = useCallback(() => {
+    const shown = editLogExpanded ? editLog : editLog.slice(0, 3);
+    const hasMore = editLog.length > 3;
+    return (
+      <div className="ptd-edit-history" aria-label="编辑历史">
+        <div className="ptd-edit-history__header">
+          <History size={13} />
+          <span>编辑历史</span>
+          <span className="ptd-edit-history__count">{editLog.length}</span>
+        </div>
+        {editLogLoading && editLog.length === 0 ? (
+          <div className="ptd-edit-history__empty">加载中…</div>
+        ) : editLog.length === 0 ? (
+          <div className="ptd-edit-history__empty">
+            暂无编辑记录
+            <br />
+            <span className="ptd-edit-history__empty-hint">下次保存时会记在这里</span>
+          </div>
+        ) : (
+          <ul className="ptd-edit-history__list">
+            {shown.map((entry, i) => (
+              <li key={`${entry.editedAt}-${i}`} className="ptd-edit-history__item">
+                <div className="ptd-edit-history__meta">
+                  <User size={11} />
+                  <span className="ptd-edit-history__editor" title={entry.editorName}>
+                    {entry.editorName}
+                  </span>
+                  <span
+                    className="ptd-edit-history__time"
+                    title={formatAbsoluteTime(entry.editedAt)}
+                  >
+                    {formatRelativeTime(entry.editedAt)}
+                  </span>
+                </div>
+                <ul className="ptd-edit-history__changes">
+                  {(entry.changes || []).map((c, ci) => (
+                    <li key={ci} title={c.summary}>
+                      <span
+                        className={`ptd-edit-history__field ptd-edit-history__field--${c.field}`}
+                      >
+                        {c.label || c.field}
+                      </span>
+                      <span className="ptd-edit-history__summary">{c.summary}</span>
+                    </li>
+                  ))}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+        {hasMore && (
+          <button
+            type="button"
+            className="ptd-edit-history__toggle"
+            onClick={() => setEditLogExpanded((v) => !v)}
+          >
+            {editLogExpanded ? (
+              <>收起 <ChevronUp size={12} /></>
+            ) : (
+              <>展开全部 {editLog.length} 条 <ChevronDown size={12} /></>
+            )}
+          </button>
+        )}
+      </div>
+    );
+  }, [editLog, editLogExpanded, editLogLoading]);
+
   /* ========== 点赞 ========== */
   const [liked, setLiked] = useState(false);
   const [likes, setLikes] = useState(doc?.likes || []);
@@ -491,8 +689,19 @@ export default function ProcessTemplateDetail() {
       const nowDate = new Date().toISOString().split('T')[0];
       // 最后编辑人统一使用真名（user.name）优先
       const editor = user?.name || user?.nickname || user?.email || 'Unknown';
+
+      // —— 计算字段级改动用于写编辑日志 ——
+      // 只保留真正改了的字段；content 内容通常很长，这里仅生成字数变化摘要，
+      // 并对 before/after 做截断，避免在 jsonb 里塞整篇正文。
+      const prev = userDocs[idx];
+      const changes = diffDocFields(prev, {
+        title,
+        description: editDescription,
+        content: editContent,
+      });
+
       const updated = {
-        ...userDocs[idx],
+        ...prev,
         title,
         description: editDescription,
         content: editContent,
@@ -512,6 +721,21 @@ export default function ProcessTemplateDetail() {
       setTimeout(() => {
         setSaveHint((h) => (h === 'saved' ? null : h));
       }, 2500);
+
+      // —— 写编辑日志（有任一字段变化才写） ——
+      if (changes.length > 0) {
+        // 本地立即插入一条，便于当前页面即时看到
+        const localEntry = {
+          editorId: user?.id || null,
+          editorName: editor,
+          editedAt: new Date().toISOString(),
+          changes,
+        };
+        setEditLog((prev) => [localEntry, ...prev]);
+        recordEditLog(String(doc.id), user, changes).catch((err) => {
+          console.warn('[ProcessTemplateDetail] 编辑日志写入失败:', err);
+        });
+      }
 
       // —— 云端异步同步（不阻塞 UI） ——
       if (canUseSupabase()) {
@@ -690,6 +914,7 @@ export default function ProcessTemplateDetail() {
                   </button>
                 ))}
               </nav>
+              {renderEditHistoryCard()}
             </aside>
           )}
 
@@ -984,6 +1209,7 @@ export default function ProcessTemplateDetail() {
                     </button>
                   ))}
                 </nav>
+                {renderEditHistoryCard()}
               </div>
             </div>
           )}

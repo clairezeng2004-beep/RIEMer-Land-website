@@ -452,3 +452,57 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN
   RAISE NOTICE 'ℹ️  document_view_logs 已在 realtime 发布中，跳过';
 END $$;
+
+-- ============================================
+-- 修复 N+1：创建 document_edit_logs 表（文档编辑历史）
+-- ============================================
+-- 用于承载流程模板详情页目录下方"编辑历史小矩形"的内容。
+-- 每次用户点"保存"时写一条记录：谁在什么时间改了哪些字段、改成了什么。
+--
+-- 字段：
+--   id          自增主键
+--   document_id 文档 id（和 documents.id 对齐，TEXT 以兼容 'doc-xxx' 前缀）
+--   editor_id   编辑者 id（未登录时为 NULL）
+--   editor_name 编辑者名称快照（避免成员改名后历史失真）
+--   edited_at   编辑时间
+--   changes     字段级改动数组（jsonb），每项形如：
+--               { field, label, before, after, summary,
+--                 prevLength?, nextLength? }
+--               content 字段仅保存截断摘要与字数变化，避免整篇正文入库
+CREATE TABLE IF NOT EXISTS public.document_edit_logs (
+  id BIGSERIAL PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  editor_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  editor_name TEXT NOT NULL DEFAULT 'Unknown',
+  edited_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  changes JSONB NOT NULL DEFAULT '[]'::jsonb
+);
+
+-- 按文档 + 时间倒序查询，加联合索引
+CREATE INDEX IF NOT EXISTS idx_document_edit_logs_doc_time
+  ON public.document_edit_logs (document_id, edited_at DESC);
+
+ALTER TABLE public.document_edit_logs ENABLE ROW LEVEL SECURITY;
+
+-- 认证用户可读所有编辑历史（团队协作场景下大家都能查看）
+DROP POLICY IF EXISTS "认证用户可查看编辑历史" ON public.document_edit_logs;
+CREATE POLICY "认证用户可查看编辑历史"
+  ON public.document_edit_logs FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 认证用户可插入编辑历史
+DROP POLICY IF EXISTS "认证用户可写入编辑历史" ON public.document_edit_logs;
+CREATE POLICY "认证用户可写入编辑历史"
+  ON public.document_edit_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- 放入 realtime 发布：保存后其它设备自动追加一条
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.document_edit_logs;
+  RAISE NOTICE '✅ document_edit_logs 已加入 realtime 发布';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'ℹ️  document_edit_logs 已在 realtime 发布中，跳过';
+END $$;

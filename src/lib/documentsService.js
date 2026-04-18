@@ -480,6 +480,158 @@ export async function fetchViewLog(documentId) {
   return list;
 }
 
+/* ============ 编辑历史（document_edit_logs） ============ */
+// 说明：
+// 每次用户点"保存"时写一条编辑记录：{ document_id, editor_id, editor_name,
+//   edited_at, changes }。
+// changes 是一个数组，逐字段描述改了什么：
+//   [{ field: 'title'|'description'|'content', before: '...', after: '...',
+//      summary: '标题由 X 改为 Y' }]
+// 为避免数据库膨胀，content 字段只保存截断摘要（前后各最多 120 字）
+// 与字数变化，完整正文仍然沉淀在 documents.content。
+//
+// 本地降级：Supabase 不可用时写 localStorage，同一设备仍能看到历史；
+// 登录后且 Supabase 可用则写云端，跨设备可见。
+
+export const DOC_EDIT_LOGS_KEY = 'riemer_document_edit_logs'; // { [documentId]: [{ editorId, editorName, editedAt, changes }] }
+
+function loadLocalEditLogs() {
+  try {
+    const stored = localStorage.getItem(DOC_EDIT_LOGS_KEY);
+    if (stored) return JSON.parse(stored) || {};
+  } catch { /* ignore */ }
+  return {};
+}
+
+function saveLocalEditLogs(map) {
+  try {
+    localStorage.setItem(DOC_EDIT_LOGS_KEY, JSON.stringify(map));
+  } catch (err) {
+    // 容量不够时保留最近 50 条（每文档）后重试
+    try {
+      const trimmed = {};
+      for (const [k, v] of Object.entries(map || {})) {
+        trimmed[k] = Array.isArray(v) ? v.slice(-50) : v;
+      }
+      localStorage.setItem(DOC_EDIT_LOGS_KEY, JSON.stringify(trimmed));
+    } catch {
+      console.warn('[documentsService] 编辑日志本地缓存写入失败', err);
+    }
+  }
+}
+
+/**
+ * 记录一次编辑日志（与 saveEdit 配套调用）。
+ * @param {string} documentId
+ * @param {{id?:string,name?:string,nickname?:string,email?:string}|null} user 当前编辑者
+ * @param {Array<{field:string,before:any,after:any,summary:string}>} changes 字段级改动
+ */
+export async function recordEditLog(documentId, user, changes) {
+  if (!Array.isArray(changes) || changes.length === 0) return { remote: false, skipped: true };
+  const editorId = user?.id || null;
+  const editorName = user?.name || user?.nickname || user?.email || 'Unknown';
+  const editedAt = new Date().toISOString();
+
+  // 本地
+  try {
+    const all = loadLocalEditLogs();
+    const list = Array.isArray(all[documentId]) ? all[documentId] : [];
+    list.push({ editorId, editorName, editedAt, changes });
+    all[documentId] = list;
+    saveLocalEditLogs(all);
+  } catch { /* ignore */ }
+
+  if (!canUseSupabase() || !supabase) return { remote: false };
+
+  try {
+    const { error } = await supabase.from('document_edit_logs').insert({
+      document_id: documentId,
+      editor_id: editorId,
+      editor_name: editorName,
+      edited_at: editedAt,
+      changes,
+    });
+    if (error) {
+      console.warn('[documentsService] 编辑日志写入失败:', error.message);
+      return { remote: false, error };
+    }
+    return { remote: true };
+  } catch (err) {
+    console.warn('[documentsService] recordEditLog 异常:', err.message);
+    return { remote: false, error: err };
+  }
+}
+
+/**
+ * 拉取某篇文档的编辑历史（最近在前）。
+ * 云端不可用或查询失败时回退本地。
+ * @param {string} documentId
+ * @returns {Promise<Array<{editorId:string|null,editorName:string,editedAt:string,changes:Array}>>}
+ */
+export async function fetchEditLog(documentId) {
+  if (canUseSupabase() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('document_edit_logs')
+        .select('editor_id,editor_name,edited_at,changes')
+        .eq('document_id', documentId)
+        .order('edited_at', { ascending: false })
+        .limit(200);
+      if (!error && Array.isArray(data)) {
+        return data.map((r) => ({
+          editorId: r.editor_id || null,
+          editorName: r.editor_name || 'Unknown',
+          editedAt: r.edited_at,
+          changes: Array.isArray(r.changes) ? r.changes : [],
+        }));
+      }
+      if (error) {
+        console.warn('[documentsService] fetchEditLog 云端失败，回退本地:', error.message);
+      }
+    } catch (err) {
+      console.warn('[documentsService] fetchEditLog 异常，回退本地:', err.message);
+    }
+  }
+  const all = loadLocalEditLogs();
+  const list = Array.isArray(all[documentId]) ? [...all[documentId]] : [];
+  list.sort((a, b) => new Date(b.editedAt || 0) - new Date(a.editedAt || 0));
+  return list;
+}
+
+/**
+ * 订阅某篇文档的编辑历史新增事件（realtime）。
+ * @param {string} documentId
+ * @param {(entry:{editorId:string|null,editorName:string,editedAt:string,changes:Array})=>void} onInsert
+ * @returns {()=>void} 解除订阅
+ */
+export function subscribeEditLog(documentId, onInsert) {
+  if (!isSupabaseConfigured || !supabase) return () => {};
+  const channel = supabase
+    .channel(`document_edit_logs_${documentId}`)
+    .on(
+      'postgres_changes',
+      {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'document_edit_logs',
+        filter: `document_id=eq.${documentId}`,
+      },
+      (payload) => {
+        const r = payload.new || {};
+        onInsert({
+          editorId: r.editor_id || null,
+          editorName: r.editor_name || 'Unknown',
+          editedAt: r.edited_at,
+          changes: Array.isArray(r.changes) ? r.changes : [],
+        });
+      }
+    )
+    .subscribe();
+  return () => {
+    try { supabase.removeChannel(channel); } catch { /* ignore */ }
+  };
+}
+
 /* ============ 判断工具 ============ */
 
 export function isUserDoc(doc) {
