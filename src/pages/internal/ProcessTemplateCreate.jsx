@@ -339,7 +339,17 @@ export default function ProcessTemplateCreate() {
       id: `doc-${Date.now()}`,
       title: newDoc.title.trim(),
       type: newDoc.type,
-      description: newDoc.description.trim(),
+      description: (() => {
+        // 把用户粘贴进来的 HTML 实体（&nbsp; / &amp; 等）还原为真实字符，并剥掉残留标签
+        const raw = (newDoc.description || '').trim();
+        if (!raw) return '';
+        try {
+          const d = new DOMParser().parseFromString(`<!doctype html><body>${raw}`, 'text/html');
+          return (d.body.textContent || '').trim();
+        } catch {
+          return raw;
+        }
+      })(),
       format: newDoc.format,
       content: newDoc.content,
       attachments: newDoc.attachments.map((f) => ({

@@ -449,11 +449,28 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     ? ['全部', ...filterTypes.filter((ft) => docTypes.some((t) => t.key === ft) || defaultTypeLabels[ft])]
     : ['全部', ...docTypes.map((t) => t.key)];
 
+  // 把用户在描述里粘贴进来的 HTML 实体（&nbsp; / &amp; / &lt; 等）还原为真实字符，
+  // 并剥掉任何残留的 HTML 标签；空值/非字符串直接返回 ''
+  const decodePlainText = (val) => {
+    if (val == null) return '';
+    const str = String(val);
+    if (!str) return '';
+    // 用浏览器原生解码（支持全部 HTML 实体，且不会执行脚本）
+    const parser = new DOMParser();
+    try {
+      const doc = parser.parseFromString(`<!doctype html><body>${str}`, 'text/html');
+      return (doc.body.textContent || '').trim();
+    } catch {
+      return str;
+    }
+  };
+
   const filtered = documents.filter((doc) => {
+    const desc = decodePlainText(doc.description);
     const matchesSearch =
       !searchTerm ||
       pinyinMatch(doc.title, searchTerm) ||
-      pinyinMatch(doc.description, searchTerm);
+      pinyinMatch(desc, searchTerm);
     const matchesType = selectedType === '全部' || doc.type === selectedType;
     return matchesSearch && matchesType;
   });
@@ -503,7 +520,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       type: newDoc.type,
       fileType,
       fileUrl,
-      description: newDoc.description,
+      description: decodePlainText(newDoc.description),
       // 贡献者统一使用注册时的真名（user.name），缺失时回退到昵称
       uploadedBy: user?.name || user?.nickname || 'Unknown',
       uploadedById: user?.id || null,
@@ -975,7 +992,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 </div>
 
                 <h4 className="doc-card__title">{doc.title}</h4>
-                <p className="doc-card__desc">{doc.description}</p>
+                <p className="doc-card__desc">{decodePlainText(doc.description)}</p>
 
                 <div className="doc-card__footer">
                   <span className="doc-card__author">
@@ -1204,7 +1221,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 <div className="doc-preview__no-preview">
                   <FileIcon fileType={previewDoc.fileType} size={64} />
                   <h3>{previewDoc.title}</h3>
-                  <p className="doc-preview__no-preview-desc">{previewDoc.description}</p>
+                  <p className="doc-preview__no-preview-desc">{decodePlainText(previewDoc.description)}</p>
                   <div className="doc-preview__no-preview-info">
                     <span><Clock size={14} /> 上传日期: {previewDoc.date}</span>
                     <span><User size={14} /> 贡献者：{resolveContributorName(previewDoc.uploadedById, previewDoc.uploadedBy)}</span>
