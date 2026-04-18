@@ -25,13 +25,13 @@ const COLUMNS = [
   { key: 'bio', label: '一句话概括自己', width: '180px', editable: true, placeholder: '用一句话介绍自己' },
   { key: 'further_education', label: '升学去向', width: '150px', editable: true, placeholder: '如 XX大学XX专业' },
   { key: 'career', label: '工作去向', width: '150px', editable: true, placeholder: '如 XX公司XX岗位 当前base地' },
-  { key: 'willing_to_share', label: '我愿意分享什么', width: '180px', editable: true, placeholder: '你愿意和大家分享的内容' },
-  { key: 'want_to_learn', label: '我想和大家请教什么', width: '180px', editable: true, placeholder: '你想请教大家的问题' },
+  { key: 'willing_to_share', label: '我愿意分享什么', width: '280px', editable: true, placeholder: '你愿意和大家分享的内容' },
+  { key: 'want_to_learn', label: '我想和大家请教什么', width: '280px', editable: true, placeholder: '你想请教大家的问题' },
   { key: 'career_interest', label: '感兴趣的职业方向/生活模式', width: '180px', editable: true, placeholder: '如 产品经理、数字游民、慢生活' },
   { key: 'hometown', label: '家乡', width: '120px', editable: true, placeholder: '如 广东广州' },
   { key: 'dream_city', label: '喜爱向往的城市与地区', width: '160px', editable: true, placeholder: '如 北京、上海、川西' },
-  { key: 'hobbies', label: '爱好', width: '150px', editable: true, placeholder: '如 摄影、阅读、运动' },
-  { key: 'favorites', label: '喜欢的音乐/作家/UP主/书籍/演员/影视剧...', width: '220px', editable: true, placeholder: '如 周杰伦、村上春树、老番茄、《三体》...' },
+  { key: 'hobbies', label: '爱好', width: '240px', editable: true, placeholder: '如 摄影、阅读、运动' },
+  { key: 'favorites', label: '喜欢的音乐/作家/UP主/书籍/演员/影视剧...', width: '340px', editable: true, placeholder: '如 周杰伦、村上春树、老番茄、《三体》...' },
   { key: 'other', label: '其他', width: '180px', editable: true, placeholder: '任何想补充的内容' },
 ];
 
