@@ -3,6 +3,7 @@ import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import {
@@ -109,6 +110,7 @@ export default function Tasks() {
   const { isAuthenticated, user, getAllUsers, supabaseOk } = useAuth();
   const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
+  const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const tc = internalConfig.tasks || {};
 
@@ -308,6 +310,19 @@ export default function Tasks() {
     });
     setShowForm(false);
 
+    // 发送"新事项创建"通知（创建者自己自动已读）
+    try {
+      const creator = user?.nickname || user?.name || '某成员';
+      addNotification({
+        title: '新事项创建',
+        message: `${creator} 新建了事项「${task.title}」${task.category ? '（' + task.category + '）' : ''}`,
+        type: 'progress',
+        read: true,
+      });
+    } catch (err) {
+      console.warn('[Tasks] 发送新事项通知失败:', err?.message || err);
+    }
+
     // 异步同步到 Supabase
     if (canUseSupabase) {
       try {
@@ -353,6 +368,20 @@ export default function Tasks() {
       targetTask.status !== '已完成'
     ) {
       setArchivePrompt({ taskTitle: targetTask.title });
+    }
+    // 发送"事项状态变更"通知（操作者自己自动已读）
+    if (targetTask.status !== newStatus) {
+      try {
+        const operator = user?.nickname || user?.name || '某成员';
+        addNotification({
+          title: '事项状态变更',
+          message: `${operator} 将事项「${targetTask.title}」状态：${targetTask.status} → ${newStatus}${note ? '｜备注：' + note : ''}`,
+          type: 'progress',
+          read: true,
+        });
+      } catch (err) {
+        console.warn('[Tasks] 发送状态变更通知失败:', err?.message || err);
+      }
     }
     if (canUseSupabase) {
       try {

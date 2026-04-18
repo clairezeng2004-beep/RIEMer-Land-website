@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import CustomSelect from '../../components/CustomSelect';
 import { marked } from 'marked';
 import {
@@ -400,6 +401,7 @@ function AttachmentUploader({ attachments, onChange }) {
 /* ====== 主组件 ====== */
 export default function MemberSharingCreate() {
   const { isAuthenticated, user } = useAuth();
+  const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
 
@@ -556,6 +558,18 @@ export default function MemberSharingCreate() {
     const existing = loadSharings();
     const updated = [post, ...existing];
     saveSharings(updated);
+
+    // 发送"新成员分享"通知（发布者自己自动已读）
+    try {
+      addNotification({
+        title: '新成员分享',
+        message: `${post.author} 发布了新分享「${post.title}」${cats.find((c) => c.key === post.category)?.label ? '（' + cats.find((c) => c.key === post.category).label + '）' : ''}`,
+        type: 'sharing',
+        read: true,
+      });
+    } catch (err) {
+      console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);
+    }
 
     // 跳转回列表页
     navigate('/internal/member-sharing');

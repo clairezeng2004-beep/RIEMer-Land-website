@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
+import { useNotifications } from '../../contexts/NotificationContext';
 import EditableText from '../../components/EditableText';
 import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
@@ -77,6 +78,7 @@ function buildCategoryMaps(cats) {
 export default function InternalArticles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { userArticles, addArticle, updateArticle, internalConfig, updateInternalConfig } = useSiteContent();
+  const { addNotification } = useNotifications();
   const { editing } = useWysiwyg();
   const navigate = useNavigate();
   const ia = internalConfig.internalArticles || {};
@@ -441,6 +443,19 @@ export default function InternalArticles() {
 
     const articleTitle = newArticle.title;
     addArticle(newArticle, user?.id);
+
+    // 发送"公众号文章归档"通知（归档者自己自动已读）
+    try {
+      addNotification({
+        title: '公众号文章归档',
+        message: `${newArticle.archivedBy} 归档了公众号文章「${articleTitle}」${newArticle.category ? '（' + newArticle.category + '）' : ''}`,
+        type: 'sharing',
+        read: true,
+      });
+    } catch (err) {
+      console.warn('[InternalArticles] 发送归档通知失败:', err?.message || err);
+    }
+
     closeModal();
     // 归档成功后提示用户是否去事项追踪标记对应事项为"已完成"
     setTaskPrompt({ articleTitle });
