@@ -12,6 +12,9 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  RefreshCw,
+  AlertCircle,
+  Loader2,
 } from 'lucide-react';
 import './MemberProfiles.css';
 
@@ -70,6 +73,37 @@ function saveLocalProfiles(profiles) {
 }
 
 // ============================================
+// 把 Supabase 返回的行统一转成前端需要的格式
+// （抽出来避免主路径和后台拉取两处写两遍）
+// ============================================
+function formatProfilesFromSupabase(rows) {
+  return (rows || []).map((p) => ({
+    id: p.user_id,
+    user_id: p.user_id,
+    name: p.profiles?.name || '未知用户',
+    enrollment_year: p.enrollment_year || '',
+    joined_at: p.joined_at || p.profiles?.created_at || '',
+    joined_at_display: (() => {
+      const raw = p.joined_at || p.profiles?.created_at;
+      if (!raw) return '';
+      const d = new Date(raw);
+      return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+    })(),
+    bio: p.bio || '',
+    further_education: p.further_education || '',
+    career: p.career || '',
+    willing_to_share: p.willing_to_share || '',
+    want_to_learn: p.want_to_learn || '',
+    career_interest: p.career_interest || '',
+    hometown: p.hometown || '',
+    dream_city: p.dream_city || '',
+    hobbies: p.hobbies || '',
+    favorites: p.favorites || '',
+    other: p.other || '',
+  }));
+}
+
+// ============================================
 // MemberProfiles 组件
 // ============================================
 export default function MemberProfiles() {
@@ -100,6 +134,13 @@ export default function MemberProfiles() {
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
+  // 云端数据加载状态，用来给用户明确反馈，而不是静默失败
+  //   idle:    初始/空闲
+  //   loading: 正在从 Supabase 拉取
+  //   ok:      云端数据已成功加载（隐藏横幅）
+  //   partial: 云端暂时拿不到，当前显示的是本地缓存
+  //   error:   云端查询失败，提供重试
+  const [cloudStatus, setCloudStatus] = useState('idle');
   const tableRef = useRef(null);
 
   // 动态列宽覆盖：{ [colKey]: widthPx }
@@ -163,47 +204,64 @@ export default function MemberProfiles() {
     setProfiles(formatted);
   }, [getAllUsers]);
 
+  // ============================================
+  // 真正从 Supabase 拉一次成员列表
+  // 返回：{ ok: boolean, data?: formatted[], error?: string }
+  // 失败时尝试一次 refreshSession 再重试，再失败才算 ok=false
+  // ============================================
+  const fetchFromSupabase = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      return { ok: false, error: 'Supabase 未配置' };
+    }
+    let { data, error } = await supabase
+      .from('member_profiles')
+      .select('*, profiles(name, created_at)')
+      .order('joined_at', { ascending: true });
+
+    if (error) {
+      console.warn('[MemberProfiles] Supabase 查询失败:', error.message, '，尝试刷新 session...');
+      try {
+        const { data: refreshData } = await supabase.auth.refreshSession();
+        if (refreshData?.session) {
+          const retry = await supabase
+            .from('member_profiles')
+            .select('*, profiles(name, created_at)')
+            .order('joined_at', { ascending: true });
+          data = retry.data;
+          error = retry.error;
+        }
+      } catch (refreshErr) {
+        console.warn('[MemberProfiles] Session 刷新异常:', refreshErr?.message);
+      }
+    }
+
+    if (error) {
+      return { ok: false, error: error.message || '未知错误' };
+    }
+    return { ok: true, data: formatProfilesFromSupabase(data) };
+  }, []);
+
   // 加载成员信息
-  const loadProfiles = useCallback(async () => {
+  //   force=true：即便 supabaseOk !== true，也强行尝试一次真实查询（用于"重试"按钮）
+  const loadProfiles = useCallback(async ({ force = false } = {}) => {
     if (!isAuthenticated) return;
 
-    // 只有 supabaseOk === true 时才走 Supabase 路径
-    const useSupabase = isSupabaseConfigured && supabaseOk === true;
+    // 没配 Supabase：纯本地模式，不需要任何云端状态
+    if (!isSupabaseConfigured) {
+      await loadLocalFallback();
+      setCloudStatus('idle');
+      return;
+    }
 
-    if (useSupabase) {
-      // Supabase 模式：从 member_profiles 表加载
-      let { data, error } = await supabase
-        .from('member_profiles')
-        .select('*, profiles(name, created_at)')
-        .order('joined_at', { ascending: true });
+    // 配了 Supabase 就应该走云端；健康检查失败时也**同步**尝试一次真实查询，
+    // 因为 health ping 可能被广告/代理拦截，但 REST 查询其实能通。
+    setCloudStatus('loading');
+    const result = await fetchFromSupabase();
 
-      // 查询失败时尝试刷新 session 后重试
-      if (error) {
-        console.warn('[MemberProfiles] Supabase 查询失败:', error.message, '，尝试刷新 session...');
-        try {
-          const { data: refreshData } = await supabase.auth.refreshSession();
-          if (refreshData?.session) {
-            console.log('[MemberProfiles] Session 刷新成功，重试查询...');
-            const retry = await supabase
-              .from('member_profiles')
-              .select('*, profiles(name, created_at)')
-              .order('joined_at', { ascending: true });
-            data = retry.data;
-            error = retry.error;
-          }
-        } catch (refreshErr) {
-          console.warn('[MemberProfiles] Session 刷新异常:', refreshErr.message);
-        }
-      }
+    if (result.ok) {
+      const data = result.data;
 
-      if (error) {
-        console.error('[MemberProfiles] Supabase 加载最终失败，降级本地模式:', error.message);
-        // 降级到本地模式
-        await loadLocalFallback();
-        return;
-      }
-
-      // 检查当前用户是否有记录，没有则自动创建
+      // 检查当前用户是否有记录，没有则自动创建，然后再拉一遍
       const currentProfile = data?.find((p) => p.user_id === user?.id);
       if (!currentProfile && user) {
         const newProfile = {
@@ -226,85 +284,37 @@ export default function MemberProfiles() {
           .from('member_profiles')
           .insert(newProfile);
         if (!insertError) {
-          // 重新加载
-          loadProfiles();
-          return;
-        }
-      }
-
-      // 转换为前端格式
-      const formatted = (data || []).map((p) => ({
-        id: p.user_id,
-        user_id: p.user_id,
-        name: p.profiles?.name || '未知用户',
-        enrollment_year: p.enrollment_year || '',
-        joined_at: p.joined_at || p.profiles?.created_at || '',
-        joined_at_display: (() => {
-          const raw = p.joined_at || p.profiles?.created_at;
-          if (!raw) return '';
-          const d = new Date(raw);
-          return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
-        })(),
-        bio: p.bio || '',
-        further_education: p.further_education || '',
-        career: p.career || '',
-        willing_to_share: p.willing_to_share || '',
-        want_to_learn: p.want_to_learn || '',
-        career_interest: p.career_interest || '',
-        hometown: p.hometown || '',
-        dream_city: p.dream_city || '',
-        hobbies: p.hobbies || '',
-        favorites: p.favorites || '',
-        other: p.other || '',
-      }));
-      setProfiles(formatted);
-    } else {
-      // 本地降级模式：先显示本地数据
-      await loadLocalFallback();
-
-      // 后台异步尝试从 Supabase 拉取最新数据（如果已配置但暂时不可达）
-      if (isSupabaseConfigured && supabase && supabaseOk !== true) {
-        try {
-          const { data, error } = await supabase
-            .from('member_profiles')
-            .select('*, profiles(name, created_at)')
-            .order('joined_at', { ascending: true });
-
-          if (!error && data && data.length > 0) {
-            console.log('[MemberProfiles] 后台 Supabase 拉取成功，更新数据:', data.length, '条');
-            const formatted = data.map((p) => ({
-              id: p.user_id,
-              user_id: p.user_id,
-              name: p.profiles?.name || '未知用户',
-              enrollment_year: p.enrollment_year || '',
-              joined_at: p.joined_at || p.profiles?.created_at || '',
-              joined_at_display: (() => {
-                const raw = p.joined_at || p.profiles?.created_at;
-                if (!raw) return '';
-                const d = new Date(raw);
-                return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
-              })(),
-              bio: p.bio || '',
-              further_education: p.further_education || '',
-              career: p.career || '',
-              willing_to_share: p.willing_to_share || '',
-              want_to_learn: p.want_to_learn || '',
-              career_interest: p.career_interest || '',
-              hometown: p.hometown || '',
-              dream_city: p.dream_city || '',
-              hobbies: p.hobbies || '',
-              favorites: p.favorites || '',
-              other: p.other || '',
-            }));
-            setProfiles(formatted);
+          // 重新加载一次（不再进入创建分支）
+          const retryAfterInsert = await fetchFromSupabase();
+          if (retryAfterInsert.ok) {
+            setProfiles(retryAfterInsert.data);
+            // 顺手把云端数据缓存到本地，下次离线/失败兜底能看到更多行
+            saveLocalProfiles(
+              retryAfterInsert.data.map(({ id: _id, joined_at_display: _d, ...rest }) => rest)
+            );
+            setCloudStatus('ok');
+            return;
           }
-        } catch (bgErr) {
-          // 后台拉取失败，静默忽略（本地数据已展示）
-          console.warn('[MemberProfiles] 后台 Supabase 拉取失败:', bgErr.message);
         }
       }
+
+      setProfiles(data);
+      // 把云端数据缓存到本地，方便离线/健康检查失败时兜底显示更完整
+      saveLocalProfiles(
+        data.map(({ id: _id, joined_at_display: _d, ...rest }) => rest)
+      );
+      setCloudStatus('ok');
+      return;
     }
-  }, [isAuthenticated, user, getAllUsers, supabaseOk, loadLocalFallback]);
+
+    // 云端查询失败：先用本地兜底撑起来，UI 上给出明确提示
+    console.warn('[MemberProfiles] Supabase 查询失败，降级本地:', result.error);
+    await loadLocalFallback();
+
+    // 如果是"健康检查未通过 + 首次进入"，至少提示这是本地缓存
+    // force 重试后仍然失败，则提升成 error（附带重试按钮）
+    setCloudStatus(force || supabaseOk === false ? 'error' : 'partial');
+  }, [isAuthenticated, user, supabaseOk, loadLocalFallback, fetchFromSupabase]);
 
   useEffect(() => {
     loadProfiles();
@@ -502,6 +512,48 @@ export default function MemberProfiles() {
             : '点击你那一行右侧的编辑按钮即可修改自己的信息。表格可左右滚动查看更多列。'
           }
         </div>
+
+        {/* 云端加载状态横幅：partial / error / loading 三态 */}
+        {cloudStatus === 'loading' && profiles.length === 0 && (
+          <div className="member-profiles-cloud-banner member-profiles-cloud-banner--loading">
+            <Loader2 size={16} className="member-profiles-cloud-banner__spin" />
+            <span>正在加载成员列表…</span>
+          </div>
+        )}
+        {cloudStatus === 'partial' && (
+          <div className="member-profiles-cloud-banner member-profiles-cloud-banner--warn">
+            <AlertCircle size={16} />
+            <span>
+              暂时无法连接云端，当前显示的是本地缓存，可能不完整。
+            </span>
+            <button
+              type="button"
+              className="member-profiles-cloud-banner__btn"
+              onClick={() => loadProfiles({ force: true })}
+              disabled={cloudStatus === 'loading'}
+            >
+              <RefreshCw size={14} />
+              <span>重试</span>
+            </button>
+          </div>
+        )}
+        {cloudStatus === 'error' && (
+          <div className="member-profiles-cloud-banner member-profiles-cloud-banner--error">
+            <AlertCircle size={16} />
+            <span>
+              未能加载云端成员列表。请检查网络/代理/广告拦截插件后重试。
+            </span>
+            <button
+              type="button"
+              className="member-profiles-cloud-banner__btn"
+              onClick={() => loadProfiles({ force: true })}
+              disabled={cloudStatus === 'loading'}
+            >
+              <RefreshCw size={14} />
+              <span>重试</span>
+            </button>
+          </div>
+        )}
 
         {/* 滚动控制 */}
         <div className="member-profiles-table-controls">
