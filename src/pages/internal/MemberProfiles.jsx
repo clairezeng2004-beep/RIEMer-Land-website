@@ -28,9 +28,10 @@ const COLUMNS = [
   { key: 'willing_to_share', label: '我愿意分享什么', width: '180px', editable: true, placeholder: '你愿意和大家分享的内容' },
   { key: 'want_to_learn', label: '我想和大家请教什么', width: '180px', editable: true, placeholder: '你想请教大家的问题' },
   { key: 'career_interest', label: '感兴趣的职业方向/生活模式', width: '180px', editable: true, placeholder: '如 产品经理、数字游民、慢生活' },
-  { key: 'hobbies', label: '爱好', width: '150px', editable: true, placeholder: '如 摄影、阅读、运动' },
   { key: 'hometown', label: '家乡', width: '120px', editable: true, placeholder: '如 广东广州' },
   { key: 'dream_city', label: '喜爱向往的城市与地区', width: '160px', editable: true, placeholder: '如 北京、上海、川西' },
+  { key: 'hobbies', label: '爱好', width: '150px', editable: true, placeholder: '如 摄影、阅读、运动' },
+  { key: 'favorites', label: '喜欢的音乐/作家/UP主/书籍/演员/影视剧...', width: '220px', editable: true, placeholder: '如 周杰伦、村上春树、老番茄、《三体》...' },
   { key: 'other', label: '其他', width: '180px', editable: true, placeholder: '任何想补充的内容' },
 ];
 
@@ -124,9 +125,10 @@ export default function MemberProfiles() {
           willing_to_share: '',
           want_to_learn: '',
           career_interest: '',
-          hobbies: '',
           hometown: '',
           dream_city: '',
+          hobbies: '',
+          favorites: '',
           other: '',
         });
         updated = true;
@@ -207,9 +209,10 @@ export default function MemberProfiles() {
           willing_to_share: '',
           want_to_learn: '',
           career_interest: '',
-          hobbies: '',
           hometown: '',
           dream_city: '',
+          hobbies: '',
+          favorites: '',
           other: '',
           joined_at: user.created_at || new Date().toISOString(),
         };
@@ -242,9 +245,10 @@ export default function MemberProfiles() {
         willing_to_share: p.willing_to_share || '',
         want_to_learn: p.want_to_learn || '',
         career_interest: p.career_interest || '',
-        hobbies: p.hobbies || '',
         hometown: p.hometown || '',
         dream_city: p.dream_city || '',
+        hobbies: p.hobbies || '',
+        favorites: p.favorites || '',
         other: p.other || '',
       }));
       setProfiles(formatted);
@@ -280,9 +284,10 @@ export default function MemberProfiles() {
               willing_to_share: p.willing_to_share || '',
               want_to_learn: p.want_to_learn || '',
               career_interest: p.career_interest || '',
-              hobbies: p.hobbies || '',
               hometown: p.hometown || '',
               dream_city: p.dream_city || '',
+              hobbies: p.hobbies || '',
+              favorites: p.favorites || '',
               other: p.other || '',
             }));
             setProfiles(formatted);

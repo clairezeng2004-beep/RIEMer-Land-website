@@ -5,6 +5,7 @@
 --   1. profiles 表缺少 signature 列
 --   2. member_profiles 表不存在
 --   3. member_profiles 表缺少 career_interest 列
+--   4. member_profiles 表缺少 favorites 列
 --
 -- 在 Supabase 控制台 → SQL Editor 中运行此脚本
 -- 所有语句都使用 IF NOT EXISTS / IF EXISTS 保护，可安全重复执行
@@ -37,6 +38,7 @@ CREATE TABLE IF NOT EXISTS public.member_profiles (
   want_to_learn TEXT DEFAULT '',
   career_interest TEXT DEFAULT '',
   hobbies TEXT DEFAULT '',
+  favorites TEXT DEFAULT '',
   hometown TEXT DEFAULT '',
   dream_city TEXT DEFAULT '',
   other TEXT DEFAULT '',
@@ -58,6 +60,22 @@ BEGIN
     RAISE NOTICE '✅ 已添加 member_profiles.career_interest 列';
   ELSE
     RAISE NOTICE 'ℹ️  member_profiles.career_interest 列已存在，跳过';
+  END IF;
+END $$;
+
+-- ========== 修复 2.6：为已存在的 member_profiles 表补齐 favorites 列 ==========
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_schema = 'public'
+      AND table_name = 'member_profiles'
+      AND column_name = 'favorites'
+  ) THEN
+    ALTER TABLE public.member_profiles ADD COLUMN favorites TEXT DEFAULT '';
+    RAISE NOTICE '✅ 已添加 member_profiles.favorites 列';
+  ELSE
+    RAISE NOTICE 'ℹ️  member_profiles.favorites 列已存在，跳过';
   END IF;
 END $$;
 

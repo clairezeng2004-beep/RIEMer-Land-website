@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS member_profiles (
   want_to_learn TEXT DEFAULT '',
   career_interest TEXT DEFAULT '',
   hobbies TEXT DEFAULT '',
+  favorites TEXT DEFAULT '',
   hometown TEXT DEFAULT '',
   dream_city TEXT DEFAULT '',
   other TEXT DEFAULT '',
