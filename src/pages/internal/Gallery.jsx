@@ -28,16 +28,41 @@ import {
 } from '../../services/albumService';
 import './Gallery.css';
 
-/* ---------- 工具函数：从 URL 生成压缩版和原图版 ---------- */
-const getThumbUrl = (url) => {
-  // 如果已经带有 ?w= 参数，直接作为压缩版；否则追加 ?w=640
-  if (/[?&]w=\d+/.test(url)) return url;
-  return url + (url.includes('?') ? '&' : '?') + 'w=640&q=75';
-};
+/* ---------- 工具函数：选择缩略图 / 原图 URL ---------- */
+// 展示优先用上传时生成的缩略图；老数据没有缩略图时降级回原图。
+const getDisplayUrl = (photo) => photo?.thumbUrl || photo?.url || '';
+// 下载始终走原图。
+const getOriginalUrl = (photo) => photo?.url || '';
 
-const getOriginalUrl = (url) => {
-  // 去掉 w= 和 q= 参数以获取原图
-  return url.replace(/[?&](w|q)=\d+/g, '').replace(/\?$/, '');
+/* ---------- 工具函数：下载时推断合适的文件名 ----------
+ * 优先级：caption(若无扩展名则补 ext) → originalName → storagePath 文件名 → 'photo.jpg'
+ */
+const guessDownloadFilename = (photo, blob) => {
+  const pickExt = () => {
+    const fromPath = (photo?.storagePath || '').split('/').pop() || '';
+    const m1 = fromPath.match(/\.([a-z0-9]+)$/i);
+    if (m1) return m1[1].toLowerCase();
+    const fromName = photo?.originalName || '';
+    const m2 = fromName.match(/\.([a-z0-9]+)$/i);
+    if (m2) return m2[1].toLowerCase();
+    const m3 = (blob?.type || '').match(/^image\/([a-z0-9+]+)$/i);
+    if (m3) return m3[1].toLowerCase().replace('jpeg', 'jpg');
+    return 'jpg';
+  };
+  const ext = pickExt();
+
+  // 1) caption 有值就用 caption（若 caption 自带扩展名则不重复追加）
+  if (photo?.caption && photo.caption.trim()) {
+    const c = photo.caption.trim();
+    return /\.[a-z0-9]+$/i.test(c) ? c : `${c}.${ext}`;
+  }
+  // 2) 用户上传时的原始文件名
+  if (photo?.originalName) return photo.originalName;
+  // 3) storage path 的文件名
+  const fromPath = (photo?.storagePath || '').split('/').pop();
+  if (fromPath) return fromPath;
+  // 4) 兜底
+  return `photo.${ext}`;
 };
 
 /* ---------- 工具函数：格式化日期显示 ---------- */
@@ -275,21 +300,22 @@ export default function Gallery() {
 
   /* ---- 下载原图 ---- */
   const handleDownloadOriginal = async (photo) => {
+    const originalUrl = getOriginalUrl(photo);
+    if (!originalUrl) return;
     try {
-      const originalUrl = getOriginalUrl(photo.url);
       const response = await fetch(originalUrl);
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = (photo.caption || 'photo') + '.jpg';
+      a.download = guessDownloadFilename(photo, blob);
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(blobUrl);
     } catch {
       // fallback: 直接在新标签页打开原图
-      window.open(getOriginalUrl(photo.url), '_blank');
+      window.open(originalUrl, '_blank');
     }
   };
 
@@ -481,7 +507,7 @@ export default function Gallery() {
                   >
                     <div className="album-card__cover">
                       {cover ? (
-                        <img src={getThumbUrl(cover.url)} alt={album.title} loading="lazy" />
+                        <img src={getDisplayUrl(cover)} alt={album.title} loading="lazy" />
                       ) : (
                         <div className="album-card__cover-empty">
                           <Images size={40} />
@@ -639,7 +665,7 @@ export default function Gallery() {
                 className="photo-card"
                 onClick={() => openLightbox(index)}
               >
-                <img src={getThumbUrl(photo.url)} alt={photo.caption} loading="lazy" />
+                <img src={getDisplayUrl(photo)} alt={photo.caption} loading="lazy" />
                 <div className="photo-card__overlay">
                   {photo.caption && (
                     <span className="photo-card__caption">{photo.caption}</span>
@@ -686,7 +712,7 @@ export default function Gallery() {
         <div className="lightbox" onClick={closeLightbox}>
           <div className="lightbox__content" onClick={(e) => e.stopPropagation()}>
             <img
-              src={getThumbUrl(selectedAlbum.photos[lightboxIndex].url)}
+              src={getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
               alt={selectedAlbum.photos[lightboxIndex].caption}
             />
             {selectedAlbum.photos[lightboxIndex].caption && (

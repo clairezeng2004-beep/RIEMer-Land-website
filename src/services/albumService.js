@@ -3,12 +3,19 @@
 // ============================================
 // 表：albums / album_photos
 // Storage bucket：album-photos （公开读）
-// 未配置 Supabase 或失败时，回退到 localStorage，保证本地开发与离线可用。
+// 照片存两份：原图 + 前端生成的缩略图（~1280px）
+//   - url / storage_path       → 原图（供下载）
+//   - thumb_url / thumb_path   → 缩略图（供列表/Lightbox 展示）
+// 未配置 Supabase 或失败时，回退到 localStorage。
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const BUCKET = 'album-photos';
 const LS_ALBUMS_KEY = 'riemer_albums_v1';
+
+// 缩略图参数：最长边 1280px、JPEG 质量 0.82
+const THUMB_MAX_SIDE = 1280;
+const THUMB_QUALITY = 0.82;
 
 const hasRemote = () => !!(isSupabaseConfigured && supabase);
 
@@ -33,6 +40,9 @@ function rowToPhoto(row) {
     id: row.id,
     url: row.url,
     storagePath: row.storage_path || null,
+    thumbUrl: row.thumb_url || null,
+    thumbPath: row.thumb_path || null,
+    originalName: row.original_name || null,
     caption: row.caption || '',
     sortIndex: typeof row.sort_index === 'number' ? row.sort_index : 0,
     uploadedById: row.uploaded_by_id || null,
@@ -78,35 +88,145 @@ export async function fetchAllAlbums() {
 }
 
 /* ============================================
- * 上传单张图片到 Storage，返回 { url, path }
+ * 前端生成缩略图
+ * ------------------------------------------
+ * 读入 File → 按最长边等比缩到 THUMB_MAX_SIDE → Canvas 导出 JPEG Blob
+ * 失败（如 HEIC 浏览器不支持）时返回 null，上层继续只传原图。
  * ============================================ */
-async function uploadToStorage(file, userId) {
+async function generateThumbnail(file) {
+  if (!file || !file.type || !file.type.startsWith('image/')) return null;
+
+  try {
+    // 优先用 createImageBitmap（快、无需 DOM）
+    let bitmap = null;
+    if (typeof createImageBitmap === 'function') {
+      try {
+        bitmap = await createImageBitmap(file);
+      } catch {
+        bitmap = null;
+      }
+    }
+
+    let width, height;
+    let source;
+
+    if (bitmap) {
+      width = bitmap.width;
+      height = bitmap.height;
+      source = bitmap;
+    } else {
+      // 兜底：用 <img>
+      const img = await new Promise((resolve, reject) => {
+        const el = new Image();
+        el.onload = () => resolve(el);
+        el.onerror = reject;
+        el.src = URL.createObjectURL(file);
+      });
+      width = img.naturalWidth;
+      height = img.naturalHeight;
+      source = img;
+    }
+
+    if (!width || !height) return null;
+
+    // 如果原图本身比阈值还小，就不再生成缩略图，避免双写浪费
+    const maxSide = Math.max(width, height);
+    if (maxSide <= THUMB_MAX_SIDE) return null;
+
+    const scale = THUMB_MAX_SIDE / maxSide;
+    const targetW = Math.round(width * scale);
+    const targetH = Math.round(height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetW;
+    canvas.height = targetH;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(source, 0, 0, targetW, targetH);
+
+    const blob = await new Promise((resolve) => {
+      canvas.toBlob((b) => resolve(b), 'image/jpeg', THUMB_QUALITY);
+    });
+
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+
+    return blob || null;
+  } catch (err) {
+    console.warn('[AlbumService] 生成缩略图失败，跳过：', err?.message || err);
+    return null;
+  }
+}
+
+/* ============================================
+ * 上传单张原图 + 缩略图到 Storage
+ * 返回 { url, path, thumbUrl, thumbPath, originalName }
+ * ============================================ */
+async function uploadOneWithThumb(file, userId) {
+  const originalName = file.name || '';
+
   if (!hasRemote()) {
-    // 本地模式：生成 dataURL 以便刷新后仍可见（blob URL 无法持久化）
+    // 本地模式：用 dataURL 直接当 url，缩略图省略
     const dataUrl = await fileToDataUrl(file);
-    return { url: dataUrl, path: null };
+    return {
+      url: dataUrl,
+      path: null,
+      thumbUrl: null,
+      thumbPath: null,
+      originalName,
+    };
   }
 
-  const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+  const ext = (originalName.split('.').pop() || 'jpg').toLowerCase();
   const rand = Math.random().toString(36).slice(2, 8);
-  const path = `${userId || 'anon'}/${Date.now()}-${rand}.${ext}`;
+  const baseKey = `${userId || 'anon'}/${Date.now()}-${rand}`;
+  const originalPath = `${baseKey}.${ext}`;
+  const thumbPath = `${baseKey}_thumb.jpg`;
 
-  const { error } = await supabase.storage
+  // 1) 上传原图
+  const { error: errOrig } = await supabase.storage
     .from(BUCKET)
-    .upload(path, file, {
+    .upload(originalPath, file, {
       cacheControl: '3600',
       upsert: false,
       contentType: file.type || 'image/jpeg',
     });
 
-  if (error) {
-    console.warn('[AlbumService] Storage 上传失败，降级 dataURL：', error.message);
+  if (errOrig) {
+    console.warn('[AlbumService] 原图上传失败，降级 dataURL：', errOrig.message);
     const dataUrl = await fileToDataUrl(file);
-    return { url: dataUrl, path: null };
+    return { url: dataUrl, path: null, thumbUrl: null, thumbPath: null, originalName };
   }
 
-  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
-  return { url: data.publicUrl, path };
+  const origPublic = supabase.storage.from(BUCKET).getPublicUrl(originalPath).data.publicUrl;
+
+  // 2) 生成并上传缩略图（失败不影响主流程）
+  let thumbUrl = null;
+  let thumbPathFinal = null;
+
+  const thumbBlob = await generateThumbnail(file);
+  if (thumbBlob) {
+    const { error: errThumb } = await supabase.storage
+      .from(BUCKET)
+      .upload(thumbPath, thumbBlob, {
+        cacheControl: '3600',
+        upsert: false,
+        contentType: 'image/jpeg',
+      });
+    if (!errThumb) {
+      thumbUrl = supabase.storage.from(BUCKET).getPublicUrl(thumbPath).data.publicUrl;
+      thumbPathFinal = thumbPath;
+    } else {
+      console.warn('[AlbumService] 缩略图上传失败（已忽略）：', errThumb.message);
+    }
+  }
+
+  return {
+    url: origPublic,
+    path: originalPath,
+    thumbUrl,
+    thumbPath: thumbPathFinal,
+    originalName,
+  };
 }
 
 function fileToDataUrl(file) {
@@ -126,8 +246,8 @@ export async function createAlbum(meta, files, user) {
   const uploaded = [];
   for (const f of files) {
     try {
-      const { url, path } = await uploadToStorage(f.file, user?.id);
-      uploaded.push({ url, path, caption: f.caption || '' });
+      const r = await uploadOneWithThumb(f.file, user?.id);
+      uploaded.push({ ...r, caption: f.caption || '' });
     } catch (err) {
       console.warn('[AlbumService] 单张上传失败：', err.message);
     }
@@ -146,6 +266,9 @@ export async function createAlbum(meta, files, user) {
         id: `localp-${Date.now()}-${i}`,
         url: u.url,
         storagePath: u.path,
+        thumbUrl: u.thumbUrl,
+        thumbPath: u.thumbPath,
+        originalName: u.originalName,
         caption: u.caption,
         sortIndex: i,
         uploadedById: user?.id || null,
@@ -181,6 +304,9 @@ export async function createAlbum(meta, files, user) {
             album_id: albumRow.id,
             url: u.url,
             storage_path: u.path,
+            thumb_url: u.thumbUrl,
+            thumb_path: u.thumbPath,
+            original_name: u.originalName,
             caption: u.caption,
             sort_index: i,
             uploaded_by_id: user?.id || null,
@@ -209,10 +335,12 @@ export async function deleteAlbum(album) {
   }
 
   try {
-    // 先收集 storage paths
-    const paths = (album.photos || [])
-      .map((p) => p.storagePath)
-      .filter(Boolean);
+    // 收集所有原图 + 缩略图路径
+    const paths = [];
+    (album.photos || []).forEach((p) => {
+      if (p.storagePath) paths.push(p.storagePath);
+      if (p.thumbPath) paths.push(p.thumbPath);
+    });
     if (paths.length > 0) {
       await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
     }
@@ -231,8 +359,8 @@ export async function addPhotosToAlbum(album, files, user) {
   const uploaded = [];
   for (const f of files) {
     try {
-      const { url, path } = await uploadToStorage(f.file, user?.id);
-      uploaded.push({ url, path, caption: f.caption || '' });
+      const r = await uploadOneWithThumb(f.file, user?.id);
+      uploaded.push({ ...r, caption: f.caption || '' });
     } catch (err) {
       console.warn('[AlbumService] 添加照片单张失败：', err.message);
     }
@@ -244,6 +372,9 @@ export async function addPhotosToAlbum(album, files, user) {
       id: `localp-${Date.now()}-${i}`,
       url: u.url,
       storagePath: u.path,
+      thumbUrl: u.thumbUrl,
+      thumbPath: u.thumbPath,
+      originalName: u.originalName,
       caption: u.caption,
       sortIndex: baseIndex + i,
       uploadedById: user?.id || null,
@@ -264,6 +395,9 @@ export async function addPhotosToAlbum(album, files, user) {
           album_id: album.id,
           url: u.url,
           storage_path: u.path,
+          thumb_url: u.thumbUrl,
+          thumb_path: u.thumbPath,
+          original_name: u.originalName,
           caption: u.caption,
           sort_index: baseIndex + i,
           uploaded_by_id: user?.id || null,
@@ -279,7 +413,7 @@ export async function addPhotosToAlbum(album, files, user) {
 }
 
 /* ============================================
- * 删除一张照片（含 Storage 文件）
+ * 删除一张照片（含 Storage 文件 + 缩略图）
  * ============================================ */
 export async function deletePhoto(album, photo) {
   if (!hasRemote() || !photo._fromDb) {
@@ -293,8 +427,11 @@ export async function deletePhoto(album, photo) {
   }
 
   try {
-    if (photo.storagePath) {
-      await supabase.storage.from(BUCKET).remove([photo.storagePath]).catch(() => {});
+    const paths = [];
+    if (photo.storagePath) paths.push(photo.storagePath);
+    if (photo.thumbPath) paths.push(photo.thumbPath);
+    if (paths.length > 0) {
+      await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
     }
     const { error } = await supabase.from('album_photos').delete().eq('id', photo.id);
     if (error) throw error;

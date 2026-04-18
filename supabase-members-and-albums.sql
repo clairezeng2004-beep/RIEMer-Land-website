@@ -298,6 +298,31 @@ CREATE POLICY "album_photos_owner_delete" ON storage.objects
 
 
 -- ════════════════════════════════════════════════════════════
+-- PART D: album_photos 增量字段（缩略图 + 原始文件名）
+-- 首次执行会自动添加；重复执行不会报错
+-- ════════════════════════════════════════════════════════════
+DO $$
+DECLARE
+  col_name TEXT;
+  cols TEXT[] := ARRAY['thumb_url','thumb_path','original_name'];
+  i INT;
+BEGIN
+  FOR i IN 1 .. array_length(cols, 1) LOOP
+    col_name := cols[i];
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'album_photos'
+        AND column_name = col_name
+    ) THEN
+      EXECUTE format('ALTER TABLE public.album_photos ADD COLUMN %I TEXT', col_name);
+      RAISE NOTICE '✅ 已添加 album_photos.% 列', col_name;
+    END IF;
+  END LOOP;
+END $$;
+
+
+-- ════════════════════════════════════════════════════════════
 -- 完成 ✅
 --   如果你看到 "Success. No rows returned" 就全部成功
 --   警告 (NOTICE) 如 "xxx 列已存在，跳过" 是正常的

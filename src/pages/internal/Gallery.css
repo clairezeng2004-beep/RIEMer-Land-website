@@ -443,6 +443,14 @@
   opacity: 1;
 }
 
+/* 触摸设备（无 hover 能力）：overlay 和下载按钮常驻显示，避免用户找不到 */
+@media (hover: none) {
+  .photo-card__overlay {
+    opacity: 1;
+    background: linear-gradient(transparent 40%, rgba(0, 0, 0, 0.5) 100%);
+  }
+}
+
 .photo-card__caption {
   font-size: var(--text-sm);
   color: white;
