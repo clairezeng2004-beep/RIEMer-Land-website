@@ -501,13 +501,30 @@ export default function MemberProfiles() {
                               <span className="member-profiles-table__year-month-sep">月</span>
                             </div>
                           ) : (
-                            <input
-                              className="member-profiles-table__input"
-                              type="text"
+                            <textarea
+                              className="member-profiles-table__input member-profiles-table__input--textarea"
+                              rows={1}
                               value={editData[col.key] || ''}
-                              onChange={(e) =>
-                                setEditData({ ...editData, [col.key]: e.target.value })
-                              }
+                              onChange={(e) => {
+                                setEditData({ ...editData, [col.key]: e.target.value });
+                                // 内容变化时自适应高度
+                                const el = e.target;
+                                el.style.height = 'auto';
+                                el.style.height = `${el.scrollHeight}px`;
+                              }}
+                              onFocus={(e) => {
+                                // 进入编辑时也按内容撑开一次
+                                const el = e.target;
+                                el.style.height = 'auto';
+                                el.style.height = `${el.scrollHeight}px`;
+                              }}
+                              ref={(el) => {
+                                // 每次渲染后根据当前内容撑开高度
+                                if (el) {
+                                  el.style.height = 'auto';
+                                  el.style.height = `${el.scrollHeight}px`;
+                                }
+                              }}
                               placeholder={col.placeholder}
                               autoFocus={col.key === 'enrollment_year'}
                             />

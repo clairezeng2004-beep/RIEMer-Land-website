@@ -299,6 +299,19 @@
   font-size: var(--text-xs);
 }
 
+/* textarea：多行自适应，不允许手动拉伸 */
+.member-profiles-table__input--textarea {
+  resize: none;
+  overflow: hidden;
+  line-height: 1.5;
+  min-height: 30px;
+  font-family: inherit;
+  white-space: pre-wrap;
+  word-break: break-word;
+  display: block;
+  vertical-align: top;
+}
+
 /* ============ Buttons ============ */
 .member-profiles-table__edit-btn {
   width: 30px;
