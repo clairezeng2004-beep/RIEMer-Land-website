@@ -247,14 +247,19 @@
 }
 
 .timeline__title {
-  font-size: var(--text-sm);
+  /* 与首页活动卡片 .featured__title 对齐（--text-md），
+     比原来的 --text-sm 提升一档，阅读体验更接近首页卡片和文章详情页。 */
+  font-size: var(--text-md);
+  font-weight: 600;
   margin-bottom: var(--space-xs);
   line-height: 1.5;
 }
 
 .timeline__desc {
   color: var(--color-text-light);
-  font-size: var(--text-xs);
+  /* 与首页活动卡片 .featured__excerpt / 文章卡片 .article-card__excerpt 对齐（--text-sm），
+     比原来的 --text-xs 提升一档。 */
+  font-size: var(--text-sm);
   line-height: 1.6;
 }
 
@@ -479,8 +484,8 @@
     overflow: visible;
   }
 
-  .timeline__title { font-size: var(--text-sm); }
-  .timeline__desc { font-size: var(--text-xs); }
+  .timeline__title { font-size: var(--text-base); }
+  .timeline__desc { font-size: var(--text-sm); }
 
   .members__grid {
     grid-template-columns: 1fr;
