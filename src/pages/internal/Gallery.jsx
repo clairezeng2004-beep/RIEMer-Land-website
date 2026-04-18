@@ -18,6 +18,7 @@ import {
   FolderPlus,
   Images,
   Download,
+  Loader2,
 } from 'lucide-react';
 import {
   fetchAlbumList,
@@ -104,6 +105,8 @@ export default function Gallery() {
   const [albums, setAlbums] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  // 上传进度：{ done, total }，total=0 表示无进度条（如纯元信息创建）
+  const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumDetailLoading, setAlbumDetailLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -182,7 +185,10 @@ export default function Gallery() {
     const d = newAlbum.day ? String(newAlbum.day).padStart(2, '0') : '';
     const albumDate = d ? `${y}-${m}-${d}` : `${y}-${m}`;
 
+    // 关键：立即进入提交态并初始化进度，让按钮第一时间给出反馈，
+    // 而不是等上传完才改 UI，避免"点击无反应"的错觉。
     setSubmitting(true);
+    setUploadProgress({ done: 0, total: createAlbumFiles.length });
     try {
       const filesPayload = createAlbumFiles.map((f) => {
         const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
@@ -198,7 +204,10 @@ export default function Gallery() {
           date: albumDate,
         },
         filesPayload,
-        user
+        user,
+        {
+          onProgress: (done, total) => setUploadProgress({ done, total }),
+        }
       );
       setAlbums((prev) => [album, ...prev]);
 
@@ -219,6 +228,7 @@ export default function Gallery() {
       alert('创建相册失败：' + (err.message || '未知错误'));
     } finally {
       setSubmitting(false);
+      setUploadProgress({ done: 0, total: 0 });
     }
   };
 
@@ -280,6 +290,7 @@ export default function Gallery() {
   const handleAddPhotos = async () => {
     if (!selectedAlbum || selectedFiles.length === 0 || submitting) return;
     setSubmitting(true);
+    setUploadProgress({ done: 0, total: selectedFiles.length });
     try {
       const filesPayload = selectedFiles.map((f) => {
         const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
@@ -288,7 +299,9 @@ export default function Gallery() {
           caption: f.caption === defaultCaption ? '' : f.caption,
         };
       });
-      const newPhotos = await svcAddPhotos(selectedAlbum, filesPayload, user);
+      const newPhotos = await svcAddPhotos(selectedAlbum, filesPayload, user, {
+        onProgress: (done, total) => setUploadProgress({ done, total }),
+      });
       setAlbums((prev) =>
         prev.map((a) =>
           a.id === selectedAlbum.id
@@ -309,6 +322,7 @@ export default function Gallery() {
       alert('上传照片失败：' + (err.message || '未知错误'));
     } finally {
       setSubmitting(false);
+      setUploadProgress({ done: 0, total: 0 });
     }
   };
 
@@ -591,8 +605,23 @@ export default function Gallery() {
                     </div>
                   )}
                 </div>
-                <button type="submit" className="btn btn-primary">
-                  <Plus size={16} /> 创建{createAlbumFiles.length > 0 ? `（含 ${createAlbumFiles.length} 张照片）` : ''}
+                <button
+                  type="submit"
+                  className="btn btn-primary"
+                  disabled={submitting || !newAlbum.title.trim()}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={16} className="gallery-spin" />
+                      {uploadProgress.total > 0
+                        ? `正在上传 ${uploadProgress.done}/${uploadProgress.total}…`
+                        : '正在创建…'}
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={16} /> 创建{createAlbumFiles.length > 0 ? `（含 ${createAlbumFiles.length} 张照片）` : ''}
+                    </>
+                  )}
                 </button>
               </form>
             </div>
@@ -770,8 +799,21 @@ export default function Gallery() {
                     </div>
                   ))}
                 </div>
-                <button className="btn btn-primary" onClick={handleAddPhotos}>
-                  <Upload size={16} /> 确认上传 {selectedFiles.length} 张照片
+                <button
+                  className="btn btn-primary"
+                  onClick={handleAddPhotos}
+                  disabled={submitting}
+                >
+                  {submitting ? (
+                    <>
+                      <Loader2 size={16} className="gallery-spin" />
+                      正在上传 {uploadProgress.done}/{uploadProgress.total || selectedFiles.length}…
+                    </>
+                  ) : (
+                    <>
+                      <Upload size={16} /> 确认上传 {selectedFiles.length} 张照片
+                    </>
+                  )}
                 </button>
               </>
             )}

@@ -327,19 +327,48 @@ function fileToDataUrl(file) {
 }
 
 /* ============================================
+ * 并发上传一批文件，保持与入参相同的顺序。
+ * onProgress(done, total) 每完成一张回调一次，用于 UI 显示进度。
+ * 默认并发 4 张，既能跑满家用带宽，又不至于把浏览器 / Supabase 打爆。
+ * ============================================ */
+async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 4) {
+  const total = files.length;
+  let done = 0;
+  const results = new Array(total);
+
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, total) }, async () => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= total) return;
+      const f = files[idx];
+      try {
+        const r = await uploadOneWithThumb(f.file, userId);
+        results[idx] = { ...r, caption: f.caption || '' };
+      } catch (err) {
+        console.warn('[AlbumService] 单张上传失败：', err?.message || err);
+        results[idx] = null;
+      } finally {
+        done++;
+        try { onProgress && onProgress(done, total); } catch { /* noop */ }
+      }
+    }
+  });
+  await Promise.all(workers);
+  // 过滤掉失败的（保持剩余成功项的相对顺序）
+  return results.filter(Boolean);
+}
+
+/* ============================================
  * 创建相册（可附带初始照片）
  * files: [{ file, caption }]
+ * options: { onProgress(done, total) }
  * ============================================ */
-export async function createAlbum(meta, files, user) {
-  const uploaded = [];
-  for (const f of files) {
-    try {
-      const r = await uploadOneWithThumb(f.file, user?.id);
-      uploaded.push({ ...r, caption: f.caption || '' });
-    } catch (err) {
-      console.warn('[AlbumService] 单张上传失败：', err.message);
-    }
-  }
+export async function createAlbum(meta, files, user, options = {}) {
+  const { onProgress } = options;
+  const uploaded = files && files.length > 0
+    ? await uploadFilesConcurrently(files, user?.id, onProgress)
+    : [];
 
   if (!hasRemote()) {
     const album = {
@@ -442,17 +471,13 @@ export async function deleteAlbum(album) {
 
 /* ============================================
  * 向相册添加多张照片
+ * options: { onProgress(done, total) }
  * ============================================ */
-export async function addPhotosToAlbum(album, files, user) {
-  const uploaded = [];
-  for (const f of files) {
-    try {
-      const r = await uploadOneWithThumb(f.file, user?.id);
-      uploaded.push({ ...r, caption: f.caption || '' });
-    } catch (err) {
-      console.warn('[AlbumService] 添加照片单张失败：', err.message);
-    }
-  }
+export async function addPhotosToAlbum(album, files, user, options = {}) {
+  const { onProgress } = options;
+  const uploaded = files && files.length > 0
+    ? await uploadFilesConcurrently(files, user?.id, onProgress)
+    : [];
 
   if (!hasRemote() || !album._fromDb) {
     const baseIndex = (album.photos || []).length;

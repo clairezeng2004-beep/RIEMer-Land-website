@@ -723,3 +723,12 @@
     height: 160px;
   }
 }
+
+/* ============ 提交按钮 loading 图标自旋 ============ */
+.gallery-spin {
+  animation: gallery-spin 1s linear infinite;
+}
+@keyframes gallery-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
