@@ -746,3 +746,42 @@ CREATE POLICY "作者或管理员可删除评论回复"
 --    SET role = 'admin', authorized = true
 --    WHERE email = '你的邮箱@example.com';
 -- ============================================
+
+
+-- ============================================
+-- site_settings：站点级全局配置（跨设备同步）
+-- 用于保存管理员在"所见即所得"编辑模式下修改的内部空间配置
+-- （侧边栏 Tab 名称、各页面标题、提示文案等）
+-- ============================================
+CREATE TABLE IF NOT EXISTS site_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE site_settings ENABLE ROW LEVEL SECURITY;
+
+-- 所有已登录用户都可读（内部空间配置需要所有成员加载）
+DROP POLICY IF EXISTS "site_settings read" ON site_settings;
+CREATE POLICY "site_settings read"
+  ON site_settings
+  FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+-- 只有管理员可写入 / 更新
+DROP POLICY IF EXISTS "site_settings write admin" ON site_settings;
+CREATE POLICY "site_settings write admin"
+  ON site_settings
+  FOR ALL
+  USING ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin')
+  WITH CHECK ((SELECT role FROM profiles WHERE id = auth.uid()) = 'admin');
+
+-- 启用 realtime 订阅（其它设备在管理员保存后自动刷新）
+-- 若报 "already member" 可忽略
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE site_settings;
+EXCEPTION WHEN duplicate_object THEN
+  NULL;
+END $$;

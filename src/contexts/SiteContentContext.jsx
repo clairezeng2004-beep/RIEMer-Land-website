@@ -1,7 +1,8 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { fetchArticles as fetchArticlesFromDb, addArticleToDb, updateArticleInDb, deleteArticleFromDb, migrateLocalArticlesToDb } from '../services/articleDbService';
+import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig } from '../services/siteSettingsService';
 
 const SiteContentContext = createContext(null);
 
@@ -276,6 +277,13 @@ export function SiteContentProvider({ children }) {
 
   // 内部空间配置持久化开关：true 时暂停自动写 localStorage（编辑模式下使用）
   const [internalConfigPersistPaused, setInternalConfigPersistPaused] = useState(false);
+  // 记录本设备最后一次成功写云端的时间戳，用于避免实时回流重复覆盖
+  const lastSyncedAtRef = useRef(null);
+  // 用 ref 镜像 persistPaused，供 realtime 回调内部判断最新值（避免闭包陷阱）
+  const persistPausedRef = useRef(false);
+  useEffect(() => {
+    persistPausedRef.current = internalConfigPersistPaused;
+  }, [internalConfigPersistPaused]);
 
   // 内部空间配置
   const [internalConfig, setInternalConfig] = useState(() => {
@@ -376,6 +384,63 @@ export function SiteContentProvider({ children }) {
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(internalConfig));
   }, [internalConfig, internalConfigPersistPaused]);
 
+  // ---- 启动时从云端拉取 internalConfig，并订阅实时变更 ----
+  // 作用：管理员在 A 设备保存的 Tab 名称等站点配置，其它设备也能看到
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+
+    // 1) 初始化拉取云端配置，覆盖本地（编辑模式下不覆盖）
+    const hydrate = async () => {
+      const { value, updatedAt, error } = await fetchInternalConfig();
+      if (cancelled) return;
+      if (error) {
+        // 表不存在或权限拒绝：安静降级，只用本地
+        console.warn('[SiteContent] 云端 internalConfig 不可用，使用本地:', error);
+        return;
+      }
+      if (!value) return; // 云端还没保存过
+      lastSyncedAtRef.current = updatedAt;
+      // 深度合并默认值，保证新增字段存在默认
+      const defaults = getDefaultInternalConfig();
+      const merged = {};
+      for (const key of Object.keys(defaults)) {
+        merged[key] = { ...defaults[key], ...(value[key] || {}) };
+      }
+      setInternalConfig((prev) => {
+        // 编辑模式下不要打断用户的修改
+        if (persistPausedRef.current) return prev;
+        return merged;
+      });
+    };
+    hydrate();
+
+    // 2) 订阅实时变更：其它设备保存后当前设备自动刷新
+    const unsubscribe = subscribeInternalConfig((value, updatedAt) => {
+      if (cancelled) return;
+      // 若本地刚刚是写入源，则跳过回流，避免闪烁
+      if (updatedAt && lastSyncedAtRef.current === updatedAt) return;
+      lastSyncedAtRef.current = updatedAt;
+      const defaults = getDefaultInternalConfig();
+      const merged = {};
+      for (const key of Object.keys(defaults)) {
+        merged[key] = { ...defaults[key], ...(value[key] || {}) };
+      }
+      setInternalConfig((prev) => {
+        // 正在编辑时不覆盖，等用户保存/取消后再同步
+        if (persistPausedRef.current) return prev;
+        return merged;
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+    // 只在挂载时订阅一次；persistPaused 通过读函数内闭包最新值即可
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     localStorage.setItem(SUGGESTIONS_KEY, JSON.stringify(suggestions));
   }, [suggestions]);
@@ -428,10 +493,20 @@ export function SiteContentProvider({ children }) {
 
   /**
    * 手动将当前 internalConfig 写入 localStorage（用于"保存编辑"显式落盘）
+   * 同时异步同步到 Supabase `site_settings`，实现跨设备共享
    */
   const flushInternalConfig = () => {
     setInternalConfig((cur) => {
       localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(cur));
+      // 云端同步（后台异步，不阻塞 UI）
+      saveInternalConfig(cur).then((res) => {
+        if (!res.success) {
+          console.warn('[SiteContent] internalConfig 云端同步失败:', res.error);
+        } else {
+          // 记录本次保存的时间戳，避免实时订阅回流导致覆盖
+          lastSyncedAtRef.current = res.updatedAt;
+        }
+      });
       return cur;
     });
   };
@@ -440,6 +515,14 @@ export function SiteContentProvider({ children }) {
     const defaults = getDefaultInternalConfig();
     setInternalConfig(defaults);
     localStorage.setItem(INTERNAL_CONFIG_KEY, JSON.stringify(defaults));
+    // 同步到云端（不阻塞）
+    saveInternalConfig(defaults).then((res) => {
+      if (!res.success) {
+        console.warn('[SiteContent] 重置后云端同步失败:', res.error);
+      } else {
+        lastSyncedAtRef.current = res.updatedAt;
+      }
+    });
   };
 
   // 文章管理 CRUD（Supabase 优先，localStorage 回退）

@@ -336,3 +336,40 @@ BEGIN
     RAISE NOTICE 'ℹ️  articles.read_num 列已存在，跳过';
   END IF;
 END $$;
+
+
+-- ========== 修复 N：创建 site_settings 表（站点级全局配置，跨设备同步） ==========
+-- 用途：保存管理员在"所见即所得"编辑模式下修改的内部空间配置
+--       （侧边栏 Tab 名称、各页面标题、提示文案等）
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  key TEXT PRIMARY KEY,
+  value JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
+
+-- 所有已登录用户都可读（内部空间配置需要所有成员加载）
+DROP POLICY IF EXISTS "site_settings read" ON public.site_settings;
+CREATE POLICY "site_settings read"
+  ON public.site_settings
+  FOR SELECT
+  USING (auth.uid() IS NOT NULL);
+
+-- 只有管理员可写入 / 更新
+DROP POLICY IF EXISTS "site_settings write admin" ON public.site_settings;
+CREATE POLICY "site_settings write admin"
+  ON public.site_settings
+  FOR ALL
+  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin')
+  WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
+
+-- 启用 realtime 订阅（其它设备在管理员保存后自动刷新）
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+  RAISE NOTICE '✅ site_settings 已加入 realtime 发布';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'ℹ️  site_settings 已在 realtime 发布中，跳过';
+END $$;
