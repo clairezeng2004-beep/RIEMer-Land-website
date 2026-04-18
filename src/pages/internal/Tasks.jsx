@@ -28,6 +28,38 @@ const statusColors = {
 // 持久化键：本地缓存 + 是否已初始化示例数据的标记
 const TASKS_LS_KEY = 'riemer_tasks';
 const TASKS_SEEDED_KEY = 'riemer_tasks_seeded';
+// 一次性迁移标记：清理旧版错误写入的示例数据 + seed 标记
+const TASKS_MIGRATION_KEY = 'riemer_tasks_migrated_v2';
+// 旧版示例数据的固定 id，用于识别并清理
+const LEGACY_SEED_IDS = new Set(['1', '2', '3', '4', '5']);
+
+/** 一次性迁移：清掉旧版误写入的示例数据 + seed 标记（幂等） */
+const runTasksMigration = () => {
+  try {
+    if (localStorage.getItem(TASKS_MIGRATION_KEY) === '1') return;
+    // 清理本地缓存里 id 为 '1'~'5' 的示例数据
+    const raw = localStorage.getItem(TASKS_LS_KEY);
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          const cleaned = parsed.filter((t) => !LEGACY_SEED_IDS.has(String(t?.id)));
+          if (cleaned.length !== parsed.length) {
+            console.log('[Tasks][migration] 清理本地缓存中的旧示例数据',
+              parsed.length - cleaned.length, '条');
+          }
+          localStorage.setItem(TASKS_LS_KEY, JSON.stringify(cleaned));
+        }
+      } catch { /* ignore */ }
+    }
+    // 清除旧的 seeded 标记，让"未登录的降级模式"有机会重新按新逻辑处理
+    localStorage.removeItem(TASKS_SEEDED_KEY);
+    localStorage.setItem(TASKS_MIGRATION_KEY, '1');
+    console.log('[Tasks][migration] ✅ v2 迁移完成');
+  } catch (err) {
+    console.warn('[Tasks][migration] 迁移失败（忽略）:', err.message);
+  }
+};
 
 /** 从 localStorage 读取 tasks（解析失败返回 null） */
 const readLocalTasks = () => {
@@ -143,23 +175,28 @@ export default function Tasks() {
   }, [teamMembers, authorizedMembers]);
 
   // ---- Tasks 状态（持久化） ----
-  // 初始值优先读本地缓存；若无缓存且从未初始化过，则用示例数据 seeds 一次
+  // 云端可用时云端才是真源；未登录或 Supabase 不可达才考虑 seed 示例数据
   const [tasks, setTasks] = useState(() => {
+    // 先跑一次性迁移：清掉旧版错误塞入的示例数据
+    runTasksMigration();
+
     const cached = readLocalTasks();
     if (cached && cached.length > 0) {
       console.log('[Tasks] 从本地缓存恢复', cached.length, '条数据');
       return cached;
     }
-    // 首次使用 或 本地为空：种下示例数据
-    if (!localStorage.getItem(TASKS_SEEDED_KEY)) {
+    // 本地缓存为空：
+    //  - 如果 Supabase 配置了，就先显示空，等异步拉取结果（不 seed 示例数据）
+    //  - 如果 Supabase 未配置（纯本地模式），才 seed 一次示例数据作为演示
+    if (!isSupabaseConfigured && !localStorage.getItem(TASKS_SEEDED_KEY)) {
       try {
         localStorage.setItem(TASKS_SEEDED_KEY, '1');
         writeLocalTasks(initialTasks);
       } catch { /* ignore */ }
-      console.log('[Tasks] 首次使用，载入示例数据', initialTasks.length, '条');
+      console.log('[Tasks] 纯本地模式首次使用，载入示例数据', initialTasks.length, '条');
       return initialTasks;
     }
-    console.log('[Tasks] 本地缓存为空（已 seeded 过）');
+    console.log('[Tasks] 本地无缓存，等待云端拉取…');
     return [];
   });
 
@@ -194,36 +231,23 @@ export default function Tasks() {
         const remote = (data || []).map(rowToTask);
         console.log('[Tasks] Supabase 返回', remote.length, '条数据');
 
-        // --- 合并策略（避免"云端覆盖本地"导致的数据丢失） ---
-        // 读取"此刻"的本地缓存（不依赖 state，避免闭包）
+        // --- 云端即真源：不再做"本地独有自动回传"，避免已删除的旧示例或旧缓存被"复活" ---
+        // 只把云端返回的数据作为最终状态；如果本地还有云端已删除的行，会被覆盖。
         const local = readLocalTasks() || [];
-        console.log('[Tasks] 本地缓存当前有', local.length, '条数据');
-
         const remoteIds = new Set(remote.map((t) => t.id));
-        // 本地独有的事项：云端没有，需要补传
         const localOnly = local.filter((t) => t.id && !remoteIds.has(t.id));
 
         if (localOnly.length > 0) {
-          console.log('[Tasks] 🆙 检测到', localOnly.length, '条本地独有事项，自动补传到 Supabase');
-          try {
-            const rows = localOnly.map(taskToRow);
-            const { error: upErr } = await supabase.from('tasks').upsert(rows);
-            if (upErr) throw upErr;
-            console.log('[Tasks] ✅ 本地独有事项补传成功');
-          } catch (upErr) {
-            console.warn('[Tasks] ⚠️ 本地独有事项补传失败（继续用合并结果显示）:', upErr);
-          }
+          // 识别是不是"本地用户刚新建、还没同步到云端"的条目：
+          // - 固定 id 的旧示例（'1'~'5'）→ 直接丢弃
+          // - 其他 id（通常是 UUID）→ 也丢弃，因为新增逻辑里已经在 handleAddTask 里同步 upsert 过；
+          //   如果 upsert 失败，用户应该能看到报错并重试，而不是让陈年残留数据无限复活。
+          const legacyCount = localOnly.filter((t) => LEGACY_SEED_IDS.has(String(t.id))).length;
+          console.log('[Tasks] 本地有', localOnly.length, '条云端没有的条目（其中旧示例',
+            legacyCount, '条），一律以云端为准丢弃');
         }
 
-        // 合并后的完整列表：云端优先 + 本地独有在后
-        const merged = [...remote, ...localOnly];
-        console.log('[Tasks] 合并后共', merged.length, '条数据');
-
-        if (merged.length > 0) {
-          setTasks(merged);
-        } else {
-          console.log('[Tasks] 远端和本地都无数据，保留当前 state');
-        }
+        setTasks(remote);
       } catch (err) {
         // 表可能未创建 / 网络失败 —— 静默，继续使用本地数据
         console.warn('[Tasks] ❌ 从 Supabase 加载失败:', err);
