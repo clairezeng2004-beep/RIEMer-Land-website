@@ -678,7 +678,7 @@ export default function MemberSharingCreate() {
             <div className="msc-form__field">
               <label>
                 <Calendar size={14} /> 时间段
-                <span className="msc-form__hint">选填，标注分享内容的时间范围</span>
+                <span className="msc-form__hint">选填，标注分享内容的时间范围，例如 2025 年 6 月到 9 月实习则标注 2025 年 6 月 至 2025 年 9 月</span>
               </label>
               <PeriodPicker
                 value={newPost.period}
