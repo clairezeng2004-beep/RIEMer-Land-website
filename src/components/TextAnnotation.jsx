@@ -47,11 +47,47 @@ export default function TextAnnotation({
   disabled,
   inline = false,
 }) {
-  const { user } = useAuth();
+  const { user, getAllUsers } = useAuth();
   const [comments, setComments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
+
+  // 评论作者真名映射（id → 真名），保证评论始终显示注册时的真名而非昵称。
+  // 来源：AuthContext.getAllUsers()（合并 Supabase + 本地）。
+  const [userNameMap, setUserNameMap] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getAllUsers?.()) || [];
+        if (cancelled) return;
+        const map = {};
+        list.forEach((u) => {
+          if (u?.id) map[u.id] = u.name || u.nickname || '';
+        });
+        setUserNameMap(map);
+      } catch {
+        /* 拉取失败时回退到 comment.userName 原值 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAllUsers]);
+
+  // 解析评论作者显示名：优先真名映射，其次当前登录用户的 name（覆盖本人旧评论），
+  // 再回退到写入时存储的 userName
+  const resolveDisplayName = useCallback(
+    (uid, fallback) => {
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return fallback || '';
+    },
+    [userNameMap, user],
+  );
 
   // 浮动工具栏（划中文字后弹出）
   const [toolbar, setToolbar] = useState({ visible: false, x: 0, y: 0 });
@@ -382,8 +418,15 @@ export default function TextAnnotation({
 
         {/* 评论头部 */}
         <div className="ta-comment__header">
-          {renderAvatar(comment.userName, comment.userAvatar, 26)}
-          <span className="ta-comment__author">{comment.userName}</span>
+          {(() => {
+            const displayName = resolveDisplayName(comment.userId, comment.userName);
+            return (
+              <>
+                {renderAvatar(displayName, comment.userAvatar, 26)}
+                <span className="ta-comment__author">{displayName}</span>
+              </>
+            );
+          })()}
           <span className="ta-comment__time">{timeAgo(comment.createdAt)}</span>
         </div>
 
@@ -423,25 +466,28 @@ export default function TextAnnotation({
         {/* 回复列表 */}
         {comment.replies && comment.replies.length > 0 && (
           <div className="ta-comment__replies">
-            {comment.replies.map((reply) => (
-              <div key={reply.id} className="ta-reply">
-                <div className="ta-reply__header">
-                  {renderAvatar(reply.userName, reply.userAvatar, 22)}
-                  <span className="ta-reply__author">{reply.userName}</span>
-                  <span className="ta-reply__time">{timeAgo(reply.createdAt)}</span>
-                  {user?.id === reply.userId && (
-                    <button
-                      className="ta-reply__delete"
-                      onClick={() => handleDeleteReply(comment.id, reply.id)}
-                      title="删除回复"
-                    >
-                      <X size={12} />
-                    </button>
-                  )}
+            {comment.replies.map((reply) => {
+              const replyName = resolveDisplayName(reply.userId, reply.userName);
+              return (
+                <div key={reply.id} className="ta-reply">
+                  <div className="ta-reply__header">
+                    {renderAvatar(replyName, reply.userAvatar, 22)}
+                    <span className="ta-reply__author">{replyName}</span>
+                    <span className="ta-reply__time">{timeAgo(reply.createdAt)}</span>
+                    {user?.id === reply.userId && (
+                      <button
+                        className="ta-reply__delete"
+                        onClick={() => handleDeleteReply(comment.id, reply.id)}
+                        title="删除回复"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                  <div className="ta-reply__content">{reply.content}</div>
                 </div>
-                <div className="ta-reply__content">{reply.content}</div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

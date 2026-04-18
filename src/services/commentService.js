@@ -140,7 +140,8 @@ export async function addComment({
         anchor_data: anchorData || null,
         content,
         user_id: user.id,
-        user_name: user.nickname || user.name || '',
+        // 评论作者统一显示真名（user.name），缺失时回退到昵称
+        user_name: user.name || user.nickname || '',
         user_avatar: user.avatar || null,
       })
       .select()
@@ -163,7 +164,7 @@ export async function addComment({
     content,
     anchorData: anchorData || null,
     userId: user.id,
-    userName: user.nickname || user.name || '',
+    userName: user.name || user.nickname || '',
     userAvatar: user.avatar || null,
     createdAt: new Date().toISOString(),
     resolved: false,
@@ -187,7 +188,7 @@ export async function replyToComment(commentId, { content, user }) {
         annotation_id: commentId,
         content,
         user_id: user.id,
-        user_name: user.nickname || user.name || '',
+        user_name: user.name || user.nickname || '',
         user_avatar: user.avatar || null,
       })
       .select()
@@ -208,7 +209,7 @@ export async function replyToComment(commentId, { content, user }) {
     id: 'reply_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8),
     content,
     userId: user.id,
-    userName: user.nickname || user.name || '',
+    userName: user.name || user.nickname || '',
     userAvatar: user.avatar || null,
     createdAt: new Date().toISOString(),
   };
