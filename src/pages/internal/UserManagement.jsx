@@ -9,9 +9,6 @@ import {
   Users,
   Shield,
   ShieldOff,
-  Check,
-  X,
-  Calendar,
   UserCheck,
   UserX,
   Eye,
@@ -24,7 +21,6 @@ import {
   ChevronDown,
   Clock,
   User,
-  Send,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -48,7 +44,6 @@ export default function UserManagement() {
     preAuthorizeByEmail,
     getPreAuthorizedEmails,
     removePreAuthorizedEmail,
-    sendInviteEmail,
   } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
@@ -72,8 +67,6 @@ export default function UserManagement() {
   const [preAuthLoading, setPreAuthLoading] = useState(false);
   const [preAuthMessage, setPreAuthMessage] = useState({ type: '', text: '' });
   const [preAuthList, setPreAuthList] = useState([]);
-  // 每个邮箱的"重发邀请"状态：{ [email]: 'sending' | 'sent' | 'failed' }
-  const [resendStatus, setResendStatus] = useState({});
 
   // 邮箱后缀自动提示
   const EMAIL_SUFFIXES = [
@@ -249,36 +242,6 @@ export default function UserManagement() {
     getPreAuthorizedEmails().then(setPreAuthList);
   };
 
-  // 重发邀请邮件
-  const handleResendInvite = async (email) => {
-    if (!sendInviteEmail) return;
-    setResendStatus((prev) => ({ ...prev, [email]: 'sending' }));
-    try {
-      const result = await sendInviteEmail(email, 'invite');
-      if (result?.sent) {
-        setResendStatus((prev) => ({ ...prev, [email]: 'sent' }));
-        setTimeout(() => {
-          setResendStatus((prev) => {
-            const { [email]: _, ...rest } = prev;
-            return rest;
-          });
-        }, 3000);
-      } else {
-        setResendStatus((prev) => ({ ...prev, [email]: 'failed' }));
-        alert(`邀请邮件发送失败：${result?.error || '未知原因'}`);
-        setTimeout(() => {
-          setResendStatus((prev) => {
-            const { [email]: _, ...rest } = prev;
-            return rest;
-          });
-        }, 3000);
-      }
-    } catch (err) {
-      setResendStatus((prev) => ({ ...prev, [email]: 'failed' }));
-      alert('邀请邮件发送异常：' + err.message);
-    }
-  };
-
   return (
     <div className="users-page">
       <div className="container">
@@ -399,7 +362,7 @@ export default function UserManagement() {
           <div className="users-preauth">
             <div className="users-preauth__header">
               <h4><Mail size={16} /> 邮箱授权</h4>
-              <p>输入成员邮箱直接授权 — 已注册的用户将立即获得权限，未注册的邮箱将加入预授权列表，注册后自动拥有权限</p>
+              <p>输入成员邮箱直接授权 — 已注册的用户将立即获得权限，未注册的邮箱将加入预授权列表，注册后自动拥有权限（不会发送邮件）</p>
             </div>
 
             <form className="users-preauth__form" onSubmit={handlePreAuthorize}>
@@ -458,51 +421,24 @@ export default function UserManagement() {
             {preAuthList.length > 0 && (
               <div className="users-preauth__list">
                 <div className="users-preauth__list-title">待注册的预授权邮箱（{preAuthList.length}）</div>
-                {preAuthList.map((item) => {
-                  const status = resendStatus[item.email];
-                  return (
-                    <div key={item.email} className="users-preauth__list-item">
-                      <div className="users-preauth__list-email">
-                        <Mail size={14} />
-                        <span>{item.email}</span>
-                        <span className="users-preauth__list-date">
-                          {item.addedAt ? new Date(item.addedAt).toLocaleDateString('zh-CN') : ''}
-                        </span>
-                      </div>
-                      <div className="users-preauth__list-actions">
-                        <button
-                          className="users-preauth__list-resend"
-                          onClick={() => handleResendInvite(item.email)}
-                          disabled={status === 'sending'}
-                          title={
-                            status === 'sent'
-                              ? '已重新发送'
-                              : status === 'failed'
-                                ? '发送失败，点击重试'
-                                : '重新发送邀请邮件'
-                          }
-                        >
-                          {status === 'sending' ? (
-                            <Loader2 size={14} className="users-preauth__spin" />
-                          ) : status === 'sent' ? (
-                            <CheckCircle size={14} style={{ color: '#5b8c3e' }} />
-                          ) : status === 'failed' ? (
-                            <AlertCircle size={14} style={{ color: '#d9534f' }} />
-                          ) : (
-                            <Send size={14} />
-                          )}
-                        </button>
-                        <button
-                          className="users-preauth__list-remove"
-                          onClick={() => handleRemovePreAuth(item.email)}
-                          title="移除"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
+                {preAuthList.map((item) => (
+                  <div key={item.email} className="users-preauth__list-item">
+                    <div className="users-preauth__list-email">
+                      <Mail size={14} />
+                      <span>{item.email}</span>
+                      <span className="users-preauth__list-date">
+                        {item.addedAt ? new Date(item.addedAt).toLocaleDateString('zh-CN') : ''}
+                      </span>
                     </div>
-                  );
-                })}
+                    <button
+                      className="users-preauth__list-remove"
+                      onClick={() => handleRemovePreAuth(item.email)}
+                      title="移除"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  </div>
+                ))}
               </div>
             )}
           </div>

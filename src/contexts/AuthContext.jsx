@@ -1316,39 +1316,11 @@ export function AuthProvider({ children }) {
     }
   }, [supabaseOk, user]);
 
-  // ---- 发送邀请/授权通知邮件（内部工具函数）----
-  // 调用 /api/send-invite-email，完全容错：邮件失败不影响授权结果
-  // 返回 { sent: boolean, error?: string }
-  const sendInviteEmailInternal = useCallback(async (email, mode) => {
-    try {
-      const res = await fetch('/api/send-invite-email', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          mode, // 'invite' | 'authorized'
-          inviterName: user?.name || '管理员',
-        }),
-      });
-      if (res.ok) {
-        return { sent: true };
-      }
-      const data = await res.json().catch(() => ({}));
-      const msg = data?.error || `HTTP ${res.status}`;
-      console.warn('[Auth] 邀请邮件发送失败:', msg);
-      return { sent: false, error: msg };
-    } catch (err) {
-      console.warn('[Auth] 邀请邮件发送异常:', err.message);
-      return { sent: false, error: err.message };
-    }
-  }, [user]);
-
   // ---- 授权用户 ----
   const authorizeUser = useCallback(async (userId) => {
     // 始终同步更新本地用户数据库
     const users = getLocalUsers();
     const idx = users.findIndex((u) => u.id === userId);
-    let targetEmail = users[idx]?.email || null;
     if (idx >= 0) {
       users[idx].authorized = true;
       saveLocalUsers(users);
@@ -1371,7 +1343,6 @@ export function AuthProvider({ children }) {
           .eq('id', userId)
           .single();
         if (profile?.email) {
-          if (!targetEmail) targetEmail = profile.email;
           fetch('/api/confirm-email', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -1390,12 +1361,7 @@ export function AuthProvider({ children }) {
         console.warn('[Auth] 获取用户邮箱失败:', err.message);
       }
     }
-
-    // 发送"授权通过"通知邮件（失败不影响授权结果）
-    if (targetEmail) {
-      sendInviteEmailInternal(targetEmail, 'authorized').catch(() => {});
-    }
-  }, [supabaseOk, sendInviteEmailInternal]);
+  }, [supabaseOk]);
 
   // ---- 撤销授权 ----
   const revokeUser = useCallback(async (userId) => {
@@ -1531,16 +1497,9 @@ export function AuthProvider({ children }) {
         }
         existingUser.authorized = true;
         saveLocalUsers(users);
-        // 发送"已授权"通知邮件
-        const mail = await sendInviteEmailInternal(normalizedEmail, 'authorized');
-        const mailSuffix = mail.sent
-          ? '，已发送通知邮件'
-          : `（通知邮件未发送：${mail.error || '未知原因'}）`;
         return {
           success: true,
-          message: `已授权用户「${existingUser.name}」（${normalizedEmail}）${mailSuffix}`,
-          mailSent: mail.sent,
-          mailError: mail.error,
+          message: `已授权用户「${existingUser.name}」（${normalizedEmail}）`,
         };
       }
     } else {
@@ -1571,16 +1530,9 @@ export function AuthProvider({ children }) {
             users[localIdx].authorized = true;
             saveLocalUsers(users);
           }
-          // 发送"已授权"通知邮件
-          const mail = await sendInviteEmailInternal(normalizedEmail, 'authorized');
-          const mailSuffix = mail.sent
-            ? '，已发送通知邮件'
-            : `（通知邮件未发送：${mail.error || '未知原因'}）`;
           return {
             success: true,
-            message: `已授权用户「${existingProfile.name}」（${normalizedEmail}）${mailSuffix}`,
-            mailSent: mail.sent,
-            mailError: mail.error,
+            message: `已授权用户「${existingProfile.name}」（${normalizedEmail}）`,
           };
         }
       } catch (err) {
@@ -1610,18 +1562,11 @@ export function AuthProvider({ children }) {
     }
 
     // 发送"邀请注册"邮件
-    const mail = await sendInviteEmailInternal(normalizedEmail, 'invite');
-    const mailSuffix = mail.sent
-      ? '，邀请邮件已发送'
-      : `（邀请邮件未发送：${mail.error || '未知原因'}）`;
-
     return {
       success: true,
-      message: `已将「${normalizedEmail}」加入预授权列表${mailSuffix}`,
-      mailSent: mail.sent,
-      mailError: mail.error,
+      message: `已将「${normalizedEmail}」加入预授权列表，该邮箱注册后将自动获得权限`,
     };
-  }, [supabaseOk, sendInviteEmailInternal]);
+  }, [supabaseOk]);
 
   // ---- 获取预授权邮箱列表 ----
   const getPreAuthorizedEmails = useCallback(async () => {
@@ -1831,7 +1776,6 @@ export function AuthProvider({ children }) {
         preAuthorizeByEmail,
         getPreAuthorizedEmails,
         removePreAuthorizedEmail,
-        sendInviteEmail: sendInviteEmailInternal,
         ROLES,
         ROLE_LABELS,
       }}
