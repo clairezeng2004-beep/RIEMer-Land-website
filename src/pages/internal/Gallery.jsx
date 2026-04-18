@@ -69,11 +69,23 @@ const guessDownloadFilename = (photo, blob) => {
 /* ---------- 工具函数：格式化日期显示 ---------- */
 const formatAlbumDate = (dateStr) => {
   if (!dateStr) return '';
-  // 支持 "2025-03" 或 "2025-03-22" 格式
+  // 支持 "2025"、"2025-03"、"2025-03-22"
   const parts = dateStr.split('-');
   const y = parts[0];
   const m = parts[1] ? parseInt(parts[1], 10) : null;
-  return m ? `${y} 年 ${m} 月` : `${y} 年`;
+  const d = parts[2] ? parseInt(parts[2], 10) : null;
+  if (m && d) return `${y} 年 ${m} 月 ${d} 日`;
+  if (m) return `${y} 年 ${m} 月`;
+  return `${y} 年`;
+};
+
+/* ---------- 工具函数：根据年月计算该月天数（用于"日"下拉的选项数量） ---------- */
+const daysInMonth = (year, month) => {
+  const y = parseInt(year, 10);
+  const m = parseInt(month, 10);
+  if (!y || !m || m < 1 || m > 12) return 31;
+  // new Date(y, m, 0) 的 day 即 y 年 m 月的最后一天
+  return new Date(y, m, 0).getDate();
 };
 
 /* ---------- 空状态由接口/本地缓存提供，不再 seed 示例数据 ---------- */
@@ -103,10 +115,14 @@ export default function Gallery() {
     description: '',
     year: now.getFullYear().toString(),
     month: (now.getMonth() + 1).toString(),
+    day: '', // 选填
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
   // 新建相册时预选的照片（与 selectedFiles 结构一致）
   const [createAlbumFiles, setCreateAlbumFiles] = useState([]);
+  // 拖拽态：标记两个 dropzone 的 hover 高亮
+  const [isDraggingCreate, setIsDraggingCreate] = useState(false);
+  const [isDraggingAdd, setIsDraggingAdd] = useState(false);
   const fileInputRef = useRef(null);
   const albumFileInputRef = useRef(null);
   const createAlbumFileRef = useRef(null);
@@ -163,6 +179,8 @@ export default function Gallery() {
     if (!newAlbum.title.trim() || submitting) return;
     const y = newAlbum.year || now.getFullYear().toString();
     const m = (newAlbum.month || '1').padStart(2, '0');
+    const d = newAlbum.day ? String(newAlbum.day).padStart(2, '0') : '';
+    const albumDate = d ? `${y}-${m}-${d}` : `${y}-${m}`;
 
     setSubmitting(true);
     try {
@@ -177,7 +195,7 @@ export default function Gallery() {
         {
           title: newAlbum.title,
           description: newAlbum.description,
-          date: `${y}-${m}`,
+          date: albumDate,
         },
         filesPayload,
         user
@@ -190,6 +208,7 @@ export default function Gallery() {
         description: '',
         year: resetNow.getFullYear().toString(),
         month: (resetNow.getMonth() + 1).toString(),
+        day: '',
       });
       // 释放 blob URL
       createAlbumFiles.forEach((f) => URL.revokeObjectURL(f.url));
@@ -203,28 +222,59 @@ export default function Gallery() {
     }
   };
 
-  /* ---- 新建相册表单中选择图片 ---- */
+  /* ---- 通用：把 File[] 转为预览对象 ---- */
+  const filesToPreviews = (files) =>
+    files
+      .filter((f) => f && f.type && f.type.startsWith('image/'))
+      .map((file) => ({
+        file,
+        url: URL.createObjectURL(file),
+        caption: file.name.replace(/\.[^.]+$/, ''),
+      }));
+
+  /* ---- 新建相册表单中选择图片（点击） ---- */
   const handleCreateAlbumFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
-    const previews = files.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-      caption: file.name.replace(/\.[^.]+$/, ''),
-    }));
+    const previews = filesToPreviews(files);
     setCreateAlbumFiles((prev) => [...prev, ...previews]);
     // 清空 input，避免同一文件无法再次选中
     if (e.target) e.target.value = '';
   };
 
-  /* ---- 添加照片到相册 ---- */
+  /* ---- 添加照片到相册（点击） ---- */
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
-    const previews = files.map((file) => ({
-      file,
-      url: URL.createObjectURL(file),
-      caption: file.name.replace(/\.[^.]+$/, ''),
-    }));
+    const previews = filesToPreviews(files);
     setSelectedFiles((prev) => [...prev, ...previews]);
+    if (e.target) e.target.value = '';
+  };
+
+  /* ---- 拖拽：通用阻止默认 ---- */
+  const preventDragDefault = (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
+  /* ---- 新建相册 dropzone：拖拽 ---- */
+  const handleCreateAlbumDrop = (e) => {
+    preventDragDefault(e);
+    setIsDraggingCreate(false);
+    const files = Array.from(e.dataTransfer?.files || []);
+    const previews = filesToPreviews(files);
+    if (previews.length > 0) {
+      setCreateAlbumFiles((prev) => [...prev, ...previews]);
+    }
+  };
+
+  /* ---- 详情页上传 dropzone：拖拽 ---- */
+  const handleAddPhotoDrop = (e) => {
+    preventDragDefault(e);
+    setIsDraggingAdd(false);
+    const files = Array.from(e.dataTransfer?.files || []);
+    const previews = filesToPreviews(files);
+    if (previews.length > 0) {
+      setSelectedFiles((prev) => [...prev, ...previews]);
+    }
   };
 
   const handleAddPhotos = async () => {
@@ -438,11 +488,31 @@ export default function Gallery() {
                       size="sm"
                       className="gallery-create__select"
                       value={String(newAlbum.month)}
-                      onChange={(v) => setNewAlbum({ ...newAlbum, month: v })}
+                      onChange={(v) => {
+                        // 切换月份后，如果已选的"日"超出新月天数，则清空
+                        const maxDay = daysInMonth(newAlbum.year, v);
+                        setNewAlbum((prev) => ({
+                          ...prev,
+                          month: v,
+                          day: prev.day && parseInt(prev.day, 10) > maxDay ? '' : prev.day,
+                        }));
+                      }}
                       options={Array.from({ length: 12 }, (_, i) => ({
                         value: String(i + 1),
                         label: `${i + 1} 月`,
                       }))}
+                    />
+                    <CustomSelect
+                      size="sm"
+                      className="gallery-create__select"
+                      value={String(newAlbum.day || '')}
+                      onChange={(v) => setNewAlbum({ ...newAlbum, day: v })}
+                      placeholder="日（选填）"
+                      allowClear
+                      options={Array.from(
+                        { length: daysInMonth(newAlbum.year, newAlbum.month) },
+                        (_, i) => ({ value: String(i + 1), label: `${i + 1} 日` })
+                      )}
                     />
                   </div>
                 </div>
@@ -459,8 +529,21 @@ export default function Gallery() {
                 <div className="gallery-create__field">
                   <label>照片（选填）</label>
                   <div
-                    className="gallery-upload__dropzone gallery-create__dropzone"
+                    className={`gallery-upload__dropzone gallery-create__dropzone${isDraggingCreate ? ' is-dragover' : ''}`}
                     onClick={() => createAlbumFileRef.current?.click()}
+                    onDragEnter={(e) => {
+                      preventDragDefault(e);
+                      setIsDraggingCreate(true);
+                    }}
+                    onDragOver={(e) => {
+                      preventDragDefault(e);
+                      setIsDraggingCreate(true);
+                    }}
+                    onDragLeave={(e) => {
+                      preventDragDefault(e);
+                      setIsDraggingCreate(false);
+                    }}
+                    onDrop={handleCreateAlbumDrop}
                   >
                     <input
                       ref={createAlbumFileRef}
@@ -471,8 +554,8 @@ export default function Gallery() {
                       style={{ display: 'none' }}
                     />
                     <Upload size={28} />
-                    <p>点击选择照片，支持多选</p>
-                    <span>创建后可以继续添加更多照片</span>
+                    <p>点击或拖拽照片到这里上传</p>
+                    <span>支持多张同时选择，创建后还能继续添加</span>
                   </div>
                   {createAlbumFiles.length > 0 && (
                     <div className="gallery-upload__preview gallery-create__preview">
@@ -626,8 +709,21 @@ export default function Gallery() {
         {showAddPhoto && (
           <div className="gallery-upload card">
             <div
-              className="gallery-upload__dropzone"
+              className={`gallery-upload__dropzone${isDraggingAdd ? ' is-dragover' : ''}`}
               onClick={() => albumFileInputRef.current?.click()}
+              onDragEnter={(e) => {
+                preventDragDefault(e);
+                setIsDraggingAdd(true);
+              }}
+              onDragOver={(e) => {
+                preventDragDefault(e);
+                setIsDraggingAdd(true);
+              }}
+              onDragLeave={(e) => {
+                preventDragDefault(e);
+                setIsDraggingAdd(false);
+              }}
+              onDrop={handleAddPhotoDrop}
             >
               <input
                 ref={albumFileInputRef}
@@ -638,8 +734,8 @@ export default function Gallery() {
                 style={{ display: 'none' }}
               />
               <Upload size={32} />
-              <p>点击选择照片，支持多选</p>
-              <span>JPG、PNG、WebP 等图片格式</span>
+              <p>点击或拖拽照片到这里上传</p>
+              <span>支持多张同时选择，JPG / PNG / WebP 等图片格式</span>
             </div>
 
             {selectedFiles.length > 0 && (

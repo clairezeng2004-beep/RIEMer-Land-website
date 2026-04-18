@@ -321,6 +321,14 @@
   background: rgba(91, 140, 62, 0.03);
 }
 
+/* 拖拽经过时的高亮态 */
+.gallery-upload__dropzone.is-dragover {
+  border-color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.08);
+  transform: scale(1.01);
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+}
+
 .gallery-upload__dropzone p {
   font-size: var(--text-base);
   font-weight: 500;
