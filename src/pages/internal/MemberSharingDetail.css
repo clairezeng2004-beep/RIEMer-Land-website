@@ -55,11 +55,17 @@
 /* 当存在目录时，内容区采用两栏布局：左目录 + 文章 */
 .msd-content__inner--with-toc {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
+  /* 目录列宽从 220px 提升到 260px；max-width 同步提升以保留正文空间 */
+  grid-template-columns: 260px minmax(0, 1fr);
   gap: var(--space-xl, 24px);
-  max-width: 1200px;
+  max-width: 1240px;
   margin: 0 auto;
   align-items: start;
+}
+
+/* 有目录时，内容区的左 padding 收窄，让「目录左边框」整体往左移一点 */
+.msd-content:has(.msd-content__inner--with-toc) {
+  padding-left: 1rem;
 }
 
 .msd-content__inner--with-toc .msd-article {

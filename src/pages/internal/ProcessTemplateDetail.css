@@ -64,14 +64,21 @@
   max-width: none;
 }
 
-/* 当存在目录时，内容区采用三栏布局：左目录 + 文章 + 右评论 */
+/* 当存在目录时，内容区采用三栏布局：左目录 + 文章 + 右评论
+   目录列宽度从 220px 提升到 260px，并让整块三栏更往左贴（见下方 .ptd-content 左 padding 覆盖）。 */
 .ptd-content__inner--with-toc {
   display: grid;
-  grid-template-columns: 220px minmax(0, 1fr) 340px;
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
   gap: var(--space-xl, 24px);
-  max-width: 1480px;
+  max-width: 1520px; /* 同步放大，抵消目录变宽导致正文被挤 */
   margin: 0 auto;
   align-items: start;
+}
+
+/* 有目录时，整块内容区的左 padding 收窄，让「目录左边框」整体往左移一点。
+   右侧保持原 2rem，避免评论栏贴到屏幕右边。 */
+.ptd-content:has(.ptd-content__inner--with-toc) {
+  padding-left: 1rem;
 }
 
 .ptd-content__inner--with-toc .ptd-article {
@@ -81,7 +88,7 @@
 
 /* 编辑态：评论栏不渲染，第三列的 340px 应当收回，让正文区（含 md 左右预览分栏）获得足够宽度 */
 .ptd-content__inner--with-toc.ptd-content__inner--editing {
-  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr);
 }
 
 /* 编辑态下的 Markdown 左右分栏：拉满高度，匹配原单 textarea 的高度基线 */
