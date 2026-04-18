@@ -491,31 +491,52 @@ export default function ProcessTemplateDetail() {
   }, [toc]);
 
   const handleTocClick = useCallback((tocId) => {
-    const el = document.getElementById(tocId);
+    // 优先用最新的内容区 DOM 查找，避免旧文档的同名 id 残留到其它页面元素上
+    const root = contentRef.current;
+    const el = (root && root.querySelector(`#${CSS.escape(tocId)}`))
+      || document.getElementById(tocId);
     if (!el) {
       console.warn('[TOC] 未找到对应标题元素：', tocId);
       return;
     }
-    // 优先用 scrollIntoView（会自动找到最近的可滚动容器，更兼容）
-    // 再用 window.scrollTo 校准偏移（避开顶部 sticky 栏 80px）
+
+    // 找到真正的"可滚动祖先"：从 el 向上冒泡，谁的 overflow-y 是 auto/scroll
+    // 并且 scrollHeight > clientHeight 谁就是滚动容器；否则退回 window。
+    // 这样无论将来是否把 .internal-layout__content 改成内部滚动，都能正确跳转。
+    const findScrollParent = (node) => {
+      let p = node?.parentElement;
+      while (p && p !== document.body) {
+        const style = window.getComputedStyle(p);
+        const oy = style.overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
+          return p;
+        }
+        p = p.parentElement;
+      }
+      return null;
+    };
+
+    const offset = 80; // 顶部 sticky topbar 的高度补偿
+    const scrollParent = findScrollParent(el);
+
     try {
-      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      // 额外补偿顶部 sticky topbar 高度（80px）
-      const offset = 80;
-      const currentTop = el.getBoundingClientRect().top;
-      if (Math.abs(currentTop) < 200) {
-        window.scrollBy({ top: currentTop - offset, behavior: 'smooth' });
+      if (scrollParent) {
+        // 容器内滚动：按相对偏移算
+        const containerRect = scrollParent.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const target = scrollParent.scrollTop + (elRect.top - containerRect.top) - offset;
+        scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
       } else {
-        // scrollIntoView 未立刻生效（例如目标还未进入视口），再退回手动计算
+        // 全局 window 滚动
         const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-        window.scrollTo({ top, behavior: 'smooth' });
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
       }
     } catch {
-      // 老浏览器兜底
-      const offset = 80;
+      // 极老浏览器兜底：直接跳
       const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo({ top, behavior: 'smooth' });
+      window.scrollTo(0, Math.max(0, top));
     }
+
     // 写入 hash，便于分享/刷新保留锚点
     try {
       window.history.replaceState(null, '', `#${tocId}`);
