@@ -868,7 +868,13 @@ export default function InternalArticles() {
                     />
                     {aiError && (
                       <div className="ia-modal__error" style={{ marginTop: 6 }}>
-                        <AlertCircle size={14} /> {aiError}
+                        <AlertCircle size={14} />
+                        <div>
+                          <div>{aiError}</div>
+                          <div style={{ fontSize: 12, opacity: 0.75, marginTop: 2 }}>
+                            你可以直接在下方输入框手动填写摘要，不影响保存。
+                          </div>
+                        </div>
                       </div>
                     )}
                   </div>

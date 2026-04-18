@@ -134,8 +134,27 @@ ${sampled}
     if (!response.ok) {
       const errorText = await response.text();
       console.error('[summarize] DeepSeek 错误:', response.status, errorText);
+
+      // 针对常见 HTTP 状态码返回更友好的中文提示
+      const statusMessageMap = {
+        400: 'DeepSeek 请求参数有误，请联系管理员检查后端配置',
+        401: 'DeepSeek API Key 无效或已过期，请联系管理员更新密钥',
+        402: 'DeepSeek 账户余额不足，请联系管理员充值后再试；此前可先手动填写摘要',
+        403: 'DeepSeek 拒绝访问（可能触发风控），请稍后重试或联系管理员',
+        404: 'DeepSeek 接口地址不存在，请联系管理员检查',
+        429: 'DeepSeek 请求过于频繁，请 30 秒后再试',
+        500: 'DeepSeek 服务端异常，请稍后重试',
+        502: 'DeepSeek 服务暂时不可用，请稍后重试',
+        503: 'DeepSeek 服务暂时不可用，请稍后重试',
+        504: 'DeepSeek 响应超时，请稍后重试',
+      };
+      const friendly =
+        statusMessageMap[response.status] ||
+        `DeepSeek API 请求失败（HTTP ${response.status}），请稍后重试或手动填写摘要`;
+
       return res.status(response.status).json({
-        error: `DeepSeek API 请求失败: ${response.status}`,
+        error: friendly,
+        deepseekStatus: response.status,
       });
     }
 
