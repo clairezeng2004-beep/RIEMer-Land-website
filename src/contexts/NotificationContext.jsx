@@ -70,6 +70,7 @@ function getStoredNotifications() {
 export function NotificationProvider({ children }) {
   const location = useLocation();
   const { user, isAdmin, supabaseOk } = useAuth();
+  const { internalConfig } = useSiteContent();
   const [notifications, setNotifications] = useState(getStoredNotifications);
   const [reads, setReads] = useState(new Set()); // 当前用户已读的通知 ID 集合
   const [emailReminderSent, setEmailReminderSent] = useState(false);
@@ -327,12 +328,18 @@ export function NotificationProvider({ children }) {
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  // 未读消息数同步到网页标题
+  // 未读消息数 + 当前路由 + 侧栏 Tab 名 → 同步到网页标题
+  // 规则详见 src/lib/pageTitle.js：
+  //   公共站: "RIEMer Land" 或 "RIEMer Land — 分享回顾/关于我们/…"
+  //   内部空间: "内部空间 — <Tab>" 或 "内部空间 — <Tab> — 新建文件"
+  //   有未读消息时整体前面加 "(N条未读消息) "
   useEffect(() => {
-    const isInternal = location.pathname.startsWith('/internal');
-    const baseTitle = isInternal ? '内部空间' : 'RIEMer Land';
-    document.title = unreadCount > 0 ? `(${unreadCount}条未读消息) ${baseTitle}` : baseTitle;
-  }, [unreadCount, location.pathname]);
+    document.title = buildDocumentTitle(
+      location.pathname,
+      internalConfig?.sidebar,
+      unreadCount
+    );
+  }, [unreadCount, location.pathname, internalConfig?.sidebar]);
 
   // ---- 标记单条已读 ----
   const markAsRead = useCallback(async (id) => {
