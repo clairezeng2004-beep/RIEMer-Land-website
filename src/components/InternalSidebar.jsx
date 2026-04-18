@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { NavLink } from 'react-router-dom';
+import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useSiteContent } from '../contexts/SiteContentContext';
 import { useWysiwyg } from '../contexts/WysiwygContext';
@@ -21,6 +22,7 @@ import {
   Contact,
   UserCircle,
   CalendarRange,
+  Activity,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -48,6 +50,7 @@ export default function InternalSidebar() {
   const { unreadCount } = useNotifications();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
+  const { isAdmin } = useAuth();
   const sc = internalConfig.sidebar || {};
 
   const updateSidebar = useCallback(
