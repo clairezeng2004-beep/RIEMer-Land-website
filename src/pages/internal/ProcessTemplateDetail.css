@@ -1390,6 +1390,15 @@
   padding: 0 1px;
 }
 
+/* 旧数据兜底：以前只存开头 600 字，改动在深处时两段裁片完全一致，
+   无法再还原出字符级差异。给一个灰底提示，避免用户误以为"高亮功能坏了"。 */
+.ptd-diff-block__body--stale {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 11px;
+  background: #f9fafb;
+}
+
 /* 移动端 drawer 里的编辑历史卡不要 sticky 过多，留余量 */
 .ptd-toc-drawer .ptd-edit-history {
   margin-top: 12px;

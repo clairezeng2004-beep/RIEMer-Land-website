@@ -123,6 +123,59 @@ function ellipsize(str, max = 80) {
   return s.slice(0, max) + '…';
 }
 
+/* 以"差异发生位置"为中心，从 before/after 各截取一段对齐的窗口用于展示 diff。
+ * 场景：正文可能数千字，我们不能整段存入 edit_log（膨胀且性能差），
+ *       但也不能像旧版那样只存「前 600 字」，因为如果修改发生在 600 字之后，
+ *       截出来的两段完全相同 → diffChars 全是 equal → 用户看不到红 / 绿高亮。
+ * 做法：
+ *   1) 先对两段纯文本求最长公共前缀 / 后缀长度；
+ *   2) 以"差异段"为中心向外扩 contextBefore / contextAfter 字的上下文；
+ *   3) 若裁掉了头 / 尾，分别补 `…` 提示省略；
+ *   4) 返回的 before / after 首字符、尾字符尽量对齐，diff 视觉更连贯。
+ * 返回 { before, after, truncated }，总长度约 <= (contextBefore + diffLen + contextAfter)。
+ */
+function extractDiffWindow(prevPlain, nextPlain, { contextBefore = 150, contextAfter = 450 } = {}) {
+  const a = String(prevPlain ?? '');
+  const b = String(nextPlain ?? '');
+
+  // 公共前缀
+  let p = 0;
+  const minLen = Math.min(a.length, b.length);
+  while (p < minLen && a[p] === b[p]) p += 1;
+
+  // 公共后缀（不跨过公共前缀边界）
+  let s = 0;
+  while (
+    s < (a.length - p) &&
+    s < (b.length - p) &&
+    a[a.length - 1 - s] === b[b.length - 1 - s]
+  ) {
+    s += 1;
+  }
+
+  // 差异段在 a / b 中各自的范围
+  const aDiffEnd = a.length - s;  // exclusive
+  const bDiffEnd = b.length - s;
+
+  // 向前向后扩上下文（共享同一个前缀，所以 start 用同一个值）
+  const startCtx = Math.max(0, p - contextBefore);
+  const aEndCtx = Math.min(a.length, aDiffEnd + contextAfter);
+  const bEndCtx = Math.min(b.length, bDiffEnd + contextAfter);
+
+  const aSlice = a.slice(startCtx, aEndCtx);
+  const bSlice = b.slice(startCtx, bEndCtx);
+
+  const headOmitted = startCtx > 0;
+  const aTailOmitted = aEndCtx < a.length;
+  const bTailOmitted = bEndCtx < b.length;
+
+  return {
+    before: `${headOmitted ? '…' : ''}${aSlice}${aTailOmitted ? '…' : ''}`,
+    after: `${headOmitted ? '…' : ''}${bSlice}${bTailOmitted ? '…' : ''}`,
+    truncated: headOmitted || aTailOmitted || bTailOmitted,
+  };
+}
+
 /* ========================================================
  * 字符级 diff（LCS，基于 O(n*m) DP）
  *   - 对中文/英文都按"字符"切分，阅读上够直观
@@ -197,22 +250,31 @@ export function diffDocFields(prevDoc, nextDoc) {
     if (String(before) === String(after)) continue;
 
     if (field === 'content') {
-      const prevLen = stripToPlain(before).length;
-      const nextLen = stripToPlain(after).length;
+      const prevPlain = stripToPlain(before);
+      const nextPlain = stripToPlain(after);
+      const prevLen = prevPlain.length;
+      const nextLen = nextPlain.length;
       const delta = nextLen - prevLen;
       const deltaText = delta > 0 ? `+${delta} 字` : delta < 0 ? `${delta} 字` : '字数不变';
       const summary = `修改正文（${deltaText}）`;
+      // 关键修复：不再无脑取前 600 字（若改动在 600 字之后，两段会完全相同，
+      // 导致 diff 全为 equal，视觉上就是"没有高亮、没有删除线"）。
+      // 改为以"差异段"为中心向外扩上下文，保证 before/after 至少有一处不同，
+      // 用户一定能看到红色删除线与绿色高亮。
+      const win = extractDiffWindow(prevPlain, nextPlain, {
+        contextBefore: 120,
+        contextAfter: 480,
+      });
       changes.push({
         field,
         label: FIELD_LABEL[field],
-        // 存纯文本首段（最多 600 字），便于在编辑历史里做 diff 高亮；
-        // 正文本身往往含大量 HTML 标签，直接 diff 会把 <p> </p> 当内容差异，
-        // 所以先 stripToPlain 再存，阅读体验更接近"正文字面差异"。
-        before: ellipsize(before, 600),
-        after: ellipsize(after, 600),
+        before: win.before,
+        after: win.after,
         prevLength: prevLen,
         nextLength: nextLen,
         summary,
+        // 仅当真的截断时才显示提示，否则避免误导
+        truncated: win.truncated,
       });
     } else {
       changes.push({
@@ -711,6 +773,10 @@ export default function ProcessTemplateDetail() {
                       const after = c.after ?? '';
                       if (!before && !after) return null;
                       const segs = diffChars(before, after);
+                      // 兜底：如果两段完全相同（常见于旧数据——老版本只存了前 600 字，
+                      // 而改动在 600 字之后；裁出来的首段两边一致导致 diff 全为 equal），
+                      // 我们无法再还原出真实差异，只能友好提示，避免用户误以为"没高亮 = 坏了"。
+                      const allEqual = segs.length > 0 && segs.every((s) => s.type === 'equal');
                       return (
                         <div key={ci} className="ptd-diff-block">
                           <div className="ptd-diff-block__head">
@@ -721,26 +787,32 @@ export default function ProcessTemplateDetail() {
                             </span>
                             {c.field === 'content' && (
                               <span className="ptd-diff-block__note">
-                                {`约 ${c.prevLength ?? '?'} → ${c.nextLength ?? '?'} 字（仅展示开头片段）`}
+                                {`约 ${c.prevLength ?? '?'} → ${c.nextLength ?? '?'} 字${c.truncated ? '（仅展示差异附近片段）' : ''}`}
                               </span>
                             )}
                           </div>
-                          <div className="ptd-diff-block__body">
-                            {segs.map((s, si) => (
-                              <span
-                                key={si}
-                                className={
-                                  s.type === 'add'
-                                    ? 'ptd-diff-add'
-                                    : s.type === 'del'
-                                      ? 'ptd-diff-del'
-                                      : 'ptd-diff-eq'
-                                }
-                              >
-                                {s.text}
-                              </span>
-                            ))}
-                          </div>
+                          {allEqual ? (
+                            <div className="ptd-diff-block__body ptd-diff-block__body--stale">
+                              （这条为旧版记录，修改发生在文档深处、未落入可对比片段；此后新保存的编辑会高亮显示差异）
+                            </div>
+                          ) : (
+                            <div className="ptd-diff-block__body">
+                              {segs.map((s, si) => (
+                                <span
+                                  key={si}
+                                  className={
+                                    s.type === 'add'
+                                      ? 'ptd-diff-add'
+                                      : s.type === 'del'
+                                        ? 'ptd-diff-del'
+                                        : 'ptd-diff-eq'
+                                  }
+                                >
+                                  {s.text}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       );
                     })}
