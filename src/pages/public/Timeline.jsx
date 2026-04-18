@@ -18,6 +18,22 @@ export default function Timeline() {
   const dragState = useRef({ startX: 0, scrollLeft: 0 });
   const [members, setMembers] = useState([]);
 
+  // 按 joined_at 升序（旧 → 新）排序；未填写 joined_at 的排到最后，其次按昵称稳定排序
+  const sortByJoinedAt = (list) => {
+    return [...list].sort((a, b) => {
+      const aHas = !!a.joined_at;
+      const bHas = !!b.joined_at;
+      if (aHas && bHas) {
+        const ta = new Date(a.joined_at).getTime();
+        const tb = new Date(b.joined_at).getTime();
+        if (ta !== tb) return ta - tb;
+      } else if (aHas !== bHas) {
+        return aHas ? -1 : 1; // 有 joined_at 的排前面
+      }
+      return (a.nickname || '').localeCompare(b.nickname || '', 'zh');
+    });
+  };
+
   // ---- 从本地 localStorage 加载成员 ----
   const loadLocalMembers = useCallback(() => {
     try {
@@ -27,8 +43,10 @@ export default function Timeline() {
       const localProfiles = profilesRaw ? JSON.parse(profilesRaw) : [];
 
       const enrollmentMap = {};
+      const joinedAtMap = {};
       localProfiles.forEach((p) => {
         enrollmentMap[p.user_id] = p.enrollment_year;
+        joinedAtMap[p.user_id] = p.joined_at;
       });
 
       const authorizedUsers = users.filter((u) => u.authorized);
@@ -40,8 +58,9 @@ export default function Timeline() {
           avatar: u.avatar || null,
           signature: u.signature || '',
           enrollment_year: enrollmentMap[u.id] || '',
+          joined_at: joinedAtMap[u.id] || null,
         }));
-        setMembers(formatted);
+        setMembers(sortByJoinedAt(formatted));
       } else {
         // 本地也没有已授权用户 → 使用 siteData 默认成员数据兜底
         console.info('[Timeline] 本地无已授权用户，使用默认成员数据');
@@ -51,8 +70,9 @@ export default function Timeline() {
           avatar: m.avatar || null,
           signature: m.bio || '',
           enrollment_year: '',
+          joined_at: null,
         }));
-        setMembers(fallback);
+        setMembers(sortByJoinedAt(fallback));
       }
     } catch {
       // 解析异常时也使用默认数据
@@ -62,8 +82,9 @@ export default function Timeline() {
         avatar: m.avatar || null,
         signature: m.bio || '',
         enrollment_year: '',
+        joined_at: null,
       }));
-      setMembers(fallback);
+      setMembers(sortByJoinedAt(fallback));
     }
   }, []);
 
@@ -86,7 +107,7 @@ export default function Timeline() {
             .eq('authorized', true),
           supabase
             .from('member_profiles')
-            .select('user_id, enrollment_year'),
+            .select('user_id, enrollment_year, joined_at'),
         ]);
 
         if (profilesRes.error) {
@@ -101,8 +122,10 @@ export default function Timeline() {
 
         if (profiles && profiles.length > 0) {
           const enrollmentMap = {};
+          const joinedAtMap = {};
           (memberProfiles || []).forEach((mp) => {
             enrollmentMap[mp.user_id] = mp.enrollment_year;
+            joinedAtMap[mp.user_id] = mp.joined_at;
           });
 
           const formatted = profiles.map((p) => ({
@@ -111,8 +134,9 @@ export default function Timeline() {
             avatar: p.avatar || null,
             signature: p.signature || '',
             enrollment_year: enrollmentMap[p.id] || '',
+            joined_at: joinedAtMap[p.id] || null,
           }));
-          setMembers(formatted);
+          setMembers(sortByJoinedAt(formatted));
           return;
         }
         // Supabase 返回空数组 → 回退本地
