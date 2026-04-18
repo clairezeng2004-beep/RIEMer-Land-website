@@ -266,12 +266,10 @@
 
 /* ============ Cell ============ */
 .member-profiles-table__cell {
-  /* 使用 -webkit-box 实现"最多 4 行"文本截断 */
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 4;
-  line-clamp: 4;
-  overflow: hidden;
+  /* 文本完整显示，不做行数截断；
+     列宽不够时由 JS 自动撑宽（见 MemberProfiles.jsx 的 useLayoutEffect 自适应逻辑） */
+  display: block;
+  overflow: visible;
   line-height: 1.6;
   /* 长文本自动换行，保留用户输入的手动换行 */
   white-space: pre-wrap;
@@ -279,7 +277,6 @@
   overflow-wrap: anywhere;
   max-width: 100%;
   vertical-align: top;
-  /* 鼠标悬停时显示完整内容（由 title 属性提供） */
   cursor: default;
 }
 

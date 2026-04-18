@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -101,6 +101,12 @@ export default function MemberProfiles() {
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
   const tableRef = useRef(null);
+
+  // 动态列宽覆盖：{ [colKey]: widthPx }
+  // 当某一列内容行数 > 4 时，自动增大该列最小宽度，直到所有行都能在 4 行内显示完（或达到上限）
+  const [colWidthOverrides, setColWidthOverrides] = useState({});
+  // 记录上一次测量后得到的"每列合适宽度"，避免 useLayoutEffect 自循环
+  const lastMeasuredRef = useRef({});
 
   // 本地模式加载成员信息
   const loadLocalFallback = useCallback(async () => {
@@ -393,6 +399,84 @@ export default function MemberProfiles() {
     }
   };
 
+  // ============================================
+  // 列宽自适应：文本超过 4 行时自动加宽所在列（而不是省略）
+  // ============================================
+  // 从 COLUMNS 的初始 width 里解析出数字，作为每列的"默认最小宽度"
+  const parsePx = (v) => {
+    if (typeof v !== 'string') return 0;
+    const m = v.match(/(\d+)/);
+    return m ? Number(m[1]) : 0;
+  };
+  const MAX_COL_WIDTH = 640; // 自动加宽的上限，避免极端情况下把列撑得过宽
+  const MAX_LINES = 4;        // 目标：每格最多 4 行
+
+  useLayoutEffect(() => {
+    if (!tableRef.current) return;
+    if (!profiles || profiles.length === 0) return;
+
+    // 编辑态下的那一行是 textarea，不计入测量
+    const cells = tableRef.current.querySelectorAll('td[data-col-key] .member-profiles-table__cell');
+    if (!cells.length) return;
+
+    // 每列期望的最小宽度：从现有覆盖 / 默认宽度出发
+    const desired = {};
+    COLUMNS.forEach((c) => {
+      desired[c.key] = Math.max(
+        parsePx(c.width),
+        colWidthOverrides[c.key] || 0
+      );
+    });
+
+    cells.forEach((el) => {
+      const td = el.closest('td[data-col-key]');
+      if (!td) return;
+      const key = td.getAttribute('data-col-key');
+      if (!key) return;
+      // 编号、姓名、入学年份、加入时间这些固定短列不做自动加宽
+      if (key === 'name' || key === 'enrollment_year' || key === 'joined_at_display') return;
+
+      // 计算实际行数
+      const cs = getComputedStyle(el);
+      const lineHeight = parseFloat(cs.lineHeight) || 22;
+      const height = el.scrollHeight;
+      const lines = Math.round(height / lineHeight);
+      if (lines <= MAX_LINES) return;
+
+      // 超过 4 行：按"当前宽度 × (lines / MAX_LINES)"放大列宽
+      const currentW = td.getBoundingClientRect().width || parsePx(
+        (COLUMNS.find((c) => c.key === key) || {}).width
+      ) || 200;
+      const scaled = Math.ceil((currentW * lines) / MAX_LINES);
+      const next = Math.min(MAX_COL_WIDTH, Math.max(desired[key], scaled));
+      if (next > desired[key]) desired[key] = next;
+    });
+
+    // 只有在结果与上次不同时才 setState，避免死循环
+    const prev = lastMeasuredRef.current;
+    let changed = false;
+    for (const k in desired) {
+      if ((prev[k] || 0) !== desired[k]) { changed = true; break; }
+    }
+    if (changed) {
+      lastMeasuredRef.current = desired;
+      // 只把"大于默认宽度"的那些 key 放进 overrides
+      const overrides = {};
+      COLUMNS.forEach((c) => {
+        const base = parsePx(c.width);
+        if ((desired[c.key] || 0) > base) overrides[c.key] = desired[c.key];
+      });
+      setColWidthOverrides(overrides);
+    }
+  }, [profiles, editingId, colWidthOverrides]);
+
+  /** 取某列的最终最小宽度（字符串形式，供 style.minWidth 使用） */
+  const getColMinWidth = (col) => {
+    const override = colWidthOverrides[col.key];
+    if (override) return `${override}px`;
+    return col.width;
+  };
+
   const isOwnRow = (profile) => profile.user_id === user?.id;
 
   return (
@@ -445,7 +529,7 @@ export default function MemberProfiles() {
                 {COLUMNS.map((col) => (
                   <th
                     key={col.key}
-                    style={{ minWidth: col.width }}
+                    style={{ minWidth: getColMinWidth(col) }}
                     className={col.key === 'name' ? 'member-profiles-table__name-col' : undefined}
                   >
                     {col.label}
@@ -473,6 +557,8 @@ export default function MemberProfiles() {
                     {COLUMNS.map((col) => (
                       <td
                         key={col.key}
+                        data-col-key={col.key}
+                        style={{ minWidth: getColMinWidth(col) }}
                         className={col.key === 'name' ? 'member-profiles-table__name-col' : undefined}
                       >
                         {isEditing && col.editable ? (
