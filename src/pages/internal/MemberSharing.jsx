@@ -376,9 +376,16 @@ export default function MemberSharing() {
 
   // 获取文本的纯文摘要（前 120 字）
   const getExcerpt = (post) => {
-    let text = post.content;
+    let text = post.content || '';
     if (post.format === 'word') {
-      text = text.replace(/<[^>]+>/g, ' ');
+      // 用 DOMParser 同时完成"剥标签 + 解码 HTML 实体（&amp; &nbsp; 等）"
+      try {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(`<!doctype html><body>${text}`, 'text/html');
+        text = doc.body.textContent || '';
+      } catch {
+        text = text.replace(/<[^>]+>/g, ' ');
+      }
     } else {
       // Markdown: 去掉标记
       text = text
@@ -387,8 +394,17 @@ export default function MemberSharing() {
         .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
         .replace(/[>\-|`~]/g, ' ')
         .replace(/!\[.*?\]\(.*?\)/g, '');
+      // 顺便把可能夹杂的 HTML 实体也解码一下
+      try {
+        const el = document.createElement('textarea');
+        el.innerHTML = text;
+        text = el.value;
+      } catch {
+        /* noop */
+      }
     }
-    text = text.replace(/\s+/g, ' ').trim();
+    // 合并所有空白（包含 &nbsp; 解码后的不间断空格 \u00A0）
+    text = text.replace(/[\s\u00A0]+/g, ' ').trim();
     return text.length > 120 ? text.slice(0, 120) + '…' : text;
   };
 
