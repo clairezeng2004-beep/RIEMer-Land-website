@@ -331,6 +331,18 @@
   box-shadow: var(--shadow-md);
 }
 
+/* 编辑态：去掉外框和阴影，让编辑区与整体内容区融为一体（白底无框风格） */
+.ptd-article--editing {
+  border: none;
+  box-shadow: none;
+  background: transparent;
+}
+
+.ptd-article--editing .ptd-article__header {
+  border-bottom: none;
+  padding-bottom: var(--space-sm);
+}
+
 /* ============ 文章详情页统一字体 ============ 
    采用 Lora + adjusted fallback + 系统中文字体，与整站保持一致，
    并且字体到位前后无视觉跳变。
@@ -932,42 +944,52 @@
 .ptd-edit__title-input {
   width: 100%;
   margin: 0.5rem 0 0.75rem;
-  padding: 0.75rem 1rem;
+  padding: 0.75rem 0;
   font-size: clamp(1.5rem, 2.2vw, 2rem);
   font-weight: 700;
   line-height: 1.25;
   color: #111827;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fafafa;
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: #fff;
   outline: none;
   transition: border-color 0.15s, background 0.15s;
   font-family: inherit;
 }
 
+.ptd-edit__title-input:hover {
+  border-bottom-color: var(--color-border-light, #e5e7eb);
+}
+
 .ptd-edit__title-input:focus {
-  border-color: var(--color-primary, #5B8C3E);
+  border-bottom-color: var(--color-primary, #5B8C3E);
   background: #fff;
 }
 
 .ptd-edit__desc-input {
   width: 100%;
   margin-bottom: 0.5rem;
-  padding: 0.625rem 0.875rem;
+  padding: 0.625rem 0;
   font-size: 15px;
   line-height: 1.6;
   color: #4b5563;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fafafa;
+  border: none;
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: #fff;
   outline: none;
   resize: vertical;
   transition: border-color 0.15s, background 0.15s;
   font-family: inherit;
 }
 
+.ptd-edit__desc-input:hover {
+  border-bottom-color: var(--color-border-light, #e5e7eb);
+}
+
 .ptd-edit__desc-input:focus {
-  border-color: var(--color-primary, #5B8C3E);
+  border-bottom-color: var(--color-primary, #5B8C3E);
   background: #fff;
 }
 
@@ -993,13 +1015,15 @@
 .ptd-edit__content-textarea {
   width: 100%;
   min-height: 480px;
-  padding: 1rem 1.125rem;
+  padding: 1rem 0;
   font-size: 15px;
   line-height: 1.75;
   color: #1f2937;
-  border: 1px solid #e5e7eb;
-  border-radius: 8px;
-  background: #fafafa;
+  border: none;
+  border-top: 1px solid var(--color-border-light, #e5e7eb);
+  border-bottom: 1px solid transparent;
+  border-radius: 0;
+  background: #fff;
   outline: none;
   resize: vertical;
   transition: border-color 0.15s, background 0.15s;
@@ -1008,7 +1032,7 @@
 }
 
 .ptd-edit__content-textarea:focus {
-  border-color: var(--color-primary, #5B8C3E);
+  border-bottom-color: var(--color-primary, #5B8C3E);
   background: #fff;
 }
 
