@@ -793,28 +793,30 @@ export default function ProcessTemplateDetail() {
               </div>
             )}
 
-            {/* 底部点赞 */}
-            <footer className="ptd-article__footer">
-              <button
-                className={`ptd-like-btn ${liked ? 'ptd-like-btn--active' : ''}`}
-                onClick={handleLike}
-              >
-                <ThumbsUp size={16} />
-                <span>{liked ? '已赞' : '点赞'}</span>
-              </button>
-              {likes.length > 0 && (
-                <div className="ptd-like-info">
-                  <div className="ptd-like-names">
-                    {likes.map((l, idx) => (
-                      <span key={l.userId}>
-                        {l.userName}{idx < likes.length - 1 ? '、' : ''}
-                      </span>
-                    ))}
+            {/* 底部点赞（编辑模式下隐藏） */}
+            {!isEditing && (
+              <footer className="ptd-article__footer">
+                <button
+                  className={`ptd-like-btn ${liked ? 'ptd-like-btn--active' : ''}`}
+                  onClick={handleLike}
+                >
+                  <ThumbsUp size={16} />
+                  <span>{liked ? '已赞' : '点赞'}</span>
+                </button>
+                {likes.length > 0 && (
+                  <div className="ptd-like-info">
+                    <div className="ptd-like-names">
+                      {likes.map((l, idx) => (
+                        <span key={l.userId}>
+                          {l.userName}{idx < likes.length - 1 ? '、' : ''}
+                        </span>
+                      ))}
+                    </div>
+                    <span className="ptd-like-count">{likes.length} 人觉得有用</span>
                   </div>
-                  <span className="ptd-like-count">{likes.length} 人觉得有用</span>
-                </div>
-              )}
-            </footer>
+                )}
+              </footer>
+            )}
           </article>
 
           {/* 右侧：所有用户可划线 / 整体评论 */}
