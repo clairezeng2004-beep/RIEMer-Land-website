@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import { trackEvent } from '../../lib/analytics';
@@ -39,7 +39,6 @@ export default function Login() {
   const [countdown, setCountdown] = useState(0);
 
   const { login, register, resetPassword, changePassword, sendResetCode, verifyResetCode, isAuthenticated, supabaseOk } = useAuth();
-  const navigate = useNavigate();
 
   // 邮箱后缀自动提示
   const EMAIL_SUFFIXES = [
@@ -174,7 +173,9 @@ export default function Login() {
         } else {
           localStorage.removeItem(SAVED_CREDENTIALS_KEY);
         }
-        navigate('/internal/documents');
+        // 不在这里主动 navigate —— 而是依赖顶部 `if (isAuthenticated) <Navigate/>`
+        // 在 user 状态真正就绪后接管跳转，避免 user 还没 commit 就跳到受保护页
+        // 被 ProtectedRoute 踢回来的"假死"现象。
       } else {
         setError(result.message);
       }

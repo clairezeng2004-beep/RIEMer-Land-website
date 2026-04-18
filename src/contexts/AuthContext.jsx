@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { supabase, isSupabaseConfigured, checkSupabaseHealth, recheckSupabaseHealth, getReachable, onReachableChange } from '../lib/supabase';
 
 const AuthContext = createContext(null);
@@ -147,6 +147,10 @@ export function AuthProvider({ children }) {
   const [bgVerifying, setBgVerifying] = useState(false);
   // Supabase 是否可达：null=检测中, true=可达, false=不可达（降级本地模式）
   const [supabaseOk, setSupabaseOk] = useState(isSupabaseConfigured ? null : false);
+
+  // 用 ref 同步镜像当前 user，方便在事件回调里判断是否需要兜底 fetchProfile
+  const userRef = useRef(user);
+  useEffect(() => { userRef.current = user; }, [user]);
 
   // ---- 本地模式：从 localStorage 恢复登录态的辅助函数 ----
   const restoreLocalAuth = useCallback(() => {
@@ -388,8 +392,28 @@ export function AuthProvider({ children }) {
         if (getReachable() === false) return;
         if (session?.user) {
           // SIGNED_IN: login() 可能已经 setUser（真 profile 或 _fallback 降级 profile）
-          // 如果是 _fallback，后台仍需尝试一次 fetchProfile 补真；login() 里已经有 setTimeout 兜底了，这里不重复。
+          // 但有些邮箱/网络场景下 login() 提前返回或 setUser 未执行 → 这里兜底补一次
           if (event === 'SIGNED_IN') {
+            // 延迟一个 tick，等 login() 里的 setUser 先生效
+            setTimeout(() => {
+              if (!userRef.current || userRef.current.id !== session.user.id) {
+                console.log('[Auth] SIGNED_IN 后发现 user 未同步，兜底 fetchProfile');
+                fetchProfile(session.user).catch(() => {
+                  // fetchProfile 失败也要 setUser，避免一直卡在登录页
+                  const cached = getCachedProfile(session.user.id);
+                  const fb = cached ? { ...cached, authorized: true } : {
+                    id: session.user.id,
+                    email: session.user.email,
+                    role: 'member',
+                    authorized: true,
+                    name: session.user.email?.split('@')[0] || '用户',
+                    _fallback: true,
+                  };
+                  setUser(fb);
+                  cacheProfile(fb);
+                });
+              }
+            }, 200);
             return;
           }
           await fetchProfile(session.user);
@@ -768,10 +792,49 @@ export function AuthProvider({ children }) {
 
         if (profileError) {
           console.error('[Auth] Profile 查询失败，不阻止登录:', profileError);
+          // 兜底：即使 profile 查询失败，也要 setUser，避免 isAuthenticated 一直为 false
+          const fallbackProfile = getCachedProfile(data.user.id) || {
+            id: data.user.id,
+            email: data.user.email,
+            role: 'member',
+            authorized: true,
+            name: data.user.email?.split('@')[0] || '用户',
+            _fallback: true,
+          };
+          setUser(fallbackProfile);
+          cacheProfile(fallbackProfile);
           return { success: true };
         }
 
         if (!profile) {
+          // profile 不存在（可能 trigger 还没跑，或 RLS 把查询过滤为空）
+          // 兜底：用 auth user 构造降级 profile 让登录生效，稍后后台补真
+          console.warn('[Auth] profile 查询返回空，使用降级 profile 放行');
+          const cachedProfile = getCachedProfile(data.user.id);
+          const fallbackProfile = cachedProfile
+            ? { ...cachedProfile, authorized: true }
+            : {
+                id: data.user.id,
+                email: data.user.email,
+                role: 'member',
+                authorized: true,
+                name: data.user.email?.split('@')[0] || '用户',
+                _fallback: true,
+              };
+          setUser(fallbackProfile);
+          cacheProfile(fallbackProfile);
+          // 后台异步重试一次 profile 查询
+          setTimeout(() => {
+            supabase.from('profiles').select('*').eq('id', data.user.id).single()
+              .then(({ data: realProfile }) => {
+                if (realProfile) {
+                  console.log('[Auth] 后台补拿到真 profile，刷新 user 状态');
+                  setUser(realProfile);
+                  cacheProfile(realProfile);
+                }
+              })
+              .catch(() => { /* ignore */ });
+          }, 800);
           return { success: true };
         }
 
@@ -832,6 +895,31 @@ export function AuthProvider({ children }) {
         const { data: { session } } = await supabase.auth.getSession();
         if (session?.user) {
           console.warn('[Auth] 登录异常但 session 已存在，按已登录处理:', session.user.email);
+          // 必须 setUser，否则 isAuthenticated 一直 false，页面会卡在登录页
+          const cachedProfile = getCachedProfile(session.user.id);
+          const fallbackProfile = cachedProfile
+            ? { ...cachedProfile, authorized: true }
+            : {
+                id: session.user.id,
+                email: session.user.email,
+                role: 'member',
+                authorized: true,
+                name: session.user.email?.split('@')[0] || '用户',
+                _fallback: true,
+              };
+          setUser(fallbackProfile);
+          cacheProfile(fallbackProfile);
+          // 后台静默补真 profile
+          setTimeout(() => {
+            supabase.from('profiles').select('*').eq('id', session.user.id).single()
+              .then(({ data: realProfile }) => {
+                if (realProfile) {
+                  setUser(realProfile);
+                  cacheProfile(realProfile);
+                }
+              })
+              .catch(() => { /* ignore */ });
+          }, 800);
           return { success: true };
         }
       } catch { /* ignore */ }
