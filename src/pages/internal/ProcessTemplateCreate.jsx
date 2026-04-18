@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useMemo } from 'react';
+import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { marked } from 'marked';
@@ -21,6 +21,7 @@ import {
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { createDoc, canUseSupabase } from '../../lib/documentsService';
+import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import './MemberSharingCreate.css';
 
 const DEFAULT_TYPE_LABELS = {
@@ -189,9 +190,33 @@ export default function ProcessTemplateCreate() {
     doc.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
     doc.querySelectorAll('*').forEach((el) => {
       const attrs = [...el.attributes];
+      const tag = el.tagName.toLowerCase();
+      // 保留 <img> 的 src/alt/width/height/style/class，其它元素只保留 href
+      const keepAttrs = tag === 'img'
+        ? new Set(['src', 'alt', 'width', 'height', 'style', 'class'])
+        : new Set(['href']);
       attrs.forEach((attr) => {
-        if (attr.name !== 'href') el.removeAttribute(attr.name);
+        if (!keepAttrs.has(attr.name)) el.removeAttribute(attr.name);
       });
+    });
+    // 对粘贴进来的 <img>：没 class 的补上 msc-img 类并包到居中段落里
+    doc.querySelectorAll('img').forEach((img) => {
+      if (!img.src || img.src.startsWith('file:')) {
+        // 本地 file:// 路径跨进程失效，直接丢弃
+        img.remove();
+        return;
+      }
+      if (!img.classList.contains('msc-img')) img.classList.add('msc-img');
+      img.setAttribute('draggable', 'false');
+      // 若没包在 msc-img-wrap 段落里，则包一个
+      const parent = img.parentElement;
+      if (!parent || !parent.classList.contains('msc-img-wrap')) {
+        const wrap = doc.createElement('p');
+        wrap.className = 'msc-img-wrap';
+        wrap.setAttribute('style', 'text-align:center');
+        img.replaceWith(wrap);
+        wrap.appendChild(img);
+      }
     });
     let cleaned = doc.body.innerHTML;
     cleaned = cleaned
@@ -206,6 +231,11 @@ export default function ProcessTemplateCreate() {
   }, []);
 
   const handleWordPaste = useCallback((e) => {
+    // 若剪贴板里有图片，则让 wordImageEditor（capture 阶段已拦截）处理，不要在这里再执行
+    const items = e.clipboardData?.items;
+    if (items && Array.from(items).some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
+      return;
+    }
     e.preventDefault();
     const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
@@ -266,6 +296,25 @@ export default function ProcessTemplateCreate() {
     marked.setOptions({ breaks: true, gfm: true });
     return marked.parse(newDoc.content);
   }, [newDoc.format, newDoc.content]);
+
+  /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 ============ */
+  const imageApiRef = useRef(null);
+  useEffect(() => {
+    if (newDoc.format !== 'word') {
+      imageApiRef.current?.destroy?.();
+      imageApiRef.current = null;
+      return undefined;
+    }
+    if (!wordEditorRef.current) return undefined;
+    const api = attachWordImageEditor(wordEditorRef.current, {
+      onChange: (html) => setNewDoc((prev) => ({ ...prev, content: html })),
+    });
+    imageApiRef.current = api;
+    return () => {
+      api.destroy();
+      imageApiRef.current = null;
+    };
+  }, [newDoc.format]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -545,13 +594,23 @@ export default function ProcessTemplateCreate() {
                 </div>
               ) : (
                 <div className="msc-form__word-editor-wrapper">
-                  <button
-                    type="button"
-                    className="msc-form__paste-btn"
-                    onClick={handleOneClickPaste}
-                  >
-                    <Clipboard size={14} /> 一键粘贴
-                  </button>
+                  <div className="msc-form__editor-toolbar">
+                    <button
+                      type="button"
+                      className="msc-form__paste-btn"
+                      onClick={handleOneClickPaste}
+                    >
+                      <Clipboard size={14} /> 一键粘贴
+                    </button>
+                    <button
+                      type="button"
+                      className="msc-form__paste-btn msc-form__paste-btn--ghost"
+                      onClick={() => imageApiRef.current?.pickImage()}
+                      title="插入图片（也支持拖拽/粘贴；插入后点击图片可拖动 8 个手柄调整大小，按住 Shift 自由缩放）"
+                    >
+                      <Image size={14} /> 插入图片
+                    </button>
+                  </div>
                   <div
                     ref={wordEditorRef}
                     className="msc-form__word-editor"
@@ -562,7 +621,7 @@ export default function ProcessTemplateCreate() {
                         setNewDoc((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
                       }
                     }}
-                    data-placeholder="从 Word / 网页复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴；也可以只上传附件、不填写正文"
+                    data-placeholder="从 Word / 网页复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
                     suppressContentEditableWarning
                   />
                 </div>

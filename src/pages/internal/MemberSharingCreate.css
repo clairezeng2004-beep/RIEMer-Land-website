@@ -644,6 +644,14 @@
   flex-direction: column;
   gap: var(--space-xs, 4px);
   flex: 1;
+  position: relative; /* 给 .msc-img-resizer 做定位容器 */
+}
+
+.msc-form__editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .msc-form__paste-btn {
@@ -718,6 +726,86 @@
 }
 
 .msc-form__word-editor li { margin: 0.2em 0; }
+
+/* ==================================================================
+   图片插入：居中换行展示 + 拖拽/粘贴态 + 可拉伸 resize
+   （图片结构：<p class="msc-img-wrap"><img class="msc-img" /></p>）
+   ================================================================== */
+
+/* 编辑器正在拖入文件时的高亮描边 */
+.msc-form__word-editor--drag {
+  border-color: var(--color-primary, #5B8C3E) !important;
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.15);
+  background: rgba(91, 140, 62, 0.02);
+}
+
+/* 图片独占一段，段内水平居中 */
+.msc-img-wrap {
+  text-align: center;
+  margin: 0.6em 0;
+  line-height: 1; /* 避免图片下方产生多余空隙 */
+}
+
+/* 图片基本样式：默认居中、不可被拖走、抗像素化变形 */
+.msc-form__word-editor .msc-img,
+.ptd-article__content .msc-img,
+.doc-preview__text .msc-img,
+.msc-md-split__preview .msc-img {
+  display: inline-block;
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--radius-sm, 4px);
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+/* 选中的图片 → 蓝色描边，提示可拖动手柄 */
+.msc-form__word-editor .msc-img--selected {
+  outline: 2px solid #3b82f6;
+  outline-offset: -1px;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+
+/* Resizer overlay（绝对定位盖在被选中图片上） */
+.msc-img-resizer {
+  position: absolute;
+  pointer-events: none; /* 只在 handle 上接收事件 */
+  z-index: 20;
+  box-sizing: border-box;
+}
+
+/* 8 个手柄 */
+.msc-img-resizer__handle {
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: #fff;
+  border: 1.5px solid #3b82f6;
+  border-radius: 2px;
+  pointer-events: auto;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.msc-img-resizer__handle--nw { top: -5px; left: -5px; cursor: nwse-resize; }
+.msc-img-resizer__handle--n  { top: -5px; left: 50%; margin-left: -5px; cursor: ns-resize; }
+.msc-img-resizer__handle--ne { top: -5px; right: -5px; cursor: nesw-resize; }
+.msc-img-resizer__handle--e  { top: 50%; right: -5px; margin-top: -5px; cursor: ew-resize; }
+.msc-img-resizer__handle--se { bottom: -5px; right: -5px; cursor: nwse-resize; }
+.msc-img-resizer__handle--s  { bottom: -5px; left: 50%; margin-left: -5px; cursor: ns-resize; }
+.msc-img-resizer__handle--sw { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.msc-img-resizer__handle--w  { top: 50%; left: -5px; margin-top: -5px; cursor: ew-resize; }
+
+/* Ghost 版"插入图片"按钮：和"一键粘贴"区分一下 */
+.msc-form__paste-btn--ghost {
+  background: #fff;
+  color: var(--color-primary, #5B8C3E);
+  border: 1px solid var(--color-primary, #5B8C3E);
+}
+.msc-form__paste-btn--ghost:hover {
+  background: rgba(91, 140, 62, 0.08);
+  border-color: var(--color-primary-dark, #4a7332);
+  color: var(--color-primary-dark, #4a7332);
+}
 
 /* ============ Attachment Uploader ============ */
 .msc-attach {
