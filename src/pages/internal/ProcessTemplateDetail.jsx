@@ -252,7 +252,8 @@ export default function ProcessTemplateDetail() {
   useEffect(() => {
     if (!contentRef.current) return;
     const root = contentRef.current;
-    const headings = root.querySelectorAll('h1, h2, h3');
+    // 扩展到 h1-h4，兼容更深层标题的目录跳转
+    const headings = root.querySelectorAll('h1, h2, h3, h4');
     const items = [];
     const slugCount = {};
     headings.forEach((el, idx) => {
@@ -294,12 +295,52 @@ export default function ProcessTemplateDetail() {
     return () => observer.disconnect();
   }, [toc]);
 
+  // 首次渲染若 URL 带 hash，自动滚到对应锚点（支持分享链接）
+  useEffect(() => {
+    if (!toc.length) return;
+    const hash = decodeURIComponent(window.location.hash || '').replace(/^#/, '');
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (!el) return;
+    // 下一帧再滚，确保布局已完成
+    requestAnimationFrame(() => {
+      const offset = 80;
+      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top, behavior: 'auto' });
+      setActiveTocId(hash);
+    });
+  }, [toc]);
+
   const handleTocClick = useCallback((tocId) => {
     const el = document.getElementById(tocId);
-    if (!el) return;
-    const offset = 80;
-    const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-    window.scrollTo({ top, behavior: 'smooth' });
+    if (!el) {
+      console.warn('[TOC] 未找到对应标题元素：', tocId);
+      return;
+    }
+    // 优先用 scrollIntoView（会自动找到最近的可滚动容器，更兼容）
+    // 再用 window.scrollTo 校准偏移（避开顶部 sticky 栏 80px）
+    try {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      // 额外补偿顶部 sticky topbar 高度（80px）
+      const offset = 80;
+      const currentTop = el.getBoundingClientRect().top;
+      if (Math.abs(currentTop) < 200) {
+        window.scrollBy({ top: currentTop - offset, behavior: 'smooth' });
+      } else {
+        // scrollIntoView 未立刻生效（例如目标还未进入视口），再退回手动计算
+        const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+        window.scrollTo({ top, behavior: 'smooth' });
+      }
+    } catch {
+      // 老浏览器兜底
+      const offset = 80;
+      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
+    // 写入 hash，便于分享/刷新保留锚点
+    try {
+      window.history.replaceState(null, '', `#${tocId}`);
+    } catch { /* ignore */ }
     setActiveTocId(tocId);
     setTocOpenMobile(false);
   }, []);

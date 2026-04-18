@@ -181,6 +181,7 @@
 .ptd-toc__item--l1 { padding-left: 10px; font-weight: 600; }
 .ptd-toc__item--l2 { padding-left: 22px; }
 .ptd-toc__item--l3 { padding-left: 34px; font-size: 12.5px; }
+.ptd-toc__item--l4 { padding-left: 46px; font-size: 12.5px; color: var(--color-text-light, #6b7280); }
 
 .ptd-toc__dot {
   display: none; /* 预留，当前不使用 */
