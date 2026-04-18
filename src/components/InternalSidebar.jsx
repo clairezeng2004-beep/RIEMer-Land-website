@@ -84,12 +84,13 @@ export default function InternalSidebar() {
   ];
 
   // 成员：成员个人信息/互动/分享类
+  // 顺序：成员内部分享 → 成员通讯录 → 建设建议 → 互动相册 → 个人主页
   const memberItems = [
-    { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
-    { to: '/internal/profile', icon: UserCircle, configKey: 'labelProfile', label: sc.labelProfile },
-    { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
-    { to: '/internal/suggestions', icon: MessageSquarePlus, configKey: 'labelSuggestions', label: sc.labelSuggestions },
     { to: '/internal/member-sharing', icon: Share2, configKey: 'labelMemberSharing', label: sc.labelMemberSharing },
+    { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, configKey: 'labelSuggestions', label: sc.labelSuggestions },
+    { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
+    { to: '/internal/profile', icon: UserCircle, configKey: 'labelProfile', label: sc.labelProfile },
   ];
 
   // 管理菜单项（所有成员可见，仅管理员可编辑）
