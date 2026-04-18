@@ -511,53 +511,60 @@ export default function ProcessTemplateDetail() {
         <button className="ptd-topbar__back" onClick={() => navigate('/internal/process-templates')}>
           <ChevronLeft size={20} /> 返回列表
         </button>
-        {canEdit && !isEditing && (
-          <button
-            type="button"
-            className="ptd-topbar__edit"
-            onClick={startEdit}
-            title="编辑此文档"
-          >
-            <Pencil size={16} /> 编辑
-          </button>
-        )}
-        {canEdit && isEditing && (
-          <div className="ptd-topbar__edit-actions">
+        {/*
+          右侧操作区：所有需要吸附到右边的元素（编辑按钮 / 编辑操作组 / 保存提示）
+          必须包在同一个容器里，否则顶栏的 space-between 会把中间的子元素
+          挤到正中，导致"保存完成时，编辑按钮短暂跳到中间再跳回右边"。
+        */}
+        <div className="ptd-topbar__right">
+          {canEdit && !isEditing && (
             <button
               type="button"
-              className="ptd-topbar__cancel"
-              onClick={cancelEdit}
-              disabled={saving}
+              className="ptd-topbar__edit"
+              onClick={startEdit}
+              title="编辑此文档"
             >
-              <X size={16} /> 取消
+              <Pencil size={16} /> 编辑
             </button>
-            <button
-              type="button"
-              className="ptd-topbar__save"
-              onClick={saveEdit}
-              disabled={saving}
+          )}
+          {canEdit && isEditing && (
+            <div className="ptd-topbar__edit-actions">
+              <button
+                type="button"
+                className="ptd-topbar__cancel"
+                onClick={cancelEdit}
+                disabled={saving}
+              >
+                <X size={16} /> 取消
+              </button>
+              <button
+                type="button"
+                className="ptd-topbar__save"
+                onClick={saveEdit}
+                disabled={saving}
+              >
+                <Save size={16} /> {saving ? '保存中…' : '保存'}
+              </button>
+            </div>
+          )}
+          {saveHint && (
+            <div
+              className={`ptd-topbar__save-hint ptd-topbar__save-hint--${saveHint}`}
+              role="status"
+              aria-live="polite"
             >
-              <Save size={16} /> {saving ? '保存中…' : '保存'}
-            </button>
-          </div>
-        )}
-        {saveHint && (
-          <div
-            className={`ptd-topbar__save-hint ptd-topbar__save-hint--${saveHint}`}
-            role="status"
-            aria-live="polite"
-          >
-            {saveHint === 'saved' ? (
-              <>
-                <Check size={14} /> 已保存
-              </>
-            ) : (
-              <>
-                <AlertTriangle size={14} /> 已本地保存，云端同步失败
-              </>
-            )}
-          </div>
-        )}
+              {saveHint === 'saved' ? (
+                <>
+                  <Check size={14} /> 已保存
+                </>
+              ) : (
+                <>
+                  <AlertTriangle size={14} /> 已本地保存，云端同步失败
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 全屏内容区域 */}

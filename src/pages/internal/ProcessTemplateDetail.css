@@ -40,6 +40,15 @@
   color: var(--color-primary, #5B8C3E);
 }
 
+/* 顶栏右侧容器：让编辑按钮 / 编辑操作 / 保存提示始终作为整体吸附右侧，
+   避免 space-between 在子元素数量变化时（保存成功瞬间 3 个子元素）
+   把中间的"编辑"按钮挤到正中央。 */
+.ptd-topbar__right {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
 /* ============ Content Area ============ */
 .ptd-content {
   flex: 1;
@@ -882,7 +891,6 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  margin-left: 10px;
   padding: 0.35rem 0.7rem;
   border-radius: var(--radius-md, 8px);
   font-size: 13px;
