@@ -406,6 +406,7 @@ export default function MemberSharingCreate() {
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
+  const mdEditorRef = useRef(null);
 
   // 加载动态分类
   const [cats, setCats] = useState(loadCategories);
@@ -781,11 +782,18 @@ export default function MemberSharingCreate() {
                       <Code2 size={14} /> 编辑
                     </div>
                     <textarea
+                      ref={mdEditorRef}
                       className="msc-md-split__editor"
                       value={newPost.content}
                       onChange={(e) => setNewPost({ ...newPost, content: e.target.value })}
                       placeholder={'# 标题\n\n正文内容...\n\n- 列表项 1\n- 列表项 2'}
                       rows={16}
+                    />
+                    <FloatingTextToolbar
+                      mode="markdown"
+                      editorRef={mdEditorRef}
+                      value={newPost.content}
+                      onChange={(nextValue) => setNewPost((prev) => ({ ...prev, content: nextValue }))}
                     />
                   </div>
                   <div className="msc-md-split__pane">

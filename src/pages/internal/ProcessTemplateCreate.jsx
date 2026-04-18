@@ -22,6 +22,7 @@ import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { createDoc, canUseSupabase } from '../../lib/documentsService';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
+import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import './MemberSharingCreate.css';
 
 const DEFAULT_TYPE_LABELS = {
@@ -75,6 +76,7 @@ export default function ProcessTemplateCreate() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
+  const mdEditorRef = useRef(null);
   const { filterOptions } = useSiteContent();
 
   // 动态类型（从 siteContent 中读取，兼容管理员自定义）+ 默认的流程/规章类型
@@ -583,11 +585,18 @@ export default function ProcessTemplateCreate() {
                       <Code2 size={14} /> 编辑
                     </div>
                     <textarea
+                      ref={mdEditorRef}
                       className="msc-md-split__editor"
                       value={newDoc.content}
                       onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
                       placeholder={'# 文档标题\n\n## 适用范围\n\n说明文档用途...\n\n## 操作步骤\n\n1. 第一步\n2. 第二步'}
                       rows={16}
+                    />
+                    <FloatingTextToolbar
+                      mode="markdown"
+                      editorRef={mdEditorRef}
+                      value={newDoc.content}
+                      onChange={(nextValue) => setNewDoc((prev) => ({ ...prev, content: nextValue }))}
                     />
                   </div>
                   <div className="msc-md-split__pane">
