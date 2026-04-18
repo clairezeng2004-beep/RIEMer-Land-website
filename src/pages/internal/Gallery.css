@@ -86,6 +86,19 @@
   gap: var(--space-md);
 }
 
+/* 新建相册表单里的上传区：比详情页版更紧凑 */
+.gallery-create__dropzone {
+  padding: var(--space-lg) var(--space-md);
+}
+
+.gallery-create__dropzone p {
+  font-size: var(--text-sm);
+}
+
+.gallery-create__preview {
+  margin-top: var(--space-sm);
+}
+
 .gallery-create__select {
   flex: 1;
   min-width: 0;

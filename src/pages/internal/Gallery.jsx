@@ -106,8 +106,11 @@ export default function Gallery() {
     month: (now.getMonth() + 1).toString(),
   });
   const [selectedFiles, setSelectedFiles] = useState([]);
+  // 新建相册时预选的照片（与 selectedFiles 结构一致）
+  const [createAlbumFiles, setCreateAlbumFiles] = useState([]);
   const fileInputRef = useRef(null);
   const albumFileInputRef = useRef(null);
+  const createAlbumFileRef = useRef(null);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -119,6 +122,15 @@ export default function Gallery() {
     if (!newAlbum.title.trim()) return;
     const y = newAlbum.year || now.getFullYear().toString();
     const m = (newAlbum.month || '1').padStart(2, '0');
+    const initialPhotos = createAlbumFiles.map((f, i) => {
+      const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
+      return {
+        id: `upload-${Date.now()}-${i}`,
+        url: f.url,
+        caption: f.caption === defaultCaption ? '' : f.caption,
+        uploadedById: user?.id || null,
+      };
+    });
     const album = {
       id: Date.now().toString(),
       title: newAlbum.title,
@@ -127,7 +139,7 @@ export default function Gallery() {
       date: `${y}-${m}`,
       createdById: user?.id || null,
       createdBy: user?.nickname || user?.name || 'Unknown',
-      photos: [],
+      photos: initialPhotos,
     };
     setAlbums([album, ...albums]);
     const resetNow = new Date();
@@ -137,7 +149,21 @@ export default function Gallery() {
       year: resetNow.getFullYear().toString(),
       month: (resetNow.getMonth() + 1).toString(),
     });
+    setCreateAlbumFiles([]);
     setShowCreateAlbum(false);
+  };
+
+  /* ---- 新建相册表单中选择图片 ---- */
+  const handleCreateAlbumFileSelect = (e) => {
+    const files = Array.from(e.target.files || []);
+    const previews = files.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+      caption: file.name.replace(/\.[^.]+$/, ''),
+    }));
+    setCreateAlbumFiles((prev) => [...prev, ...previews]);
+    // 清空 input，避免同一文件无法再次选中
+    if (e.target) e.target.value = '';
   };
 
   /* ---- 添加照片到相册 ---- */
@@ -280,7 +306,14 @@ export default function Gallery() {
             </div>
             <button
               className="btn btn-primary"
-              onClick={() => setShowCreateAlbum(!showCreateAlbum)}
+              onClick={() => {
+                const next = !showCreateAlbum;
+                if (!next) {
+                  // 关闭/取消时清空已选图片
+                  setCreateAlbumFiles([]);
+                }
+                setShowCreateAlbum(next);
+              }}
             >
               {showCreateAlbum ? <X size={18} /> : <FolderPlus size={18} />}
               {showCreateAlbum ? '取消' : <EditableText
@@ -345,8 +378,60 @@ export default function Gallery() {
                     rows={3}
                   />
                 </div>
+                <div className="gallery-create__field">
+                  <label>照片（选填）</label>
+                  <div
+                    className="gallery-upload__dropzone gallery-create__dropzone"
+                    onClick={() => createAlbumFileRef.current?.click()}
+                  >
+                    <input
+                      ref={createAlbumFileRef}
+                      type="file"
+                      multiple
+                      accept="image/*"
+                      onChange={handleCreateAlbumFileSelect}
+                      style={{ display: 'none' }}
+                    />
+                    <Upload size={28} />
+                    <p>点击选择照片，支持多选</p>
+                    <span>创建后可以继续添加更多照片</span>
+                  </div>
+                  {createAlbumFiles.length > 0 && (
+                    <div className="gallery-upload__preview gallery-create__preview">
+                      {createAlbumFiles.map((f, i) => (
+                        <div key={i} className="gallery-upload__preview-item">
+                          <div className="gallery-upload__preview-img-wrapper">
+                            <img src={f.url} alt={f.caption} />
+                            <button
+                              type="button"
+                              className="gallery-upload__preview-remove"
+                              onClick={() =>
+                                setCreateAlbumFiles((prev) => prev.filter((_, idx) => idx !== i))
+                              }
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                          <input
+                            type="text"
+                            className="gallery-upload__caption-input"
+                            placeholder="添加注释（选填）"
+                            value={f.caption === f.file.name.replace(/\.[^.]+$/, '') ? '' : f.caption}
+                            onChange={(e) => {
+                              setCreateAlbumFiles((prev) =>
+                                prev.map((item, idx) =>
+                                  idx === i ? { ...item, caption: e.target.value } : item
+                                )
+                              );
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button type="submit" className="btn btn-primary">
-                  <Plus size={16} /> 创建
+                  <Plus size={16} /> 创建{createAlbumFiles.length > 0 ? `（含 ${createAlbumFiles.length} 张照片）` : ''}
                 </button>
               </form>
             </div>
