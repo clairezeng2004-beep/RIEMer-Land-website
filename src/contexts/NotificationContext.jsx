@@ -2,7 +2,9 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { useLocation } from 'react-router-dom';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { useSiteContent } from './SiteContentContext';
 import { notificationsData } from '../data/siteData';
+import { buildDocumentTitle } from '../lib/pageTitle';
 
 const NotificationContext = createContext(null);
 
