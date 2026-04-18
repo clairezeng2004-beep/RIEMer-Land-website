@@ -118,16 +118,47 @@ export function NotificationProvider({ children }) {
         }
 
         // 加载当前用户的已读状态
-        const { data: { user: authUser } } = await supabase.auth.getUser();
+        // 优先用 supabase.auth.getUser() 拿到最新认证用户；若失败（比如
+        // 偶发的 session 读取异常）再 fallback 到 AuthContext 里已确认的 user。
+        // 这样能避免"Session 偶发读不出来 → 以为未登录 → 所有消息变未读"。
+        let authUser = null;
+        try {
+          const { data: userData } = await supabase.auth.getUser();
+          authUser = userData?.user || null;
+        } catch (e) {
+          console.warn('[Notification] supabase.auth.getUser() 异常:', e.message);
+        }
+        if (!authUser && user) {
+          console.log('[Notification] supabase.auth.getUser() 返回空，使用 AuthContext 的 user 兜底');
+          authUser = user;
+        }
+
         let readSet = new Set();
         if (authUser) {
-          const { data: readData } = await supabase
+          const { data: readData, error: readErr } = await supabase
             .from('notification_reads')
             .select('notification_id')
             .eq('user_id', authUser.id);
-          if (readData) {
+          if (readErr) {
+            // 查询已读状态失败 —— 不要直接把所有通知视为未读，
+            // 否则会导致"另一设备登录后消息又变未读"的错觉。
+            // 这时退回到 localStorage 里缓存的已读状态做兜底。
+            console.warn('[Notification] 已读状态查询失败，使用本地缓存兜底:', readErr.message);
+            try {
+              const cached = localStorage.getItem(NOTIFICATIONS_KEY);
+              if (cached) {
+                const parsed = JSON.parse(cached);
+                if (Array.isArray(parsed)) {
+                  readSet = new Set(parsed.filter((n) => n.read).map((n) => n.id));
+                }
+              }
+            } catch { /* ignore */ }
+          } else if (readData) {
             readSet = new Set(readData.map((r) => r.notification_id));
+            console.log('[Notification] 云端已读记录:', readData.length, '条');
           }
+        } else {
+          console.warn('[Notification] 当前未登录 Supabase，无法获取云端已读状态');
         }
 
         // 根据用户角色过滤通知（管理员看所有，普通成员只看非 admin-only）
@@ -189,7 +220,7 @@ export function NotificationProvider({ children }) {
     } else {
       loadLocalNotifications();
     }
-  }, [useSupabase, isAdmin]);
+  }, [useSupabase, isAdmin, user]);
 
   const loadLocalNotifications = () => {
     let notifs = null;
@@ -313,10 +344,23 @@ export function NotificationProvider({ children }) {
     if (useSupabase) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await supabase
-            .from('notification_reads')
-            .upsert({ notification_id: id, user_id: user.id });
+        if (!user) {
+          console.warn('[Notification] 标记已读：当前未登录，云端同步跳过');
+          return;
+        }
+        // 复合主键表必须显式指定 onConflict，否则部分 PostgREST 版本
+        // 会把 upsert 降级成 INSERT → 撞主键冲突 → RLS 检查失败 →
+        // 前端看着"已读"但云端根本没写成功，另一台设备登录就还是未读。
+        const { error } = await supabase
+          .from('notification_reads')
+          .upsert(
+            { notification_id: id, user_id: user.id, read_at: new Date().toISOString() },
+            { onConflict: 'notification_id,user_id' }
+          );
+        if (error) {
+          console.warn('[Notification] 云端已读写入失败:', error.message, error.code);
+        } else {
+          console.log('[Notification] 云端已读写入成功, notification_id:', id);
         }
       } catch (err) {
         console.warn('[Notification] 标记已读失败:', err.message);
@@ -341,14 +385,26 @@ export function NotificationProvider({ children }) {
     if (useSupabase) {
       try {
         const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          const unread = notifications.filter((n) => !n.read);
-          if (unread.length > 0) {
-            const rows = unread.map((n) => ({
-              notification_id: n.id,
-              user_id: user.id,
-            }));
-            await supabase.from('notification_reads').upsert(rows);
+        if (!user) {
+          console.warn('[Notification] 全部标记已读：当前未登录，云端同步跳过');
+          return;
+        }
+        const unread = notifications.filter((n) => !n.read);
+        if (unread.length > 0) {
+          const now = new Date().toISOString();
+          const rows = unread.map((n) => ({
+            notification_id: n.id,
+            user_id: user.id,
+            read_at: now,
+          }));
+          // 同样需要显式 onConflict，否则复合主键 upsert 可能失败
+          const { error } = await supabase
+            .from('notification_reads')
+            .upsert(rows, { onConflict: 'notification_id,user_id' });
+          if (error) {
+            console.warn('[Notification] 全部标记已读：云端写入失败:', error.message, error.code);
+          } else {
+            console.log('[Notification] 全部标记已读：云端写入成功, 共', rows.length, '条');
           }
         }
       } catch (err) {
@@ -397,7 +453,10 @@ export function NotificationProvider({ children }) {
           if (user && data) {
             await supabase
               .from('notification_reads')
-              .upsert({ notification_id: data.id, user_id: user.id });
+              .upsert(
+                { notification_id: data.id, user_id: user.id, read_at: new Date().toISOString() },
+                { onConflict: 'notification_id,user_id' }
+              );
             // 本地记录此 ID 为「自动已读」，列表显示时与手动已读区分
             addAutoReadId(data.id);
           }
