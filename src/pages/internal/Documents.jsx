@@ -147,9 +147,45 @@ function loadDocViews() {
 }
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
   const { addNotification } = useNotifications();
   const { internalConfig, updateInternalConfig, filterOptions, updateFilterOptions } = useSiteContent();
+
+  /* ==========
+     贡献者真名映射：通过 uploadedById 动态解析真名，
+     兼容历史数据里存了昵称的情况，保证"贡献者"统一显示真名。
+     ========== */
+  const [userNameMap, setUserNameMap] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getAllUsers?.()) || [];
+        if (cancelled) return;
+        const map = {};
+        list.forEach((u) => {
+          if (u?.id) map[u.id] = u.name || u.nickname || '';
+        });
+        setUserNameMap(map);
+      } catch {
+        /* 拉取失败时回退到 doc.uploadedBy 原值 */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAllUsers]);
+
+  const resolveContributorName = useCallback(
+    (uid, fallback) => {
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return fallback || 'Unknown';
+    },
+    [userNameMap, user],
+  );
   const { editing } = useWysiwyg();
   const sectionKey = configSection || 'documents';
   const dc = internalConfig[sectionKey] || internalConfig.documents;
@@ -463,7 +499,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       fileType,
       fileUrl,
       description: newDoc.description,
-      uploadedBy: user?.nickname || user?.name || 'Unknown',
+      // 贡献者统一使用注册时的真名（user.name），缺失时回退到昵称
+      uploadedBy: user?.name || user?.nickname || 'Unknown',
       uploadedById: user?.id || null,
       date: new Date().toISOString().split('T')[0],
       size: selectedFile ? formatSize(selectedFile.size) : '—',
@@ -515,9 +552,9 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           });
         }
       }
-      // 通知中显示原文档的详细信息：名称 / 类型 / 上传者 / 操作人
-      const operator = user?.nickname || user?.name || '管理员';
-      const uploader = target.uploadedBy || '未知';
+      // 通知中显示原文档的详细信息：名称 / 类型 / 上传者 / 操作人（统一用真名）
+      const operator = user?.name || user?.nickname || '管理员';
+      const uploader = resolveContributorName(target.uploadedById, target.uploadedBy) || '未知';
       const parts = [
         `分类：${typeLabel}`,
         `上传者：${uploader}`,
@@ -937,7 +974,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
                 <div className="doc-card__footer">
                   <span className="doc-card__author">
-                    <User size={12} /> 贡献者：{doc.uploadedBy}
+                    <User size={12} /> 贡献者：{resolveContributorName(doc.uploadedById, doc.uploadedBy)}
                   </span>
                   <span className="doc-card__stats">
                     <Eye size={12} /> {(docViews[doc.id] || 0) + (doc.viewCount || 0)}
@@ -1026,7 +1063,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
               <div className="doc-preview__title-area">
                 <h3>{previewDoc.title}</h3>
                 <span className="doc-preview__meta">
-                  贡献者：{previewDoc.uploadedBy} · {previewDoc.date} · {previewDoc.size}
+                  贡献者：{resolveContributorName(previewDoc.uploadedById, previewDoc.uploadedBy)} · {previewDoc.date} · {previewDoc.size}
                 </span>
               </div>
               <div className="doc-preview__header-actions">
@@ -1156,7 +1193,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   <p className="doc-preview__no-preview-desc">{previewDoc.description}</p>
                   <div className="doc-preview__no-preview-info">
                     <span><Clock size={14} /> 上传日期: {previewDoc.date}</span>
-                    <span><User size={14} /> 贡献者：{previewDoc.uploadedBy}</span>
+                    <span><User size={14} /> 贡献者：{resolveContributorName(previewDoc.uploadedById, previewDoc.uploadedBy)}</span>
                     <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
                     <span><BarChart3 size={14} /> 浏览次数: {(docViews[previewDoc.id] || 0) + (previewDoc.viewCount || 0)}</span>
                   </div>

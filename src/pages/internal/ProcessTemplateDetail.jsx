@@ -134,10 +134,47 @@ function isUserDoc(doc) {
 
 /* ========== 主组件 ========== */
 export default function ProcessTemplateDetail() {
-  const { isAuthenticated, user, isAdmin } = useAuth();
+  const { isAuthenticated, user, isAdmin, getAllUsers } = useAuth();
   const { filterOptions } = useSiteContent();
   const { id } = useParams();
   const navigate = useNavigate();
+
+  /* ==========
+     贡献者真名映射：Supabase + 本地成员的 id → 真名
+     历史数据中 uploadedBy 可能存的是昵称，这里通过 uploadedById 动态解析回真名，
+     保证"贡献者"展示始终是注册时的真名。
+     ========== */
+  const [userNameMap, setUserNameMap] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getAllUsers?.()) || [];
+        if (cancelled) return;
+        const map = {};
+        list.forEach((u) => {
+          if (u?.id) map[u.id] = u.name || u.nickname || '';
+        });
+        setUserNameMap(map);
+      } catch {
+        /* 拉取失败时降级：使用文档里原始 uploadedBy */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAllUsers]);
+
+  const resolveContributorName = useCallback(
+    (uid, fallback) => {
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return fallback || 'Unknown';
+    },
+    [userNameMap, user],
+  );
   const contentRef = useRef(null);
 
   // 合并数据源：
@@ -441,7 +478,8 @@ export default function ProcessTemplateDetail() {
         return;
       }
       const nowDate = new Date().toISOString().split('T')[0];
-      const editor = user?.nickname || user?.name || user?.email || 'Unknown';
+      // 最后编辑人统一使用真名（user.name）优先
+      const editor = user?.name || user?.nickname || user?.email || 'Unknown';
       const updated = {
         ...userDocs[idx],
         title,
@@ -693,7 +731,7 @@ export default function ProcessTemplateDetail() {
               )}
 
               <div className="ptd-article__meta">
-                <span><User size={14} /> {doc.uploadedBy || 'Unknown'}</span>
+                <span><User size={14} /> {resolveContributorName(doc.uploadedById, doc.uploadedBy)}</span>
                 <span><Clock size={14} /> {doc.date}</span>
                 <span><Eye size={14} /> {(views[doc.id] || 0) + (doc.viewCount || 0)} 次浏览</span>
                 {doc.size && doc.size !== '—' && (

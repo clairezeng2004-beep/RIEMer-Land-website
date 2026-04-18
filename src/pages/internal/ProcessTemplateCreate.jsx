@@ -304,7 +304,8 @@ export default function ProcessTemplateCreate() {
       fileType: primaryAttachment ? inferFileType(primaryAttachment.name) : 'docx',
       fileUrl: primaryAttachment ? primaryAttachment.dataUrl : null,
       size: primaryAttachment ? formatFileSize(primaryAttachment.size) : '—',
-      uploadedBy: user?.nickname || user?.name || 'Unknown',
+      // 贡献者统一使用注册时的真名（user.name），缺失时回退到昵称
+      uploadedBy: user?.name || user?.nickname || 'Unknown',
       uploadedById: user?.id || null,
       date: new Date().toISOString().split('T')[0],
       viewCount: 0,
