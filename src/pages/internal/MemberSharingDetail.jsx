@@ -21,6 +21,8 @@ import {
   X,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
+import ViewLogPopover from '../../components/ViewLogPopover';
+import { recordViewLog, fetchViewLog } from '../../lib/documentsService';
 import './MemberSharingDetail.css';
 
 const SHARING_KEY = 'riemer_member_sharing';
@@ -147,10 +149,44 @@ function saveViews(data) {
 }
 
 export default function MemberSharingDetail() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, getAllUsers } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const contentRef = useRef(null);
+
+  // 访问记录弹层开关
+  const [viewLogOpen, setViewLogOpen] = useState(false);
+
+  // 成员真名映射（用于弹层里把历史数据存的 userName 还原到真名）
+  const [userNameMap, setUserNameMap] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getAllUsers?.()) || [];
+        if (cancelled) return;
+        const map = {};
+        list.forEach((u) => {
+          if (u?.id) map[u.id] = u.name || u.nickname || '';
+        });
+        setUserNameMap(map);
+      } catch { /* ignore */ }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAllUsers]);
+
+  const resolveVisitorName = useCallback(
+    (uid, fallback) => {
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return fallback || '访客';
+    },
+    [userNameMap, user],
+  );
 
   // 动态分类
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(loadCategories());
@@ -158,12 +194,28 @@ export default function MemberSharingDetail() {
   const [sharings, setSharings] = useState(loadSharings);
   const post = sharings.find((s) => s.id === id);
 
-  // 浏览次数统计
+  // 浏览次数统计 + 访问日志
+  // 同一个会话内重复刷新不重复计数，避免"每刷一次 +1"；
+  // 关闭窗口重开 → sessionStorage 清空 → 新会话再计一次。
   useEffect(() => {
     if (!post) return;
-    const views = loadViews();
-    views[post.id] = (views[post.id] || 0) + 1;
-    saveViews(views);
+    try {
+      const SESSION_KEY = 'riemer_msd_session_viewed';
+      const sessionViewed = new Set(
+        JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
+      );
+      if (sessionViewed.has(String(post.id))) return;
+      const views = loadViews();
+      views[post.id] = (views[post.id] || 0) + 1;
+      saveViews(views);
+      sessionViewed.add(String(post.id));
+      sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
+      // 访问日志（云端 + 本地兜底）
+      recordViewLog(String(post.id), user).catch((err) => {
+        console.warn('[MemberSharingDetail] 访问日志写入失败:', err);
+      });
+    } catch { /* ignore */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.id]);
 
   // 配置 marked
@@ -366,7 +418,14 @@ export default function MemberSharingDetail() {
               <div className="msd-article__meta">
                 <span><User size={14} /> {post.author}</span>
                 <span><Clock size={14} /> {post.createdAt}</span>
-                <span><Eye size={14} /> {views[post.id] || 0} 次浏览</span>
+                <button
+                  type="button"
+                  className="views-trigger"
+                  onClick={() => setViewLogOpen(true)}
+                  title="查看所有访问记录"
+                >
+                  <Eye size={14} /> {views[post.id] || 0} 次浏览
+                </button>
               </div>
             </header>
 
@@ -488,6 +547,15 @@ export default function MemberSharingDetail() {
           )}
         </>
       )}
+
+      {/* 访问记录弹层：点击浏览数小眼睛时弹出 */}
+      <ViewLogPopover
+        open={viewLogOpen}
+        onClose={() => setViewLogOpen(false)}
+        totalCount={views[post.id] || 0}
+        fetchLog={() => fetchViewLog(String(post.id))}
+        resolveName={resolveVisitorName}
+      />
     </div>
   );
 }

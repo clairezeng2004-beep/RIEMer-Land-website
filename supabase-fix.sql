@@ -402,3 +402,53 @@ BEGIN
 EXCEPTION WHEN duplicate_object THEN
   RAISE NOTICE 'ℹ️  documents_deleted_defaults 已在 realtime 发布中，跳过';
 END $$;
+
+-- ============================================
+-- 修复 N：创建 document_view_logs 表（访问记录明细）
+-- ============================================
+-- 用于承载小眼睛浏览数按钮点击后的"访客名单 + 访问时间"弹层。
+-- document_views 表只记录总浏览数，无法展示谁看过；这里每条记录代表
+-- 一次访问（同一用户每新会话重复计一次）。
+--
+-- 字段：
+--   id         自增主键
+--   document_id 文档 / 分享帖 id（与 documents.id 或 sharing id 对齐，沿用文本类型）
+--   user_id    访问者 id（未登录时为 NULL）
+--   user_name  访问者名称快照（避免成员改名后历史记录失真）
+--   viewed_at  访问时间
+CREATE TABLE IF NOT EXISTS public.document_view_logs (
+  id BIGSERIAL PRIMARY KEY,
+  document_id TEXT NOT NULL,
+  user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  user_name TEXT NOT NULL DEFAULT '访客',
+  viewed_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- 访问记录通常按 document_id + 时间倒序检索，加联合索引
+CREATE INDEX IF NOT EXISTS idx_document_view_logs_doc_time
+  ON public.document_view_logs (document_id, viewed_at DESC);
+
+ALTER TABLE public.document_view_logs ENABLE ROW LEVEL SECURITY;
+
+-- 认证用户可读取所有访问记录（用于"谁访问过"弹层）
+DROP POLICY IF EXISTS "认证用户可查看访问记录" ON public.document_view_logs;
+CREATE POLICY "认证用户可查看访问记录"
+  ON public.document_view_logs FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 认证用户可写入访问记录（每次浏览一条）
+DROP POLICY IF EXISTS "认证用户可写入访问记录" ON public.document_view_logs;
+CREATE POLICY "认证用户可写入访问记录"
+  ON public.document_view_logs FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- 放入 realtime 发布（不是必须，但日后可以订阅新增访客通知）
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.document_view_logs;
+  RAISE NOTICE '✅ document_view_logs 已加入 realtime 发布';
+EXCEPTION WHEN duplicate_object THEN
+  RAISE NOTICE 'ℹ️  document_view_logs 已在 realtime 发布中，跳过';
+END $$;

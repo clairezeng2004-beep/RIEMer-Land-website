@@ -378,6 +378,108 @@ export async function incrementView(documentId) {
   }
 }
 
+/* ============ 浏览记录详表（document_view_logs） ============ */
+// 说明：
+// document_views 表只存"总浏览数"，无法展示"谁什么时候看过"。
+// 新增 document_view_logs 表，每次访问（按 session+文档去重）写入一条：
+//   { document_id, user_id, user_name, viewed_at }
+// 需要先在 Supabase 执行 supabase-fix.sql 中的对应建表语句。
+//
+// 本地降级：同时把访问记录按 documentId 分组存到 localStorage，
+// 在 Supabase 不可用 / 未登录 / 表不存在时也能展示本设备的访问者。
+
+export const DOC_VIEW_LOGS_KEY = 'riemer_document_view_logs'; // { [documentId]: [{userId,userName,viewedAt}] }
+
+function loadLocalViewLogs() {
+  try {
+    const stored = localStorage.getItem(DOC_VIEW_LOGS_KEY);
+    if (stored) return JSON.parse(stored) || {};
+  } catch { /* ignore */ }
+  return {};
+}
+
+function saveLocalViewLogs(map) {
+  try {
+    localStorage.setItem(DOC_VIEW_LOGS_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
+/**
+ * 记录一次访问日志（与 incrementView 配套调用）。
+ * @param {string} documentId
+ * @param {{id?:string,name?:string,nickname?:string}|null} user 当前登录用户（可为空）
+ */
+export async function recordViewLog(documentId, user) {
+  const userId = user?.id || null;
+  const userName = user?.name || user?.nickname || user?.email || '访客';
+  const viewedAt = new Date().toISOString();
+
+  // 本地写一条
+  try {
+    const all = loadLocalViewLogs();
+    const list = Array.isArray(all[documentId]) ? all[documentId] : [];
+    list.push({ userId, userName, viewedAt });
+    all[documentId] = list;
+    saveLocalViewLogs(all);
+  } catch { /* ignore */ }
+
+  if (!canUseSupabase() || !supabase) return { remote: false };
+
+  try {
+    const { error } = await supabase.from('document_view_logs').insert({
+      document_id: documentId,
+      user_id: userId,
+      user_name: userName,
+      viewed_at: viewedAt,
+    });
+    if (error) {
+      // 表不存在 / 无权限 → 静默降级
+      console.warn('[documentsService] 访问日志写入失败:', error.message);
+      return { remote: false, error };
+    }
+    return { remote: true };
+  } catch (err) {
+    console.warn('[documentsService] recordViewLog 异常:', err.message);
+    return { remote: false, error: err };
+  }
+}
+
+/**
+ * 拉取某篇文档的访问日志（最近在前）。
+ * 云端不可用时回退本地。
+ * @param {string} documentId
+ * @returns {Promise<Array<{userId:string|null,userName:string,viewedAt:string}>>}
+ */
+export async function fetchViewLog(documentId) {
+  if (canUseSupabase() && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from('document_view_logs')
+        .select('user_id,user_name,viewed_at')
+        .eq('document_id', documentId)
+        .order('viewed_at', { ascending: false })
+        .limit(500);
+      if (!error && Array.isArray(data)) {
+        return data.map((r) => ({
+          userId: r.user_id || null,
+          userName: r.user_name || '访客',
+          viewedAt: r.viewed_at,
+        }));
+      }
+      if (error) {
+        console.warn('[documentsService] fetchViewLog 云端失败，回退本地:', error.message);
+      }
+    } catch (err) {
+      console.warn('[documentsService] fetchViewLog 异常，回退本地:', err.message);
+    }
+  }
+  // 本地兜底：按时间倒序
+  const all = loadLocalViewLogs();
+  const list = Array.isArray(all[documentId]) ? [...all[documentId]] : [];
+  list.sort((a, b) => new Date(b.viewedAt || 0) - new Date(a.viewedAt || 0));
+  return list;
+}
+
 /* ============ 判断工具 ============ */
 
 export function isUserDoc(doc) {

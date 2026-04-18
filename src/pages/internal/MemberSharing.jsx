@@ -1,9 +1,11 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import ViewLogPopover from '../../components/ViewLogPopover';
+import { fetchViewLog } from '../../lib/documentsService';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import {
   Share2,
@@ -215,9 +217,43 @@ function loadViews() {
 }
 
 export default function MemberSharing() {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   useWysiwyg();
+
+  // 访问记录弹层：viewLogPost 保存当前查看日志的分享帖
+  const [viewLogPost, setViewLogPost] = useState(null);
+
+  // 访问者真名映射
+  const [userNameMap, setUserNameMap] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getAllUsers?.()) || [];
+        if (cancelled) return;
+        const map = {};
+        list.forEach((u) => {
+          if (u?.id) map[u.id] = u.name || u.nickname || '';
+        });
+        setUserNameMap(map);
+      } catch { /* ignore */ }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAllUsers]);
+
+  const resolveVisitorName = useCallback(
+    (uid, fallback) => {
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return fallback || '访客';
+    },
+    [userNameMap, user],
+  );
 
   const sc = internalConfig.memberSharing || {};
   const updateSC = useCallback(
@@ -572,9 +608,19 @@ export default function MemberSharing() {
                     <span className="ms-card__date">
                       <Clock size={12} /> {post.createdAt}
                     </span>
-                    <span className="ms-card__views">
+                    <button
+                      type="button"
+                      className="ms-card__views views-trigger"
+                      onClick={(e) => {
+                        // 卡片本身包在 <a> 里，需要阻止默认导航与冒泡
+                        e.preventDefault();
+                        e.stopPropagation();
+                        setViewLogPost(post);
+                      }}
+                      title="查看所有访问记录"
+                    >
                       <Eye size={12} /> {views[post.id] || 0}
-                    </span>
+                    </button>
                   </div>
                 </div>
               </a>
@@ -631,6 +677,17 @@ export default function MemberSharing() {
           </div>
         )}
       </div>
+
+      {/* 访问记录弹层：点击卡片上的浏览数小眼睛时弹出 */}
+      <ViewLogPopover
+        open={Boolean(viewLogPost)}
+        onClose={() => setViewLogPost(null)}
+        totalCount={viewLogPost ? (views[viewLogPost.id] || 0) : 0}
+        fetchLog={
+          viewLogPost ? () => fetchViewLog(String(viewLogPost.id)) : undefined
+        }
+        resolveName={resolveVisitorName}
+      />
     </div>
   );
 }

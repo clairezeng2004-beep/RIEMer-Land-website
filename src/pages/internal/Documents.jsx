@@ -40,6 +40,7 @@ import WordPreview from '../../components/WordPreview';
 import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
+  fetchViewLog,
   deleteUserDoc,
   markDefaultDeleted,
   updateDoc as cloudUpdateDoc,
@@ -47,6 +48,7 @@ import {
   subscribeDocuments,
   subscribeDeletedDefaults,
 } from '../../lib/documentsService';
+import ViewLogPopover from '../../components/ViewLogPopover';
 import './Documents.css';
 
 const defaultTypeLabels = {
@@ -433,6 +435,9 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // 访问记录弹层：点击小眼睛时激活，保存当前查看的文档
+  const [viewLogDoc, setViewLogDoc] = useState(null);
   const fileInputRef = useRef(null);
   const docContentRef = useRef(null);
 
@@ -976,9 +981,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   <span className="doc-card__author">
                     <User size={12} /> 贡献者：{resolveContributorName(doc.uploadedById, doc.uploadedBy)}
                   </span>
-                  <span className="doc-card__stats">
+                  <button
+                    type="button"
+                    className="doc-card__stats views-trigger"
+                    onClick={(e) => {
+                      // 不能冒泡到卡片本身的打开预览行为
+                      e.stopPropagation();
+                      setViewLogDoc(doc);
+                    }}
+                    title="查看所有访问记录"
+                  >
                     <Eye size={12} /> {(docViews[doc.id] || 0) + (doc.viewCount || 0)}
-                  </span>
+                  </button>
                 </div>
 
                 <div className="doc-card__meta">
@@ -1195,7 +1209,14 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                     <span><Clock size={14} /> 上传日期: {previewDoc.date}</span>
                     <span><User size={14} /> 贡献者：{resolveContributorName(previewDoc.uploadedById, previewDoc.uploadedBy)}</span>
                     <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
-                    <span><BarChart3 size={14} /> 浏览次数: {(docViews[previewDoc.id] || 0) + (previewDoc.viewCount || 0)}</span>
+                    <button
+                      type="button"
+                      className="views-trigger"
+                      onClick={() => setViewLogDoc(previewDoc)}
+                      title="查看所有访问记录"
+                    >
+                      <BarChart3 size={14} /> 浏览次数: {(docViews[previewDoc.id] || 0) + (previewDoc.viewCount || 0)}
+                    </button>
                   </div>
                   {previewDoc.fileUrl ? (
                     <p className="doc-preview__no-preview-hint">
@@ -1257,6 +1278,21 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           </div>
         </div>
       )}
+
+      {/* 访问记录弹层：点击浏览数小眼睛时弹出 */}
+      <ViewLogPopover
+        open={Boolean(viewLogDoc)}
+        onClose={() => setViewLogDoc(null)}
+        totalCount={
+          viewLogDoc
+            ? (docViews[viewLogDoc.id] || 0) + (viewLogDoc.viewCount || 0)
+            : 0
+        }
+        fetchLog={
+          viewLogDoc ? () => fetchViewLog(String(viewLogDoc.id)) : undefined
+        }
+        resolveName={resolveContributorName}
+      />
     </div>
   );
 }

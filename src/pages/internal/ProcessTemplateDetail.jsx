@@ -34,11 +34,14 @@ import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
   incrementView,
+  recordViewLog,
+  fetchViewLog,
   updateDoc as cloudUpdateDoc,
   canUseSupabase,
   subscribeDocuments,
   subscribeDeletedDefaults,
 } from '../../lib/documentsService';
+import ViewLogPopover from '../../components/ViewLogPopover';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
 import './MemberSharingCreate.css';
@@ -177,6 +180,9 @@ export default function ProcessTemplateDetail() {
   );
   const contentRef = useRef(null);
 
+  // 访问记录弹层：点击浏览数小眼睛时打开，展示谁在什么时候看过这篇文档
+  const [viewLogOpen, setViewLogOpen] = useState(false);
+
   // 合并数据源：
   // - 挂载时先用 localStorage 渲染（避免白屏），随后异步从 Supabase 拉取最新数据
   // - docsVersion 递增会强制 useMemo 重新计算
@@ -270,6 +276,11 @@ export default function ProcessTemplateDetail() {
           console.warn('[ProcessTemplateDetail] 云端浏览计数同步失败:', err);
         });
       }
+      // 记录访问日志（谁在什么时候看过）—— 云端可用时写 document_view_logs，
+      // 不可用时降级到本地。失败不影响计数
+      recordViewLog(String(doc.id), user).catch((err) => {
+        console.warn('[ProcessTemplateDetail] 访问日志写入失败:', err);
+      });
     } catch { /* ignore */ }
   }, [doc?.id]);
 
@@ -733,7 +744,14 @@ export default function ProcessTemplateDetail() {
               <div className="ptd-article__meta">
                 <span><User size={14} /> {resolveContributorName(doc.uploadedById, doc.uploadedBy)}</span>
                 <span><Clock size={14} /> {doc.date}</span>
-                <span><Eye size={14} /> {(views[doc.id] || 0) + (doc.viewCount || 0)} 次浏览</span>
+                <button
+                  type="button"
+                  className="views-trigger"
+                  onClick={() => setViewLogOpen(true)}
+                  title="查看所有访问记录"
+                >
+                  <Eye size={14} /> {(views[doc.id] || 0) + (doc.viewCount || 0)} 次浏览
+                </button>
                 {doc.size && doc.size !== '—' && (
                   <span><HardDrive size={14} /> {doc.size}</span>
                 )}
@@ -971,6 +989,15 @@ export default function ProcessTemplateDetail() {
           )}
         </>
       )}
+
+      {/* 访问记录弹层：点击浏览数小眼睛时弹出 */}
+      <ViewLogPopover
+        open={viewLogOpen}
+        onClose={() => setViewLogOpen(false)}
+        totalCount={(views[doc.id] || 0) + (doc.viewCount || 0)}
+        fetchLog={() => fetchViewLog(String(doc.id))}
+        resolveName={resolveContributorName}
+      />
     </div>
   );
 }
