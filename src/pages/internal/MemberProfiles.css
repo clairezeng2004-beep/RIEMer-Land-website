@@ -201,6 +201,18 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   font-weight: 500;
+  /* 编号列始终单行显示，不因 td 的 break-word / overflow-wrap: anywhere 被掰断 */
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
+}
+
+/* 编号列（# 列）整体不换行，保证 10、11、12… 等多位数字在同一行 */
+.member-profiles-table td.member-profiles-table__sticky-col,
+.member-profiles-table th.member-profiles-table__sticky-col {
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow-wrap: normal;
 }
 
 /* ============ Action Column ============ */
