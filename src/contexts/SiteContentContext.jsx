@@ -110,8 +110,8 @@ const getDefaultInternalConfig = () => ({
   sidebar: {
     sectionLabelNav: '',
     sectionLabelDaily: '日常管理',
-    sectionLabelMembers: '成员',
-    sectionLabelAdmin: '管理',
+    sectionLabelMembers: '成员信息',
+    sectionLabelAdmin: '网站管理',
     labelHome: '快捷导航',
     labelNotifications: '消息通知',
     labelDocuments: '文档管理',
@@ -241,6 +241,26 @@ const getDefaultFilters = () => ({
   documentTypes: defaultDocumentTypes.map((t) => ({ ...t })),
 });
 
+// 侧边栏旧默认值 → 新默认值迁移表
+// 历史版本默认 sectionLabelMembers='成员' / sectionLabelAdmin='管理'，
+// 新版本改为 '成员信息' / '网站管理'。
+// 对于已经把旧默认值落盘到 localStorage / Supabase 的设备，
+// 这里做一次"字段级"自动迁移：仅当持久化值恰好等于旧默认值时才升级，
+// 用户若已自定义成其它文案（例如改成 "Members"）则保持不变。
+const SIDEBAR_LEGACY_LABEL_MIGRATION = {
+  sectionLabelMembers: { from: ['成员'], to: '成员信息' },
+  sectionLabelAdmin: { from: ['管理'], to: '网站管理' },
+};
+
+function migrateSidebarLegacyLabels(sidebar) {
+  if (!sidebar || typeof sidebar !== 'object') return sidebar;
+  const next = { ...sidebar };
+  for (const [key, { from, to }] of Object.entries(SIDEBAR_LEGACY_LABEL_MIGRATION)) {
+    if (from.includes(next[key])) next[key] = to;
+  }
+  return next;
+}
+
 export function SiteContentProvider({ children }) {
   const [content, setContent] = useState(() => {
     const stored = localStorage.getItem(CONTENT_KEY);
@@ -297,6 +317,8 @@ export function SiteContentProvider({ children }) {
         for (const key of Object.keys(defaults)) {
           merged[key] = { ...defaults[key], ...(parsed[key] || {}) };
         }
+        // 侧边栏旧标签一次性迁移（'成员' → '成员信息'、'管理' → '网站管理'）
+        merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
         return merged;
       } catch {
         return getDefaultInternalConfig();
@@ -430,6 +452,8 @@ export function SiteContentProvider({ children }) {
       for (const key of Object.keys(defaults)) {
         merged[key] = { ...defaults[key], ...(value[key] || {}) };
       }
+      // 侧边栏旧标签一次性迁移
+      merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
       setInternalConfig((prev) => {
         // 编辑模式下不要打断用户的修改
         if (persistPausedRef.current) return prev;
@@ -449,6 +473,8 @@ export function SiteContentProvider({ children }) {
       for (const key of Object.keys(defaults)) {
         merged[key] = { ...defaults[key], ...(value[key] || {}) };
       }
+      // 侧边栏旧标签一次性迁移
+      merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
       setInternalConfig((prev) => {
         // 正在编辑时不覆盖，等用户保存/取消后再同步
         if (persistPausedRef.current) return prev;
