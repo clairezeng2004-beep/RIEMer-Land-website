@@ -29,6 +29,7 @@ export default function CustomSelect({
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef(null);
+  const dropdownRef = useRef(null);
 
   // 标准化 options 为 { value, label }
   const normalised = options.map((opt) =>
@@ -52,6 +53,24 @@ export default function CustomSelect({
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  // 下拉打开时，自动把"当前选中项"滚到可视区中间，
+  // 避免长列表（如年份 2015~2027）打开后只看得到开头、找不到选中值的情况。
+  // 多选场景滚到第一个已选项。
+  useEffect(() => {
+    if (!open) return;
+    // 等 DOM 渲染完成再找元素
+    const id = requestAnimationFrame(() => {
+      const dd = dropdownRef.current;
+      if (!dd) return;
+      const active = dd.querySelector('.custom-select__option--active');
+      if (!active) return;
+      // 用相对容器的偏移做居中滚动，避免 scrollIntoView 把外层页面也滚掉
+      const targetTop = active.offsetTop - dd.clientHeight / 2 + active.clientHeight / 2;
+      dd.scrollTop = Math.max(0, targetTop);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [open]);
 
   const handleSelect = (val) => {
     if (multiple) {
@@ -124,7 +143,7 @@ export default function CustomSelect({
       </button>
 
       {open && (
-        <div className="custom-select__dropdown">
+        <div className="custom-select__dropdown" ref={dropdownRef}>
           {normalised.map((opt) => {
             const isActive = multiple
               ? selectedValues.includes(opt.value)
