@@ -529,6 +529,7 @@ ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "认证用户可查看文档" ON documents;
 DROP POLICY IF EXISTS "认证用户可新增文档" ON documents;
+DROP POLICY IF EXISTS "认证用户可更新文档" ON documents;
 DROP POLICY IF EXISTS "管理员或作者可更新文档" ON documents;
 DROP POLICY IF EXISTS "管理员或作者可删除文档" ON documents;
 
@@ -613,6 +614,7 @@ ALTER TABLE document_views ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "认证用户可查看浏览计数" ON document_views;
 DROP POLICY IF EXISTS "认证用户可更新浏览计数" ON document_views;
+DROP POLICY IF EXISTS "认证用户可增量浏览计数" ON document_views;
 
 CREATE POLICY "认证用户可查看浏览计数"
   ON document_views FOR SELECT
