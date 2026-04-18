@@ -147,10 +147,12 @@ export default function TextAnnotation({
           },
         });
 
+        // 工具栏吸附在文档容器的右边缘，垂直跟随选区中点
+        // 使用视口坐标（position: fixed）避免被 inline 模式的 .ta-inline 父定位干扰
         setToolbar({
           visible: true,
-          x: rect.left + rect.width / 2 - containerRect.left,
-          y: rect.top - containerRect.top - 8,
+          x: containerRect.right + 8,
+          y: rect.top + rect.height / 2,
         });
       }, 10);
     };
@@ -183,6 +185,33 @@ export default function TextAnnotation({
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [toolbar.visible]);
+
+  // 滚动 / 窗口尺寸变化时：重新计算工具栏位置（固定定位需要跟随选区视口坐标）
+  useEffect(() => {
+    if (!toolbar.visible || !contentRef?.current) return;
+    const recomputePosition = () => {
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || !sel.toString().trim()) return;
+      try {
+        const range = sel.getRangeAt(0);
+        const rect = range.getBoundingClientRect();
+        const containerRect = contentRef.current.getBoundingClientRect();
+        setToolbar((prev) => ({
+          ...prev,
+          x: containerRect.right + 8,
+          y: rect.top + rect.height / 2,
+        }));
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('scroll', recomputePosition, true);
+    window.addEventListener('resize', recomputePosition);
+    return () => {
+      window.removeEventListener('scroll', recomputePosition, true);
+      window.removeEventListener('resize', recomputePosition);
+    };
+  }, [toolbar.visible, contentRef]);
 
   // ---- 提交评论（划中文本） ----
   const handleSubmitComment = async () => {
@@ -516,7 +545,6 @@ export default function TextAnnotation({
       style={{
         left: toolbar.x,
         top: toolbar.y,
-        transform: 'translate(-50%, -100%)',
       }}
     >
       {!isCommenting ? (

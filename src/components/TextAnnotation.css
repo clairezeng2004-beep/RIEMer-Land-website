@@ -18,14 +18,15 @@ mark.ta-highlight:hover {
 
 /* ---- 浮动工具栏 ---- */
 .ta-toolbar {
-  position: absolute;
+  position: fixed;
   z-index: 800;
+  transform: translateY(-50%);
   animation: ta-toolbar-in 0.15s ease;
 }
 
 @keyframes ta-toolbar-in {
-  from { opacity: 0; transform: translate(-50%, -100%) translateY(4px); }
-  to { opacity: 1; transform: translate(-50%, -100%) translateY(0); }
+  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
+  to { opacity: 1; transform: translateY(-50%) translateX(0); }
 }
 
 .ta-toolbar__btn {
