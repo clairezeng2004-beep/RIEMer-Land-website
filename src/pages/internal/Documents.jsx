@@ -37,6 +37,14 @@ import EditableText from '../../components/EditableText';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
+import {
+  fetchAllFromCloud,
+  fetchViewsFromCloud,
+  deleteUserDoc,
+  markDefaultDeleted,
+  updateDoc as cloudUpdateDoc,
+  canUseSupabase,
+} from '../../lib/documentsService';
 import './Documents.css';
 
 const defaultTypeLabels = {
@@ -245,6 +253,51 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   // 与 ProcessTemplateDetail 共享的浏览计数（在列表卡片上实时展示）
   const [docViews, setDocViews] = useState(() => loadDocViews());
 
+  // 是否是"流程模板"模式（跨设备同步走 Supabase）
+  const isProcessTemplateMode = configSection === 'processTemplates';
+
+  // ========== 云端同步（仅流程模板模式） ==========
+  // 挂载时从 Supabase 拉取最新文档列表 + 已删除默认 id + 浏览计数；
+  // 成功后覆盖本地 state；失败/未配置 Supabase 则保持本地数据。
+  useEffect(() => {
+    if (!isProcessTemplateMode) return;
+    if (!canUseSupabase()) return;
+
+    let cancelled = false;
+    (async () => {
+      const cloud = await fetchAllFromCloud();
+      if (cancelled || !cloud) return;
+      const { docs: cloudDocs, deletedIds: cloudDeletedIds } = cloud;
+
+      // 合并云端用户文档 + 默认数据（过滤被删除的）
+      const deletedSet = new Set(cloudDeletedIds.map(String));
+      const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
+      const userDocs = cloudDocs.filter((d) => String(d.id).startsWith('doc-'));
+
+      const base = filterTypes
+        ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
+        : [...userDocs, ...defaults];
+
+      const sorted = base.sort((a, b) => {
+        const aIsUser = isUserDoc(a);
+        const bIsUser = isUserDoc(b);
+        if (aIsUser && !bIsUser) return -1;
+        if (!aIsUser && bIsUser) return 1;
+        return 0;
+      });
+      setDocuments(sorted);
+      console.log('[Documents] 从云端同步', userDocs.length, '条用户文档，', cloudDeletedIds.length, '条默认删除记录');
+
+      // 同步浏览计数
+      const merged = await fetchViewsFromCloud();
+      if (!cancelled && merged) {
+        setDocViews(merged);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [isProcessTemplateMode, filterTypes]);
+
   // 监听独立发布页（新窗口）发来的刷新消息 + 监听浏览计数变化
   useEffect(() => {
     const handler = (event) => {
@@ -390,16 +443,26 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (window.confirm(confirmMsg)) {
       setDocuments((prev) => prev.filter((d) => d.id !== id));
       if (String(id).startsWith('doc-')) {
-        // 用户发布的文档：直接从 localStorage 移除
+        // 用户发布的文档：本地 + 云端同步删除
         const userDocs = loadUserDocs().filter((d) => d.id !== id);
         saveUserDocs(userDocs);
+        if (isProcessTemplateMode && canUseSupabase()) {
+          deleteUserDoc(id).catch((err) => {
+            console.warn('[Documents] 云端删除用户文档失败:', err);
+          });
+        }
       } else {
-        // 默认模拟数据：记录到"已删除 id 列表"，防止刷新/重新合并后又出现
+        // 默认模拟数据：本地 + 云端同步标记
         const deletedIds = loadDeletedDefaultIds();
         const sid = String(id);
         if (!deletedIds.includes(sid)) {
           deletedIds.push(sid);
           saveDeletedDefaultIds(deletedIds);
+        }
+        if (isProcessTemplateMode && canUseSupabase()) {
+          markDefaultDeleted(id).catch((err) => {
+            console.warn('[Documents] 云端标记默认文档删除失败:', err);
+          });
         }
       }
       // 通知中显示原文档的详细信息：名称 / 类型 / 上传者 / 操作人
@@ -439,17 +502,19 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       userName: user.nickname || user.name || user.email,
       userAvatar: user.avatar || null,
     };
+
+    let nextLikesSnapshot = null;
+
     setDocuments((prev) =>
       prev.map((d) => {
         if (d.id !== docId) return d;
         const likes = d.likes || [];
         const alreadyLiked = likes.some((l) => l.userId === user.id);
-        return {
-          ...d,
-          likes: alreadyLiked
-            ? likes.filter((l) => l.userId !== user.id)
-            : [...likes, likeData],
-        };
+        const nextLikes = alreadyLiked
+          ? likes.filter((l) => l.userId !== user.id)
+          : [...likes, likeData];
+        nextLikesSnapshot = nextLikes;
+        return { ...d, likes: nextLikes };
       })
     );
     // 同步更新 previewDoc
@@ -464,6 +529,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
             ? likes.filter((l) => l.userId !== user.id)
             : [...likes, likeData],
         };
+      });
+    }
+
+    // 流程模板模式：点赞同步到 Supabase（仅对用户文档 doc-* 有效）
+    if (
+      isProcessTemplateMode &&
+      canUseSupabase() &&
+      String(docId).startsWith('doc-') &&
+      nextLikesSnapshot
+    ) {
+      cloudUpdateDoc(docId, { likes: nextLikesSnapshot }).catch((err) => {
+        console.warn('[Documents] 云端点赞同步失败:', err);
       });
     }
   };

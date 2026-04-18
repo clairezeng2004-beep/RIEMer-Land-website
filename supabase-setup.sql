@@ -485,6 +485,152 @@ CREATE POLICY "认证用户可删除事项"
   USING (true);
 
 -- ============================================
+-- 20. 创建 documents 表（流程模板 / 规章制度等文档，跨设备同步）
+-- ============================================
+-- 内部空间"流程模板文件"模块使用，存储所有用户发布的文档（含正文/附件/点赞）。
+-- 前端代码：
+--   - src/pages/internal/Documents.jsx          （列表 + 上传）
+--   - src/pages/internal/ProcessTemplateCreate.jsx （独立发布页）
+--   - src/pages/internal/ProcessTemplateDetail.jsx （详情/编辑）
+--
+-- 设计说明：
+--   - attachments 以 JSONB 存储，含 dataUrl；前端限制单文件 5MB、最多 10 个，
+--     所以单条 row 不会超过 ~50MB 的 Postgres TOAST 极限（实际上还会更小）。
+--   - content 直接存 Markdown 源文或清洗过的 Word-HTML 片段。
+--   - likes 用 JSONB 数组，元素形如 { userId, userName, userAvatar }。
+--   - deleted_default_ids 也放到这里是不合适的 —— 默认模拟数据的"已删除"
+--     标记改用单独的 documents_deleted_defaults 表，保证跨设备一致。
+CREATE TABLE IF NOT EXISTS documents (
+  id TEXT PRIMARY KEY,                          -- 前端生成的 'doc-xxx' / 时间戳 id，保持兼容
+  title TEXT NOT NULL,
+  type TEXT NOT NULL DEFAULT 'process',         -- process / regulation / course / history / experience / custom_*
+  description TEXT NOT NULL DEFAULT '',
+  format TEXT NOT NULL DEFAULT 'word',          -- word / markdown
+  content TEXT NOT NULL DEFAULT '',             -- 正文（HTML 或 Markdown）
+  attachments JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ id, name, size, type, dataUrl }]
+  file_type TEXT DEFAULT NULL,                  -- pdf / docx / xlsx / pptx / image（主文件类型）
+  file_url TEXT DEFAULT NULL,                   -- 主文件 dataUrl（向后兼容）
+  size_text TEXT DEFAULT '—',                   -- 展示用大小
+  uploaded_by TEXT DEFAULT 'Unknown',
+  uploaded_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  date TEXT NOT NULL DEFAULT to_char(now(), 'YYYY-MM-DD'),
+  view_count INTEGER NOT NULL DEFAULT 0,
+  likes JSONB NOT NULL DEFAULT '[]'::jsonb,
+  last_edited_at TEXT DEFAULT NULL,
+  last_edited_by TEXT DEFAULT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents (created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_documents_type ON documents (type);
+
+ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看文档" ON documents;
+DROP POLICY IF EXISTS "认证用户可新增文档" ON documents;
+DROP POLICY IF EXISTS "管理员或作者可更新文档" ON documents;
+DROP POLICY IF EXISTS "管理员或作者可删除文档" ON documents;
+
+-- 所有已认证用户可查看所有文档
+CREATE POLICY "认证用户可查看文档"
+  ON documents FOR SELECT
+  TO authenticated
+  USING (true);
+
+-- 所有已认证用户可新增文档
+CREATE POLICY "认证用户可新增文档"
+  ON documents FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+-- 管理员或作者可更新（编辑标题、正文、点赞等）
+-- 注意：点赞也走 UPDATE，所以条件里允许所有已认证用户对 likes 字段做修改较麻烦，
+-- 这里采用与 articles 一致的宽松策略：管理员 + 作者；点赞改为独立表也可以，
+-- 但为了最小改动，先允许所有认证用户 UPDATE（协作团队场景，信任边界在登录鉴权）。
+CREATE POLICY "认证用户可更新文档"
+  ON documents FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- 管理员或作者可删除
+CREATE POLICY "管理员或作者可删除文档"
+  ON documents FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+    OR uploaded_by_id = auth.uid()
+  );
+
+-- ============================================
+-- 21. 创建 documents_deleted_defaults 表（被管理员删除的默认模拟文档 id 列表）
+-- ============================================
+-- documentsData 里有一批 hardcode 的默认示例文档，管理员可以删除它们。
+-- 之前"删除记录"只写在单机 localStorage，导致另一台设备又看到这些默认数据。
+-- 改为数据库共享状态，保证跨设备一致。
+CREATE TABLE IF NOT EXISTS documents_deleted_defaults (
+  default_id TEXT PRIMARY KEY,                  -- siteData.documentsData 里的 id（string）
+  deleted_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  deleted_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE documents_deleted_defaults ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看已删除默认文档" ON documents_deleted_defaults;
+DROP POLICY IF EXISTS "认证用户可标记删除默认文档" ON documents_deleted_defaults;
+DROP POLICY IF EXISTS "管理员可恢复默认文档" ON documents_deleted_defaults;
+
+CREATE POLICY "认证用户可查看已删除默认文档"
+  ON documents_deleted_defaults FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "认证用户可标记删除默认文档"
+  ON documents_deleted_defaults FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "管理员可恢复默认文档"
+  ON documents_deleted_defaults FOR DELETE
+  TO authenticated
+  USING (
+    (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- ============================================
+-- 22. 创建 document_views 表（流程模板/文档的浏览计数，跨设备累计）
+-- ============================================
+-- 原来 riemer_process_template_views 只存本地，每台设备各算各的 —— 合到云端后
+-- 可以展示整个团队的真实浏览量。
+CREATE TABLE IF NOT EXISTS document_views (
+  document_id TEXT PRIMARY KEY,
+  view_count INTEGER NOT NULL DEFAULT 0,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE document_views ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看浏览计数" ON document_views;
+DROP POLICY IF EXISTS "认证用户可更新浏览计数" ON document_views;
+
+CREATE POLICY "认证用户可查看浏览计数"
+  ON document_views FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "认证用户可更新浏览计数"
+  ON document_views FOR INSERT
+  TO authenticated
+  WITH CHECK (true);
+
+CREATE POLICY "认证用户可增量浏览计数"
+  ON document_views FOR UPDATE
+  TO authenticated
+  USING (true)
+  WITH CHECK (true);
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，

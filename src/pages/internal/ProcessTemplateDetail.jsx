@@ -26,6 +26,13 @@ import {
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
+import {
+  fetchAllFromCloud,
+  fetchViewsFromCloud,
+  incrementView,
+  updateDoc as cloudUpdateDoc,
+  canUseSupabase,
+} from '../../lib/documentsService';
 import './ProcessTemplateDetail.css';
 
 const DOCUMENTS_KEY = 'riemer_documents';
@@ -124,23 +131,49 @@ export default function ProcessTemplateDetail() {
   const navigate = useNavigate();
   const contentRef = useRef(null);
 
-  // 合并数据源：localStorage（用户发布） + siteData.documentsData（默认模拟，排除被删除的）
-  // 使用 state + 版本号 让"保存"后重新加载数据，而不是永远锁死在首次 mount 快照
+  // 合并数据源：
+  // - 挂载时先用 localStorage 渲染（避免白屏），随后异步从 Supabase 拉取最新数据
+  // - docsVersion 递增会强制 useMemo 重新计算
+  // - cloudData 存放云端返回的快照（包含用户文档 + 已删除默认 id）
   const [docsVersion, setDocsVersion] = useState(0);
+  const [cloudData, setCloudData] = useState(null); // { userDocs, deletedIds } | null
+
+  // 挂载时从云端拉一次 + 浏览计数
+  useEffect(() => {
+    if (!canUseSupabase()) return;
+    let cancelled = false;
+    (async () => {
+      const cloud = await fetchAllFromCloud();
+      if (cancelled || !cloud) return;
+      const userDocs = cloud.docs.filter((d) => String(d.id).startsWith('doc-'));
+      setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
+      // 浏览计数合并
+      await fetchViewsFromCloud();
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   const allDocs = useMemo(() => {
-    // 依赖 docsVersion：编辑保存后递增，强制重算；loadUserDocs/loadDeletedDefaultIds 是直接读 localStorage 的纯函数
     void docsVersion;
+    if (cloudData) {
+      // 云端数据优先
+      const deletedSet = new Set(cloudData.deletedIds);
+      const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
+      return [...cloudData.userDocs, ...defaults];
+    }
+    // 退回本地缓存
     const userDocs = loadUserDocs();
-    const deletedIds = new Set(loadDeletedDefaultIds());
-    const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
+    const deletedSet = new Set(loadDeletedDefaultIds().map(String));
+    const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
     return [...userDocs, ...defaults];
-  }, [docsVersion]);
+  }, [docsVersion, cloudData]);
 
   const doc = useMemo(() => allDocs.find((d) => String(d.id) === String(id)), [allDocs, id]);
 
   /* 浏览次数：
-     - 存在 localStorage: riemer_process_template_views （与卡片列表共享）
-     - 同一个会话（同一标签页）内刷新不重复计数，避免"每刷一次就 +1"
+     - 本地 localStorage: riemer_process_template_views（与卡片列表共享）
+     - 云端 document_views 表（跨设备累计）
+     - 同一个会话内刷新不重复计数，避免"每刷一次就 +1"
      - 关闭窗口重开 → sessionStorage 清空 → 新会话再计一次
   */
   useEffect(() => {
@@ -151,14 +184,21 @@ export default function ProcessTemplateDetail() {
         JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
       );
       if (sessionViewed.has(String(doc.id))) {
-        // 当前会话内已经计过一次，刷新不再增加
         return;
       }
+      // 本地即时 +1（incrementView 内部会同时写云端，异步不阻塞）
       const views = loadViews();
       views[doc.id] = (views[doc.id] || 0) + 1;
       saveViews(views);
       sessionViewed.add(String(doc.id));
       sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
+
+      // 云端同步（Supabase 可用时）
+      if (canUseSupabase()) {
+        incrementView(String(doc.id)).catch((err) => {
+          console.warn('[ProcessTemplateDetail] 云端浏览计数同步失败:', err);
+        });
+      }
     } catch { /* ignore */ }
   }, [doc?.id]);
 
@@ -260,10 +300,17 @@ export default function ProcessTemplateDetail() {
     setLiked(!liked);
     // 仅对用户发布的文档（doc-*）能持久化 likes
     if (isUserDoc(doc)) {
+      // 本地
       const userDocs = loadUserDocs().map((d) =>
         d.id === doc.id ? { ...d, likes: nextLikes } : d
       );
       saveUserDocs(userDocs);
+      // 云端
+      if (canUseSupabase()) {
+        cloudUpdateDoc(doc.id, { likes: nextLikes }).catch((err) => {
+          console.warn('[ProcessTemplateDetail] 云端点赞同步失败:', err);
+        });
+      }
     }
   }, [doc, user, liked, likes]);
 
@@ -286,7 +333,7 @@ export default function ProcessTemplateDetail() {
     setIsEditing(false);
   }, []);
 
-  const saveEdit = useCallback(() => {
+  const saveEdit = useCallback(async () => {
     if (!doc) return;
     const title = editTitle.trim();
     if (!title) {
@@ -302,16 +349,46 @@ export default function ProcessTemplateDetail() {
         setSaving(false);
         return;
       }
+      const nowDate = new Date().toISOString().split('T')[0];
+      const editor = user?.nickname || user?.name || user?.email || 'Unknown';
       userDocs[idx] = {
         ...userDocs[idx],
         title,
         description: editDescription,
         content: editContent,
-        // 保留旧的 format：markdown / word
-        lastEditedAt: new Date().toISOString().split('T')[0],
-        lastEditedBy: user?.nickname || user?.name || user?.email || 'Unknown',
+        lastEditedAt: nowDate,
+        lastEditedBy: editor,
       };
       saveUserDocs(userDocs);
+
+      // 云端同步
+      if (canUseSupabase()) {
+        const result = await cloudUpdateDoc(doc.id, {
+          title,
+          description: editDescription,
+          content: editContent,
+          lastEditedAt: nowDate,
+          lastEditedBy: editor,
+        });
+        if (!result.remote) {
+          console.warn('[ProcessTemplateDetail] 云端编辑同步失败，其他设备暂不可见', result.error);
+          // 不阻塞用户，编辑已本地保存
+        } else {
+          // 云端成功后同步刷新 cloudData，避免下次重新进入页面读到旧版
+          setCloudData((prev) => {
+            if (!prev) return prev;
+            return {
+              ...prev,
+              userDocs: prev.userDocs.map((d) =>
+                String(d.id) === String(doc.id)
+                  ? { ...d, title, description: editDescription, content: editContent, lastEditedAt: nowDate, lastEditedBy: editor }
+                  : d
+              ),
+            };
+          });
+        }
+      }
+
       setDocsVersion((v) => v + 1);
       setIsEditing(false);
     } catch (err) {

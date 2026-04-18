@@ -1,0 +1,385 @@
+// ============================================
+// 文档（流程模板）数据服务
+// ============================================
+// 负责 Supabase 和 localStorage 的统一 CRUD，保证 Documents.jsx /
+// ProcessTemplateCreate.jsx / ProcessTemplateDetail.jsx 三处共用相同的持久化逻辑。
+//
+// 持久化策略：
+// - Supabase 可用 → 优先读写云端 `documents` 表；本地同时写一份缓存
+//   （加速首屏、离线兜底）。
+// - Supabase 不可用 / 未登录 → 读写 localStorage。
+//
+// 默认模拟数据的"已删除 id 列表"也走云端的 documents_deleted_defaults 表，
+// 避免一台设备删了默认数据、另一台设备又看到。
+// 跨设备浏览计数走 document_views 表。
+
+import { supabase, isSupabaseConfigured, getReachable } from './supabase';
+
+export const DOCUMENTS_KEY = 'riemer_documents';
+export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
+export const DOC_VIEWS_KEY = 'riemer_process_template_views';
+
+/**
+ * 判断当前是否可以使用 Supabase（已配置 + 健康检测通过）
+ */
+export function canUseSupabase() {
+  if (!isSupabaseConfigured) return false;
+  const reachable = getReachable();
+  // 健康检查未完成（null）时先尝试一次；true 时使用云端；false 时纯本地
+  return reachable !== false;
+}
+
+/* ============ Row ↔ Doc 对象互转 ============ */
+// 数据库列名（snake_case）与前端字段（camelCase）互转
+
+function rowToDoc(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    title: row.title || '',
+    type: row.type || 'process',
+    description: row.description || '',
+    format: row.format || 'word',
+    content: row.content || '',
+    attachments: Array.isArray(row.attachments) ? row.attachments : [],
+    fileType: row.file_type || null,
+    fileUrl: row.file_url || null,
+    size: row.size_text || '—',
+    uploadedBy: row.uploaded_by || 'Unknown',
+    uploadedById: row.uploaded_by_id || null,
+    date: row.date || '',
+    viewCount: row.view_count || 0,
+    likes: Array.isArray(row.likes) ? row.likes : [],
+    lastEditedAt: row.last_edited_at || null,
+    lastEditedBy: row.last_edited_by || null,
+    _remote: true, // 标记此记录来自云端，便于调试
+  };
+}
+
+function docToRow(doc) {
+  return {
+    id: doc.id,
+    title: doc.title || '',
+    type: doc.type || 'process',
+    description: doc.description || '',
+    format: doc.format || 'word',
+    content: doc.content || '',
+    attachments: Array.isArray(doc.attachments) ? doc.attachments : [],
+    file_type: doc.fileType || null,
+    file_url: doc.fileUrl || null,
+    size_text: doc.size || '—',
+    uploaded_by: doc.uploadedBy || 'Unknown',
+    uploaded_by_id: doc.uploadedById || null,
+    date: doc.date || new Date().toISOString().split('T')[0],
+    view_count: doc.viewCount || 0,
+    likes: Array.isArray(doc.likes) ? doc.likes : [],
+    last_edited_at: doc.lastEditedAt || null,
+    last_edited_by: doc.lastEditedBy || null,
+  };
+}
+
+/* ============ 本地 localStorage 读写 ============ */
+
+export function loadLocalDocs() {
+  try {
+    const stored = localStorage.getItem(DOCUMENTS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return [];
+}
+
+export function saveLocalDocs(data) {
+  try {
+    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(data));
+  } catch (err) {
+    console.error('[documentsService] localStorage 保存失败（空间不足？）', err);
+    throw err;
+  }
+}
+
+export function loadLocalDeletedIds() {
+  try {
+    const stored = localStorage.getItem(DELETED_DEFAULT_IDS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return [];
+}
+
+export function saveLocalDeletedIds(ids) {
+  try {
+    localStorage.setItem(DELETED_DEFAULT_IDS_KEY, JSON.stringify(ids));
+  } catch (err) {
+    console.error('[documentsService] localStorage 保存已删除列表失败', err);
+  }
+}
+
+/* ============ Supabase 云端读写 ============ */
+
+/**
+ * 从云端拉取所有用户发布的文档 + 已删除默认 id 列表。
+ * 失败（表不存在 / 网络异常 / 未登录）时返回 null，调用方退回本地。
+ */
+export async function fetchAllFromCloud() {
+  if (!canUseSupabase() || !supabase) return null;
+  try {
+    const [docsRes, deletedRes] = await Promise.all([
+      supabase
+        .from('documents')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      supabase.from('documents_deleted_defaults').select('default_id'),
+    ]);
+
+    if (docsRes.error) {
+      console.warn('[documentsService] 云端拉取 documents 失败:', docsRes.error.message);
+      return null;
+    }
+
+    const docs = (docsRes.data || []).map(rowToDoc);
+    const deletedIds = deletedRes.error
+      ? []
+      : (deletedRes.data || []).map((r) => String(r.default_id));
+
+    // 写入本地缓存，用于下次首屏快速渲染
+    try {
+      const userDocs = docs.filter((d) => String(d.id).startsWith('doc-'));
+      saveLocalDocs(userDocs);
+      saveLocalDeletedIds(deletedIds);
+    } catch { /* ignore */ }
+
+    return { docs, deletedIds };
+  } catch (err) {
+    console.warn('[documentsService] fetchAllFromCloud 异常:', err.message);
+    return null;
+  }
+}
+
+/**
+ * 新增一条文档。云端成功后同步更新本地缓存。
+ * 云端失败会 throw，由调用方决定是否退回本地存储（比如：非登录 / 表未建）。
+ */
+export async function createDoc(doc) {
+  // 始终先把本地缓存也加一份，失败了至少当前设备不会丢
+  try {
+    const existing = loadLocalDocs();
+    saveLocalDocs([doc, ...existing]);
+  } catch {
+    // saveLocalDocs 内部抛了（localStorage 空间不足），继续上抛
+    throw new Error('本地存储空间不足');
+  }
+
+  if (!canUseSupabase() || !supabase) {
+    return { doc, remote: false };
+  }
+
+  try {
+    const row = docToRow(doc);
+    const { error } = await supabase.from('documents').insert(row);
+    if (error) {
+      console.warn('[documentsService] 云端插入失败:', error.message, error.code);
+      return { doc, remote: false, error };
+    }
+    console.log('[documentsService] 云端插入成功, id:', doc.id);
+    return { doc, remote: true };
+  } catch (err) {
+    console.warn('[documentsService] createDoc 异常:', err.message);
+    return { doc, remote: false, error: err };
+  }
+}
+
+/**
+ * 更新一条用户发布的文档（内容、标题、likes 等）。
+ * 会同时写云端和本地缓存；云端失败不致命，只是跨设备不同步。
+ */
+export async function updateDoc(id, patch) {
+  // 更新本地缓存
+  try {
+    const all = loadLocalDocs();
+    const idx = all.findIndex((d) => String(d.id) === String(id));
+    if (idx !== -1) {
+      all[idx] = { ...all[idx], ...patch };
+      saveLocalDocs(all);
+    }
+  } catch { /* ignore */ }
+
+  if (!canUseSupabase() || !supabase) {
+    return { remote: false };
+  }
+
+  try {
+    // 把 camelCase patch 转成 snake_case（只转已知字段，避免污染数据库列）
+    const update = {};
+    if ('title' in patch) update.title = patch.title;
+    if ('description' in patch) update.description = patch.description;
+    if ('content' in patch) update.content = patch.content;
+    if ('format' in patch) update.format = patch.format;
+    if ('type' in patch) update.type = patch.type;
+    if ('attachments' in patch) update.attachments = patch.attachments;
+    if ('fileType' in patch) update.file_type = patch.fileType;
+    if ('fileUrl' in patch) update.file_url = patch.fileUrl;
+    if ('likes' in patch) update.likes = patch.likes;
+    if ('lastEditedAt' in patch) update.last_edited_at = patch.lastEditedAt;
+    if ('lastEditedBy' in patch) update.last_edited_by = patch.lastEditedBy;
+    update.updated_at = new Date().toISOString();
+
+    const { error } = await supabase.from('documents').update(update).eq('id', id);
+    if (error) {
+      console.warn('[documentsService] 云端更新失败:', error.message, error.code);
+      return { remote: false, error };
+    }
+    return { remote: true };
+  } catch (err) {
+    console.warn('[documentsService] updateDoc 异常:', err.message);
+    return { remote: false, error: err };
+  }
+}
+
+/**
+ * 删除一条用户发布的文档。
+ */
+export async function deleteUserDoc(id) {
+  // 本地
+  try {
+    const all = loadLocalDocs().filter((d) => String(d.id) !== String(id));
+    saveLocalDocs(all);
+  } catch { /* ignore */ }
+
+  if (!canUseSupabase() || !supabase) return { remote: false };
+
+  try {
+    const { error } = await supabase.from('documents').delete().eq('id', id);
+    if (error) {
+      console.warn('[documentsService] 云端删除失败:', error.message, error.code);
+      return { remote: false, error };
+    }
+    return { remote: true };
+  } catch (err) {
+    console.warn('[documentsService] deleteUserDoc 异常:', err.message);
+    return { remote: false, error: err };
+  }
+}
+
+/**
+ * 标记默认模拟文档为已删除（跨设备生效）。
+ */
+export async function markDefaultDeleted(defaultId) {
+  const sid = String(defaultId);
+  // 本地
+  try {
+    const ids = loadLocalDeletedIds();
+    if (!ids.includes(sid)) {
+      ids.push(sid);
+      saveLocalDeletedIds(ids);
+    }
+  } catch { /* ignore */ }
+
+  if (!canUseSupabase() || !supabase) return { remote: false };
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase
+      .from('documents_deleted_defaults')
+      .upsert(
+        { default_id: sid, deleted_by: user?.id || null },
+        { onConflict: 'default_id' }
+      );
+    if (error) {
+      console.warn('[documentsService] 标记默认文档删除失败:', error.message);
+      return { remote: false, error };
+    }
+    return { remote: true };
+  } catch (err) {
+    console.warn('[documentsService] markDefaultDeleted 异常:', err.message);
+    return { remote: false, error: err };
+  }
+}
+
+/* ============ 浏览计数（document_views） ============ */
+
+export function loadLocalViews() {
+  try {
+    const stored = localStorage.getItem(DOC_VIEWS_KEY);
+    if (stored) return JSON.parse(stored);
+  } catch { /* ignore */ }
+  return {};
+}
+
+export function saveLocalViews(map) {
+  try {
+    localStorage.setItem(DOC_VIEWS_KEY, JSON.stringify(map));
+  } catch { /* ignore */ }
+}
+
+/**
+ * 从云端拉取所有文档的浏览计数，合并到本地视图。
+ * 合并策略：取两边较大值，避免掉线期间本地累计的数据被云端旧数据覆盖。
+ */
+export async function fetchViewsFromCloud() {
+  if (!canUseSupabase() || !supabase) return null;
+  try {
+    const { data, error } = await supabase.from('document_views').select('*');
+    if (error) {
+      console.warn('[documentsService] 拉取浏览计数失败:', error.message);
+      return null;
+    }
+    const cloudMap = {};
+    (data || []).forEach((r) => {
+      cloudMap[r.document_id] = r.view_count || 0;
+    });
+    const localMap = loadLocalViews();
+    const merged = { ...localMap };
+    Object.entries(cloudMap).forEach(([k, v]) => {
+      merged[k] = Math.max(Number(merged[k]) || 0, Number(v) || 0);
+    });
+    saveLocalViews(merged);
+    return merged;
+  } catch (err) {
+    console.warn('[documentsService] fetchViewsFromCloud 异常:', err.message);
+    return null;
+  }
+}
+
+/**
+ * 浏览计数 +1。
+ * 云端用 upsert 增量更新；本地缓存同步 +1。
+ */
+export async function incrementView(documentId) {
+  // 本地 +1
+  try {
+    const map = loadLocalViews();
+    map[documentId] = (map[documentId] || 0) + 1;
+    saveLocalViews(map);
+  } catch { /* ignore */ }
+
+  if (!canUseSupabase() || !supabase) return { remote: false };
+
+  try {
+    // 先读当前云端值，再 upsert 新值（简单但非原子；并发冲突对于浏览计数可接受）
+    const { data: existing } = await supabase
+      .from('document_views')
+      .select('view_count')
+      .eq('document_id', documentId)
+      .maybeSingle();
+    const nextCount = (existing?.view_count || 0) + 1;
+    const { error } = await supabase
+      .from('document_views')
+      .upsert(
+        { document_id: documentId, view_count: nextCount, updated_at: new Date().toISOString() },
+        { onConflict: 'document_id' }
+      );
+    if (error) {
+      console.warn('[documentsService] 浏览计数写入失败:', error.message);
+      return { remote: false, error };
+    }
+    return { remote: true, count: nextCount };
+  } catch (err) {
+    console.warn('[documentsService] incrementView 异常:', err.message);
+    return { remote: false, error: err };
+  }
+}
+
+/* ============ 判断工具 ============ */
+
+export function isUserDoc(doc) {
+  return String(doc?.id || '').startsWith('doc-');
+}

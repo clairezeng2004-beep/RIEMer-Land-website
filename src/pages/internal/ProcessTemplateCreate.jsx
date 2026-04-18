@@ -20,9 +20,8 @@ import {
 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { createDoc, canUseSupabase } from '../../lib/documentsService';
 import './MemberSharingCreate.css';
-
-const DOCUMENTS_KEY = 'riemer_documents';
 
 const DEFAULT_TYPE_LABELS = {
   process: '流程手册及模版文件',
@@ -68,24 +67,7 @@ function fileToDataUrl(file) {
   });
 }
 
-function loadDocs() {
-  try {
-    const stored = localStorage.getItem(DOCUMENTS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return [];
-}
-
-function saveDocs(data) {
-  try {
-    localStorage.setItem(DOCUMENTS_KEY, JSON.stringify(data));
-  } catch (err) {
-    // localStorage 配额溢出（通常是附件 dataUrl 太大）
-    console.error('保存失败：localStorage 空间不足', err);
-    alert('保存失败：本地存储空间不足，请减少附件大小或数量');
-    throw err;
-  }
-}
+// 注：真正的发布持久化（本地 + 云端）已由 documentsService.createDoc 统一处理。
 
 /* ====== 主组件 ====== */
 export default function ProcessTemplateCreate() {
@@ -288,7 +270,7 @@ export default function ProcessTemplateCreate() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   /* ============ 发布 ============ */
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
     const hasContent = newDoc.content.trim().length > 0;
     const hasAttachments = newDoc.attachments.length > 0;
@@ -330,10 +312,18 @@ export default function ProcessTemplateCreate() {
     };
 
     try {
-      const existing = loadDocs();
-      saveDocs([doc, ...existing]);
-    } catch {
-      return; // saveDocs 内部已提示
+      // 通过 documentsService 同时写本地 + 云端（Supabase 可用时）
+      const result = await createDoc(doc);
+      if (canUseSupabase() && !result.remote) {
+        // Supabase 配置但写云端失败 —— 给用户一个可感知的警告，
+        // 但仍然允许发布（本地已保存），避免阻塞工作流。
+        console.warn('[ProcessTemplateCreate] 云端同步失败，其他设备将看不到此文档，请联系管理员检查 Supabase 配置。', result.error);
+        alert('已本地保存，但云端同步失败 —— 其他设备可能看不到此文档。请联系管理员检查后台配置。');
+      }
+    } catch (err) {
+      console.error('[ProcessTemplateCreate] 发布失败:', err);
+      alert('发布失败：' + (err.message || '未知错误'));
+      return;
     }
 
     // 返回流程模板列表页（非新窗口跳转时）
