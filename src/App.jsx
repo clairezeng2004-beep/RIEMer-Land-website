@@ -34,6 +34,7 @@ import Suggestions from './pages/internal/Suggestions';
 import Guestbook from './pages/internal/Guestbook';
 import NotificationManagement from './pages/internal/NotificationManagement';
 import EventPublish from './pages/internal/EventPublish';
+import SyncDiagnostic from './pages/internal/SyncDiagnostic';
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
 const FULLSCREEN_PATHS = [
@@ -94,6 +95,7 @@ function AppShell() {
             <Route path="profile" element={<Profile />} />
             <Route path="member-profiles" element={<MemberProfiles />} />
             <Route path="event-publish" element={<EventPublish />} />
+            <Route path="sync-diagnostic" element={<SyncDiagnostic />} />
           </Route>
         </Routes>
       </main>

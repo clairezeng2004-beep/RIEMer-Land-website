@@ -1,0 +1,360 @@
+/* ============================================
+   同步诊断面板样式
+   ============================================ */
+
+.sd-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 24px 20px 80px;
+  color: #1a1a1a;
+  font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", Arial, sans-serif;
+}
+
+/* ---- 未授权 ---- */
+.sd-unauthorized {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 18px 20px;
+  background: #fff8ec;
+  border: 1px solid #f0e0b8;
+  border-radius: 10px;
+  color: #6b5a2b;
+}
+.sd-unauthorized p { margin: 0; }
+
+/* ---- 头部 ---- */
+.sd-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #e8e8e3;
+}
+
+.sd-title {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+  letter-spacing: 0.02em;
+}
+
+.sd-subtitle {
+  color: #777;
+  font-size: 13px;
+  margin: 0;
+  line-height: 1.6;
+}
+
+.sd-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sd-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: #fff;
+  border: 1px solid #d8d8d0;
+  border-radius: 6px;
+  color: #333;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+.sd-btn:hover:not(:disabled) {
+  border-color: #8b6f47;
+  color: #8b6f47;
+}
+.sd-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sd-btn--primary {
+  background: #8b6f47;
+  color: #fff;
+  border-color: #8b6f47;
+}
+.sd-btn--primary:hover:not(:disabled) {
+  background: #6f5635;
+  border-color: #6f5635;
+  color: #fff;
+}
+
+.sd-btn--secondary {
+  background: #f5ede0;
+  border-color: #d9c7a7;
+  color: #6b5a2b;
+}
+.sd-btn--secondary:hover:not(:disabled) {
+  background: #ecddbf;
+  border-color: #b89c6e;
+  color: #6b5a2b;
+}
+
+.sd-spin {
+  animation: sd-spin 1s linear infinite;
+}
+@keyframes sd-spin {
+  from { transform: rotate(0); }
+  to { transform: rotate(360deg); }
+}
+
+/* ---- 概要快览条 ---- */
+.sd-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 12px;
+  background: #f7f5f0;
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+@media (max-width: 640px) {
+  .sd-summary { grid-template-columns: 1fr; }
+}
+
+.sd-summary__item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.sd-summary__label {
+  font-size: 11px;
+  color: #888;
+  letter-spacing: 0.05em;
+}
+.sd-summary__value {
+  font-size: 14px;
+  color: #1a1a1a;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+/* ---- Section 容器 ---- */
+.sd-section {
+  margin-bottom: 28px;
+}
+
+.sd-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #555;
+  letter-spacing: 0.05em;
+  margin: 0 0 12px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #eee8dc;
+}
+
+.sd-hint {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #777;
+  margin: 0 0 12px 0;
+}
+
+/* ---- 检查结果行 ---- */
+.sd-row {
+  display: flex;
+  gap: 12px;
+  padding: 12px 14px;
+  border: 1px solid #eae6dd;
+  border-radius: 8px;
+  margin-bottom: 8px;
+  background: #fff;
+  transition: all 0.2s;
+}
+
+.sd-row--ok { border-left: 3px solid #2d9c6e; }
+.sd-row--warn { border-left: 3px solid #e0a63b; background: #fffcf3; }
+.sd-row--fail { border-left: 3px solid #d14b47; background: #fff5f4; }
+.sd-row--pending { border-left: 3px solid #8b6f47; background: #fafaf5; }
+.sd-row--idle { opacity: 0.55; }
+
+.sd-row__icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-start;
+  padding-top: 2px;
+}
+
+.sd-row__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.sd-row__title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #1a1a1a;
+  margin-bottom: 3px;
+}
+
+.sd-row__detail {
+  font-size: 13px;
+  color: #555;
+  line-height: 1.7;
+  word-break: break-word;
+}
+
+.sd-row__note {
+  font-size: 12px;
+  color: #8a6f40;
+  line-height: 1.7;
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(139, 111, 71, 0.06);
+  border-radius: 4px;
+}
+
+/* ---- 状态图标 ---- */
+.sd-icon--ok { color: #2d9c6e; }
+.sd-icon--warn { color: #e0a63b; }
+.sd-icon--fail { color: #d14b47; }
+.sd-icon--pending {
+  color: #8b6f47;
+  animation: sd-spin 1s linear infinite;
+}
+.sd-icon-idle {
+  color: #bbb;
+  font-size: 16px;
+  width: 18px;
+  display: inline-block;
+  text-align: center;
+}
+
+/* ---- 实时事件 ---- */
+.sd-events {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  border: 1px solid #eae6dd;
+  border-radius: 8px;
+  background: #fff;
+  overflow: hidden;
+}
+.sd-events__item {
+  display: flex;
+  gap: 12px;
+  padding: 8px 12px;
+  border-bottom: 1px solid #f3f0e8;
+  font-size: 13px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+.sd-events__item:last-child { border-bottom: none; }
+
+.sd-events__time { color: #999; min-width: 80px; }
+.sd-events__type {
+  min-width: 60px;
+  color: #2d9c6e;
+  font-weight: 600;
+}
+.sd-events__table { color: #555; }
+
+.sd-empty {
+  padding: 18px;
+  text-align: center;
+  color: #999;
+  font-size: 13px;
+  background: #fafaf5;
+  border: 1px dashed #e0d9c6;
+  border-radius: 8px;
+}
+
+/* ---- 写入探针结果 ---- */
+.sd-probe {
+  margin-top: 14px;
+  padding: 14px 16px;
+  border-radius: 8px;
+  border: 1px solid #eae6dd;
+  background: #fff;
+}
+.sd-probe--ok { border-left: 3px solid #2d9c6e; }
+.sd-probe--fail { border-left: 3px solid #d14b47; background: #fff5f4; }
+
+.sd-probe__summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.sd-probe__hint {
+  font-size: 12px;
+  color: #8a6f40;
+  padding: 6px 8px;
+  background: rgba(139, 111, 71, 0.06);
+  border-radius: 4px;
+  margin-bottom: 10px;
+  line-height: 1.7;
+}
+
+.sd-probe__steps {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.sd-probe__steps li {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  border-top: 1px dashed #eee;
+}
+.sd-probe__steps li:first-child { border-top: none; }
+
+.sd-probe__step-name {
+  font-weight: 500;
+  min-width: 120px;
+  flex-shrink: 0;
+}
+.sd-probe__step-msg {
+  color: #666;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  word-break: break-all;
+  line-height: 1.6;
+}
+
+/* ---- 使用提示 ---- */
+.sd-tips {
+  background: #fffcf3;
+  border: 1px solid #f0e0b8;
+  border-radius: 10px;
+  padding: 16px 20px;
+}
+.sd-tips ol {
+  padding-left: 20px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: #6b5a2b;
+  margin: 0;
+}
+.sd-tips code {
+  background: rgba(139, 111, 71, 0.12);
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* ---- 移动端适配 ---- */
+@media (max-width: 640px) {
+  .sd-container { padding: 16px 14px 60px; }
+  .sd-title { font-size: 20px; }
+  .sd-header { flex-direction: column; align-items: stretch; }
+  .sd-actions { justify-content: flex-start; }
+  .sd-probe__steps li { flex-direction: column; gap: 2px; }
+  .sd-probe__step-name { min-width: auto; }
+}

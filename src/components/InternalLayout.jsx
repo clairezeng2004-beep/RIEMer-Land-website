@@ -10,7 +10,7 @@ import ErrorBoundary from './ErrorBoundary';
 import {
   Bell, BellRing, FolderOpen, Share2, BookOpen, CheckSquare,
   Camera, BarChart3, MessageSquarePlus, MessageCircle, UserCircle, Contact,
-  Users, Settings, CalendarRange,
+  Users, Settings, CalendarRange, Activity,
 } from 'lucide-react';
 import './InternalLayout.css';
 
@@ -18,6 +18,7 @@ import './InternalLayout.css';
 function MobileInternalNav() {
   const { unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
+  const { isAdmin } = useAuth();
   const sc = internalConfig.sidebar || {};
   const scrollRef = useRef(null);
   const location = useLocation();
@@ -41,6 +42,10 @@ function MobileInternalNav() {
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
     { to: '/internal/notification-management', icon: BellRing, label: sc.labelNotificationMgmt },
+    // 同步诊断：仅管理员可见
+    ...(isAdmin ? [
+      { to: '/internal/sync-diagnostic', icon: Activity, label: '同步诊断' },
+    ] : []),
   ];
 
   // 路由变化时将当前激活项滚动到可见区域

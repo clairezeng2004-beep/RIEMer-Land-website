@@ -98,6 +98,10 @@ export default function InternalSidebar() {
     { to: '/internal/users', icon: Users, configKey: 'labelUsers', label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, configKey: 'labelContent', label: sc.labelContent },
     { to: '/internal/notification-management', icon: BellRing, configKey: 'labelNotificationMgmt', label: sc.labelNotificationMgmt },
+    // 同步诊断入口：仅管理员可见（用于排查跨设备数据同步问题）
+    ...(isAdmin ? [
+      { to: '/internal/sync-diagnostic', icon: Activity, label: '同步诊断' },
+    ] : []),
   ];
 
   // 渲染一组菜单项的辅助函数
