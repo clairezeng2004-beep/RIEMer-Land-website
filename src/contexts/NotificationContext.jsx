@@ -137,10 +137,15 @@ export function NotificationProvider({ children }) {
         }
 
         let readSet = new Set();
+        // read_at 映射：notification_id -> ISO 时间字符串
+        // 用于判定「自动已读」：如果某条通知的 read_at 与 created_at 间隔极短
+        // （< 5 秒，正常人不可能这么快手动点击），就判定为系统自动已读。
+        // 这样即使换设备登录或清缓存，也能稳定显示「自动已读」而不是「已读」。
+        let readAtMap = new Map();
         if (authUser) {
           const { data: readData, error: readErr } = await supabase
             .from('notification_reads')
-            .select('notification_id')
+            .select('notification_id, read_at')
             .eq('user_id', authUser.id);
           if (readErr) {
             // 查询已读状态失败 —— 不要直接把所有通知视为未读，
@@ -158,6 +163,7 @@ export function NotificationProvider({ children }) {
             } catch { /* ignore */ }
           } else if (readData) {
             readSet = new Set(readData.map((r) => r.notification_id));
+            readAtMap = new Map(readData.map((r) => [r.notification_id, r.read_at]));
             console.log('[Notification] 云端已读记录:', readData.length, '条');
           }
         } else {
@@ -194,15 +200,32 @@ export function NotificationProvider({ children }) {
 
         // 转换为前端格式
         const autoReadSet = loadAutoReadIds();
-        const mapped = filtered.map((n) => ({
-          id: n.id,
-          title: n.title,
-          message: n.message,
-          type: n.type,
-          date: n.date,
-          read: readSet.has(n.id),
-          autoRead: autoReadSet.has(String(n.id)),
-        }));
+        // 5 秒内自动已读的阈值（单位: 毫秒）
+        // 正常用户不可能在一条通知产生后 5 秒内手动点击已读，所以超短间隔一定是系统自动标记的
+        const AUTO_READ_THRESHOLD_MS = 5000;
+        const mapped = filtered.map((n) => {
+          // 先按本地记录判断（老数据兜底）
+          let isAuto = autoReadSet.has(String(n.id));
+          // 再按云端 read_at 与 created_at 间隔判断（跨设备也可靠）
+          if (!isAuto && readSet.has(n.id)) {
+            const readAt = readAtMap.get(n.id);
+            if (readAt && n.created_at) {
+              const diff = Math.abs(new Date(readAt).getTime() - new Date(n.created_at).getTime());
+              if (diff <= AUTO_READ_THRESHOLD_MS) {
+                isAuto = true;
+              }
+            }
+          }
+          return {
+            id: n.id,
+            title: n.title,
+            message: n.message,
+            type: n.type,
+            date: n.date,
+            read: readSet.has(n.id),
+            autoRead: isAuto,
+          };
+        });
 
         // 只有数据真正变化时才更新 state，避免轮询/可见性变化导致列表重渲染闪动
         setNotifications((prev) => {
