@@ -299,14 +299,66 @@ export default function MemberSharingDetail() {
   }, [toc]);
 
   const handleTocClick = useCallback((id) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const offset = 80; // 顶栏高度预留
-    const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-    window.scrollTo({ top, behavior: 'smooth' });
+    // 优先用最新的内容区 DOM 查找，避免同名 id 残留到页面其它地方
+    const root = contentRef.current;
+    let el = null;
+    try {
+      el = root && root.querySelector(`#${CSS.escape(id)}`);
+    } catch {
+      el = null;
+    }
+    if (!el) el = document.getElementById(id);
+    // 兜底：按文本内容匹配（id 可能因为 DOM 被其它副作用重置或被 sanitize 而丢失）
+    if (!el && root) {
+      const item = toc.find((t) => t.id === id);
+      if (item) {
+        const headings = Array.from(root.querySelectorAll('h1, h2, h3'));
+        el = headings.find((h) => (h.textContent || '').trim() === item.text) || null;
+        if (el && !el.id) el.id = id;
+      }
+    }
+    if (!el) {
+      console.warn('[TOC] 未找到对应标题元素：', id);
+      return;
+    }
+
+    // 找到真正的"可滚动祖先"：谁的 overflow-y 是 auto/scroll 且确实在滚就是它
+    const findScrollParent = (node) => {
+      let p = node?.parentElement;
+      while (p && p !== document.body) {
+        const style = window.getComputedStyle(p);
+        const oy = style.overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
+          return p;
+        }
+        p = p.parentElement;
+      }
+      return null;
+    };
+
+    const offset = 80;
+    const scrollParent = findScrollParent(el);
+    try {
+      if (scrollParent) {
+        const containerRect = scrollParent.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        const target = scrollParent.scrollTop + (elRect.top - containerRect.top) - offset;
+        scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+      } else {
+        const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+      }
+    } catch {
+      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo(0, Math.max(0, top));
+    }
+
+    try {
+      window.history.replaceState(null, '', `#${id}`);
+    } catch { /* ignore */ }
     setActiveTocId(id);
     setTocOpenMobile(false);
-  }, []);
+  }, [toc]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
