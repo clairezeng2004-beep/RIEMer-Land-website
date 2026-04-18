@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
-  MessageSquare, X, Send, Check, Trash2, CornerDownRight,
+  MessageSquare, X, Send, Trash2, CornerDownRight,
   CheckCircle, Circle, ChevronDown, ChevronUp, User,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,24 +31,36 @@ function timeAgo(dateStr) {
  * TextAnnotation — 划词评论组件
  *
  * Props:
- *   targetType: 'article' | 'document'
+ *   targetType: 'article' | 'document' | 'sharing' | 'template'
  *   targetId: string
  *   contentRef: React.RefObject — 包裹可选中内容的 DOM 容器
  *   disabled?: boolean — 如果为 true 则不显示划词工具栏
+ *   inline?: boolean —
+ *     false（默认）：浮动按钮 + 右侧抽屉面板（老版样式）。
+ *     true：不渲染浮动按钮和抽屉，评论面板作为子元素直接输出，
+ *           由父组件布局到想要的位置（例如右侧侧栏）。
  */
-export default function TextAnnotation({ targetType, targetId, contentRef, disabled }) {
+export default function TextAnnotation({
+  targetType,
+  targetId,
+  contentRef,
+  disabled,
+  inline = false,
+}) {
   const { user } = useAuth();
   const [comments, setComments] = useState([]);
+  const [loading, setLoading] = useState(true);
   const [showPanel, setShowPanel] = useState(false);
   const [showResolved, setShowResolved] = useState(false);
 
-  // 浮动工具栏
+  // 浮动工具栏（划中文字后弹出）
   const [toolbar, setToolbar] = useState({ visible: false, x: 0, y: 0 });
   const [selection, setSelection] = useState({ text: '', anchorData: null });
 
   // 评论输入
   const [commentInput, setCommentInput] = useState('');
   const [isCommenting, setIsCommenting] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   // 回复
   const [replyingTo, setReplyingTo] = useState(null);
@@ -60,9 +72,18 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
   const toolbarRef = useRef(null);
   const panelRef = useRef(null);
 
-  // ---- 加载评论 ----
-  const loadComments = useCallback(() => {
-    setComments(getComments(targetType, targetId));
+  // ---- 加载评论（异步） ----
+  const loadComments = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await getComments(targetType, targetId);
+      setComments(list);
+    } catch (err) {
+      console.error('[TextAnnotation] 加载评论失败:', err);
+      setComments([]);
+    } finally {
+      setLoading(false);
+    }
   }, [targetType, targetId]);
 
   useEffect(() => {
@@ -136,7 +157,11 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
 
     const container = contentRef.current;
     container.addEventListener('mouseup', handleMouseUp);
-    return () => container.removeEventListener('mouseup', handleMouseUp);
+    container.addEventListener('touchend', handleMouseUp);
+    return () => {
+      container.removeEventListener('mouseup', handleMouseUp);
+      container.removeEventListener('touchend', handleMouseUp);
+    };
   }, [disabled, contentRef]);
 
   // 点击外部关闭工具栏
@@ -159,65 +184,98 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
     return () => document.removeEventListener('mousedown', handleClick);
   }, [toolbar.visible]);
 
-  // ---- 提交评论 ----
-  const handleSubmitComment = () => {
-    if (!commentInput.trim() || !user) return;
-    addComment({
-      targetType,
-      targetId,
-      selectedText: selection.text,
-      content: commentInput.trim(),
-      user,
-      anchorData: selection.anchorData,
-    });
-    setCommentInput('');
-    setIsCommenting(false);
-    setToolbar({ visible: false, x: 0, y: 0 });
-    window.getSelection()?.removeAllRanges();
-    loadComments();
-    setShowPanel(true);
-  };
-
-  // ---- 提交整体评论（无选中文本） ----
-  const handleSubmitGeneralComment = () => {
-    if (!commentInput.trim() || !user) return;
-    addComment({
-      targetType,
-      targetId,
-      selectedText: '',
-      content: commentInput.trim(),
-      user,
-      anchorData: null,
-    });
-    setCommentInput('');
-    loadComments();
-  };
-
-  // ---- 提交回复 ----
-  const handleSubmitReply = (commentId) => {
-    if (!replyInput.trim() || !user) return;
-    replyToComment(commentId, { content: replyInput.trim(), user });
-    setReplyInput('');
-    setReplyingTo(null);
-    loadComments();
-  };
-
-  // ---- 解决 / 删除 ----
-  const handleResolve = (id) => {
-    toggleResolve(id);
-    loadComments();
-  };
-
-  const handleDelete = (id) => {
-    if (window.confirm('确定要删除这条评论吗？')) {
-      deleteComment(id);
-      loadComments();
+  // ---- 提交评论（划中文本） ----
+  const handleSubmitComment = async () => {
+    if (!commentInput.trim() || !user || submitting) return;
+    setSubmitting(true);
+    try {
+      await addComment({
+        targetType,
+        targetId,
+        selectedText: selection.text,
+        content: commentInput.trim(),
+        user,
+        anchorData: selection.anchorData,
+      });
+      setCommentInput('');
+      setIsCommenting(false);
+      setToolbar({ visible: false, x: 0, y: 0 });
+      window.getSelection()?.removeAllRanges();
+      await loadComments();
+      if (!inline) setShowPanel(true);
+    } catch (err) {
+      console.error('[TextAnnotation] 提交评论失败:', err);
+      alert('评论提交失败，请稍后再试');
+    } finally {
+      setSubmitting(false);
     }
   };
 
-  const handleDeleteReply = (commentId, replyId) => {
-    deleteReply(commentId, replyId);
-    loadComments();
+  // ---- 提交整体评论（无选中文本） ----
+  const handleSubmitGeneralComment = async () => {
+    if (!commentInput.trim() || !user || submitting) return;
+    setSubmitting(true);
+    try {
+      await addComment({
+        targetType,
+        targetId,
+        selectedText: '',
+        content: commentInput.trim(),
+        user,
+        anchorData: null,
+      });
+      setCommentInput('');
+      await loadComments();
+    } catch (err) {
+      console.error('[TextAnnotation] 提交整体评论失败:', err);
+      alert('评论提交失败，请稍后再试');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // ---- 提交回复 ----
+  const handleSubmitReply = async (commentId) => {
+    if (!replyInput.trim() || !user) return;
+    try {
+      await replyToComment(commentId, { content: replyInput.trim(), user });
+      setReplyInput('');
+      setReplyingTo(null);
+      await loadComments();
+    } catch (err) {
+      console.error('[TextAnnotation] 回复失败:', err);
+      alert('回复提交失败，请稍后再试');
+    }
+  };
+
+  // ---- 解决 / 删除 ----
+  const handleResolve = async (id) => {
+    try {
+      await toggleResolve(id);
+      await loadComments();
+    } catch (err) {
+      console.error('[TextAnnotation] 切换状态失败:', err);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('确定要删除这条评论吗？')) return;
+    try {
+      await deleteComment(id);
+      await loadComments();
+    } catch (err) {
+      console.error('[TextAnnotation] 删除失败:', err);
+      alert('删除失败，请稍后再试');
+    }
+  };
+
+  const handleDeleteReply = async (commentId, replyId) => {
+    try {
+      await deleteReply(commentId, replyId);
+      await loadComments();
+    } catch (err) {
+      console.error('[TextAnnotation] 删除回复失败:', err);
+    }
   };
 
   // ---- 分组 ----
@@ -266,13 +324,13 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
         {/* 选中的文本引用 */}
         {comment.selectedText && (
           <div className="ta-comment__quote">
-            <span className="ta-comment__quote-mark">"</span>
+            <span className="ta-comment__quote-mark">&ldquo;</span>
             <span className="ta-comment__quote-text">
               {comment.selectedText.length > 80
                 ? comment.selectedText.slice(0, 80) + '…'
                 : comment.selectedText}
             </span>
-            <span className="ta-comment__quote-mark">"</span>
+            <span className="ta-comment__quote-mark">&rdquo;</span>
           </div>
         )}
 
@@ -317,7 +375,7 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
         </div>
 
         {/* 回复列表 */}
-        {comment.replies.length > 0 && (
+        {comment.replies && comment.replies.length > 0 && (
           <div className="ta-comment__replies">
             {comment.replies.map((reply) => (
               <div key={reply.id} className="ta-reply">
@@ -369,59 +427,150 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
 
   if (!user) return null;
 
-  return (
+  // ---- 共享的"面板内部"内容（输入框 + 列表） ----
+  const panelBody = (
     <>
-      {/* 浮动工具栏 */}
-      {toolbar.visible && (
-        <div
-          ref={toolbarRef}
-          className="ta-toolbar"
-          style={{
-            left: toolbar.x,
-            top: toolbar.y,
-            transform: 'translate(-50%, -100%)',
-          }}
-        >
-          {!isCommenting ? (
-            <button
-              className="ta-toolbar__btn"
-              onClick={() => setIsCommenting(true)}
-            >
-              <MessageSquare size={14} />
-              <span>评论</span>
-            </button>
-          ) : (
-            <div className="ta-toolbar__input-area">
-              <div className="ta-toolbar__selected-text">
-                "{selection.text.length > 40 ? selection.text.slice(0, 40) + '…' : selection.text}"
-              </div>
-              <div className="ta-toolbar__input-row">
-                <input
-                  type="text"
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  placeholder="写下你的评论…"
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSubmitComment();
-                    if (e.key === 'Escape') {
-                      setIsCommenting(false);
-                      setCommentInput('');
-                    }
-                  }}
-                />
-                <button
-                  onClick={handleSubmitComment}
-                  disabled={!commentInput.trim()}
-                  className="ta-toolbar__send"
-                >
-                  <Send size={14} />
-                </button>
-              </div>
+      {/* 整体评论输入 */}
+      <div className="ta-panel__new-comment">
+        <div className="ta-panel__new-input-row">
+          <input
+            type="text"
+            value={!isCommenting ? commentInput : ''}
+            onChange={(e) => {
+              if (!isCommenting) setCommentInput(e.target.value);
+            }}
+            placeholder="添加整体评论…（或划选文字精准评论）"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') handleSubmitGeneralComment();
+            }}
+          />
+          <button
+            onClick={handleSubmitGeneralComment}
+            disabled={isCommenting || !commentInput.trim() || submitting}
+          >
+            <Send size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* 评论列表 */}
+      <div className="ta-panel__list">
+        {loading && comments.length === 0 && (
+          <div className="ta-panel__empty">
+            <MessageSquare size={28} />
+            <p>加载评论中…</p>
+          </div>
+        )}
+
+        {!loading &&
+          unresolvedComments.length === 0 &&
+          resolvedComments.length === 0 && (
+            <div className="ta-panel__empty">
+              <MessageSquare size={32} />
+              <p>暂无评论</p>
+              <span>选中文字后点击「评论」，或在上方输入整体评论</span>
             </div>
           )}
+
+        {unresolvedComments.map(renderComment)}
+
+        {/* 已解决评论折叠 */}
+        {resolvedComments.length > 0 && (
+          <div className="ta-panel__resolved-section">
+            <button
+              className="ta-panel__resolved-toggle"
+              onClick={() => setShowResolved(!showResolved)}
+            >
+              {showResolved ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              <span>已解决 ({resolvedComments.length})</span>
+            </button>
+            {showResolved && resolvedComments.map(renderComment)}
+          </div>
+        )}
+      </div>
+    </>
+  );
+
+  // ---- 浮动工具栏（划中文字后弹出，inline 与否都需要） ----
+  const floatingToolbar = toolbar.visible && (
+    <div
+      ref={toolbarRef}
+      className="ta-toolbar"
+      style={{
+        left: toolbar.x,
+        top: toolbar.y,
+        transform: 'translate(-50%, -100%)',
+      }}
+    >
+      {!isCommenting ? (
+        <button
+          className="ta-toolbar__btn"
+          onClick={() => setIsCommenting(true)}
+        >
+          <MessageSquare size={14} />
+          <span>评论</span>
+        </button>
+      ) : (
+        <div className="ta-toolbar__input-area">
+          <div className="ta-toolbar__selected-text">
+            &ldquo;{selection.text.length > 40
+              ? selection.text.slice(0, 40) + '…'
+              : selection.text}&rdquo;
+          </div>
+          <div className="ta-toolbar__input-row">
+            <input
+              type="text"
+              value={commentInput}
+              onChange={(e) => setCommentInput(e.target.value)}
+              placeholder="写下你的评论…"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitComment();
+                if (e.key === 'Escape') {
+                  setIsCommenting(false);
+                  setCommentInput('');
+                }
+              }}
+            />
+            <button
+              onClick={handleSubmitComment}
+              disabled={!commentInput.trim() || submitting}
+              className="ta-toolbar__send"
+            >
+              <Send size={14} />
+            </button>
+          </div>
         </div>
       )}
+    </div>
+  );
+
+  // ================================================================
+  // 渲染：inline 模式 —— 作为子元素直接输出一个面板
+  // ================================================================
+  if (inline) {
+    return (
+      <div className="ta-inline">
+        {floatingToolbar}
+        <div className="ta-panel ta-panel--inline ta-panel--open">
+          <div className="ta-panel__header">
+            <h4>
+              <MessageSquare size={16} />
+              评论 ({comments.length})
+            </h4>
+          </div>
+          {panelBody}
+        </div>
+      </div>
+    );
+  }
+
+  // ================================================================
+  // 渲染：默认模式 —— 浮动按钮 + 抽屉面板
+  // ================================================================
+  return (
+    <>
+      {floatingToolbar}
 
       {/* 评论面板入口按钮 */}
       <button
@@ -447,55 +596,7 @@ export default function TextAnnotation({ targetType, targetId, contentRef, disab
           </button>
         </div>
 
-        {/* 整体评论输入 */}
-        <div className="ta-panel__new-comment">
-          <div className="ta-panel__new-input-row">
-            <input
-              type="text"
-              value={!isCommenting ? commentInput : ''}
-              onChange={(e) => {
-                if (!isCommenting) setCommentInput(e.target.value);
-              }}
-              placeholder="添加整体评论…（或划选文字精准评论）"
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmitGeneralComment();
-              }}
-            />
-            <button
-              onClick={handleSubmitGeneralComment}
-              disabled={isCommenting || !commentInput.trim()}
-            >
-              <Send size={14} />
-            </button>
-          </div>
-        </div>
-
-        {/* 评论列表 */}
-        <div className="ta-panel__list">
-          {unresolvedComments.length === 0 && resolvedComments.length === 0 && (
-            <div className="ta-panel__empty">
-              <MessageSquare size={32} />
-              <p>暂无评论</p>
-              <span>选中文字后点击「评论」，或在上方输入整体评论</span>
-            </div>
-          )}
-
-          {unresolvedComments.map(renderComment)}
-
-          {/* 已解决评论折叠 */}
-          {resolvedComments.length > 0 && (
-            <div className="ta-panel__resolved-section">
-              <button
-                className="ta-panel__resolved-toggle"
-                onClick={() => setShowResolved(!showResolved)}
-              >
-                {showResolved ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                <span>已解决 ({resolvedComments.length})</span>
-              </button>
-              {showResolved && resolvedComments.map(renderComment)}
-            </div>
-          )}
-        </div>
+        {panelBody}
       </div>
 
       {/* 遮罩层（手机端） */}

@@ -53,12 +53,12 @@
   max-width: none;
 }
 
-/* 当存在目录时，内容区采用两栏布局：文章 + 右侧 TOC */
+/* 当存在目录时，内容区采用三栏布局：左目录 + 文章 + 右评论 */
 .ptd-content__inner--with-toc {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 240px;
+  grid-template-columns: 220px minmax(0, 1fr) 340px;
   gap: var(--space-xl, 24px);
-  max-width: 1240px;
+  max-width: 1480px;
   margin: 0 auto;
   align-items: start;
 }
@@ -66,6 +66,20 @@
 .ptd-content__inner--with-toc .ptd-article {
   max-width: none;
   margin: 0;
+}
+
+/* 右侧：划线评论栏（inline TextAnnotation 面板的外壳） */
+.ptd-comments {
+  position: sticky;
+  top: 80px;
+  max-height: calc(100vh - 100px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.ptd-comments .ta-panel.ta-panel--inline {
+  max-height: calc(100vh - 100px);
 }
 
 /* ============ 目录（TOC）侧栏 ============ */
@@ -641,7 +655,7 @@
 
 /* ============ Responsive ============ */
 @media (max-width: 1024px) {
-  /* TOC 侧栏退出两栏布局，改用浮动按钮 */
+  /* TOC 侧栏退出三栏布局，改用浮动按钮；评论栏改为底部展开 */
   .ptd-content__inner--with-toc {
     display: block;
     max-width: none;
@@ -651,6 +665,11 @@
   }
   .ptd-toc-fab {
     display: flex;
+  }
+  .ptd-comments {
+    position: static;
+    max-height: none;
+    margin-top: var(--space-xl, 24px);
   }
 }
 

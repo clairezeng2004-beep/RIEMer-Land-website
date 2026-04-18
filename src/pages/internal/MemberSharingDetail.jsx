@@ -20,6 +20,7 @@ import {
   List,
   X,
 } from 'lucide-react';
+import TextAnnotation from '../../components/TextAnnotation';
 import './MemberSharingDetail.css';
 
 const SHARING_KEY = 'riemer_member_sharing';

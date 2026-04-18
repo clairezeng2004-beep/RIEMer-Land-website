@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
+import TextAnnotation from '../../components/TextAnnotation';
 import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
@@ -478,6 +479,30 @@ export default function ProcessTemplateDetail() {
       {/* 全屏内容区域 */}
       <div className="ptd-content">
         <div className={`ptd-content__inner ${showToc ? 'ptd-content__inner--with-toc' : ''}`}>
+          {/* 左侧目录 */}
+          {showToc && (
+            <aside className="ptd-toc ptd-toc--left" aria-label="文档目录">
+              <div className="ptd-toc__header">
+                <List size={14} />
+                <span>目录</span>
+              </div>
+              <nav className="ptd-toc__list">
+                {toc.map((item) => (
+                  <button
+                    key={item.id}
+                    type="button"
+                    className={`ptd-toc__item ptd-toc__item--l${item.level} ${activeTocId === item.id ? 'ptd-toc__item--active' : ''}`}
+                    onClick={() => handleTocClick(item.id)}
+                    title={item.text}
+                  >
+                    <span className="ptd-toc__dot" />
+                    <span className="ptd-toc__text">{item.text}</span>
+                  </button>
+                ))}
+              </nav>
+            </aside>
+          )}
+
           {/* 文章主体 */}
           <article className={`ptd-article ${isEditing ? 'ptd-article--editing' : ''}`}>
             {/* 文章头部 */}
@@ -675,27 +700,15 @@ export default function ProcessTemplateDetail() {
             </footer>
           </article>
 
-          {/* 右侧目录 */}
-          {showToc && (
-            <aside className="ptd-toc" aria-label="文档目录">
-              <div className="ptd-toc__header">
-                <List size={14} />
-                <span>目录</span>
-              </div>
-              <nav className="ptd-toc__list">
-                {toc.map((item) => (
-                  <button
-                    key={item.id}
-                    type="button"
-                    className={`ptd-toc__item ptd-toc__item--l${item.level} ${activeTocId === item.id ? 'ptd-toc__item--active' : ''}`}
-                    onClick={() => handleTocClick(item.id)}
-                    title={item.text}
-                  >
-                    <span className="ptd-toc__dot" />
-                    <span className="ptd-toc__text">{item.text}</span>
-                  </button>
-                ))}
-              </nav>
+          {/* 右侧：所有用户可划线 / 整体评论 */}
+          {showToc && !isEditing && (
+            <aside className="ptd-comments" aria-label="划线评论">
+              <TextAnnotation
+                targetType="template"
+                targetId={doc.id}
+                contentRef={contentRef}
+                inline
+              />
             </aside>
           )}
         </div>

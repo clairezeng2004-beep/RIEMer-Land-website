@@ -123,6 +123,31 @@ export default function InternalArticles() {
     [userArticles]
   );
 
+  // ---- 异步批量加载每篇文章的评论数 ----
+  const [commentCounts, setCommentCounts] = useState({});
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const ids = allArticles.map((a) => a.id);
+      const entries = await Promise.all(
+        ids.map(async (id) => {
+          try {
+            const n = await getCommentCount('article', id);
+            return [id, n];
+          } catch {
+            return [id, 0];
+          }
+        }),
+      );
+      if (!cancelled) {
+        setCommentCounts(Object.fromEntries(entries));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [allArticles]);
+
   // 从所有文章中提取已有标签（按频次降序，用于标签建议）
   const existingTags = useMemo(() => {
     const tagCount = {};

@@ -189,6 +189,31 @@ mark.ta-highlight:hover {
   transform: translateX(0);
 }
 
+/* ---- Inline 模式：作为侧栏直接嵌入页面，不使用 fixed ---- */
+.ta-inline {
+  position: relative;
+}
+
+.ta-panel.ta-panel--inline {
+  position: sticky;
+  top: 80px;
+  right: auto;
+  bottom: auto;
+  width: 100%;
+  max-width: none;
+  max-height: calc(100vh - 100px);
+  z-index: 1;
+  transform: none;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: none;
+}
+
+.ta-panel.ta-panel--inline .ta-panel__header {
+  padding: 12px 14px;
+}
+
 .ta-panel__header {
   display: flex;
   align-items: center;
@@ -594,6 +619,16 @@ mark.ta-highlight:hover {
 
   .ta-panel--open {
     transform: translateY(0);
+  }
+
+  /* inline 模式在移动端走父容器布局，不需要浮层动画 */
+  .ta-panel.ta-panel--inline {
+    position: static;
+    width: 100%;
+    max-height: none;
+    border-left: 1px solid var(--color-border-light);
+    border-radius: var(--radius-lg, 12px);
+    transform: none;
   }
 
   .ta-toggle {

@@ -631,6 +631,110 @@ CREATE POLICY "认证用户可增量浏览计数"
   WITH CHECK (true);
 
 -- ============================================
+-- 24. 创建 annotations 表（文本划线评论 / 全站共享）
+-- ============================================
+-- 任何已授权用户都能对"文章 / 文档 / 内部分享 / 流程模板" 等内容
+-- 进行划线评论和回复；评论对所有登录用户可见。
+CREATE TABLE IF NOT EXISTS annotations (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  target_type TEXT NOT NULL,          -- 'article' | 'document' | 'sharing' | 'template'
+  target_id TEXT NOT NULL,            -- 对应内容 id（可能是 UUID 或前端生成的字符串）
+  selected_text TEXT NOT NULL DEFAULT '', -- 划中的原文（空串表示整体评论）
+  anchor_data JSONB,                  -- 高亮锚点（contextBefore / contextAfter 等）
+  content TEXT NOT NULL,              -- 评论正文
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  user_name TEXT NOT NULL DEFAULT '',
+  user_avatar TEXT,
+  resolved BOOLEAN NOT NULL DEFAULT false,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_annotations_target
+  ON annotations (target_type, target_id);
+CREATE INDEX IF NOT EXISTS idx_annotations_user
+  ON annotations (user_id);
+
+-- 25. 创建 annotation_replies 表（评论回复）
+CREATE TABLE IF NOT EXISTS annotation_replies (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  annotation_id UUID NOT NULL REFERENCES annotations(id) ON DELETE CASCADE,
+  content TEXT NOT NULL,
+  user_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  user_name TEXT NOT NULL DEFAULT '',
+  user_avatar TEXT,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS idx_annotation_replies_annotation
+  ON annotation_replies (annotation_id);
+
+-- 26. RLS —— annotations
+ALTER TABLE annotations ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看所有划线评论" ON annotations;
+DROP POLICY IF EXISTS "认证用户可新增自己的划线评论" ON annotations;
+DROP POLICY IF EXISTS "作者或管理员可更新划线评论" ON annotations;
+DROP POLICY IF EXISTS "作者或管理员可删除划线评论" ON annotations;
+
+CREATE POLICY "认证用户可查看所有划线评论"
+  ON annotations FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "认证用户可新增自己的划线评论"
+  ON annotations FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+-- 作者本人或管理员可更新（例如标记"已解决"）
+CREATE POLICY "作者或管理员可更新划线评论"
+  ON annotations FOR UPDATE
+  TO authenticated
+  USING (
+    auth.uid() = user_id
+    OR (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  )
+  WITH CHECK (
+    auth.uid() = user_id
+    OR (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- 作者本人或管理员可删除
+CREATE POLICY "作者或管理员可删除划线评论"
+  ON annotations FOR DELETE
+  TO authenticated
+  USING (
+    auth.uid() = user_id
+    OR (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- 27. RLS —— annotation_replies
+ALTER TABLE annotation_replies ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看所有评论回复" ON annotation_replies;
+DROP POLICY IF EXISTS "认证用户可新增自己的评论回复" ON annotation_replies;
+DROP POLICY IF EXISTS "作者或管理员可删除评论回复" ON annotation_replies;
+
+CREATE POLICY "认证用户可查看所有评论回复"
+  ON annotation_replies FOR SELECT
+  TO authenticated
+  USING (true);
+
+CREATE POLICY "认证用户可新增自己的评论回复"
+  ON annotation_replies FOR INSERT
+  TO authenticated
+  WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "作者或管理员可删除评论回复"
+  ON annotation_replies FOR DELETE
+  TO authenticated
+  USING (
+    auth.uid() = user_id
+    OR (SELECT role FROM profiles WHERE id = auth.uid()) = 'admin'
+  );
+
+-- ============================================
 -- 初始设置完成后，手动操作：
 -- 1. 注册你的账号（通过网站或 Supabase Dashboard）
 -- 2. 在 Supabase SQL Editor 中运行以下命令，
