@@ -17,7 +17,7 @@ import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
   Plus, Link2, Loader2, X, Check, Tag, AlertCircle,
   ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
-  CheckSquare, Sparkles, Eye,
+  CheckSquare, Sparkles, Eye, ClipboardPaste, Wand2,
 } from 'lucide-react';
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
@@ -73,6 +73,99 @@ function buildCategoryMaps(cats) {
     colors[c.label] = c.color;
   });
   return { labels, colors };
+}
+
+// ==========================================================
+//  批量粘贴解析：公众号后台复制的阅读量文本 → { 阅读数, 文本 }
+// ==========================================================
+//
+// 典型可粘贴格式（多种来源都兼容）：
+//   1) 每行一条：标题 + 数字；数字可带千分位逗号
+//        "春日随笔                      1,234"
+//        "清明诗歌会实录   2026-04-10    890"
+//   2) 表格复制（Excel/网页表格）：以 Tab 分隔或多空格分隔
+//        "春日随笔\t2026-04-15\t1234\t890"
+//   3) 多行合并：用户手动粘贴后换行符可能丢失 → 按"标题-数字"对尝试
+//
+// 策略：
+//   - 按行切
+//   - 每行从中抽所有数字（带逗号），取其中 **最大值** 作为阅读数
+//     （避免把日期里的 "2026"、"04" 当阅读数，通常阅读数更大；
+//      若阅读数确实 < 年份则用户自己改）
+//   - 剔除明显不是标题的字符（日期、纯数字、Tab 等）后，剩余文本作为"标题候选"
+// 返回：[{ rawLine, titleText, readNum }]
+function parseReadNumsFromPaste(text) {
+  if (!text || typeof text !== 'string') return [];
+  const lines = text
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+
+  const rows = [];
+  for (const line of lines) {
+    // 1. 抽出所有"带千分位/纯数字"的 token
+    const numberTokens = line.match(/\d{1,3}(?:,\d{3})+|\d+/g) || [];
+    if (numberTokens.length === 0) continue;
+
+    // 2. 转成整数，过滤像年份(1900~2100)这种明显是日期的 → 用不到可忽略
+    const numbers = numberTokens
+      .map((t) => parseInt(t.replace(/,/g, ''), 10))
+      .filter((n) => Number.isFinite(n) && n >= 0);
+
+    if (numbers.length === 0) continue;
+
+    // 3. 优先取 "不像年份/月份" 的最大值
+    //    年份：1900-2099；月/日：1-31；阅读数通常要么 < 31 要么远大于 2099
+    //    简单规则：取最大值，但若最大值落在 [1900, 2099] 且还有其它候选，换第二大
+    let readNum = Math.max(...numbers);
+    if (numbers.length > 1 && readNum >= 1900 && readNum <= 2099) {
+      const others = numbers.filter((n) => n !== readNum);
+      const second = Math.max(...others);
+      if (second >= 0) readNum = second;
+    }
+
+    // 4. 剔除数字 token + 常见日期格式 → 剩下的是标题候选
+    let titleText = line;
+    numberTokens.forEach((t) => {
+      titleText = titleText.split(t).join(' ');
+    });
+    // 去掉 "YYYY-MM-DD" / "YYYY/MM/DD" / "MM-DD" 这类残留连字符
+    titleText = titleText
+      .replace(/[-/.]+/g, ' ')
+      .replace(/\t+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+    if (!titleText) continue;
+
+    rows.push({ rawLine: line, titleText, readNum });
+  }
+  return rows;
+}
+
+// 模糊匹配：粘贴行的"标题文本" → 已归档文章
+//   - 归一化：去标点、去空白、小写
+//   - 包含关系（任一方包含另一方即算匹配）
+//   - 返回第一个命中的 article.id，否则 null
+function findMatchingArticleId(titleText, articles) {
+  const normalize = (s) =>
+    (s || '')
+      .toLowerCase()
+      .replace(/[\s\u3000]+/g, '')
+      .replace(/[·・,.，。、!?！？:：;；'"'""()（）\[\]【】《》<>]/g, '');
+
+  const needle = normalize(titleText);
+  if (!needle) return null;
+
+  // 先找完全相等 / 包含命中
+  for (const a of articles) {
+    const hay = normalize(a.title);
+    if (!hay) continue;
+    if (hay === needle || hay.includes(needle) || needle.includes(hay)) {
+      return a.id;
+    }
+  }
+  return null;
 }
 
 export default function InternalArticles() {
@@ -166,6 +259,12 @@ export default function InternalArticles() {
   const [readNumDraft, setReadNumDraft] = useState({});
   const [readNumSaving, setReadNumSaving] = useState(false);
   const [readNumSaved, setReadNumSaved] = useState(false);
+
+  // ---- 从公众号后台批量粘贴导入 ----
+  const [showPastePanel, setShowPastePanel] = useState(false);
+  const [pasteText, setPasteText] = useState('');
+  // 解析结果：{ matched: [{id,title,readNum}], unmatched: [{titleText,readNum}] }
+  const [pasteResult, setPasteResult] = useState(null);
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -470,6 +569,9 @@ export default function InternalArticles() {
     });
     setReadNumDraft(draft);
     setReadNumSaved(false);
+    setShowPastePanel(false);
+    setPasteText('');
+    setPasteResult(null);
     setShowReadNumModal(true);
   };
 
@@ -478,12 +580,55 @@ export default function InternalArticles() {
     setShowReadNumModal(false);
     setReadNumDraft({});
     setReadNumSaved(false);
+    setShowPastePanel(false);
+    setPasteText('');
+    setPasteResult(null);
   };
 
   const handleReadNumChange = (id, val) => {
     // 仅保留数字
     const cleaned = val.replace(/[^0-9]/g, '');
     setReadNumDraft((prev) => ({ ...prev, [id]: cleaned }));
+  };
+
+  // 解析粘贴文本 → 匹配文章 → 自动填入 readNumDraft
+  const handleParsePaste = () => {
+    const rows = parseReadNumsFromPaste(pasteText);
+    if (rows.length === 0) {
+      setPasteResult({ matched: [], unmatched: [], emptyInput: true });
+      return;
+    }
+
+    const matched = [];
+    const unmatched = [];
+    const nextDraft = { ...readNumDraft };
+
+    for (const row of rows) {
+      const articleId = findMatchingArticleId(row.titleText, allArticles);
+      if (articleId) {
+        const art = allArticles.find((a) => a.id === articleId);
+        nextDraft[articleId] = String(row.readNum);
+        matched.push({
+          id: articleId,
+          title: art?.title || row.titleText,
+          readNum: row.readNum,
+        });
+      } else {
+        unmatched.push({
+          titleText: row.titleText,
+          readNum: row.readNum,
+          rawLine: row.rawLine,
+        });
+      }
+    }
+
+    setReadNumDraft(nextDraft);
+    setPasteResult({ matched, unmatched, emptyInput: false });
+  };
+
+  const handleClearPaste = () => {
+    setPasteText('');
+    setPasteResult(null);
   };
 
   const handleSaveReadNums = async () => {
@@ -1013,6 +1158,102 @@ export default function InternalArticles() {
               <p className="ia-modal__hint">
                 录入各篇公众号推送的阅读量。首页"公众号累计阅读"将自动基于所有文章的阅读量求和。
               </p>
+
+              {/* ==== 批量粘贴面板（折叠展开式） ==== */}
+              <div className={`ia-paste-panel ${showPastePanel ? 'ia-paste-panel--open' : ''}`}>
+                <button
+                  type="button"
+                  className="ia-paste-panel__toggle"
+                  onClick={() => setShowPastePanel(!showPastePanel)}
+                >
+                  <ClipboardPaste size={15} />
+                  <span>从公众号后台批量粘贴</span>
+                  {showPastePanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </button>
+
+                {showPastePanel && (
+                  <div className="ia-paste-panel__body">
+                    <p className="ia-paste-panel__tip">
+                      打开 <code>mp.weixin.qq.com</code> → 左侧菜单「统计」→「图文分析」→
+                      选中文章列表 → <kbd>Ctrl/Cmd</kbd> + <kbd>C</kbd> 复制 → 粘贴到下方。
+                      系统会按<strong>标题 + 阅读数</strong>自动匹配到已归档的文章。
+                    </p>
+                    <textarea
+                      className="ia-paste-panel__textarea"
+                      placeholder={
+                        '示例（每行一条）：\n春日随笔        2026-04-15       1,234\n清明诗歌会实录  2026-04-10       890\n新晋成员访谈    2026-04-05       567'
+                      }
+                      value={pasteText}
+                      onChange={(e) => {
+                        setPasteText(e.target.value);
+                        if (pasteResult) setPasteResult(null);
+                      }}
+                      rows={6}
+                      spellCheck={false}
+                    />
+                    <div className="ia-paste-panel__actions">
+                      <button
+                        type="button"
+                        className="btn btn-ghost btn-sm"
+                        onClick={handleClearPaste}
+                        disabled={!pasteText}
+                      >
+                        <X size={14} /> 清空
+                      </button>
+                      <button
+                        type="button"
+                        className="btn btn-primary btn-sm"
+                        onClick={handleParsePaste}
+                        disabled={!pasteText.trim()}
+                      >
+                        <Wand2 size={14} /> 解析并填入
+                      </button>
+                    </div>
+
+                    {/* 解析结果反馈 */}
+                    {pasteResult && (
+                      <div className="ia-paste-panel__result">
+                        {pasteResult.emptyInput && (
+                          <div className="ia-paste-panel__msg ia-paste-panel__msg--warn">
+                            <AlertCircle size={14} />
+                            <span>未识别出任何有效行，请检查粘贴内容格式。</span>
+                          </div>
+                        )}
+                        {pasteResult.matched.length > 0 && (
+                          <div className="ia-paste-panel__msg ia-paste-panel__msg--success">
+                            <Check size={14} />
+                            <span>
+                              匹配成功 <strong>{pasteResult.matched.length}</strong> 篇，已自动填入下方输入框。
+                              请核对后点击"保存"。
+                            </span>
+                          </div>
+                        )}
+                        {pasteResult.unmatched.length > 0 && (
+                          <div className="ia-paste-panel__msg ia-paste-panel__msg--warn">
+                            <AlertCircle size={14} />
+                            <div style={{ flex: 1 }}>
+                              <div style={{ marginBottom: 4 }}>
+                                未匹配 <strong>{pasteResult.unmatched.length}</strong> 条（可能是未归档的文章，请手动添加或忽略）：
+                              </div>
+                              <ul className="ia-paste-panel__unmatched-list">
+                                {pasteResult.unmatched.slice(0, 5).map((u, i) => (
+                                  <li key={i}>
+                                    <span className="ia-paste-panel__unmatched-title">{u.titleText}</span>
+                                    <span className="ia-paste-panel__unmatched-num">{u.readNum.toLocaleString()}</span>
+                                  </li>
+                                ))}
+                                {pasteResult.unmatched.length > 5 && (
+                                  <li style={{ opacity: 0.6 }}>…另 {pasteResult.unmatched.length - 5} 条</li>
+                                )}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
 
               <div className="ia-readnum-summary">
                 <span className="ia-readnum-summary__label">当前累计：</span>
