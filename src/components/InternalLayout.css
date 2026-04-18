@@ -17,7 +17,12 @@
   flex: 1;
   min-width: 0;
   min-height: calc(100vh - 72px);
-  overflow-x: hidden;
+  /* 关键：使用 overflow-x: clip 而不是 hidden。
+     hidden 会让浏览器把本元素变成一个"滚动容器"（并把 overflow-y 隐式变为 auto），
+     这样所有子元素（例如文档详情页的目录）上的 position: sticky 就会以这个容器为参照系，
+     而真实纵向滚动发生在 window 上 → 结果就是 sticky 失效、目录跟着内容一起走。
+     clip 只做视觉裁剪、不创建滚动容器，overflow-y 保持 visible，sticky 挂到 window 上后正常生效。 */
+  overflow-x: clip;
   background: var(--color-bg);
   margin-left: 220px;
   overscroll-behavior-x: none;
