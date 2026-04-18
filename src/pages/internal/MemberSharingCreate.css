@@ -719,6 +719,16 @@
 
 .msc-form__word-editor p { margin: 0.4em 0; }
 
+.msc-form__word-editor blockquote {
+  margin: 0.6em 0;
+  padding: 8px 14px;
+  border-left: 3px solid var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.06);
+  color: var(--color-text, #1f2937);
+  border-radius: 0 6px 6px 0;
+}
+.msc-form__word-editor blockquote p { margin: 0.2em 0; }
+
 .msc-form__word-editor ul,
 .msc-form__word-editor ol {
   margin: 0.4em 0;

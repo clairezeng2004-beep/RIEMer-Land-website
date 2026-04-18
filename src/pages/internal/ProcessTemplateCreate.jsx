@@ -634,6 +634,10 @@ export default function ProcessTemplateCreate() {
                     data-placeholder="从 Word / 网页复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
                     suppressContentEditableWarning
                   />
+                  <FloatingTextToolbar
+                    editorRef={wordEditorRef}
+                    onChange={(html) => setNewDoc((prev) => ({ ...prev, content: html }))}
+                  />
                 </div>
               )}
             </div>

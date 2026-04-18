@@ -1,0 +1,78 @@
+/* ============ FloatingTextToolbar ============ */
+.ftt {
+  position: fixed;
+  z-index: 1200;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-bg-card, #ffffff);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14), 0 2px 6px rgba(0, 0, 0, 0.06);
+  animation: fttIn 0.12s ease;
+  user-select: none;
+  /* 让里面的按钮不被编辑器的默认 font 继承扭曲 */
+  font-size: 14px;
+  color: var(--color-text, #1f2937);
+  white-space: nowrap;
+}
+
+@keyframes fttIn {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.ftt__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-muted, #4b5563);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ftt__btn:hover {
+  background: var(--color-bg-alt, #f3f4f6);
+  color: var(--color-text, #111827);
+}
+
+.ftt__btn--active {
+  background: rgba(91, 140, 62, 0.14);
+  color: var(--color-primary, #5B8C3E);
+}
+
+.ftt__btn--active:hover {
+  background: rgba(91, 140, 62, 0.2);
+}
+
+.ftt__sep {
+  display: inline-block;
+  width: 1px;
+  height: 18px;
+  background: var(--color-border-light, #e5e7eb);
+  margin: 0 2px;
+}
+
+@media (max-width: 480px) {
+  .ftt {
+    gap: 0;
+    padding: 3px;
+  }
+  .ftt__btn {
+    width: 28px;
+    height: 28px;
+  }
+}

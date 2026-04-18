@@ -24,6 +24,7 @@ import {
   FileArchive,
 } from 'lucide-react';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
+import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import './MemberSharingCreate.css';
 
 const SHARING_KEY = 'riemer_member_sharing';
@@ -830,6 +831,10 @@ export default function MemberSharingCreate() {
                     }}
                     data-placeholder="从 Word 复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
                     suppressContentEditableWarning
+                  />
+                  <FloatingTextToolbar
+                    editorRef={wordEditorRef}
+                    onChange={(html) => setNewPost((prev) => ({ ...prev, content: html }))}
                   />
                 </div>
               )}
