@@ -122,6 +122,67 @@ function ellipsize(str, max = 80) {
   return s.slice(0, max) + '…';
 }
 
+/* ========================================================
+ * 字符级 diff（LCS，基于 O(n*m) DP）
+ *   - 对中文/英文都按"字符"切分，阅读上够直观
+ *   - 输入 before / after；输出 [{ type: 'equal'|'add'|'del', text }]
+ *   - 小规模（几百字以内）性能充足；超过阈值直接用块级 fallback
+ * 为什么不用外部库：依赖克制，这里只为了编辑历史高亮，没必要引 diff-match-patch
+ * ========================================================*/
+export function diffChars(before, after) {
+  const a = String(before ?? '');
+  const b = String(after ?? '');
+  if (a === b) return [{ type: 'equal', text: a }];
+  if (!a) return [{ type: 'add', text: b }];
+  if (!b) return [{ type: 'del', text: a }];
+
+  // 防爆：过长时退化为"整段删 + 整段增"，避免卡死
+  const MAX = 1500;
+  if (a.length > MAX || b.length > MAX) {
+    return [
+      { type: 'del', text: a },
+      { type: 'add', text: b },
+    ];
+  }
+
+  const m = a.length;
+  const n = b.length;
+  // dp[i][j] = a[0..i) 与 b[0..j) 的 LCS 长度
+  const dp = Array.from({ length: m + 1 }, () => new Uint16Array(n + 1));
+  for (let i = 1; i <= m; i += 1) {
+    for (let j = 1; j <= n; j += 1) {
+      dp[i][j] = a[i - 1] === b[j - 1]
+        ? dp[i - 1][j - 1] + 1
+        : Math.max(dp[i - 1][j], dp[i][j - 1]);
+    }
+  }
+
+  // 回溯生成段
+  const segs = [];
+  let i = m;
+  let j = n;
+  const push = (type, ch) => {
+    const last = segs[segs.length - 1];
+    if (last && last.type === type) last.text = ch + last.text;
+    else segs.push({ type, text: ch });
+  };
+  while (i > 0 && j > 0) {
+    if (a[i - 1] === b[j - 1]) {
+      push('equal', a[i - 1]);
+      i -= 1; j -= 1;
+    } else if (dp[i - 1][j] >= dp[i][j - 1]) {
+      push('del', a[i - 1]);
+      i -= 1;
+    } else {
+      push('add', b[j - 1]);
+      j -= 1;
+    }
+  }
+  while (i > 0) { push('del', a[i - 1]); i -= 1; }
+  while (j > 0) { push('add', b[j - 1]); j -= 1; }
+  return segs;
+}
+
 // 比较编辑前后三个字段，返回 changes[]
 // 每条 { field, before, after, summary }
 // 其中 content 用"字数变化 +X / -Y（旧首段 → 新首段）"替代长正文，避免膨胀
@@ -143,8 +204,11 @@ export function diffDocFields(prevDoc, nextDoc) {
       changes.push({
         field,
         label: FIELD_LABEL[field],
-        before: ellipsize(before, 120),
-        after: ellipsize(after, 120),
+        // 存纯文本首段（最多 600 字），便于在编辑历史里做 diff 高亮；
+        // 正文本身往往含大量 HTML 标签，直接 diff 会把 <p> </p> 当内容差异，
+        // 所以先 stripToPlain 再存，阅读体验更接近"正文字面差异"。
+        before: ellipsize(before, 600),
+        after: ellipsize(after, 600),
         prevLength: prevLen,
         nextLength: nextLen,
         summary,
@@ -153,8 +217,9 @@ export function diffDocFields(prevDoc, nextDoc) {
       changes.push({
         field,
         label: FIELD_LABEL[field],
-        before: ellipsize(before, 120),
-        after: ellipsize(after, 120),
+        // 标题/简介一般较短，直接存完整原文（最多 300 字），保证 diff 可还原全貌
+        before: ellipsize(before, 300),
+        after: ellipsize(after, 300),
         summary: `${FIELD_LABEL[field]}由"${ellipsize(before, 20) || '（空）'}"改为"${ellipsize(after, 20) || '（空）'}"`,
       });
     }
@@ -281,6 +346,16 @@ export default function ProcessTemplateDetail() {
   const [editLog, setEditLog] = useState([]);
   const [editLogExpanded, setEditLogExpanded] = useState(false);
   const [editLogLoading, setEditLogLoading] = useState(false);
+  // 哪些条目被展开查看 diff 对比。key: `${editedAt}|${editorId}|${idx}`
+  const [expandedEntries, setExpandedEntries] = useState(() => new Set());
+  const toggleEntryExpanded = useCallback((key) => {
+    setExpandedEntries((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  }, []);
 
   // 合并数据源：
   // - 挂载时先用 localStorage 渲染（避免白屏），随后异步从 Supabase 拉取最新数据
@@ -567,34 +642,112 @@ export default function ProcessTemplateDetail() {
           </div>
         ) : (
           <ul className="ptd-edit-history__list">
-            {shown.map((entry, i) => (
-              <li key={`${entry.editedAt}-${i}`} className="ptd-edit-history__item">
-                <div className="ptd-edit-history__meta">
-                  <User size={11} />
-                  <span className="ptd-edit-history__editor" title={entry.editorName}>
-                    {entry.editorName}
-                  </span>
-                  <span
-                    className="ptd-edit-history__time"
-                    title={formatAbsoluteTime(entry.editedAt)}
-                  >
-                    {formatRelativeTime(entry.editedAt)}
-                  </span>
+            {shown.map((entry, i) => {
+              const entryKey = `${entry.editedAt}|${entry.editorId || 'anon'}|${i}`;
+              const isOpen = expandedEntries.has(entryKey);
+              const hasDiff = (entry.changes || []).some(
+                (c) => c && (c.before !== undefined || c.after !== undefined)
+              );
+              return (
+              <li
+                key={entryKey}
+                className={`ptd-edit-history__item${isOpen ? ' ptd-edit-history__item--open' : ''}`}
+              >
+                {/* 用 div + role=button 而不是真 <button>，因为里面嵌套了 <ul>，
+                    <button> 不允许包含块级/列表元素（HTML 规范层面） */}
+                <div
+                  className="ptd-edit-history__row"
+                  role={hasDiff ? 'button' : undefined}
+                  tabIndex={hasDiff ? 0 : -1}
+                  aria-expanded={hasDiff ? isOpen : undefined}
+                  aria-disabled={!hasDiff}
+                  title={hasDiff ? (isOpen ? '点击收起对比' : '点击查看修改前后对比') : ''}
+                  onClick={() => hasDiff && toggleEntryExpanded(entryKey)}
+                  onKeyDown={(e) => {
+                    if (!hasDiff) return;
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      toggleEntryExpanded(entryKey);
+                    }
+                  }}
+                >
+                  <div className="ptd-edit-history__meta">
+                    <User size={11} />
+                    <span className="ptd-edit-history__editor" title={entry.editorName}>
+                      {entry.editorName}
+                    </span>
+                    <span
+                      className="ptd-edit-history__time"
+                      title={formatAbsoluteTime(entry.editedAt)}
+                    >
+                      {formatRelativeTime(entry.editedAt)}
+                    </span>
+                    {hasDiff && (
+                      <ChevronDown
+                        size={12}
+                        className={`ptd-edit-history__caret${isOpen ? ' ptd-edit-history__caret--open' : ''}`}
+                        aria-hidden="true"
+                      />
+                    )}
+                  </div>
+                  <ul className="ptd-edit-history__changes">
+                    {(entry.changes || []).map((c, ci) => (
+                      <li key={ci} title={c.summary}>
+                        <span
+                          className={`ptd-edit-history__field ptd-edit-history__field--${c.field}`}
+                        >
+                          {c.label || c.field}
+                        </span>
+                        <span className="ptd-edit-history__summary">{c.summary}</span>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-                <ul className="ptd-edit-history__changes">
-                  {(entry.changes || []).map((c, ci) => (
-                    <li key={ci} title={c.summary}>
-                      <span
-                        className={`ptd-edit-history__field ptd-edit-history__field--${c.field}`}
-                      >
-                        {c.label || c.field}
-                      </span>
-                      <span className="ptd-edit-history__summary">{c.summary}</span>
-                    </li>
-                  ))}
-                </ul>
+                {isOpen && hasDiff && (
+                  <div className="ptd-edit-history__diff" role="region" aria-label="修改前后对比">
+                    {(entry.changes || []).map((c, ci) => {
+                      const before = c.before ?? '';
+                      const after = c.after ?? '';
+                      if (!before && !after) return null;
+                      const segs = diffChars(before, after);
+                      return (
+                        <div key={ci} className="ptd-diff-block">
+                          <div className="ptd-diff-block__head">
+                            <span
+                              className={`ptd-edit-history__field ptd-edit-history__field--${c.field}`}
+                            >
+                              {c.label || c.field}
+                            </span>
+                            {c.field === 'content' && (
+                              <span className="ptd-diff-block__note">
+                                {`约 ${c.prevLength ?? '?'} → ${c.nextLength ?? '?'} 字（仅展示开头片段）`}
+                              </span>
+                            )}
+                          </div>
+                          <div className="ptd-diff-block__body">
+                            {segs.map((s, si) => (
+                              <span
+                                key={si}
+                                className={
+                                  s.type === 'add'
+                                    ? 'ptd-diff-add'
+                                    : s.type === 'del'
+                                      ? 'ptd-diff-del'
+                                      : 'ptd-diff-eq'
+                                }
+                              >
+                                {s.text}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </li>
-            ))}
+              );
+            })}
           </ul>
         )}
         {hasMore && (
@@ -612,7 +765,7 @@ export default function ProcessTemplateDetail() {
         )}
       </div>
     );
-  }, [editLog, editLogExpanded, editLogLoading]);
+  }, [editLog, editLogExpanded, editLogLoading, expandedEntries, toggleEntryExpanded]);
 
   /* ========== 点赞 ========== */
   const [liked, setLiked] = useState(false);

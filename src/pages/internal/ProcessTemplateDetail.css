@@ -1264,6 +1264,111 @@
   color: #4a7533;
 }
 
+/* -------------------------------------------------------
+ * 编辑历史单条记录：可点击展开 diff
+ * 把整个 "头部 + changes 列表" 当作一个点击区域（div role=button），
+ * 点击切换展开/收起。用 div 而非 <button>，因为其中嵌套了 <ul>，
+ * <button> 元素不允许包含块级/列表内容。
+ * ------------------------------------------------------- */
+.ptd-edit-history__row {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 4px;
+  outline: none;
+}
+
+.ptd-edit-history__row[aria-disabled="true"] {
+  cursor: default;
+}
+
+.ptd-edit-history__row:focus-visible {
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.35);
+}
+
+.ptd-edit-history__caret {
+  margin-left: 4px;
+  color: var(--color-text-muted, #9ca3af);
+  transition: transform 0.18s ease;
+}
+
+.ptd-edit-history__caret--open {
+  transform: rotate(180deg);
+  color: var(--color-primary, #5B8C3E);
+}
+
+.ptd-edit-history__item--open {
+  border-color: rgba(91, 140, 62, 0.35);
+  box-shadow: 0 2px 6px rgba(91, 140, 62, 0.1);
+}
+
+/* -------------------------------------------------------
+ * Diff 对比面板
+ * ------------------------------------------------------- */
+.ptd-edit-history__diff {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(91, 140, 62, 0.25);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ptd-diff-block {
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.ptd-diff-block__head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.ptd-diff-block__note {
+  font-size: 10px;
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.ptd-diff-block__body {
+  padding: 6px 8px;
+  background: #fcfcfa;
+  border: 1px solid rgba(229, 231, 235, 0.9);
+  border-radius: 6px;
+  color: #374151;
+  white-space: pre-wrap;
+  word-break: break-word;
+  /* 正文 diff 可能较长，限制高度并允许滚动 */
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+/* 未变化段：正常字色，仅做视觉底色 */
+.ptd-diff-eq {
+  color: #6b7280;
+}
+
+/* 删除段：红色带删除线 */
+.ptd-diff-del {
+  background: rgba(239, 68, 68, 0.12);
+  color: #b91c1c;
+  text-decoration: line-through;
+  text-decoration-color: rgba(185, 28, 28, 0.6);
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
+/* 新增段：绿色高亮 */
+.ptd-diff-add {
+  background: rgba(34, 197, 94, 0.16);
+  color: #166534;
+  font-weight: 500;
+  border-radius: 2px;
+  padding: 0 1px;
+}
+
 /* 移动端 drawer 里的编辑历史卡不要 sticky 过多，留余量 */
 .ptd-toc-drawer .ptd-edit-history {
   margin-top: 12px;
