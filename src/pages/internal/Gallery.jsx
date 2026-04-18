@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -19,6 +19,13 @@ import {
   Images,
   Download,
 } from 'lucide-react';
+import {
+  fetchAllAlbums,
+  createAlbum as svcCreateAlbum,
+  deleteAlbum as svcDeleteAlbum,
+  addPhotosToAlbum as svcAddPhotos,
+  deletePhoto as svcDeletePhoto,
+} from '../../services/albumService';
 import './Gallery.css';
 
 /* ---------- 工具函数：从 URL 生成压缩版和原图版 ---------- */
@@ -43,45 +50,8 @@ const formatAlbumDate = (dateStr) => {
   return m ? `${y} 年 ${m} 月` : `${y} 年`;
 };
 
-/* ---------- 示例相册数据 ---------- */
-const initialAlbums = [
-  {
-    id: '1',
-    title: '春季聚会',
-    description: '成员线下春季见面会，烧烤与户外活动',
-    coverIndex: 0,
-    date: '2025-03',
-    photos: [
-      { id: 'p1', url: 'https://images.unsplash.com/photo-1529156069898-49953e39b3ac?w=640&q=75', caption: '合照' },
-      { id: 'p2', url: 'https://images.unsplash.com/photo-1506784983877-45594efa4cbe?w=640&q=75', caption: '烧烤现场' },
-      { id: 'p3', url: 'https://images.unsplash.com/photo-1511632765486-a01980e01a18?w=640&q=75', caption: '户外游戏' },
-      { id: 'p4', url: 'https://images.unsplash.com/photo-1523301343968-6a6ebf63c672?w=640&q=75', caption: '傍晚合影' },
-    ],
-  },
-  {
-    id: '2',
-    title: '线上读书分享会',
-    description: '第三期线上读书会，分享近期阅读心得',
-    coverIndex: 0,
-    date: '2025-02',
-    photos: [
-      { id: 'p5', url: 'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?w=640&q=75', caption: '读书会截图' },
-      { id: 'p6', url: 'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?w=640&q=75', caption: '推荐书单' },
-    ],
-  },
-  {
-    id: '3',
-    title: '年末总结会',
-    description: '回顾这一年的成长与收获，展望新年计划',
-    coverIndex: 0,
-    date: '2024-12',
-    photos: [
-      { id: 'p7', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=640&q=75', caption: '总结会现场' },
-      { id: 'p8', url: 'https://images.unsplash.com/photo-1517486808906-6ca8b3f04846?w=640&q=75', caption: '颁奖环节' },
-      { id: 'p9', url: 'https://images.unsplash.com/photo-1528605248644-14dd04022da1?w=640&q=75', caption: '聚餐时光' },
-    ],
-  },
-];
+/* ---------- 空状态由接口/本地缓存提供，不再 seed 示例数据 ---------- */
+
 
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
@@ -93,7 +63,9 @@ export default function Gallery() {
     (key, val) => updateInternalConfig({ gallery: { [key]: val } }),
     [updateInternalConfig]
   );
-  const [albums, setAlbums] = useState(initialAlbums);
+  const [albums, setAlbums] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [lightboxIndex, setLightboxIndex] = useState(null);
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -112,45 +84,72 @@ export default function Gallery() {
   const albumFileInputRef = useRef(null);
   const createAlbumFileRef = useRef(null);
 
+  /* ---- 初次加载：从 Supabase 拉取相册（失败时本地缓存兜底） ---- */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        const list = await fetchAllAlbums();
+        if (alive) setAlbums(list);
+      } catch (err) {
+        console.warn('[Gallery] 加载相册失败：', err);
+      } finally {
+        if (alive) setLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
-  /* ---- 创建相册 ---- */
-  const handleCreateAlbum = (e) => {
+  /* ---- 创建相册（上传到 Storage + 写入 DB） ---- */
+  const handleCreateAlbum = async (e) => {
     e.preventDefault();
-    if (!newAlbum.title.trim()) return;
+    if (!newAlbum.title.trim() || submitting) return;
     const y = newAlbum.year || now.getFullYear().toString();
     const m = (newAlbum.month || '1').padStart(2, '0');
-    const initialPhotos = createAlbumFiles.map((f, i) => {
-      const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
-      return {
-        id: `upload-${Date.now()}-${i}`,
-        url: f.url,
-        caption: f.caption === defaultCaption ? '' : f.caption,
-        uploadedById: user?.id || null,
-      };
-    });
-    const album = {
-      id: Date.now().toString(),
-      title: newAlbum.title,
-      description: newAlbum.description,
-      coverIndex: 0,
-      date: `${y}-${m}`,
-      createdById: user?.id || null,
-      createdBy: user?.nickname || user?.name || 'Unknown',
-      photos: initialPhotos,
-    };
-    setAlbums([album, ...albums]);
-    const resetNow = new Date();
-    setNewAlbum({
-      title: '',
-      description: '',
-      year: resetNow.getFullYear().toString(),
-      month: (resetNow.getMonth() + 1).toString(),
-    });
-    setCreateAlbumFiles([]);
-    setShowCreateAlbum(false);
+
+    setSubmitting(true);
+    try {
+      const filesPayload = createAlbumFiles.map((f) => {
+        const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
+        return {
+          file: f.file,
+          caption: f.caption === defaultCaption ? '' : f.caption,
+        };
+      });
+      const album = await svcCreateAlbum(
+        {
+          title: newAlbum.title,
+          description: newAlbum.description,
+          date: `${y}-${m}`,
+        },
+        filesPayload,
+        user
+      );
+      setAlbums((prev) => [album, ...prev]);
+
+      const resetNow = new Date();
+      setNewAlbum({
+        title: '',
+        description: '',
+        year: resetNow.getFullYear().toString(),
+        month: (resetNow.getMonth() + 1).toString(),
+      });
+      // 释放 blob URL
+      createAlbumFiles.forEach((f) => URL.revokeObjectURL(f.url));
+      setCreateAlbumFiles([]);
+      setShowCreateAlbum(false);
+    } catch (err) {
+      console.error('[Gallery] 创建相册失败：', err);
+      alert('创建相册失败：' + (err.message || '未知错误'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   /* ---- 新建相册表单中选择图片 ---- */
@@ -177,35 +176,53 @@ export default function Gallery() {
     setSelectedFiles((prev) => [...prev, ...previews]);
   };
 
-  const handleAddPhotos = () => {
-    if (!selectedAlbum || selectedFiles.length === 0) return;
-    const newPhotos = selectedFiles.map((f, i) => {
-      const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
-      return {
-        id: `upload-${Date.now()}-${i}`,
-        url: f.url,
-        caption: f.caption === defaultCaption ? '' : f.caption,
-        uploadedById: user?.id || null,
-      };
-    });
-    setAlbums((prev) =>
-      prev.map((a) =>
-        a.id === selectedAlbum.id
-          ? { ...a, photos: [...a.photos, ...newPhotos] }
-          : a
-      )
-    );
-    setSelectedAlbum((prev) => ({
-      ...prev,
-      photos: [...prev.photos, ...newPhotos],
-    }));
-    setSelectedFiles([]);
-    setShowAddPhoto(false);
+  const handleAddPhotos = async () => {
+    if (!selectedAlbum || selectedFiles.length === 0 || submitting) return;
+    setSubmitting(true);
+    try {
+      const filesPayload = selectedFiles.map((f) => {
+        const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
+        return {
+          file: f.file,
+          caption: f.caption === defaultCaption ? '' : f.caption,
+        };
+      });
+      const newPhotos = await svcAddPhotos(selectedAlbum, filesPayload, user);
+      setAlbums((prev) =>
+        prev.map((a) =>
+          a.id === selectedAlbum.id
+            ? { ...a, photos: [...a.photos, ...newPhotos] }
+            : a
+        )
+      );
+      setSelectedAlbum((prev) => ({
+        ...prev,
+        photos: [...prev.photos, ...newPhotos],
+      }));
+      // 释放 blob URL
+      selectedFiles.forEach((f) => URL.revokeObjectURL(f.url));
+      setSelectedFiles([]);
+      setShowAddPhoto(false);
+    } catch (err) {
+      console.error('[Gallery] 上传照片失败：', err);
+      alert('上传照片失败：' + (err.message || '未知错误'));
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   /* ---- 删除照片 ---- */
-  const handleDeletePhoto = (photoId) => {
+  const handleDeletePhoto = async (photoId) => {
     if (!window.confirm('确定要删除这张照片吗？')) return;
+    const photo = selectedAlbum.photos.find((p) => p.id === photoId);
+    if (!photo) return;
+    try {
+      await svcDeletePhoto(selectedAlbum, photo);
+    } catch (err) {
+      console.error('[Gallery] 删除照片失败：', err);
+      alert('删除照片失败：' + (err.message || '未知错误'));
+      return;
+    }
     setAlbums((prev) =>
       prev.map((a) =>
         a.id === selectedAlbum.id
@@ -220,8 +237,17 @@ export default function Gallery() {
   };
 
   /* ---- 删除相册 ---- */
-  const handleDeleteAlbum = (albumId) => {
+  const handleDeleteAlbum = async (albumId) => {
     if (!window.confirm('确定要删除整个相册吗？所有照片将一并删除。')) return;
+    const album = albums.find((a) => a.id === albumId);
+    if (!album) return;
+    try {
+      await svcDeleteAlbum(album);
+    } catch (err) {
+      console.error('[Gallery] 删除相册失败：', err);
+      alert('删除相册失败：' + (err.message || '未知错误'));
+      return;
+    }
     setAlbums((prev) => prev.filter((a) => a.id !== albumId));
     if (selectedAlbum?.id === albumId) setSelectedAlbum(null);
   };
@@ -438,7 +464,12 @@ export default function Gallery() {
           )}
 
           {/* 相册列表 */}
-          {albums.length > 0 ? (
+          {loading ? (
+            <div className="gallery-empty">
+              <Images size={48} />
+              <h3>加载中...</h3>
+            </div>
+          ) : albums.length > 0 ? (
             <div className="gallery-grid">
               {[...albums].sort((a, b) => b.date.localeCompare(a.date)).map((album) => {
                 const cover = album.photos[album.coverIndex] || album.photos[0];

@@ -806,3 +806,114 @@ BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE documents_deleted_defaults;
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
+
+-- ============================================
+-- 相册功能：albums + album_photos + album-photos bucket
+-- ============================================
+CREATE TABLE IF NOT EXISTS public.albums (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  title TEXT NOT NULL DEFAULT '',
+  description TEXT DEFAULT '',
+  date TEXT DEFAULT '',
+  cover_index INT DEFAULT 0,
+  created_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_by TEXT DEFAULT '',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_albums_date ON public.albums(date DESC);
+
+CREATE TABLE IF NOT EXISTS public.album_photos (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  album_id UUID NOT NULL REFERENCES public.albums(id) ON DELETE CASCADE,
+  url TEXT NOT NULL,
+  storage_path TEXT,
+  caption TEXT DEFAULT '',
+  sort_index INT DEFAULT 0,
+  uploaded_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_album_photos_album_id ON public.album_photos(album_id);
+CREATE INDEX IF NOT EXISTS idx_album_photos_sort ON public.album_photos(album_id, sort_index);
+
+ALTER TABLE public.albums ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.album_photos ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "albums_select_auth" ON public.albums
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "albums_insert_auth" ON public.albums
+  FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "albums_update_owner_or_admin" ON public.albums
+  FOR UPDATE TO authenticated
+  USING (
+    created_by_id = auth.uid()
+    OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
+  );
+CREATE POLICY "albums_delete_owner_or_admin" ON public.albums
+  FOR DELETE TO authenticated
+  USING (
+    created_by_id = auth.uid()
+    OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
+  );
+
+CREATE POLICY "album_photos_select_auth" ON public.album_photos
+  FOR SELECT TO authenticated USING (true);
+CREATE POLICY "album_photos_insert_auth" ON public.album_photos
+  FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY "album_photos_update_uploader_or_admin" ON public.album_photos
+  FOR UPDATE TO authenticated
+  USING (
+    uploaded_by_id = auth.uid()
+    OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
+    OR EXISTS (
+      SELECT 1 FROM public.albums a
+      WHERE a.id = album_id AND a.created_by_id = auth.uid()
+    )
+  );
+CREATE POLICY "album_photos_delete_uploader_or_admin" ON public.album_photos
+  FOR DELETE TO authenticated
+  USING (
+    uploaded_by_id = auth.uid()
+    OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
+    OR EXISTS (
+      SELECT 1 FROM public.albums a
+      WHERE a.id = album_id AND a.created_by_id = auth.uid()
+    )
+  );
+
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.albums;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.album_photos;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+
+-- Storage bucket
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('album-photos', 'album-photos', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+CREATE POLICY "album_photos_public_read" ON storage.objects
+  FOR SELECT TO public USING (bucket_id = 'album-photos');
+CREATE POLICY "album_photos_auth_upload" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'album-photos');
+CREATE POLICY "album_photos_owner_update" ON storage.objects
+  FOR UPDATE TO authenticated
+  USING (
+    bucket_id = 'album-photos'
+    AND (
+      owner = auth.uid()
+      OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
+    )
+  );
+CREATE POLICY "album_photos_owner_delete" ON storage.objects
+  FOR DELETE TO authenticated
+  USING (
+    bucket_id = 'album-photos'
+    AND (
+      owner = auth.uid()
+      OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
+    )
+  );
