@@ -480,6 +480,16 @@ export default function MemberProfiles() {
   };
 
   // 保存编辑
+  //
+  // 关键修复：
+  //   过去仅在 `supabaseOk === true` 时才写云端，但 supabaseOk 有三态
+  //   （null=健康检查未返回 / true=可达 / false=不可达）。很多用户因广告
+  //   拦截/代理，健康 ping 被挡住，长期停在 null；而此时 REST 查询其实
+  //   是通的（列表能正常显示）。按旧逻辑会误把 `null` 当成"不可达"而
+  //   降级到本地保存，再 `loadProfiles()` 拉云端覆盖 UI → 表现为"点
+  //   对勾完全没反应，改动消失"。
+  //   现在只要配置了 Supabase，就优先尝试云端保存；仅当云端明确失败
+  //   或者未配置 Supabase 时，才写本地；任何最终失败都必须 alert 告知。
   const saveEdit = async () => {
     if (!editingId) return;
     setSaving(true);
@@ -488,44 +498,78 @@ export default function MemberProfiles() {
       // 计算加入时间
       const newJoinedAt = yearMonthToDate(editData._joined_year, editData._joined_month);
 
-      if (isSupabaseConfigured && supabaseOk === true) {
-        const updateData = {};
-        COLUMNS.forEach((col) => {
-          if (col.editable && col.key !== 'joined_at_display' && editData[col.key] !== undefined) {
-            updateData[col.key] = editData[col.key];
+      // 收集可编辑字段
+      const updateData = {};
+      COLUMNS.forEach((col) => {
+        if (col.editable && col.key !== 'joined_at_display' && editData[col.key] !== undefined) {
+          updateData[col.key] = editData[col.key];
+        }
+      });
+      if (newJoinedAt) {
+        updateData.joined_at = newJoinedAt;
+      }
+
+      let savedToCloud = false;
+
+      // --- 优先走云端（配置了 Supabase 就试一次，不看 supabaseOk）---
+      if (isSupabaseConfigured && supabase) {
+        try {
+          let { error } = await supabase
+            .from('member_profiles')
+            .update(updateData)
+            .eq('user_id', editingId);
+
+          // 失败则刷新 session 后重试一次（处理 401/过期）
+          if (error) {
+            console.warn('[MemberProfiles] 云端保存失败，尝试刷新 session 后重试:', error.message);
+            try {
+              await supabase.auth.refreshSession();
+            } catch { /* ignore */ }
+            const retry = await supabase
+              .from('member_profiles')
+              .update(updateData)
+              .eq('user_id', editingId);
+            error = retry.error;
           }
-        });
-        // 加入时间单独处理
-        if (newJoinedAt) {
-          updateData.joined_at = newJoinedAt;
+
+          if (!error) {
+            savedToCloud = true;
+          } else {
+            console.error('[MemberProfiles] 云端保存最终失败:', error);
+          }
+        } catch (netErr) {
+          console.error('[MemberProfiles] 云端保存异常:', netErr);
+        }
+      }
+
+      // --- 云端没保存成功，才写本地；并给出明确提示 ---
+      if (!savedToCloud) {
+        // 写本地兜底（即使云端失败，先保留用户刚填的内容）
+        const localProfiles = getLocalProfiles();
+        let idx = localProfiles.findIndex((p) => p.user_id === editingId);
+        if (idx < 0) {
+          // 本地缓存里还没这一行：从当前表格里把原行合成一份塞进去，
+          // 保证下次加载兜底时能看到用户刚改的内容。
+          const existing = profiles.find((p) => p.user_id === editingId);
+          if (existing) {
+            const { id: _id, joined_at_display: _d, ...rest } = existing;
+            localProfiles.push({ ...rest });
+            idx = localProfiles.length - 1;
+          }
+        }
+        if (idx >= 0) {
+          Object.keys(updateData).forEach((k) => {
+            localProfiles[idx][k] = updateData[k];
+          });
+          saveLocalProfiles(localProfiles);
         }
 
-        const { error } = await supabase
-          .from('member_profiles')
-          .update(updateData)
-          .eq('user_id', editingId);
-
-        if (error) {
-          console.error('[MemberProfiles] Save failed:', error);
-          alert('保存失败，请重试');
+        // 如果压根没配 Supabase，是"纯本地模式"，这是正常路径，不报错
+        if (isSupabaseConfigured) {
+          alert('保存到云端失败（网络或权限问题），已暂存到本地。请稍后检查网络并重新编辑保存。');
+          // 不跳出编辑态，让用户能再试一次
           setSaving(false);
           return;
-        }
-      } else {
-        // 本地模式
-        const localProfiles = getLocalProfiles();
-        const idx = localProfiles.findIndex((p) => p.user_id === editingId);
-        if (idx >= 0) {
-          COLUMNS.forEach((col) => {
-            if (col.editable && col.key !== 'joined_at_display' && editData[col.key] !== undefined) {
-              localProfiles[idx][col.key] = editData[col.key];
-            }
-          });
-          // 加入时间单独处理
-          if (newJoinedAt) {
-            localProfiles[idx].joined_at = newJoinedAt;
-          }
-          saveLocalProfiles(localProfiles);
         }
       }
 
