@@ -539,6 +539,9 @@ export function SiteContentProvider({ children }) {
   // ============================================
   // 为每条 state 维护一个 lastSyncedAt，用于避免 realtime 回流被自己覆盖
   const siteSyncRefs = useRef({});
+  // 标记该 key 是否已完成首次云端拉取（hydrated）。只有 hydrated 后的本地变更才允许 push 回云端，
+  // 否则初始化阶段的本地 mock 会把云端真实数据覆盖掉。
+  const hydratedKeysRef = useRef({});
   // 每条 state 的 setter + 默认值生成器 + 是否为合并型（对象）或替换型（数组）
   const syncDefs = [
     { key: SITE_KEYS.PUBLIC_CONTENT, setter: setContent,        fallback: getDefaultContent,  kind: 'object' },
@@ -550,7 +553,11 @@ export function SiteContentProvider({ children }) {
 
   // 初始化拉云 + 订阅（挂载一次）
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      // 未配置 Supabase：所有 key 立刻标记 hydrated，避免后续 push 等待无意义
+      syncDefs.forEach(({ key }) => { hydratedKeysRef.current[key] = true; });
+      return;
+    }
     let cancelled = false;
     const unsubs = [];
 
@@ -559,10 +566,17 @@ export function SiteContentProvider({ children }) {
       fetchSetting(key).then(({ value, updatedAt, error }) => {
         if (cancelled) return;
         if (error) {
-          // 表不存在或权限问题：安静降级，只用本地
+          console.warn(`[SiteContent] 首次拉取 ${key} 失败（走本地）:`, error);
+          // 即便失败也标记 hydrated，避免之后用户编辑永远不能 push
+          hydratedKeysRef.current[key] = true;
           return;
         }
-        if (value == null) return;
+        if (value == null) {
+          // 云端没有该 key —— 说明还没被写过，允许后续本地变更推上去
+          console.log(`[SiteContent] ${key} 云端暂无数据，首次本地变更将推上云`);
+          hydratedKeysRef.current[key] = true;
+          return;
+        }
         siteSyncRefs.current[key] = updatedAt;
         setter((prev) => {
           if (kind === 'object') {
@@ -573,6 +587,9 @@ export function SiteContentProvider({ children }) {
           if (Array.isArray(value)) return value;
           return prev;
         });
+        // 注意：先完成 setState，再标记 hydrated，保证 push-effect 在这次 state 变化时跳过
+        hydratedKeysRef.current[key] = true;
+        console.log(`[SiteContent] ${key} 已从云端 hydrate，updatedAt=${updatedAt}`);
       });
 
       // 订阅变更
@@ -603,6 +620,8 @@ export function SiteContentProvider({ children }) {
   const pushDebouncedRef = useRef({});
   const pushToCloud = useCallback((key, value) => {
     if (!isSupabaseConfigured) return;
+    // 必须等该 key 从云端 hydrate 完成后才允许回写，否则初始化阶段的本地 mock 会覆盖云端真实数据
+    if (!hydratedKeysRef.current[key]) return;
     if (pushDebouncedRef.current[key]) clearTimeout(pushDebouncedRef.current[key]);
     pushDebouncedRef.current[key] = setTimeout(async () => {
       const res = await saveSetting(key, value);
