@@ -235,3 +235,20 @@
     height: 14px;
   }
 }
+
+/* ============================================
+   全局兜底：内部空间所有表格的表头不允许"逐字折行"
+   --------------------------------------------
+   问题背景（iOS 实测）：
+   "事项追踪"表格在手机端把"负责人 / 协助人 / 标题"这类 2~3 字的中文表头
+   一个字一个字地竖着折成多行。原因是各 tab 的 <th> 没统一加 white-space: nowrap，
+   当表格宽度被挤压时，浏览器会把每个汉字视为可折点。
+
+   修复：只要是 .internal-layout__content 下的 <th>，一律 white-space: nowrap。
+   这样即使列被挤，表头也始终保持单行；配套的 *-table-wrapper 本来就有
+   overflow:auto，多余的宽度由横向滚动承载，不影响任何移动交互。
+   ============================================ */
+.internal-layout__content table th,
+.internal-layout__content thead th {
+  white-space: nowrap;
+}
