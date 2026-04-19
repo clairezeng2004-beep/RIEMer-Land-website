@@ -543,13 +543,13 @@ export default function InternalArticles() {
     const articleTitle = newArticle.title;
     addArticle(newArticle, user?.id);
 
-    // 发送"公众号文章归档"通知（归档者自己自动已读）
+    // 发送"公众号文章归档"通知（由规则引擎按用户自定义规则触发）
     try {
-      addNotification({
-        title: '公众号文章归档',
-        message: `${newArticle.archivedBy} 归档了公众号文章「${articleTitle}」${newArticle.category ? '（' + newArticle.category + '）' : ''}`,
-        type: 'sharing',
-        read: true,
+      emitNotificationEvent('article.archive', {
+        operator: newArticle.archivedBy,
+        operatorUserId: user?.id,
+        title: articleTitle,
+        category: newArticle.category || '',
       });
     } catch (err) {
       console.warn('[InternalArticles] 发送归档通知失败:', err?.message || err);

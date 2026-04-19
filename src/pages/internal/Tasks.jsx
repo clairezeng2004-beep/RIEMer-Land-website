@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import {
@@ -117,7 +118,9 @@ export default function Tasks() {
   const { isAuthenticated, user, getAllUsers, supabaseOk } = useAuth();
   const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const { addNotification } = useNotifications();
+  // useNotifications 保留引用以确保 NotificationProvider 已就绪；
+  // 实际通知派发已统一走规则引擎 emitNotificationEvent。
+  useNotifications();
   const navigate = useNavigate();
   const tc = internalConfig.tasks || {};
 
@@ -332,14 +335,15 @@ export default function Tasks() {
     });
     setShowForm(false);
 
-    // 发送"新事项创建"通知（创建者自己自动已读）
+    // 发送"新事项创建"通知（由规则引擎按用户自定义规则触发）
     try {
       const creator = user?.nickname || user?.name || '某成员';
-      addNotification({
-        title: '新事项创建',
-        message: `${creator} 新建了事项「${task.title}」${task.category ? '（' + task.category + '）' : ''}`,
-        type: 'progress',
-        read: true,
+      emitNotificationEvent('task.new', {
+        operator: creator,
+        operatorUserId: user?.id,
+        title: task.title,
+        category: task.category || '',
+        status: task.status,
       });
     } catch (err) {
       console.warn('[Tasks] 发送新事项通知失败:', err?.message || err);
@@ -386,15 +390,16 @@ export default function Tasks() {
     ) {
       setArchivePrompt({ taskTitle: targetTask.title });
     }
-    // 发送"事项状态变更"通知（操作者自己自动已读）
+    // 发送"事项状态变更"通知（由规则引擎按用户自定义规则触发）
     if (targetTask.status !== newStatus) {
       try {
         const operator = user?.nickname || user?.name || '某成员';
-        addNotification({
-          title: '事项状态变更',
-          message: `${operator} 将事项「${targetTask.title}」状态：${targetTask.status} → ${newStatus}`,
-          type: 'progress',
-          read: true,
+        emitNotificationEvent('task.status_change', {
+          operator,
+          operatorUserId: user?.id,
+          title: targetTask.title,
+          from: targetTask.status,
+          to: newStatus,
         });
       } catch (err) {
         console.warn('[Tasks] 发送状态变更通知失败:', err?.message || err);

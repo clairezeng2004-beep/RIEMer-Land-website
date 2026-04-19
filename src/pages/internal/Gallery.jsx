@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
 import {
@@ -122,7 +123,9 @@ export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const { addNotification } = useNotifications();
+  // useNotifications 保留以确保 NotificationProvider 就绪；
+  // 通知派发已统一走规则引擎 emitNotificationEvent。
+  useNotifications();
   const gc = internalConfig.gallery || {};
 
   const updateGallery = useCallback(
@@ -372,16 +375,16 @@ export default function Gallery() {
         photos: [...prev.photos, ...newPhotos],
       }));
 
-      // 发送"相册新增照片"通知（上传者自己自动已读）。
+      // 发送"相册新增照片"通知（由规则引擎按用户自定义规则触发）。
       // 以实际成功写入的 newPhotos 数量为准，避免中途失败时数字对不上。
       if (Array.isArray(newPhotos) && newPhotos.length > 0) {
         try {
           const uploader = user?.nickname || user?.name || '某成员';
-          addNotification({
-            title: '相册新增照片',
-            message: `${uploader} 向相册「${selectedAlbum.title}」上传了 ${newPhotos.length} 张照片`,
-            type: 'sharing',
-            read: true,
+          emitNotificationEvent('gallery.upload', {
+            operator: uploader,
+            operatorUserId: user?.id,
+            albumTitle: selectedAlbum.title,
+            count: newPhotos.length,
           });
         } catch (err) {
           console.warn('[Gallery] 发送上传通知失败:', err?.message || err);

@@ -110,7 +110,9 @@ function App() {
       <SiteContentProvider>
         <Router>
           <NotificationProvider>
-            <AppShell />
+            <NotificationRulesProvider>
+              <AppShell />
+            </NotificationRulesProvider>
           </NotificationProvider>
         </Router>
       </SiteContentProvider>

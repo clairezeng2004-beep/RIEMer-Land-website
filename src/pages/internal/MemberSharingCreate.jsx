@@ -666,13 +666,15 @@ export default function MemberSharingCreate() {
     const updated = [post, ...existing];
     saveSharings(updated);
 
-    // 发送"新成员分享"通知（发布者自己自动已读）
+    // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
     try {
-      addNotification({
-        title: '新成员分享',
-        message: `${post.author} 发布了新分享「${post.title}」${cats.find((c) => c.key === post.category)?.label ? '（' + cats.find((c) => c.key === post.category).label + '）' : ''}`,
-        type: 'sharing',
-        read: true,
+      const categoryLabel =
+        cats.find((c) => c.key === post.category)?.label || '';
+      emitNotificationEvent('sharing.new', {
+        operator: post.author,
+        operatorUserId: user?.id,
+        title: post.title,
+        categoryLabel,
       });
     } catch (err) {
       console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);

@@ -30,7 +30,9 @@ const ORG_STATUSES = ['已完成', '暂时不做'];
 export default function Suggestions() {
   const { isAuthenticated, user, getAllUsers } = useAuth();
   const { suggestions, addSuggestion, updateSuggestion, deleteSuggestion, internalConfig, updateInternalConfig } = useSiteContent();
-  const { addNotification } = useNotifications();
+  // useNotifications 保留以确保 NotificationProvider 就绪；
+  // 通知派发已统一走规则引擎 emitNotificationEvent。
+  useNotifications();
   const { editing } = useWysiwyg();
   const sc = internalConfig.suggestions || {};
   const updateSugs = useCallback((key, val) => updateInternalConfig({ suggestions: { [key]: val } }), [updateInternalConfig]);
@@ -355,11 +357,11 @@ export default function Suggestions() {
                     statusUpdatedBy: editingSuggestion.proposer,
                     statusUpdatedByAvatar: null,
                   });
-                  addNotification({
-                    title: '新建设建议',
-                    message: `${editingSuggestion.proposer} 提出了建议：${editingSuggestion.content.slice(0, 40)}${editingSuggestion.content.length > 40 ? '…' : ''}`,
-                    type: 'progress',
-                    read: true,
+                  emitNotificationEvent('suggestion.new', {
+                    operator: editingSuggestion.proposer,
+                    summary:
+                      editingSuggestion.content.slice(0, 40) +
+                      (editingSuggestion.content.length > 40 ? '…' : ''),
                   });
                   setEditingSuggestion(null);
                 }}
@@ -478,11 +480,12 @@ export default function Suggestions() {
                                     statusUpdatedByAvatar: null,
                                   });
                                   if (oldSug && oldSug.status !== editingSuggestion.status) {
-                                    addNotification({
-                                      title: '建设建议状态变更',
-                                      message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
-                                      type: 'progress',
-                                      read: true,
+                                    emitNotificationEvent('suggestion.status_change', {
+                                      summary:
+                                        editingSuggestion.content.slice(0, 30) +
+                                        (editingSuggestion.content.length > 30 ? '…' : ''),
+                                      from: oldSug.status,
+                                      to: editingSuggestion.status,
                                     });
                                   }
                                   setEditingSuggestionId(null);
@@ -690,11 +693,12 @@ export default function Suggestions() {
                                     statusUpdatedByAvatar: null,
                                   });
                                   if (oldSug && oldSug.status !== editingSuggestion.status) {
-                                    addNotification({
-                                      title: '建设建议状态变更',
-                                      message: `建议「${editingSuggestion.content.slice(0, 30)}${editingSuggestion.content.length > 30 ? '…' : ''}」状态：${oldSug.status} → ${editingSuggestion.status}`,
-                                      type: 'progress',
-                                      read: true,
+                                    emitNotificationEvent('suggestion.status_change', {
+                                      summary:
+                                        editingSuggestion.content.slice(0, 30) +
+                                        (editingSuggestion.content.length > 30 ? '…' : ''),
+                                      from: oldSug.status,
+                                      to: editingSuggestion.status,
                                     });
                                   }
                                   setEditingSuggestionId(null);

@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import {
   FileText,
   Upload,
@@ -577,16 +578,16 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       _file: selectedFile,
     };
     setDocuments([doc, ...documents]);
-    // 自动发送已读通知到通知中心
+    // 通知由规则引擎统一触发（规则可在"通知管理"页面自定义）
     const uploaderLabel = finalContributorIds
       .map((id) => userNameMap[id] || (id === user?.id ? user?.name || user?.nickname : ''))
       .filter(Boolean)
       .join('、') || primaryName;
-    addNotification({
-      title: '新内部分享',
-      message: `${uploaderLabel} 上传了文档「${doc.title}」（${typeLabels[doc.type]}）`,
-      type: 'sharing',
-      read: true, // 自动已读，不打扰成员
+    emitNotificationEvent('doc.upload', {
+      operator: uploaderLabel,
+      operatorUserId: user?.id,
+      title: doc.title,
+      typeLabel: typeLabels[doc.type],
     });
     setNewDoc({ title: '', type: 'course', description: '' });
     setContributorIds(user?.id ? [user.id] : []);

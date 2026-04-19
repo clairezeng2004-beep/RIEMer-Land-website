@@ -2,6 +2,14 @@ import { useState, useCallback, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { useNotificationRules } from '../../contexts/NotificationRulesContext';
+import NotificationRuleEditor from '../../components/NotificationRuleEditor';
+import {
+  EVENT_CATALOG,
+  AUDIENCE_OPTIONS,
+  TYPE_OPTIONS,
+  describeRule,
+} from '../../lib/notificationRuleDSL';
 import {
   Bell,
   BellRing,
@@ -18,16 +26,11 @@ import {
   Users,
   Shield,
   FileText,
-  MessageSquarePlus,
-  Upload,
   Filter,
-  ChevronDown,
-  ChevronUp,
   X,
-  CheckSquare,
-  Share2,
-  BookMarked,
-  Image as ImageIcon,
+  Edit3,
+  Power,
+  RotateCcw,
 } from 'lucide-react';
 import './NotificationManagement.css';
 
@@ -37,118 +40,6 @@ const typeConfig = {
   sharing: { icon: BookOpen, color: '#5B8C3E', label: '内部分享' },
   other: { icon: Info, color: '#8B5CF6', label: '其他' },
 };
-
-// ====== 什么时候会收到通知 ======
-const TRIGGER_RULES = [
-  {
-    id: 'doc-upload',
-    source: '文档管理',
-    sourceIcon: Upload,
-    trigger: '有人上传了新文档',
-    title: '新内部分享',
-    message: '例：「小明」上传了文档「会议纪要」（流程手册）',
-    type: 'sharing',
-    autoRead: true,
-    autoReadReason: '上传文档的人不会被自己的操作打扰，所以这条对 TA 自己自动标为已读',
-    file: 'Documents.jsx',
-  },
-  {
-    id: 'suggestion-new',
-    source: '建设建议',
-    sourceIcon: MessageSquarePlus,
-    trigger: '有人提交了新的建设建议',
-    title: '新建设建议',
-    message: '例：「小红」提出了建议：希望增加暑期实习经验分享板块…',
-    type: 'progress',
-    autoRead: true,
-    autoReadReason: '提建议的人不需要再提醒自己，所以这条对 TA 自动标为已读',
-    file: 'Suggestions.jsx',
-  },
-  {
-    id: 'suggestion-status',
-    source: '建设建议',
-    sourceIcon: MessageSquarePlus,
-    trigger: '建议的处理状态发生了变化',
-    title: '建设建议状态变更',
-    message: '例：建议「增加实习板块」的状态从"处理中"变为"已完成"',
-    type: 'progress',
-    autoRead: true,
-    autoReadReason: '操作状态的人不需要再提醒自己，所以这条对 TA 自动标为已读',
-    file: 'Suggestions.jsx',
-  },
-  {
-    id: 'task-new',
-    source: '事项追踪',
-    sourceIcon: CheckSquare,
-    trigger: '有人新建了事项',
-    title: '新事项创建',
-    message: '例：「小明」新建了事项「整理暑期实习材料」（状态：待启动）',
-    type: 'progress',
-    autoRead: true,
-    autoReadReason: '创建事项的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
-    file: 'Tasks.jsx',
-  },
-  {
-    id: 'task-status',
-    source: '事项追踪',
-    sourceIcon: CheckSquare,
-    trigger: '有人改变了事项的状态',
-    title: '事项状态变更',
-    message: '例：事项「整理暑期实习材料」状态：进行中 → 已完成',
-    type: 'progress',
-    autoRead: true,
-    autoReadReason: '操作状态的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
-    file: 'Tasks.jsx',
-  },
-  {
-    id: 'sharing-new',
-    source: '成员内部分享',
-    sourceIcon: Share2,
-    trigger: '有人发布了新的分享',
-    title: '新成员分享',
-    message: '例：「小红」发布了新分享「实习面试经验总结」（经验干货）',
-    type: 'sharing',
-    autoRead: true,
-    autoReadReason: '发布分享的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
-    file: 'MemberSharingCreate.jsx',
-  },
-  {
-    id: 'article-archive',
-    source: '公众号归档',
-    sourceIcon: BookMarked,
-    trigger: '有人进行了新的公众号归档',
-    title: '公众号文章归档',
-    message: '例：「小明」归档了公众号文章「2024 年度总结」（年度纪事）',
-    type: 'sharing',
-    autoRead: true,
-    autoReadReason: '归档文章的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
-    file: 'InternalArticles.jsx',
-  },
-  {
-    id: 'gallery-upload',
-    source: '相册',
-    sourceIcon: ImageIcon,
-    trigger: '有人向相册上传了新照片（无论是新建相册时带照片、还是在已有相册里追加）',
-    title: '相册新增照片',
-    message: '例：「小红」向相册「2024 年度纪念」上传了 8 张照片',
-    type: 'sharing',
-    autoRead: true,
-    autoReadReason: '上传照片的人不需要再提醒自己，所以这条对 TA 自动标为已读；其他成员收到后会在通知中心看到',
-    file: 'Gallery.jsx',
-  },
-  {
-    id: 'weekly-email',
-    source: '系统自动',
-    sourceIcon: Clock,
-    trigger: '每周检查一次，如果你有没看过的消息',
-    title: '不会在页面上显示，只通过邮件提醒',
-    message: '系统会自动给你的邮箱发一封汇总邮件，提醒你本周有未读消息',
-    type: 'other',
-    autoRead: false,
-    autoReadReason: '这不是页面上的通知，只是一个邮件提醒，每周最多发一次，不会频繁打扰',
-    file: 'NotificationContext.jsx',
-  },
-];
 
 // 新建通知表单默认值
 const defaultNewNotif = {
@@ -168,8 +59,22 @@ export default function NotificationManagement() {
     refreshNotifications,
   } = useNotifications();
 
-  // 展开的触发规则
-  const [expandedRule, setExpandedRule] = useState(null);
+  // 通知规则管理
+  const {
+    rules,
+    cloudAvailable,
+    addRule,
+    updateRule,
+    deleteRule,
+    toggleRule,
+    resetToDefaults,
+  } = useNotificationRules();
+
+  // 规则编辑器状态
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editingRule, setEditingRule] = useState(null);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
+
   // 新建通知表单
   const [showNewForm, setShowNewForm] = useState(false);
   const [newNotif, setNewNotif] = useState({ ...defaultNewNotif });
@@ -264,95 +169,135 @@ export default function NotificationManagement() {
             <div className="notif-mgmt__stat-label">已读</div>
           </div>
           <div className="notif-mgmt__stat-card notif-mgmt__stat-card--rules">
-            <div className="notif-mgmt__stat-value">{TRIGGER_RULES.length}</div>
-            <div className="notif-mgmt__stat-label">通知场景</div>
+            <div className="notif-mgmt__stat-value">{rules.length}</div>
+            <div className="notif-mgmt__stat-label">通知规则</div>
           </div>
         </div>
 
-        {/* ====== 第一部分：通知触发规则 ====== */}
+        {/* ====== 第一部分：通知触发规则（可自定义） ====== */}
         <section className="notif-mgmt__section">
           <div className="notif-mgmt__section-header">
-            <h2><Zap size={20} /> 什么时候会收到通知？</h2>
-            <p>以下列出了所有会自动产生通知的场景，点击可以展开看详细说明</p>
+            <h2><Zap size={20} /> 通知触发规则</h2>
+            <p>
+              你可以自定义"在什么情况下、给谁、发什么样的通知"；系统会自动把你的选择翻译成执行逻辑。
+              {!cloudAvailable && (
+                <span className="notif-mgmt__rule-hint">
+                  （当前规则只保存在本浏览器。如需多端同步，请在 Supabase 中执行 <code>supabase-notification-rules.sql</code>）
+                </span>
+              )}
+            </p>
+            {isAdmin && (
+              <div className="notif-mgmt__rules-actions">
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setEditingRule(null);
+                    setEditorOpen(true);
+                  }}
+                >
+                  <Plus size={14} /> 新增规则
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setShowResetConfirm(true)}
+                  title="把所有规则恢复到系统默认配置"
+                >
+                  <RotateCcw size={14} /> 恢复默认规则
+                </button>
+              </div>
+            )}
           </div>
 
           <div className="notif-mgmt__rules">
-            {TRIGGER_RULES.map((rule) => {
-              const SourceIcon = rule.sourceIcon;
-              const config = typeConfig[rule.type];
-              const TypeIcon = config.icon;
-              const isExpanded = expandedRule === rule.id;
+            {rules.length === 0 && (
+              <div className="notif-mgmt__empty">
+                <Bell size={36} />
+                <p>还没有配置任何规则，点击"新增规则"开始</p>
+              </div>
+            )}
+            {rules.map((rule) => {
+              const ev = EVENT_CATALOG.find((e) => e.key === rule.event);
+              const typeCfg = typeConfig[rule.type] || typeConfig.other;
+              const TypeIcon = typeCfg.icon;
+              const audienceLabel =
+                AUDIENCE_OPTIONS.find((a) => a.value === rule.audience)?.label
+                || '所有人';
+              const typeMeta = TYPE_OPTIONS.find((t) => t.value === rule.type);
+              const disabled = rule.enabled === false;
 
               return (
                 <div
                   key={rule.id}
-                  className={`notif-mgmt__rule card ${isExpanded ? 'notif-mgmt__rule--expanded' : ''}`}
+                  className={`notif-mgmt__rule card ${disabled ? 'notif-mgmt__rule--disabled' : ''}`}
                 >
-                  <div
-                    className="notif-mgmt__rule-header"
-                    onClick={() => setExpandedRule(isExpanded ? null : rule.id)}
-                  >
+                  <div className="notif-mgmt__rule-header">
                     <div className="notif-mgmt__rule-left">
-                      <div className="notif-mgmt__rule-source-icon" style={{ background: `${config.color}15`, color: config.color }}>
-                        <SourceIcon size={18} />
+                      <div
+                        className="notif-mgmt__rule-source-icon"
+                        style={{ background: `${typeCfg.color}15`, color: typeCfg.color }}
+                      >
+                        <TypeIcon size={18} />
                       </div>
                       <div className="notif-mgmt__rule-info">
-                        <h4>{rule.trigger}</h4>
-                        <span className="notif-mgmt__rule-source">{rule.source}</span>
+                        <h4>{rule.title || '（未命名规则）'}</h4>
+                        <span className="notif-mgmt__rule-source">
+                          {ev ? `【${ev.source}】${ev.label}` : rule.event}
+                        </span>
                       </div>
                     </div>
                     <div className="notif-mgmt__rule-right">
                       <span
                         className="notif-mgmt__rule-type"
-                        style={{ color: config.color, background: `${config.color}12` }}
+                        style={{
+                          color: typeMeta?.color || typeCfg.color,
+                          background: `${typeMeta?.color || typeCfg.color}12`,
+                        }}
                       >
-                        <TypeIcon size={12} /> {config.label}
+                        <TypeIcon size={12} /> {typeCfg.label}
                       </span>
-                      {rule.autoRead ? (
-                        <span className="notif-mgmt__rule-badge notif-mgmt__rule-badge--read">
-                          <CheckCircle size={12} /> 不打扰
-                        </span>
-                      ) : (
-                        <span className="notif-mgmt__rule-badge notif-mgmt__rule-badge--unread">
-                          <Bell size={12} /> 需查看
-                        </span>
+                      <span className="notif-mgmt__rule-audience">
+                        <Users size={12} /> {audienceLabel}
+                      </span>
+                      {isAdmin && (
+                        <>
+                          <button
+                            className={`notif-mgmt__action-btn ${disabled ? '' : 'notif-mgmt__action-btn--on'}`}
+                            onClick={() => toggleRule(rule.id)}
+                            title={disabled ? '点击启用' : '点击停用'}
+                          >
+                            <Power size={14} />
+                          </button>
+                          <button
+                            className="notif-mgmt__action-btn"
+                            onClick={() => {
+                              setEditingRule(rule);
+                              setEditorOpen(true);
+                            }}
+                            title="编辑规则"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                          <button
+                            className="notif-mgmt__action-btn notif-mgmt__action-btn--danger"
+                            onClick={() => {
+                              if (confirm(`确认删除规则「${rule.title}」？`)) {
+                                deleteRule(rule.id);
+                              }
+                            }}
+                            title="删除规则"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </>
                       )}
-                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </div>
                   </div>
 
-                  {isExpanded && (
-                    <div className="notif-mgmt__rule-detail">
-                      <div className="notif-mgmt__rule-detail-grid">
-                        <div className="notif-mgmt__rule-detail-item">
-                          <label>通知标题</label>
-                          <span>{rule.title}</span>
-                        </div>
-                        <div className="notif-mgmt__rule-detail-item">
-                          <label>你会看到的消息内容</label>
-                          <span className="notif-mgmt__rule-template">{rule.message}</span>
-                        </div>
-                        <div className="notif-mgmt__rule-detail-item">
-                          <label>收到后需要手动查看吗？</label>
-                          <span>
-                            {rule.autoRead ? (
-                              <span className="notif-mgmt__detail-tag notif-mgmt__detail-tag--green">
-                                <CheckCircle size={12} /> 不需要，系统会帮你自动标为已读
-                              </span>
-                            ) : (
-                              <span className="notif-mgmt__detail-tag notif-mgmt__detail-tag--orange">
-                                <Bell size={12} /> 需要你点开查看后才会标为已读
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                        <div className="notif-mgmt__rule-detail-item">
-                          <label>为什么这样设计？</label>
-                          <span>{rule.autoReadReason}</span>
-                        </div>
-                      </div>
+                  <div className="notif-mgmt__rule-detail">
+                    <div className="notif-mgmt__rule-nl">
+                      <Info size={12} /> {describeRule(rule)}
                     </div>
-                  )}
+                  </div>
                 </div>
               );
             })}
@@ -383,9 +328,9 @@ export default function NotificationManagement() {
               <div className="notif-mgmt__filter-group">
                 {[
                   { value: 'all', label: '全部类型' },
-                  { value: 'reminder', label: '提醒' },
-                  { value: 'info', label: '通知' },
-                  { value: 'system', label: '系统' },
+                  { value: 'progress', label: '事项进度' },
+                  { value: 'sharing', label: '内部分享' },
+                  { value: 'other', label: '其他' },
                 ].map((f) => (
                   <button
                     key={f.value}
@@ -590,6 +535,71 @@ export default function NotificationManagement() {
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* ====== 规则编辑器 ====== */}
+        <NotificationRuleEditor
+          open={editorOpen}
+          rule={editingRule}
+          onClose={() => {
+            setEditorOpen(false);
+            setEditingRule(null);
+          }}
+          onSave={async (draft) => {
+            if (editingRule?.id) {
+              await updateRule({ ...editingRule, ...draft });
+            } else {
+              await addRule(draft);
+            }
+            setEditorOpen(false);
+            setEditingRule(null);
+          }}
+        />
+
+        {/* ====== 恢复默认确认 ====== */}
+        {showResetConfirm && (
+          <div
+            className="notif-mgmt__modal-overlay"
+            onClick={() => setShowResetConfirm(false)}
+          >
+            <div
+              className="notif-mgmt__modal"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="notif-mgmt__modal-header">
+                <h3><RotateCcw size={18} /> 恢复默认规则</h3>
+                <button
+                  className="notif-mgmt__modal-close"
+                  onClick={() => setShowResetConfirm(false)}
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="notif-mgmt__modal-body">
+                <p>
+                  这将会<strong>删除所有自定义规则</strong>并恢复为系统默认的 8 条规则。
+                  这个操作不可撤销，确定要继续吗？
+                </p>
+              </div>
+              <div className="notif-mgmt__modal-footer">
+                <button
+                  className="btn btn-ghost"
+                  onClick={() => setShowResetConfirm(false)}
+                >
+                  取消
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={async () => {
+                    await resetToDefaults();
+                    setShowResetConfirm(false);
+                  }}
+                >
+                  确认恢复
+                </button>
+              </div>
             </div>
           </div>
         )}
