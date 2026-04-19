@@ -1,0 +1,235 @@
+/* ============================================
+   AvatarCropper —— 个人主页头像裁剪弹窗样式
+   ============================================ */
+
+.avatar-cropper__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 30, 20, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-md);
+  animation: avatar-cropper-fade 0.18s ease-out;
+}
+
+@keyframes avatar-cropper-fade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.avatar-cropper__dialog {
+  background: var(--color-bg-card, #fff);
+  border-radius: var(--radius-lg, 16px);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+  width: min(360px, 92vw);
+  max-height: 92vh;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header */
+.avatar-cropper__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-light, #E8F0E9);
+}
+
+.avatar-cropper__title {
+  margin: 0;
+  font-size: var(--text-base, 16px);
+  font-weight: 600;
+  color: var(--color-text, #2C3E2D);
+  font-family: var(--font-body);
+}
+
+.avatar-cropper__close {
+  background: transparent;
+  border: none;
+  color: var(--color-text-muted, #8A9A8C);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.avatar-cropper__close:hover {
+  background: var(--color-bg-alt, #EFF5ED);
+  color: var(--color-text, #2C3E2D);
+}
+
+/* Hint */
+.avatar-cropper__hint {
+  text-align: center;
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-muted, #8A9A8C);
+  padding: var(--space-sm) var(--space-lg) 0;
+}
+
+/* Stage —— 裁剪区（正方形） */
+.avatar-cropper__stage {
+  position: relative;
+  margin: var(--space-md) auto;
+  background: #1a1f18;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none; /* 禁用浏览器默认手势，交给我们处理 */
+  border-radius: 8px;
+}
+
+.avatar-cropper__stage:active {
+  cursor: grabbing;
+}
+
+.avatar-cropper__image {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  max-width: none;
+  user-select: none;
+  -webkit-user-drag: none;
+  pointer-events: none; /* 事件交给 stage 处理 */
+  will-change: transform;
+}
+
+/* 圆形蒙版：半径 = stage 宽高的一半；外圈通过巨大 box-shadow 盖暗
+   —— 用 pointer-events:none 保证鼠标穿透到 stage */
+.avatar-cropper__mask {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.55);
+  border: 2px solid rgba(255, 255, 255, 0.9);
+}
+
+/* Controls —— 缩放滑竿 */
+.avatar-cropper__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  padding: 0 var(--space-lg) var(--space-md);
+}
+
+.avatar-cropper__icon-btn {
+  background: var(--color-bg-alt, #EFF5ED);
+  border: none;
+  color: var(--color-text-light, #5A6B5C);
+  border-radius: var(--radius-sm, 6px);
+  padding: 6px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.15s ease;
+}
+
+.avatar-cropper__icon-btn:hover {
+  background: var(--color-primary-light, rgba(91, 140, 62, 0.08));
+  color: var(--color-primary, #5B8C3E);
+}
+
+.avatar-cropper__range {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 4px;
+  background: var(--color-border-light, #E8F0E9);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+}
+
+.avatar-cropper__range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary, #5B8C3E);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: grab;
+}
+
+.avatar-cropper__range::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-primary, #5B8C3E);
+  border: 2px solid #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  cursor: grab;
+}
+
+/* Footer —— 按钮 */
+.avatar-cropper__footer {
+  display: flex;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--color-border-light, #E8F0E9);
+}
+
+.avatar-cropper__btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0.55rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  font-size: var(--text-sm, 14px);
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  font-family: inherit;
+}
+
+.avatar-cropper__btn--ghost {
+  background: transparent;
+  color: var(--color-text-light, #5A6B5C);
+  border-color: var(--color-border, #D4E2D5);
+}
+
+.avatar-cropper__btn--ghost:hover {
+  background: var(--color-bg-alt, #EFF5ED);
+  color: var(--color-text, #2C3E2D);
+}
+
+.avatar-cropper__btn--primary {
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+}
+
+.avatar-cropper__btn--primary:hover {
+  background: var(--color-primary-dark, #4A7A30);
+  box-shadow: 0 2px 6px rgba(91, 140, 62, 0.3);
+}
+
+/* 移动端适配 */
+@media (max-width: 480px) {
+  .avatar-cropper__dialog {
+    width: 100%;
+    max-width: 360px;
+  }
+
+  .avatar-cropper__header,
+  .avatar-cropper__controls,
+  .avatar-cropper__footer {
+    padding-left: var(--space-md);
+    padding-right: var(--space-md);
+  }
+}

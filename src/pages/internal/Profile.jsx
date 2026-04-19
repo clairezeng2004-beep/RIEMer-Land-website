@@ -4,6 +4,7 @@ import { supabase, isSupabaseConfigured, getReachable } from '../../lib/supabase
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import AvatarCropper from '../../components/AvatarCropper';
 import { User, Camera, Save, Loader2 } from 'lucide-react';
 import './Profile.css';
 
@@ -33,6 +34,8 @@ export default function Profile() {
   });
   const [avatarPreview, setAvatarPreview] = useState(user?.avatar || null);
   const [avatarFile, setAvatarFile] = useState(null);
+  // 打开裁剪弹窗用：保存用户刚选择的原始图 DataURL
+  const [cropperSrc, setCropperSrc] = useState(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   // 标记是否已经从 user 对象恢复过数据（避免异步 user 更新反复覆盖用户正在编辑的内容）
@@ -106,6 +109,8 @@ export default function Profile() {
 
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
+    // 重置 input value，确保选同一张图也能再次触发 change
+    e.target.value = '';
     if (!file) return;
 
     // 限制文件大小 2MB
@@ -114,12 +119,24 @@ export default function Profile() {
       return;
     }
 
-    setAvatarFile(file);
+    // 读取为 DataURL 后传给裁剪器，用户确认后再写入 avatarPreview / avatarFile
     const reader = new FileReader();
     reader.onload = (ev) => {
-      setAvatarPreview(ev.target.result);
+      setCropperSrc(ev.target.result);
     };
     reader.readAsDataURL(file);
+  };
+
+  // 裁剪确认回调：收到 512x512 的 JPEG DataURL
+  const handleCropConfirm = (dataUrl) => {
+    setAvatarPreview(dataUrl);
+    // 用 dataUrl 伪造一个"文件已更改"的标记，让保存流程走 updates.avatar 分支
+    setAvatarFile({ cropped: true });
+    setCropperSrc(null);
+  };
+
+  const handleCropCancel = () => {
+    setCropperSrc(null);
   };
 
   const handleSave = async () => {
@@ -393,6 +410,14 @@ export default function Profile() {
           </div>
         </div>
       </div>
+
+      {cropperSrc && (
+        <AvatarCropper
+          imageSrc={cropperSrc}
+          onCancel={handleCropCancel}
+          onConfirm={handleCropConfirm}
+        />
+      )}
     </div>
   );
 }
