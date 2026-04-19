@@ -930,11 +930,6 @@ export default function MemberProfiles() {
                             }${
                               (col.key === 'joined_at_display' || col.key === 'enrollment_year') ? ' member-profiles-table__cell--nowrap' : ''
                             }`}
-                            title={
-                              col.key === 'name' || !profile[col.key]
-                                ? undefined
-                                : String(profile[col.key])
-                            }
                           >
                             {col.key === 'name' && isSelf ? (
                               <span className="member-profiles-table__name-cell">
