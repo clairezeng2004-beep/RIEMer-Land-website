@@ -771,7 +771,8 @@ export default function Tasks() {
                       <input
                         type="text"
                         className="tasks-table__reason-input"
-                        placeholder="亮点总结…"
+                        placeholder="如：规模大、参与人数多、主题热门、嘉宾准备细心…"
+                        title="可以从规模大、参与人数多、主题热门、嘉宾准备细心等方向总结"
                         value={task.highlights || ''}
                         onChange={(e) => updateTaskField(task.id, 'highlights', e.target.value)}
                       />
@@ -782,7 +783,8 @@ export default function Tasks() {
                       <input
                         type="text"
                         className="tasks-table__reason-input"
-                        placeholder="经验复盘…"
+                        placeholder="如：设备调试、时间策划、宣传力度、嘉宾跟进节奏…"
+                        title="可以从设备调试、时间策划、宣传力度、嘉宾跟进节奏等方面总结"
                         value={task.reflections || ''}
                         onChange={(e) => updateTaskField(task.id, 'reflections', e.target.value)}
                       />
