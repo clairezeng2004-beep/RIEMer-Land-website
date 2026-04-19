@@ -20,8 +20,9 @@ const CROP_SIZE = 280;
 // 最终输出尺寸（px）—— 导出为正方形 JPEG
 const OUTPUT_SIZE = 512;
 // 缩放边界（基于"使图片最短边 === 裁剪框边长"的基准比例）
-const MIN_SCALE = 1;   // 下限：图片刚好铺满裁剪框
-const MAX_SCALE = 4;   // 上限：放大 4 倍
+const MIN_SCALE = 1;    // 下限：图片刚好铺满裁剪框
+const MAX_SCALE = 3;    // 上限：放大 3 倍（过去是 4，触屏上灵敏度过高）
+const SCALE_STEP = 0.05; // 滑杆步长：过去 0.01 太灵敏，0.05 更稳
 
 export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
   // 原图尺寸
@@ -262,7 +263,7 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
             type="button"
             className="avatar-cropper__icon-btn"
             onClick={() => {
-              const next = Math.max(MIN_SCALE, scale - 0.1);
+              const next = Math.max(MIN_SCALE, scale - SCALE_STEP * 2);
               setScale(next);
               setOffset((prev) => clampOffset(prev, next));
             }}
@@ -275,7 +276,7 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
             className="avatar-cropper__range"
             min={MIN_SCALE}
             max={MAX_SCALE}
-            step={0.01}
+            step={SCALE_STEP}
             value={scale}
             onChange={onRangeChange}
           />
@@ -283,7 +284,7 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
             type="button"
             className="avatar-cropper__icon-btn"
             onClick={() => {
-              const next = Math.min(MAX_SCALE, scale + 0.1);
+              const next = Math.min(MAX_SCALE, scale + SCALE_STEP * 2);
               setScale(next);
               setOffset((prev) => clampOffset(prev, next));
             }}

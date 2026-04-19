@@ -145,33 +145,69 @@
   flex: 1;
   -webkit-appearance: none;
   appearance: none;
-  height: 4px;
+  height: 6px;
   background: var(--color-border-light, #E8F0E9);
-  border-radius: 2px;
+  border-radius: 3px;
   outline: none;
   cursor: pointer;
+  /* 防止触屏滑动时页面跟着滚动 / 缩放，让手势完全交给滑杆 */
+  touch-action: none;
+  /* 纵向多留一点可点区域，手指边缘也能拖到 */
+  padding: 10px 0;
+  margin: -10px 0;
+  background-clip: content-box;
 }
 
 .avatar-cropper__range::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--color-primary, #5B8C3E);
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+.avatar-cropper__range:active::-webkit-slider-thumb {
+  transform: scale(1.15);
+  cursor: grabbing;
 }
 
 .avatar-cropper__range::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: var(--color-primary, #5B8C3E);
   border: 2px solid #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
   cursor: grab;
+  transition: transform 0.15s ease;
+}
+
+.avatar-cropper__range:active::-moz-range-thumb {
+  transform: scale(1.15);
+  cursor: grabbing;
+}
+
+/* 触屏设备：进一步放大拇指，轨道加高，手指更容易精准定位 */
+@media (hover: none) and (pointer: coarse) {
+  .avatar-cropper__range {
+    height: 8px;
+    border-radius: 4px;
+  }
+  .avatar-cropper__range::-webkit-slider-thumb {
+    width: 28px;
+    height: 28px;
+    border-width: 3px;
+  }
+  .avatar-cropper__range::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-width: 3px;
+  }
 }
 
 /* Footer —— 按钮 */
