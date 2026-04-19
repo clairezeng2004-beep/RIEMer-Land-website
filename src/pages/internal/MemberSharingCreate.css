@@ -694,6 +694,53 @@
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+  /* 下滑时工具栏固定在顶部 navbar（高 72px）之下，类似 Word 的体验。
+     -----------------------------------------------------------------
+     生效前提（此前已满足，这里留痕以防后续误改）：
+     1) 祖先 .internal-layout__content 用 overflow-x: clip（非 hidden），
+        不会把自己变成滚动容器 → 真正的滚动在 window 上，sticky 以
+        viewport 为参照。
+     2) 父级 .msc-form__word-editor-wrapper 没有 overflow 限制，sticky
+        不会被截断；该 wrapper 够高（里面有长正文编辑器），sticky 才
+        有"停留区间"可言。
+     3) 工具栏和编辑器是同级兄弟（不是编辑器的子节点），故不受
+        .msc-form__word-editor 的 overflow:auto 影响。
+     -----------------------------------------------------------------
+     视觉处理：
+     - 需要不透明背景色和下边界，下滑后工具栏会盖住编辑器顶部，
+       否则文字会从工具栏下方透出。
+     - padding 纵向略加一点，避免按钮紧贴上/下边缘。
+     - z-index 10：高于编辑器及图片，但低于 FloatingTextToolbar(z-index: 1200)
+       和 Navbar(z-index: 1000)，保证浮层仍在它之上。 */
+  position: sticky;
+  top: 72px; /* navbar 高度 */
+  z-index: 10;
+  background: var(--color-bg, #f9fafb);
+  padding: 6px 0;
+  border-bottom: 1px solid transparent;
+  /* 只在真正粘住（离开初始位置）时再显示分隔线：粗暴做法是始终显示，
+     但视觉会在页面顶部就露出一条横线；这里先用 transparent，
+     粘住后让 box-shadow 代替分隔视觉即可。 */
+  transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+/* 浏览器支持时：sticky 真正激活（top 命中）那一刻加 box-shadow，
+   视觉上像 Word 工具栏浮起并与下方内容分隔。 */
+@supports (animation-timeline: view()) or (selector(:has(*))) {
+  /* 用 :has 做不到 stuck 状态检测，这里退化为"始终显示淡阴影"作为兜底，
+     实际项目体验验证显示即使初始态有这条淡阴影也不突兀。 */
+  .msc-form__editor-toolbar {
+    box-shadow: 0 1px 0 var(--color-border-light, #f0f0f0);
+  }
+}
+
+@media (max-width: 768px) {
+  /* 手机端 navbar 高 64px，另外 .internal-mobile-nav 本身也是 sticky top:64px 的
+     水平导航条（高度约 44px）。工具栏要停在它们之下，约 64 + 44 = 108px。
+     如果导航条高度变化，这里需要同步。 */
+  .msc-form__editor-toolbar {
+    top: 108px;
+  }
 }
 
 .msc-form__paste-btn {
