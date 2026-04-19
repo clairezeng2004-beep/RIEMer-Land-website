@@ -623,6 +623,10 @@
 }
 
 /* ============ 保存反馈（行内，不用 alert） ============ */
+/* 注：下面这组 .member-profiles-table__save-msg 样式是旧版"内联在编辑操作
+   单元格里"的提示方案。当前组件已改为使用页面级 toast
+   （.member-profiles-save-toast，见下方），旧样式暂时保留以防有其他
+   引用点，但不会被渲染。 */
 .member-profiles-table__save-msg {
   position: absolute;
   top: 100%;
@@ -663,3 +667,94 @@
   color: #a1322a;
   border: 1px solid #f0b9b3;
 }
+
+/* ============ 保存反馈 Toast（页面级浮层，脱离表格堆叠上下文） ============ */
+/*
+ * 为什么要用 position: fixed 而不是 absolute：
+ *   .member-profiles-table-wrapper 是 overflow: auto 的滚动容器，
+ *   其内部的 sticky 操作列（.member-profiles-table__action-col）自带
+ *   层叠上下文，并在下一行同样出现 —— 导致把 absolute 的 save-msg
+ *   盖住（截图里"弹窗下半部被下面遮挡"就是这个原因）。
+ *   fixed 直接挂到 viewport 上，不再受任何祖先 overflow / z-index 影响。
+ */
+.member-profiles-save-toast {
+  position: fixed;
+  /* 放在右上角偏下，避开全局顶栏；移动端自动改为底部居中（见 media query） */
+  top: 84px;
+  right: 24px;
+  z-index: 2000;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px 10px 14px;
+  border-radius: 8px;
+  font-size: var(--text-xs);
+  line-height: 1.55;
+  max-width: 360px;
+  min-width: 220px;
+  word-break: break-word;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.14);
+  animation: member-profiles-save-toast-in 180ms ease-out both;
+}
+
+@keyframes member-profiles-save-toast-in {
+  from { opacity: 0; transform: translateY(-6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.member-profiles-save-toast__text {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.member-profiles-save-toast__close {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: inherit;
+  opacity: 0.65;
+  cursor: pointer;
+  border-radius: 4px;
+  padding: 0;
+  transition: opacity 120ms ease, background 120ms ease;
+}
+
+.member-profiles-save-toast__close:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.member-profiles-save-toast--success {
+  background: #eaf7ef;
+  color: #2e7d3d;
+  border: 1px solid #b9e0c5;
+}
+
+.member-profiles-save-toast--warning {
+  background: #fff6e0;
+  color: #8a5a00;
+  border: 1px solid #f0d8a0;
+}
+
+.member-profiles-save-toast--error {
+  background: #fdeaea;
+  color: #a1322a;
+  border: 1px solid #f0b9b3;
+}
+
+/* 移动端：改为顶部居中窄条，避免与右侧滚动箭头重叠 */
+@media (max-width: 768px) {
+  .member-profiles-save-toast {
+    top: 72px;
+    right: 12px;
+    left: 12px;
+    max-width: none;
+    min-width: 0;
+  }
+}
+

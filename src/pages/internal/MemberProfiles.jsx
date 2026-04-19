@@ -500,7 +500,12 @@ export default function MemberProfiles() {
     setSaving(true);
     setSaveMsg(null);
 
-    // 帮助函数：给 Promise 加超时，避免永远 pending 导致 saving 卡死
+    // 帮助函数：给 Promise 加超时，避免永远 pending 导致 saving 卡死。
+    //
+    // ⚠ 这个外层超时要比 src/lib/supabase.js 里的 global.fetch 超时（10s）
+    //    明显更长，否则两层 10s 超时会同时触发，把"云端响应稍慢"也误判为
+    //    "网络不通"。Supabase fetch 自己到 10s 就会 AbortError，本层 25s
+    //    只是兜底防止"promise 永远 pending 卡住 saving 状态"。
     const withTimeout = (promise, ms, label) =>
       Promise.race([
         promise,
@@ -544,7 +549,7 @@ export default function MemberProfiles() {
               .update(updateData)
               .eq('user_id', editingId)
               .select('user_id'),
-            10000,
+            25000,
             '云端保存'
           );
           let error = firstAttempt.error;
@@ -562,7 +567,7 @@ export default function MemberProfiles() {
                 .update(updateData)
                 .eq('user_id', editingId)
                 .select('user_id'),
-              10000,
+              25000,
               '云端保存重试'
             );
             error = retry.error;
@@ -613,8 +618,13 @@ export default function MemberProfiles() {
             hint = '（疑似数据库缺少新字段，请联系管理员在 Supabase 后台执行 supabase-members-and-albums.sql 完成升级）';
           } else if (/row-level security|RLS|没有权限/i.test(cloudErrMsg)) {
             hint = '（疑似权限不足，请确认你是该行所属人或管理员）';
-          } else if (/超时|timeout|Failed to fetch|NetworkError/i.test(cloudErrMsg)) {
-            hint = '（网络似乎不通，请检查代理 / 广告拦截插件后重试）';
+          } else if (/超时|timeout|Failed to fetch|NetworkError|AbortError|aborted/i.test(cloudErrMsg)) {
+            // 之前这里直接断言"网络不通"，但实际上更常见的原因是：
+            //   - Supabase 免费层冷启动 / 当前并发高，单次请求耗时较长
+            //   - 浏览器正在刷新 token 或 session 同步进行中
+            //   - 本地 DNS / 路由抖动一小段时间
+            // 用中性措辞，避免让网络其实正常的用户陷入"以为自己网络坏了"。
+            hint = '（云端响应较慢或暂时不可达；稍等几秒再点"保存"通常即可恢复。若持续失败可检查代理 / 广告拦截插件）';
           }
 
           setSaveMsg({
@@ -974,14 +984,10 @@ export default function MemberProfiles() {
                           >
                             <X size={14} />
                           </button>
-                          {saveMsg && (
-                            <div
-                              className={`member-profiles-table__save-msg member-profiles-table__save-msg--${saveMsg.type}`}
-                              role="alert"
-                            >
-                              {saveMsg.text}
-                            </div>
-                          )}
+                          {/* saveMsg 以前作为 absolute 子节点内联渲染在这里，
+                              但父级 td 是 sticky 列 + 祖先容器 overflow: auto，
+                              会把它的下半部分裁掉 / 被下一行的 sticky 列盖住。
+                              现已挪到页面根节点的 toast 区（见组件底部）。 */}
                         </div>
                       )}
                     </td>
@@ -1000,6 +1006,27 @@ export default function MemberProfiles() {
           </table>
         </div>
       </div>
+
+      {/* 保存反馈 Toast：位于页面根节点末尾，position: fixed 脱离表格
+          sticky 列 / overflow 容器的堆叠环境，确保提示永远浮在最上层、
+          不会被下一行的 sticky 操作列遮挡。 */}
+      {saveMsg && (
+        <div
+          className={`member-profiles-save-toast member-profiles-save-toast--${saveMsg.type}`}
+          role="alert"
+        >
+          <span className="member-profiles-save-toast__text">{saveMsg.text}</span>
+          <button
+            type="button"
+            className="member-profiles-save-toast__close"
+            onClick={() => setSaveMsg(null)}
+            aria-label="关闭提示"
+            title="关闭"
+          >
+            <X size={14} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
