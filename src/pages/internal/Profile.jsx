@@ -122,16 +122,20 @@ export default function Profile() {
     }
   };
 
-  // 选择"上传新图片"：触发 file input
-  const handleUploadNew = () => {
-    setShowAvatarActions(false);
-    fileInputRef.current?.click();
-  };
-
+  // 选择"上传新图片"：
+  // 注意：不在此处调用 fileInputRef.current.click() —— 在 iOS Safari 上，
+  // 用户点击的是 sheet 里的 <button>，再通过 JS 触发另一个 <input type="file">
+  // 的 click，经常会被浏览器判断为"非用户手势"而静默失败（表现就是用户点了
+  // "上传新图片"之后啥也没发生）。
+  // 正确做法：把文件输入直接用 <label htmlFor> 包住按钮样式，用户点到的就是
+  // label → 浏览器原生把点击路由给 input，手势信任链完整，文件选择器必然弹起。
+  // 这里的 handler 只负责关 sheet（在 change 事件中已关，不会重复）。
   const handleAvatarChange = (e) => {
     const file = e.target.files?.[0];
     // 重置 input value，确保选同一张图也能再次触发 change
     e.target.value = '';
+    // 文件选择完成（或取消），无论如何关闭 sheet
+    setShowAvatarActions(false);
     if (!file) return;
 
     // 限制文件大小 2MB
@@ -144,6 +148,10 @@ export default function Profile() {
     const reader = new FileReader();
     reader.onload = (ev) => {
       setCropperSrc(ev.target.result);
+    };
+    reader.onerror = () => {
+      // iOS Safari 对部分 HEIC / 超大图片会 fail，给明确提示
+      setMessage({ type: 'error', text: '图片读取失败，请换一张试试（建议 JPG/PNG 格式）' });
     };
     reader.readAsDataURL(file);
   };
@@ -311,6 +319,7 @@ export default function Profile() {
             </div>
             <input
               ref={fileInputRef}
+              id="profile-avatar-file-input"
               type="file"
               accept="image/*"
               onChange={handleAvatarChange}
@@ -475,17 +484,22 @@ export default function Profile() {
                   <span className="avatar-actions__desc">继续使用这张照片，重新裁剪和缩放</span>
                 </span>
               </button>
-              <button
-                type="button"
-                className="avatar-actions__item"
-                onClick={handleUploadNew}
+              {/* 注意：这里必须用 <label htmlFor> 而不是 <button onClick={() => input.click()}>。
+                  iOS Safari 要求文件选择器必须在"用户原生点击"的直系 handler 中触发，
+                  如果先点 <button>、handler 里再去 JS 调用另一个 <input type="file"> 的
+                  click()，浏览器会视为"非用户手势"而静默失败——表现就是用户点了"上传新图片"
+                  却没有任何反应。用 <label htmlFor> 时，浏览器原生把点击路由到对应 input，
+                  手势链完整，必定弹出文件选择器。 */}
+              <label
+                htmlFor="profile-avatar-file-input"
+                className="avatar-actions__item avatar-actions__item--as-label"
               >
                 <span className="avatar-actions__icon"><Upload size={20} /></span>
                 <span className="avatar-actions__text">
                   <span className="avatar-actions__label">上传新图片</span>
                   <span className="avatar-actions__desc">从相册中选择一张新图片</span>
                 </span>
-              </button>
+              </label>
             </div>
           </div>
         </div>

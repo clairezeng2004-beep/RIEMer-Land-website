@@ -391,6 +391,18 @@
   transition: background 0.15s ease, border-color 0.15s ease;
 }
 
+/* <label> 版本的同款按钮（用于"上传新图片"——以 label 形式存在以确保 iOS Safari
+   原生手势链能直接触发 <input type="file">）。
+   label 默认没有 button 的 box-sizing / font 继承，这里显式对齐。 */
+.avatar-actions__item--as-label {
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
 .avatar-actions__item:hover {
   background: var(--color-bg-muted, #F5F7F3);
   border-color: var(--color-border-light, #E8F0E9);
