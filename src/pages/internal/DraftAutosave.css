@@ -1,0 +1,135 @@
+/* 草稿自动保存 —— 状态条 / 恢复 Banner 通用样式 */
+
+.draft-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1;
+  background: rgba(0, 0, 0, 0.04);
+  color: #555;
+  margin-right: 8px;
+  user-select: none;
+  white-space: nowrap;
+  transition: color 0.2s, background 0.2s;
+}
+
+.draft-status--saving {
+  color: #b07b00;
+  background: rgba(255, 176, 32, 0.14);
+}
+
+.draft-status--saving svg {
+  animation: draft-spin 1.2s linear infinite;
+}
+
+.draft-status--saved {
+  color: #1b7a48;
+  background: rgba(46, 160, 90, 0.12);
+}
+
+@keyframes draft-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+/* —— 恢复 Banner —— */
+.draft-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  border: 1px solid #f2d48a;
+  border-left: 4px solid #e0a32d;
+  background: linear-gradient(180deg, #fff9e8 0%, #fef4d8 100%);
+  border-radius: 8px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.draft-banner__icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #d89022;
+}
+
+.draft-banner__text {
+  flex: 1;
+  min-width: 0;
+  color: #5a4110;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.draft-banner__text strong {
+  color: #3d2d08;
+  font-weight: 600;
+  margin-right: 4px;
+}
+
+.draft-banner__time {
+  color: #8a6a28;
+  font-size: 12px;
+  margin-left: 2px;
+}
+
+.draft-banner__text p {
+  margin: 4px 0 0;
+  color: #6a5124;
+  font-size: 13px;
+}
+
+.draft-banner__actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+  align-items: center;
+}
+
+.draft-banner__btn {
+  padding: 6px 14px;
+  border-radius: 6px;
+  border: 1px solid #d9b765;
+  background: #fff;
+  color: #5a4110;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+  white-space: nowrap;
+}
+
+.draft-banner__btn:hover {
+  background: #fffaec;
+  border-color: #c69738;
+}
+
+.draft-banner__btn--primary {
+  background: #d89022;
+  border-color: #d89022;
+  color: #fff;
+}
+
+.draft-banner__btn--primary:hover {
+  background: #c37f18;
+  border-color: #c37f18;
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  .draft-banner {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .draft-banner__actions {
+    justify-content: flex-end;
+  }
+}

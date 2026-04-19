@@ -30,6 +30,7 @@ import {
   History,
   ChevronDown,
   ChevronUp,
+  RotateCcw,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
@@ -49,9 +50,12 @@ import {
   subscribeDeletedDefaults,
 } from '../../lib/documentsService';
 import ViewLogPopover from '../../components/ViewLogPopover';
+import useDraftAutosave from '../../hooks/useDraftAutosave';
+import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
 import './MemberSharingCreate.css';
+import './DraftAutosave.css';
 
 const DOCUMENTS_KEY = 'riemer_documents';
 const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
@@ -897,17 +901,78 @@ export default function ProcessTemplateDetail() {
   // 'cloud-failed'：本地已保存但云端同步失败（不阻塞，提示用户）
   const [saveHint, setSaveHint] = useState(null);
 
+  /* ========== 编辑草稿自动保存 ========== */
+  const editDraftKey = doc?.id && user?.id
+    ? `process-template-edit:${doc.id}:${user.id}`
+    : null;
+  const editDraft = useDraftAutosave({
+    key: editDraftKey,
+    values: { editTitle, editDescription, editContent },
+    enabled: isEditing && Boolean(editDraftKey),
+    delay: 1500,
+    isEmpty: (v) =>
+      !v ||
+      ((v.editTitle || '').trim() === '' &&
+        (v.editDescription || '').trim() === '' &&
+        (v.editContent || '').trim() === ''),
+  });
+  const [showEditDraftPrompt, setShowEditDraftPrompt] = useState(false);
+  const [pendingDraft, setPendingDraft] = useState(null);
+
   const startEdit = useCallback(() => {
     if (!doc) return;
-    setEditTitle(doc.title || '');
-    setEditDescription(doc.description || '');
-    setEditContent(doc.content || '');
+    const originalTitle = doc.title || '';
+    const originalDescription = doc.description || '';
+    const originalContent = doc.content || '';
+
+    // 检查是否存在未保存草稿且与当前 doc 有差异
+    const existing = editDraft.loadDraft();
+    if (existing && existing.values) {
+      const v = existing.values;
+      const hasDiff =
+        (v.editTitle ?? '') !== originalTitle ||
+        (v.editDescription ?? '') !== originalDescription ||
+        (v.editContent ?? '') !== originalContent;
+      const hasAnyContent =
+        (v.editTitle || '').trim() !== '' ||
+        (v.editDescription || '').trim() !== '' ||
+        (v.editContent || '').trim() !== '';
+      if (hasDiff && hasAnyContent) {
+        setPendingDraft({ values: v, savedAt: existing.savedAt });
+        setShowEditDraftPrompt(true);
+      }
+    }
+
+    setEditTitle(originalTitle);
+    setEditDescription(originalDescription);
+    setEditContent(originalContent);
     setIsEditing(true);
-  }, [doc]);
+  }, [doc, editDraft]);
 
   const cancelEdit = useCallback(() => {
     setIsEditing(false);
-  }, []);
+    setShowEditDraftPrompt(false);
+    setPendingDraft(null);
+    // 取消编辑时清除该文档的本地草稿（用户已明确放弃）
+    editDraft.clearDraft();
+  }, [editDraft]);
+
+  const handleRestoreEditDraft = useCallback(() => {
+    if (pendingDraft?.values) {
+      const v = pendingDraft.values;
+      if (typeof v.editTitle === 'string') setEditTitle(v.editTitle);
+      if (typeof v.editDescription === 'string') setEditDescription(v.editDescription);
+      if (typeof v.editContent === 'string') setEditContent(v.editContent);
+    }
+    setShowEditDraftPrompt(false);
+    setPendingDraft(null);
+  }, [pendingDraft]);
+
+  const handleDiscardEditDraft = useCallback(() => {
+    editDraft.clearDraft();
+    setShowEditDraftPrompt(false);
+    setPendingDraft(null);
+  }, [editDraft]);
 
   /* Markdown 编辑态的实时预览（仅当 doc.format === 'markdown' 时使用） */
   const editMarkdownPreview = useMemo(() => {
@@ -965,6 +1030,10 @@ export default function ProcessTemplateDetail() {
       setIsEditing(false);
       setSaving(false);
       setSaveHint('saved');
+      // 保存成功 —— 清除本地编辑草稿
+      editDraft.clearDraft();
+      setShowEditDraftPrompt(false);
+      setPendingDraft(null);
       // 2.5s 后自动消失
       setTimeout(() => {
         setSaveHint((h) => (h === 'saved' ? null : h));
@@ -1029,7 +1098,7 @@ export default function ProcessTemplateDetail() {
       alert('保存失败，请重试');
       setSaving(false);
     }
-  }, [doc, editTitle, editDescription, editContent, user]);
+  }, [doc, editTitle, editDescription, editContent, user, editDraft]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -1100,6 +1169,7 @@ export default function ProcessTemplateDetail() {
           )}
           {canEdit && isEditing && (
             <div className="ptd-topbar__edit-actions">
+              <DraftStatusIndicator saving={editDraft.saving} lastSavedAt={editDraft.lastSavedAt} />
               <button
                 type="button"
                 className="ptd-topbar__cancel"
@@ -1168,6 +1238,13 @@ export default function ProcessTemplateDetail() {
 
           {/* 文章主体 */}
           <article className={`ptd-article ${isEditing ? 'ptd-article--editing' : ''}`}>
+            {isEditing && showEditDraftPrompt && pendingDraft && (
+              <DraftRestoreBanner
+                savedAt={pendingDraft.savedAt}
+                onRestore={handleRestoreEditDraft}
+                onDiscard={handleDiscardEditDraft}
+              />
+            )}
             {/* 文章头部 */}
             <header className="ptd-article__header">
               <span

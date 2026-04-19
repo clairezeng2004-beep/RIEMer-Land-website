@@ -17,6 +17,9 @@ import {
   Image,
   FileSpreadsheet,
   FileArchive,
+  Clock,
+  Check,
+  RotateCcw,
 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -24,7 +27,9 @@ import { createDoc, canUseSupabase } from '../../lib/documentsService';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import { stripUnderline } from '../../utils/stripUnderline';
+import useDraftAutosave from '../../hooks/useDraftAutosave';
 import './MemberSharingCreate.css';
+import './DraftAutosave.css';
 
 const DEFAULT_TYPE_LABELS = {
   process: '流程手册及模版文件',
@@ -118,6 +123,56 @@ export default function ProcessTemplateCreate() {
 
   const MAX_FILE_SIZE = 5 * 1024 * 1024;
   const MAX_FILES = 10;
+
+  /* ============ 草稿自动保存 ============ */
+  const draftKey = user?.id ? `process-template-create:${user.id}` : 'process-template-create:guest';
+  const draft = useDraftAutosave({
+    key: draftKey,
+    values: newDoc,
+    enabled: isAuthenticated,
+    delay: 1500,
+    isEmpty: (v) =>
+      !v ||
+      ((v.title || '').trim() === '' &&
+        (v.description || '').trim() === '' &&
+        (v.content || '').trim() === '' &&
+        (!v.attachments || v.attachments.length === 0)),
+  });
+
+  // 是否展示恢复草稿 banner（初次进入页面时检测）
+  const [showDraftPrompt, setShowDraftPrompt] = useState(false);
+  const [draftSavedAt, setDraftSavedAt] = useState(null);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const existing = draft.loadDraft();
+    if (existing && existing.values) {
+      const v = existing.values;
+      const nonEmpty =
+        (v.title || '').trim() ||
+        (v.description || '').trim() ||
+        (v.content || '').trim() ||
+        (v.attachments && v.attachments.length > 0);
+      if (nonEmpty) {
+        setShowDraftPrompt(true);
+        setDraftSavedAt(existing.savedAt);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated]);
+
+  const handleRestoreDraft = useCallback(() => {
+    const existing = draft.loadDraft();
+    if (existing && existing.values) {
+      setNewDoc((prev) => ({ ...prev, ...existing.values }));
+    }
+    setShowDraftPrompt(false);
+  }, [draft]);
+
+  const handleDiscardDraft = useCallback(() => {
+    draft.clearDraft();
+    setShowDraftPrompt(false);
+  }, [draft]);
 
   /* ============ 附件处理 ============ */
   const handleFiles = useCallback(async (files) => {
@@ -428,6 +483,9 @@ export default function ProcessTemplateCreate() {
       return;
     }
 
+    // 发布成功 —— 清除草稿
+    draft.clearDraft();
+
     // 返回流程模板列表页（非新窗口跳转时）
     if (window.opener && !window.opener.closed) {
       // 通知父窗口刷新
@@ -448,6 +506,7 @@ export default function ProcessTemplateCreate() {
           <ChevronLeft size={20} /> 返回列表
         </button>
         <div className="msc-topbar__actions">
+          <DraftStatusIndicator saving={draft.saving} lastSavedAt={draft.lastSavedAt} />
           <button
             type="button"
             className="btn btn-secondary"
@@ -467,6 +526,13 @@ export default function ProcessTemplateCreate() {
       {/* 全屏编辑区 */}
       <div className="msc-content">
         <div className="msc-content__inner">
+          {showDraftPrompt && (
+            <DraftRestoreBanner
+              savedAt={draftSavedAt}
+              onRestore={handleRestoreDraft}
+              onDiscard={handleDiscardDraft}
+            />
+          )}
           <h2 className="msc-content__title"><FolderOpen size={22} /> 发布流程/模版文件</h2>
           <p className="msc-content__desc">支持 Markdown、Word 正文与附件上传，三者可组合使用</p>
 
@@ -704,6 +770,66 @@ export default function ProcessTemplateCreate() {
             </div>
           </form>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ================== 草稿相关子组件 ================== */
+function formatDraftTime(date) {
+  if (!date) return '';
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
+  const now = new Date();
+  const sameDay =
+    d.getFullYear() === now.getFullYear() &&
+    d.getMonth() === now.getMonth() &&
+    d.getDate() === now.getDate();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  const ss = String(d.getSeconds()).padStart(2, '0');
+  if (sameDay) return `${hh}:${mm}:${ss}`;
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const da = String(d.getDate()).padStart(2, '0');
+  return `${mo}-${da} ${hh}:${mm}`;
+}
+
+export function DraftStatusIndicator({ saving, lastSavedAt }) {
+  if (saving) {
+    return (
+      <span className="draft-status draft-status--saving" title="正在保存草稿">
+        <Clock size={14} /> 保存中…
+      </span>
+    );
+  }
+  if (lastSavedAt) {
+    return (
+      <span className="draft-status draft-status--saved" title={`草稿已保存于 ${formatDraftTime(lastSavedAt)}`}>
+        <Check size={14} /> 草稿已保存 {formatDraftTime(lastSavedAt)}
+      </span>
+    );
+  }
+  return null;
+}
+
+export function DraftRestoreBanner({ savedAt, onRestore, onDiscard }) {
+  return (
+    <div className="draft-banner" role="status">
+      <div className="draft-banner__icon">
+        <RotateCcw size={18} />
+      </div>
+      <div className="draft-banner__text">
+        <strong>检测到未发布的草稿</strong>
+        {savedAt && <span className="draft-banner__time">（保存于 {formatDraftTime(savedAt)}）</span>}
+        <p>是否恢复上次编辑的内容？忽略则继续使用当前空白表单。</p>
+      </div>
+      <div className="draft-banner__actions">
+        <button type="button" className="draft-banner__btn draft-banner__btn--primary" onClick={onRestore}>
+          恢复草稿
+        </button>
+        <button type="button" className="draft-banner__btn" onClick={onDiscard}>
+          忽略并清除
+        </button>
       </div>
     </div>
   );
