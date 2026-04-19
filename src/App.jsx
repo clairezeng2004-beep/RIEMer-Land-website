@@ -4,6 +4,7 @@ import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import { NotificationRulesProvider } from './contexts/NotificationRulesContext';
 import ScrollToTop from './components/ScrollToTop';
+import ConnectionDiagBadge from './components/ConnectionDiagBadge';
 import usePageTracking from './hooks/usePageTracking';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -101,6 +102,7 @@ function AppShell() {
         </Routes>
       </main>
       {!isFullscreen && <Footer isInternal={isInternal} />}
+      <ConnectionDiagBadge />
     </>
   );
 }

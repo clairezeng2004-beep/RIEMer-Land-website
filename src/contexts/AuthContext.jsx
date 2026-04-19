@@ -263,16 +263,20 @@ export function AuthProvider({ children }) {
       // 1. 先快速检测 Supabase 是否可达（3 秒超时）
       const reachable = await checkSupabaseHealth();
       if (!reachable) {
-        console.warn('[Auth] Supabase 不可达，自动降级到本地模式');
-        setSupabaseOk(false);
-        if (!isBgMode) {
+        // 健康检查失败 —— 这里不立即把 supabaseOk 设为 false，避免因为 HEAD 请求
+        // 被 CDN/代理 block 导致整站错误降级到 mock 数据。
+        // 保持 supabaseOk=null（乐观），让后续的 getSession / 数据查询自己去尝试；
+        // 若它们也失败，才会真正走降级分支。
+        console.warn('[Auth] Supabase 健康检查失败（HEAD 探活不通），仍乐观尝试后续查询，不强制降级');
+        if (!isBgMode && !hasCachedUser) {
+          // 没有缓存用户，本地兜底恢复一下，免得首屏空白
           restoreLocalAuth();
           setLoading(false);
         }
-        setBgVerifying(false);
-        return;
+        // 不 return，继续尝试 getSession —— 让真正的 API 结果决定 supabaseOk
+      } else {
+        console.log('[Auth] Supabase 服务可达，开始恢复 session...', isBgMode ? '(后台)' : '');
       }
-      console.log('[Auth] Supabase 服务可达，开始恢复 session...', isBgMode ? '(后台)' : '');
 
       try {
         // 2. 尝试获取 session（独立 5 秒超时，不依赖全局 fetch 超时）
