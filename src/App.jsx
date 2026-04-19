@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'r
 import { AuthProvider } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
+import { NotificationRulesProvider } from './contexts/NotificationRulesContext';
 import ScrollToTop from './components/ScrollToTop';
 import usePageTracking from './hooks/usePageTracking';
 import Navbar from './components/Navbar';
