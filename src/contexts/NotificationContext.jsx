@@ -78,179 +78,231 @@ export function NotificationProvider({ children }) {
   const [emailReminderSent, setEmailReminderSent] = useState(false);
   const [loaded, setLoaded] = useState(() => getStoredNotifications().length > 0);
   const pollRef = useRef(null);
+  // 并发去重：请求序号 + 当前在途请求，避免"先发后到"的响应覆盖"后发先到"的新状态
+  const reqSeqRef = useRef(0);
+  const inflightRef = useRef(false);
+  // 距上次成功加载的最短间隔（ms），防止 visibilitychange / storage / 轮询同时开火
+  const lastLoadAtRef = useRef(0);
+  const MIN_RELOAD_INTERVAL_MS = 1500;
 
-  // 判断是否使用 Supabase —— 只有 supabaseOk === true 时才走 Supabase 路径
-  // supabaseOk: null=检测中, true=可达, false=不可达
-  const useSupabase = isSupabaseConfigured && supabaseOk === true;
+  // 用 ref 镜像 user.id / isAdmin，避免它们变化时 useCallback 重建
+  // 导致挂载的 effect 重跑、触发额外网络请求（这是"数据忽多忽少"的主因之一）
+  const userIdRef = useRef(user?.id || null);
+  const isAdminRef = useRef(isAdmin);
+  useEffect(() => { userIdRef.current = user?.id || null; }, [user?.id]);
+  useEffect(() => { isAdminRef.current = isAdmin; }, [isAdmin]);
+
+  // Supabase 是否"明确不可达"：只有 === false 才走本地；null（检测中）仍乐观走 Supabase
+  // 避免首次挂载 supabaseOk 还是 null 时错误走本地 → 拿到模板 5 条 → 再被云端数据覆盖的抖动
+  const isSupabaseDown = supabaseOk === false;
+  const useSupabase = isSupabaseConfigured && !isSupabaseDown;
 
   // ---- 加载通知 ----
-  const loadNotifications = useCallback(async () => {
-    if (useSupabase) {
-      try {
-        console.log('[Notification] 尝试从 Supabase 加载通知...');
+  // 关键设计：
+  // 1) useCallback 依赖极少（只有 useSupabase），不会因 user 对象引用变化/isAdmin 波动被重建
+  //    → 挂载用的 effect 不会反复重跑 → 不会产生并发请求风暴
+  // 2) 内部通过 reqSeqRef 给每次请求打序号，响应回来时只有"最后发出的那一个"会写入 state
+  //    → 旧响应迟到也不会覆盖新状态（这是"刚看到 10 条突然变空"的根因之一）
+  // 3) lastLoadAtRef 做 1.5s 节流：visibilitychange / storage / 轮询同时开火时只真正跑一次
+  // 4) Supabase 查询成功但表里是空数组 → 就老实显示"没有通知"，不再注入 5 条默认模板
+  //    （过去的行为会导致"有时刷出来一堆模板消息"，这是"忽多忽少"最直观的来源）
+  const loadNotifications = useCallback(async (options = {}) => {
+    const { force = false } = options;
 
-        // 查询通知
-        let { data, error } = await supabase
-          .from('notifications')
-          .select('*')
-          .order('created_at', { ascending: false });
+    // 节流：距上次加载 < 1.5s 且非 force，直接跳过
+    const now = Date.now();
+    if (!force && now - lastLoadAtRef.current < MIN_RELOAD_INTERVAL_MS) {
+      return;
+    }
+    // 同一时刻只允许一个请求在飞
+    if (inflightRef.current) {
+      return;
+    }
+    inflightRef.current = true;
 
-        // 查询失败（可能 401/session 过期），尝试刷新 session 后重试
-        if (error) {
-          console.warn('[Notification] Supabase 通知查询失败:', error.message, '，尝试刷新 session...');
-          try {
-            const { data: refreshData } = await supabase.auth.refreshSession();
-            if (refreshData?.session) {
-              console.log('[Notification] Session 刷新成功，重试查询...');
-              const retry = await supabase
-                .from('notifications')
-                .select('*')
-                .order('created_at', { ascending: false });
-              data = retry.data;
-              error = retry.error;
-            }
-          } catch (refreshErr) {
-            console.warn('[Notification] Session 刷新异常:', refreshErr.message);
-          }
-        }
+    const mySeq = ++reqSeqRef.current;
+    const isLatest = () => mySeq === reqSeqRef.current;
 
-        if (error) {
-          console.warn('[Notification] Supabase 加载通知最终失败，降级本地:', error.message);
-          loadLocalNotifications();
-          return;
-        }
-
-        // 加载当前用户的已读状态
-        // 优先用 supabase.auth.getUser() 拿到最新认证用户；若失败（比如
-        // 偶发的 session 读取异常）再 fallback 到 AuthContext 里已确认的 user。
-        // 这样能避免"Session 偶发读不出来 → 以为未登录 → 所有消息变未读"。
-        let authUser = null;
+    try {
+      if (useSupabase) {
         try {
-          const { data: userData } = await supabase.auth.getUser();
-          authUser = userData?.user || null;
-        } catch (e) {
-          console.warn('[Notification] supabase.auth.getUser() 异常:', e.message);
-        }
-        if (!authUser && user) {
-          console.log('[Notification] supabase.auth.getUser() 返回空，使用 AuthContext 的 user 兜底');
-          authUser = user;
-        }
+          console.log('[Notification] 尝试从 Supabase 加载通知...');
 
-        let readSet = new Set();
-        // read_at 映射：notification_id -> ISO 时间字符串
-        // 用于判定「自动已读」：如果某条通知的 read_at 与 created_at 间隔极短
-        // （< 5 秒，正常人不可能这么快手动点击），就判定为系统自动已读。
-        // 这样即使换设备登录或清缓存，也能稳定显示「自动已读」而不是「已读」。
-        let readAtMap = new Map();
-        if (authUser) {
-          const { data: readData, error: readErr } = await supabase
-            .from('notification_reads')
-            .select('notification_id, read_at')
-            .eq('user_id', authUser.id);
-          if (readErr) {
-            // 查询已读状态失败 —— 不要直接把所有通知视为未读，
-            // 否则会导致"另一设备登录后消息又变未读"的错觉。
-            // 这时退回到 localStorage 里缓存的已读状态做兜底。
-            console.warn('[Notification] 已读状态查询失败，使用本地缓存兜底:', readErr.message);
+          // 查询通知
+          let { data, error } = await supabase
+            .from('notifications')
+            .select('*')
+            .order('created_at', { ascending: false });
+
+          // 查询失败（可能 401/session 过期），尝试刷新 session 后重试
+          if (error) {
+            console.warn('[Notification] Supabase 通知查询失败:', error.message, '，尝试刷新 session...');
             try {
-              const cached = localStorage.getItem(NOTIFICATIONS_KEY);
-              if (cached) {
-                const parsed = JSON.parse(cached);
-                if (Array.isArray(parsed)) {
-                  readSet = new Set(parsed.filter((n) => n.read).map((n) => n.id));
+              const { data: refreshData } = await supabase.auth.refreshSession();
+              if (refreshData?.session) {
+                console.log('[Notification] Session 刷新成功，重试查询...');
+                const retry = await supabase
+                  .from('notifications')
+                  .select('*')
+                  .order('created_at', { ascending: false });
+                data = retry.data;
+                error = retry.error;
+              }
+            } catch (refreshErr) {
+              console.warn('[Notification] Session 刷新异常:', refreshErr.message);
+            }
+          }
+
+          if (error) {
+            console.warn('[Notification] Supabase 加载通知最终失败:', error.message);
+            // 失败 → 保持现状（不清空、不塞模板），让用户看到的上一帧数据稳定
+            // 过去这里直接 loadLocalNotifications()，会把云端数据替换成 5 条本地模板
+            return;
+          }
+
+          // 加载当前用户的已读状态
+          // 优先用 supabase.auth.getUser() 拿到最新认证用户；若失败（比如
+          // 偶发的 session 读取异常）再 fallback 到 AuthContext 里已确认的 user。
+          // 这样能避免"Session 偶发读不出来 → 以为未登录 → 所有消息变未读"。
+          let authUser = null;
+          try {
+            const { data: userData } = await supabase.auth.getUser();
+            authUser = userData?.user || null;
+          } catch (e) {
+            console.warn('[Notification] supabase.auth.getUser() 异常:', e.message);
+          }
+          if (!authUser && userIdRef.current) {
+            console.log('[Notification] supabase.auth.getUser() 返回空，使用 AuthContext 的 user 兜底');
+            authUser = { id: userIdRef.current };
+          }
+
+          let readSet = new Set();
+          // read_at 映射：notification_id -> ISO 时间字符串
+          // 用于判定「自动已读」：如果某条通知的 read_at 与 created_at 间隔极短
+          // （< 5 秒，正常人不可能这么快手动点击），就判定为系统自动已读。
+          // 这样即使换设备登录或清缓存，也能稳定显示「自动已读」而不是「已读」。
+          let readAtMap = new Map();
+          if (authUser) {
+            const { data: readData, error: readErr } = await supabase
+              .from('notification_reads')
+              .select('notification_id, read_at')
+              .eq('user_id', authUser.id);
+            if (readErr) {
+              // 查询已读状态失败 —— 不要直接把所有通知视为未读，
+              // 否则会导致"另一设备登录后消息又变未读"的错觉。
+              // 这时退回到 localStorage 里缓存的已读状态做兜底。
+              console.warn('[Notification] 已读状态查询失败，使用本地缓存兜底:', readErr.message);
+              try {
+                const cached = localStorage.getItem(NOTIFICATIONS_KEY);
+                if (cached) {
+                  const parsed = JSON.parse(cached);
+                  if (Array.isArray(parsed)) {
+                    readSet = new Set(parsed.filter((n) => n.read).map((n) => n.id));
+                  }
+                }
+              } catch { /* ignore */ }
+            } else if (readData) {
+              readSet = new Set(readData.map((r) => r.notification_id));
+              readAtMap = new Map(readData.map((r) => [r.notification_id, r.read_at]));
+              console.log('[Notification] 云端已读记录:', readData.length, '条');
+            }
+          } else {
+            console.warn('[Notification] 当前未登录 Supabase，无法获取云端已读状态');
+          }
+
+          // 根据用户角色过滤通知（管理员看所有，普通成员只看非 admin-only）
+          // 获取当前用户的角色
+          let userRole = 'member';
+          if (authUser) {
+            const { data: profile } = await supabase
+              .from('profiles')
+              .select('role')
+              .eq('id', authUser.id)
+              .single();
+            if (profile) userRole = profile.role;
+          }
+
+          // 关键修复：Supabase 查询成功但表里就是空的 → 老实显示"没有通知"
+          // 过去这里会调用 loadLocalNotifications() 塞 5 条模板进来，是"有时突然出来很多条"的元凶
+          const sourceData = Array.isArray(data) ? data : [];
+
+          console.log('[Notification] Supabase 返回', sourceData.length, '条通知, 用户角色:', userRole);
+
+          const filtered = sourceData.filter((n) => {
+            if (!n.target_role) return true; // target_role 为 null 表示所有人可见
+            return n.target_role === userRole || userRole === 'admin';
+          });
+
+          // 转换为前端格式
+          const autoReadSet = loadAutoReadIds();
+          // 5 秒内自动已读的阈值（单位: 毫秒）
+          // 正常用户不可能在一条通知产生后 5 秒内手动点击已读，所以超短间隔一定是系统自动标记的
+          const AUTO_READ_THRESHOLD_MS = 5000;
+          const mapped = filtered.map((n) => {
+            // 先按本地记录判断（老数据兜底）
+            let isAuto = autoReadSet.has(String(n.id));
+            // 再按云端 read_at 与 created_at 间隔判断（跨设备也可靠）
+            if (!isAuto && readSet.has(n.id)) {
+              const readAt = readAtMap.get(n.id);
+              if (readAt && n.created_at) {
+                const diff = Math.abs(new Date(readAt).getTime() - new Date(n.created_at).getTime());
+                if (diff <= AUTO_READ_THRESHOLD_MS) {
+                  isAuto = true;
                 }
               }
-            } catch { /* ignore */ }
-          } else if (readData) {
-            readSet = new Set(readData.map((r) => r.notification_id));
-            readAtMap = new Map(readData.map((r) => [r.notification_id, r.read_at]));
-            console.log('[Notification] 云端已读记录:', readData.length, '条');
-          }
-        } else {
-          console.warn('[Notification] 当前未登录 Supabase，无法获取云端已读状态');
-        }
-
-        // 根据用户角色过滤通知（管理员看所有，普通成员只看非 admin-only）
-        // 获取当前用户的角色
-        let userRole = 'member';
-        if (authUser) {
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', authUser.id)
-            .single();
-          if (profile) userRole = profile.role;
-        }
-
-        // 如果 Supabase 通知表为空，使用默认通知数据兜底
-        const sourceData = (data && data.length > 0) ? data : null;
-
-        if (!sourceData) {
-          console.info('[Notification] Supabase 通知表为空，降级本地模板数据');
-          loadLocalNotifications();
-          return;
-        }
-
-        console.log('[Notification] Supabase 返回', data.length, '条通知, 用户角色:', userRole);
-
-        const filtered = sourceData.filter((n) => {
-          if (!n.target_role) return true; // target_role 为 null 表示所有人可见
-          return n.target_role === userRole || userRole === 'admin';
-        });
-
-        // 转换为前端格式
-        const autoReadSet = loadAutoReadIds();
-        // 5 秒内自动已读的阈值（单位: 毫秒）
-        // 正常用户不可能在一条通知产生后 5 秒内手动点击已读，所以超短间隔一定是系统自动标记的
-        const AUTO_READ_THRESHOLD_MS = 5000;
-        const mapped = filtered.map((n) => {
-          // 先按本地记录判断（老数据兜底）
-          let isAuto = autoReadSet.has(String(n.id));
-          // 再按云端 read_at 与 created_at 间隔判断（跨设备也可靠）
-          if (!isAuto && readSet.has(n.id)) {
-            const readAt = readAtMap.get(n.id);
-            if (readAt && n.created_at) {
-              const diff = Math.abs(new Date(readAt).getTime() - new Date(n.created_at).getTime());
-              if (diff <= AUTO_READ_THRESHOLD_MS) {
-                isAuto = true;
-              }
             }
+            return {
+              id: n.id,
+              title: n.title,
+              message: n.message,
+              type: n.type,
+              date: n.date,
+              read: readSet.has(n.id),
+              autoRead: isAuto,
+            };
+          });
+
+          // 并发保护：如果在等待期间有更新的请求发起了，丢弃本次旧响应
+          if (!isLatest()) {
+            console.log('[Notification] 本次响应已被更新的请求取代，丢弃');
+            return;
           }
-          return {
-            id: n.id,
-            title: n.title,
-            message: n.message,
-            type: n.type,
-            date: n.date,
-            read: readSet.has(n.id),
-            autoRead: isAuto,
-          };
-        });
 
-        // 只有数据真正变化时才更新 state，避免轮询/可见性变化导致列表重渲染闪动
-        setNotifications((prev) => {
-          if (notificationsEqual(prev, mapped)) return prev;
-          return mapped;
-        });
-        setReads(readSet);
-        setLoaded(true);
+          // 只有数据真正变化时才更新 state，避免轮询/可见性变化导致列表重渲染闪动
+          setNotifications((prev) => {
+            if (notificationsEqual(prev, mapped)) return prev;
+            return mapped;
+          });
+          setReads(readSet);
+          setLoaded(true);
+          lastLoadAtRef.current = Date.now();
 
-        // 同步到 localStorage，下次刷新时可立即显示
-        try {
-          localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(mapped));
-        } catch { /* ignore */ }
-      } catch (err) {
-        console.warn('[Notification] Supabase 通知加载异常，降级本地:', err.message);
+          // 同步到 localStorage，下次刷新时可立即显示
+          try {
+            localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(mapped));
+          } catch { /* ignore */ }
+        } catch (err) {
+          console.warn('[Notification] Supabase 通知加载异常:', err.message);
+          // 异常也不再塞模板。若当前已有数据就保持，若从未加载过则读 localStorage 缓存
+          if (isLatest() && !loaded) {
+            loadLocalNotifications({ allowDefault: false });
+          }
+        }
+      } else {
+        // 明确处于本地/离线模式
         loadLocalNotifications();
       }
-    } else {
-      loadLocalNotifications();
+    } finally {
+      inflightRef.current = false;
     }
-  }, [useSupabase, isAdmin, user]);
+  }, [useSupabase, loaded]);
 
-  const loadLocalNotifications = () => {
+  // 本地/离线模式加载。
+  // 重要：默认 allowDefault=false —— 过去这里会在 localStorage 没数据时注入 5 条 notificationsData 模板，
+  // 这是"有时刷新突然冒出很多条通知"的根本原因。现在只有显式 allowDefault=true 才会使用模板。
+  const loadLocalNotifications = (options = {}) => {
+    const { allowDefault = false } = options;
     let notifs = null;
-    let fromDefault = false;
     try {
       const stored = localStorage.getItem(NOTIFICATIONS_KEY);
       if (stored) {
@@ -263,34 +315,41 @@ export function NotificationProvider({ children }) {
     } catch {
       // 解析失败，忽略
     }
-    // 无有效本地数据时，使用默认模板数据并写入 localStorage
     if (!notifs) {
-      notifs = notificationsData;
-      fromDefault = true;
-    }
-    console.log('[Notification] 本地模式加载:', notifs.length, '条通知', fromDefault ? '(来自默认数据)' : '');
-    // 如果使用了默认数据，立即写入 localStorage，确保后续 markAsRead 等操作能正确持久化
-    if (fromDefault) {
-      try {
-        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifs));
-      } catch { /* ignore */ }
+      if (allowDefault) {
+        notifs = notificationsData;
+        try {
+          localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifs));
+        } catch { /* ignore */ }
+        console.log('[Notification] 本地模式加载: 无缓存，使用默认模板', notifs.length, '条');
+      } else {
+        // 既没缓存也不允许默认 → 显示空列表（稳定胜过花哨）
+        notifs = [];
+        console.log('[Notification] 本地模式加载: 无缓存，显示空列表');
+      }
+    } else {
+      console.log('[Notification] 本地模式加载:', notifs.length, '条通知（来自本地缓存）');
     }
     // 本地模式：过滤 target_role（非管理员看不到 admin-only 通知）
     const filtered = notifs.filter((n) => {
       if (!n.target_role) return true;
-      return n.target_role === 'admin' && isAdmin;
+      return n.target_role === 'admin' && isAdminRef.current;
     });
     setNotifications((prev) => {
       if (notificationsEqual(prev, filtered)) return prev;
       return filtered;
     });
     setLoaded(true);
+    lastLoadAtRef.current = Date.now();
   };
 
   // ---- 初始化加载 ----
+  // 首次加载 force=true 绕过节流；supabaseOk 从 null → true 时也 force 一次，
+  // 让"启动时用本地缓存渲染 → 检测到 Supabase 可达后切云端数据"这一步稳定发生一次
   useEffect(() => {
-    loadNotifications();
-  }, [loadNotifications]);
+    loadNotifications({ force: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useSupabase]);
 
   // ---- 定时轮询 Supabase（每 30 秒刷新一次） ----
   useEffect(() => {
@@ -494,8 +553,8 @@ export function NotificationProvider({ children }) {
           }
         }
 
-        // 刷新通知列表
-        loadNotifications();
+        // 刷新通知列表（绕过节流，确保立即能看到新消息）
+        loadNotifications({ force: true });
       } catch (err) {
         console.warn('[Notification] 添加通知异常:', err.message);
         addLocalNotification(notification);
@@ -563,7 +622,7 @@ export function NotificationProvider({ children }) {
         addNotification,
         deleteNotification,
         emailReminderSent,
-        refreshNotifications: loadNotifications,
+        refreshNotifications: () => loadNotifications({ force: true }),
       }}
     >
       {children}
