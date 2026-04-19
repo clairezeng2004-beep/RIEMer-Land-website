@@ -171,6 +171,158 @@ export default function Suggestions() {
     return category === 'organization' ? '已完成' : '处理中';
   };
 
+  // 开始新建一条建议（category: 'website' | 'organization'）
+  const startAddSuggestion = (category) => {
+    setEditingSuggestion({
+      id: `sug-${Date.now()}`,
+      content: '',
+      category,
+      proposer: user?.name || user?.nickname || '',
+      supporters: [],
+      status: getDefaultStatus(category),
+      statusUpdatedAt: new Date().toISOString().split('T')[0],
+      statusUpdatedBy: '',
+      statusUpdatedByAvatar: null,
+      createdAt: new Date().toISOString().split('T')[0],
+      resolver: '',
+      skipReason: '',
+    });
+    setEditingSuggestionId(null);
+  };
+
+  // 渲染"新建建议"表单（内嵌到对应的 section 中）
+  const renderAddForm = (category) => {
+    if (!editingSuggestion || editingSuggestionId) return null;
+    if (editingSuggestion.category !== category) return null;
+    return (
+      <div className="suggestions-page__form">
+        <div className="suggestions-page__form-header">
+          <h4>新建{category === 'organization' ? '组织' : '网站'}建议</h4>
+          <button
+            className="suggestions-page__icon-btn"
+            onClick={() => setEditingSuggestion(null)}
+            title="取消"
+          >
+            <X size={14} />
+          </button>
+        </div>
+
+        <div className="suggestions-page__field">
+          <div className="suggestions-page__label-row">
+            <label>具体建议</label>
+            <button
+              type="button"
+              className={`suggestions-page__voice-btn-inline${isListening ? ' suggestions-page__voice-btn-inline--active' : ''}`}
+              onClick={() => toggleVoiceInput('content')}
+              title={isListening ? '停止语音输入' : '点击开始语音输入，说话即可自动转为文字'}
+            >
+              {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+              <span>{isListening ? '停止录音' : '语音输入'}</span>
+            </button>
+          </div>
+          <textarea
+            value={editingSuggestion.content}
+            onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+            className="suggestions-page__input suggestions-page__textarea"
+            rows={3}
+            placeholder={category === 'organization'
+              ? '描述你的组织建设建议…（团队协作、活动策划、制度流程等）'
+              : '描述你的网站建设建议…（功能改进、UI/UX、新模块等）'}
+          />
+          {isListening && (
+            <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话…识别到的文字将自动填入上方输入框</span>
+          )}
+        </div>
+
+        <div className="suggestions-page__inline-group">
+          <div className="suggestions-page__field suggestions-page__field--flex">
+            <label><User size={14} /> 提出人</label>
+            <input
+              type="text"
+              value={editingSuggestion.proposer}
+              className="suggestions-page__input suggestions-page__input--readonly"
+              readOnly
+            />
+          </div>
+          <div className="suggestions-page__field suggestions-page__field--flex">
+            <label><Calendar size={14} /> 提出时间</label>
+            <input
+              type="date"
+              value={editingSuggestion.createdAt}
+              onChange={(e) => setEditingSuggestion({ ...editingSuggestion, createdAt: e.target.value })}
+              className="suggestions-page__input"
+            />
+          </div>
+        </div>
+
+        <div className="suggestions-page__inline-group">
+          <div className="suggestions-page__field suggestions-page__field--flex">
+            <label>当前状态</label>
+            <CustomSelect
+              value={editingSuggestion.status}
+              onChange={(val) => setEditingSuggestion({ ...editingSuggestion, status: val })}
+              options={getStatusOptions(editingSuggestion.category)}
+              placeholder="请选择状态"
+              allowClear
+            />
+          </div>
+          <div className="suggestions-page__field suggestions-page__field--flex">
+            <label>负责人</label>
+            <CustomSelect
+              value={editingSuggestion.resolver}
+              onChange={(val) => setEditingSuggestion({ ...editingSuggestion, resolver: val })}
+              options={authorizedUsers}
+              placeholder="选择负责人"
+              allowClear
+            />
+          </div>
+        </div>
+
+        {(editingSuggestion.status === '暂时搁置' || editingSuggestion.status === '暂时不做') && (
+          <div className="suggestions-page__field">
+            <label><AlertCircle size={14} /> {editingSuggestion.status === '暂时不做' ? '原因说明' : '搁置原因'}</label>
+            <textarea
+              value={editingSuggestion.skipReason}
+              onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
+              className="suggestions-page__input suggestions-page__textarea"
+              rows={2}
+              placeholder={editingSuggestion.status === '暂时不做' ? '请说明暂时不做的原因…' : '请说明暂时搁置的原因…'}
+            />
+          </div>
+        )}
+
+        <div className="suggestions-page__form-actions">
+          <button
+            className="btn btn-primary"
+            disabled={!editingSuggestion.content.trim() || !editingSuggestion.proposer.trim()}
+            onClick={() => {
+              addSuggestion({
+                ...editingSuggestion,
+                statusUpdatedBy: editingSuggestion.proposer,
+                statusUpdatedByAvatar: null,
+              });
+              emitNotificationEvent('suggestion.new', {
+                operator: editingSuggestion.proposer,
+                summary:
+                  editingSuggestion.content.slice(0, 40) +
+                  (editingSuggestion.content.length > 40 ? '…' : ''),
+              });
+              setEditingSuggestion(null);
+            }}
+          >
+            <Plus size={16} /> 添加{category === 'organization' ? '组织' : '网站'}建议
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setEditingSuggestion(null)}
+          >
+            取消
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -198,190 +350,20 @@ export default function Suggestions() {
         </div>
 
         <div className="suggestions-page__content">
-        {/* 添加新建议 */}
-        {!editingSuggestion && (
-          <button
-            className="suggestions-page__add-btn"
-            onClick={() => {
-              setEditingSuggestion({
-                id: `sug-${Date.now()}`,
-                content: '',
-                category: 'website',
-                proposer: user?.name || user?.nickname || '',
-                supporters: [],
-                status: '处理中',
-                statusUpdatedAt: new Date().toISOString().split('T')[0],
-                statusUpdatedBy: '',
-                statusUpdatedByAvatar: null,
-                createdAt: new Date().toISOString().split('T')[0],
-                resolver: '',
-                skipReason: '',
-              });
-              setEditingSuggestionId(null);
-            }}
-          >
-            <Plus size={16} /> <EditableText as="span" value={sc.addBtn || '添加建议'} configKey="suggestions.addBtn" onChange={v => updateSugs('addBtn', v)} />
-          </button>
-        )}
 
-        {/* 新建表单 */}
-        {editingSuggestion && !editingSuggestionId && (
-          <div className="suggestions-page__form">
-            <div className="suggestions-page__form-header">
-              <h4>新建建议</h4>
-              <button
-                className="suggestions-page__icon-btn"
-                onClick={() => setEditingSuggestion(null)}
-                title="取消"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="suggestions-page__field">
-              <label>建议类别</label>
-              <div className="suggestions-page__category-toggle">
-                <button
-                  type="button"
-                  className={`suggestions-page__category-btn${editingSuggestion.category === 'website' ? ' suggestions-page__category-btn--active' : ''}`}
-                  onClick={() => setEditingSuggestion({
-                    ...editingSuggestion,
-                    category: 'website',
-                    status: getDefaultStatus('website'),
-                  })}
-                >
-                  <Monitor size={14} /> 网站建设
-                </button>
-                <button
-                  type="button"
-                  className={`suggestions-page__category-btn${editingSuggestion.category === 'organization' ? ' suggestions-page__category-btn--active' : ''}`}
-                  onClick={() => setEditingSuggestion({
-                    ...editingSuggestion,
-                    category: 'organization',
-                    status: getDefaultStatus('organization'),
-                  })}
-                >
-                  <Users size={14} /> 组织建设
-                </button>
-              </div>
-            </div>
-
-            <div className="suggestions-page__field">
-              <div className="suggestions-page__label-row">
-                <label>具体建议</label>
-                <button
-                  type="button"
-                  className={`suggestions-page__voice-btn-inline${isListening ? ' suggestions-page__voice-btn-inline--active' : ''}`}
-                  onClick={() => toggleVoiceInput('content')}
-                  title={isListening ? '停止语音输入' : '点击开始语音输入，说话即可自动转为文字'}
-                >
-                  {isListening ? <MicOff size={14} /> : <Mic size={14} />}
-                  <span>{isListening ? '停止录音' : '语音输入'}</span>
-                </button>
-              </div>
-              <textarea
-                value={editingSuggestion.content}
-                onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
-                className="suggestions-page__input suggestions-page__textarea"
-                rows={3}
-                placeholder="描述你的建议…（可以是网站功能改进、组织活动策划、团队协作优化等）"
-              />
-              {isListening && (
-                <span className="suggestions-page__voice-hint">🎙️ 正在聆听，请说话…识别到的文字将自动填入上方输入框</span>
-              )}
-            </div>
-
-            <div className="suggestions-page__inline-group">
-              <div className="suggestions-page__field suggestions-page__field--flex">
-                <label><User size={14} /> 提出人</label>
-                <input
-                  type="text"
-                  value={editingSuggestion.proposer}
-                  className="suggestions-page__input suggestions-page__input--readonly"
-                  readOnly
-                />
-              </div>
-              <div className="suggestions-page__field suggestions-page__field--flex">
-                <label><Calendar size={14} /> 提出时间</label>
-                <input
-                  type="date"
-                  value={editingSuggestion.createdAt}
-                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, createdAt: e.target.value })}
-                  className="suggestions-page__input"
-                />
-              </div>
-            </div>
-
-            <div className="suggestions-page__inline-group">
-              <div className="suggestions-page__field suggestions-page__field--flex">
-                <label>当前状态</label>
-                <CustomSelect
-                  value={editingSuggestion.status}
-                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, status: val })}
-                  options={getStatusOptions(editingSuggestion.category)}
-                  placeholder="请选择状态"
-                  allowClear
-                />
-              </div>
-              <div className="suggestions-page__field suggestions-page__field--flex">
-                <label>负责人</label>
-                <CustomSelect
-                  value={editingSuggestion.resolver}
-                  onChange={(val) => setEditingSuggestion({ ...editingSuggestion, resolver: val })}
-                  options={authorizedUsers}
-                  placeholder="选择负责人"
-                  allowClear
-                />
-              </div>
-            </div>
-
-            {(editingSuggestion.status === '暂时搁置' || editingSuggestion.status === '暂时不做') && (
-              <div className="suggestions-page__field">
-                <label><AlertCircle size={14} /> {editingSuggestion.status === '暂时不做' ? '原因说明' : '搁置原因'}</label>
-                <textarea
-                  value={editingSuggestion.skipReason}
-                  onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
-                  className="suggestions-page__input suggestions-page__textarea"
-                  rows={2}
-                  placeholder={editingSuggestion.status === '暂时不做' ? '请说明暂时不做的原因…' : '请说明暂时搁置的原因…'}
-                />
-              </div>
-            )}
-
-            <div className="suggestions-page__form-actions">
-              <button
-                className="btn btn-primary"
-                disabled={!editingSuggestion.content.trim() || !editingSuggestion.proposer.trim()}
-                onClick={() => {
-                  addSuggestion({
-                    ...editingSuggestion,
-                    statusUpdatedBy: editingSuggestion.proposer,
-                    statusUpdatedByAvatar: null,
-                  });
-                  emitNotificationEvent('suggestion.new', {
-                    operator: editingSuggestion.proposer,
-                    summary:
-                      editingSuggestion.content.slice(0, 40) +
-                      (editingSuggestion.content.length > 40 ? '…' : ''),
-                  });
-                  setEditingSuggestion(null);
-                }}
-              >
-                <Plus size={16} /> 添加建议
-              </button>
-              <button
-                className="btn btn-ghost"
-                onClick={() => setEditingSuggestion(null)}
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        )}
-
+        {/* 新建表单：内联在对应分区下渲染（由 renderAddForm 输出） */}
         {/* ============ 网站建设相关 ============ */}
         <div className="sug-section">
           <h3 className="sug-section__title"><Monitor size={18} /> 网站建设相关</h3>
+          {!editingSuggestion && (
+            <button
+              className="suggestions-page__add-btn suggestions-page__add-btn--section"
+              onClick={() => startAddSuggestion('website')}
+            >
+              <Plus size={16} /> 添加网站建议
+            </button>
+          )}
+          {renderAddForm('website')}
           {websiteSugs.length > 0 ? (
             <div className="sug-table-wrap">
               <table className="sug-table">
@@ -595,6 +577,15 @@ export default function Suggestions() {
         {/* ============ 组织建设相关 ============ */}
         <div className="sug-section">
           <h3 className="sug-section__title"><Users size={18} /> 组织建设相关</h3>
+          {!editingSuggestion && (
+            <button
+              className="suggestions-page__add-btn suggestions-page__add-btn--section"
+              onClick={() => startAddSuggestion('organization')}
+            >
+              <Plus size={16} /> 添加组织建议
+            </button>
+          )}
+          {renderAddForm('organization')}
           {orgSugs.length > 0 ? (
             <div className="sug-table-wrap">
               <table className="sug-table">

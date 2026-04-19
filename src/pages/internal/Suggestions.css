@@ -54,6 +54,14 @@
   background: rgba(91, 140, 62, 0.04);
 }
 
+/* Section 级别的添加按钮（放在每个分区标题下方） */
+.suggestions-page__add-btn--section {
+  margin-top: var(--space-sm);
+  margin-bottom: var(--space-md);
+  padding: 8px var(--space-md);
+  font-size: var(--text-sm);
+}
+
 /* Form */
 .suggestions-page__form {
   background: var(--color-bg-alt);
