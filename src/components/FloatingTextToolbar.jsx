@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Heading1, Heading2, Heading3, Quote, Bold } from 'lucide-react';
+import { Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon } from 'lucide-react';
 import './FloatingTextToolbar.css';
 
 /**
@@ -8,8 +8,8 @@ import './FloatingTextToolbar.css';
  *   - mode="rich" (默认)：在 contentEditable 编辑器上根据选区弹工具栏，走 document.execCommand
  *   - mode="markdown"：在 <textarea> 上根据选区弹工具栏，对选中区间插入 Markdown 语法
  *
- * 仅保留以下五个格式化能力：
- *   一级标题 / 二级标题 / 三级标题 / 引用 / 加粗
+ * 仅保留以下六个格式化能力：
+ *   一级标题 / 二级标题 / 三级标题 / 引用 / 加粗 / 插入超链接
  *
  * Props:
  *   mode        — 'rich' | 'markdown'，默认 'rich'
@@ -71,6 +71,8 @@ export default function FloatingTextToolbar({
       h2: false,
       h3: false,
       blockquote: false,
+      link: false,
+      linkHref: '',
     };
     try {
       const blockTag = (document.queryCommandValue('formatBlock') || '').toLowerCase();
@@ -92,6 +94,25 @@ export default function FloatingTextToolbar({
         while (n && n !== editor) {
           if (n.tagName === 'BLOCKQUOTE') {
             next.blockquote = true;
+            break;
+          }
+          n = n.parentElement;
+        }
+      }
+    }
+    // 检测选区是否落在 <a> 内部，用于链接按钮的 active 态和编辑时预填 URL
+    {
+      const sel = window.getSelection();
+      if (sel && sel.rangeCount > 0) {
+        let n =
+          sel.anchorNode && sel.anchorNode.nodeType === 1
+            ? sel.anchorNode
+            : sel.anchorNode?.parentElement;
+        const editor = editorRef.current;
+        while (n && n !== editor) {
+          if (n.tagName === 'A') {
+            next.link = true;
+            next.linkHref = n.getAttribute('href') || '';
             break;
           }
           n = n.parentElement;
@@ -282,6 +303,76 @@ export default function FloatingTextToolbar({
     fireChangeRich();
   }, [active, detectActiveRich, fireChangeRich]);
 
+  /* -----------------------------------------------------------------
+   * 链接：富文本模式
+   *   - 当选中已是 <a>：弹框预填当前 href；用户留空 → 解除链接（unlink）；
+   *     用户改了 URL → 解除旧链接后再 createLink 包新 href。
+   *   - 当选中不是链接：弹框输入 URL，execCommand('createLink') 包 <a>。
+   * 为了保持选区在 prompt 弹出后不丢失，先把选区存好再恢复。
+   * ----------------------------------------------------------------- */
+  const normalizeUrl = (raw) => {
+    const v = (raw || '').trim();
+    if (!v) return '';
+    // 允许 mailto: / tel: / # 锚点 / 协议开头；否则默认补 https://
+    if (/^(https?:|mailto:|tel:|ftp:|\/|#)/i.test(v)) return v;
+    return `https://${v}`;
+  };
+
+  const applyLinkRich = useCallback(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    // 保存选区，prompt 弹出后再恢复（避免 blur 掉丢掉选中范围）
+    const savedRange = sel.getRangeAt(0).cloneRange();
+
+    const existingHref = active.linkHref || '';
+    // eslint-disable-next-line no-alert
+    const input = window.prompt(
+      existingHref ? '编辑链接（留空可解除链接）' : '插入链接 URL',
+      existingHref
+    );
+    if (input === null) return; // 用户点了取消
+    const url = normalizeUrl(input);
+
+    // 恢复选区，让 execCommand 作用在原本选中的文字上
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+
+    if (!url) {
+      // 空字符串 → 解除链接
+      document.execCommand('unlink');
+    } else {
+      if (active.link) {
+        // 已是链接：先解除再创建，实现"改地址"
+        document.execCommand('unlink');
+      }
+      document.execCommand('createLink', false, url);
+      // 新增：给 <a> 打上 target="_blank" + rel="noopener" 更安全
+      // execCommand 本身不支持加 target，这里补一刀：找刚创建的那个 <a>
+      try {
+        const sel2 = window.getSelection();
+        if (sel2 && sel2.rangeCount > 0) {
+          const r = sel2.getRangeAt(0);
+          let n =
+            r.commonAncestorContainer.nodeType === 1
+              ? r.commonAncestorContainer
+              : r.commonAncestorContainer.parentElement;
+          while (n && n !== editor) {
+            if (n.tagName === 'A' && n.getAttribute('href') === url) {
+              n.setAttribute('target', '_blank');
+              n.setAttribute('rel', 'noopener noreferrer');
+              break;
+            }
+            n = n.parentElement;
+          }
+        }
+      } catch { /* 忽略：target 是锦上添花 */ }
+    }
+    detectActiveRich();
+    fireChangeRich();
+  }, [active.link, active.linkHref, detectActiveRich, editorRef, fireChangeRich]);
+
   /* =================================================================
    * Markdown 模式命令：对 textarea 的选区做文本变换
    * ================================================================= */
@@ -309,6 +400,34 @@ export default function FloatingTextToolbar({
 
   // 包裹型：**x**
   const wrap = (pre, post) => (text) => ({ text, prefix: pre, suffix: post });
+
+  // Markdown 模式：插入链接 [text](url)
+  //   - 选区非空：把选中的文字作为链接 text，弹 URL 弹框；
+  //   - 已是 Markdown 链接 [text](url) 形式：不做形态识别（代价高且易误判），
+  //     用户可手动调整。
+  const applyLinkMarkdown = useCallback(() => {
+    const ta = editorRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    if (start === end) return;
+    // eslint-disable-next-line no-alert
+    const raw = window.prompt('插入链接 URL', 'https://');
+    if (raw === null) return;
+    const url = normalizeUrl(raw);
+    if (!url) return;
+    const before = ta.value.substring(0, start);
+    const selected = ta.value.substring(start, end);
+    const after = ta.value.substring(end);
+    const next = `${before}[${selected}](${url})${after}`;
+    const nextStart = start + 1;
+    const nextEnd = nextStart + selected.length;
+    if (onChange) onChange(next, { start: nextStart, end: nextEnd });
+    requestAnimationFrame(() => {
+      ta.focus();
+      try { ta.setSelectionRange(nextStart, nextEnd); } catch { /* noop */ }
+    });
+  }, [editorRef, onChange]);
 
   // 行首添加/切换 Markdown 前缀（支持多行）
   const applyLinePrefixV2 = useCallback((kind) => {
@@ -380,6 +499,7 @@ export default function FloatingTextToolbar({
   const onBold = isMarkdown
     ? () => applyMarkdown(wrap('**', '**'))
     : () => applyInlineRich('bold');
+  const onLink = isMarkdown ? applyLinkMarkdown : applyLinkRich;
 
   return (
     <div
@@ -404,6 +524,13 @@ export default function FloatingTextToolbar({
       </Btn>
       <Btn onClick={onBold} title="加粗 (Ctrl/Cmd+B)" activeFlag={active.bold}>
         <Bold size={16} />
+      </Btn>
+      <Btn
+        onClick={onLink}
+        title={active.link ? '编辑 / 移除链接' : '插入超链接'}
+        activeFlag={active.link}
+      >
+        <LinkIcon size={16} />
       </Btn>
     </div>
   );

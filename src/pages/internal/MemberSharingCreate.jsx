@@ -462,6 +462,9 @@ export default function MemberSharingCreate() {
       .replace(/<p>\s*<\/p>/gi, '')
       .replace(/\n{3,}/g, '\n\n')
       .trim();
+    // 粘贴入口统一清除 Word / 网页带过来的下划线装饰，
+    // 保证编辑器里的所见即所得与全站正文样式一致（站点正文不使用下划线装饰）。
+    cleaned = stripUnderline(cleaned);
     return cleaned;
   }, []);
 
@@ -480,7 +483,9 @@ export default function MemberSharingCreate() {
       const cleaned = cleanWordHtml(html);
       document.execCommand('insertHTML', false, cleaned);
     } else if (text) {
-      const paragraphs = text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+      const paragraphs = stripUnderline(
+        text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+      );
       document.execCommand('insertHTML', false, paragraphs || text);
     }
 
@@ -507,7 +512,9 @@ export default function MemberSharingCreate() {
         if (item.types.includes('text/plain')) {
           const blob = await item.getType('text/plain');
           const text = await blob.text();
-          const paragraphs = text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+          const paragraphs = stripUnderline(
+            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+          );
           if (wordEditorRef.current) {
             wordEditorRef.current.innerHTML = paragraphs;
             setNewPost((prev) => ({ ...prev, content: paragraphs }));
@@ -519,7 +526,9 @@ export default function MemberSharingCreate() {
       try {
         const text = await navigator.clipboard.readText();
         if (text && wordEditorRef.current) {
-          const paragraphs = text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('');
+          const paragraphs = stripUnderline(
+            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+          );
           wordEditorRef.current.innerHTML = paragraphs;
           setNewPost((prev) => ({ ...prev, content: paragraphs }));
         }
