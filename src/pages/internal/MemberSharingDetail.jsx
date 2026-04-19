@@ -529,9 +529,6 @@ export default function MemberSharingDetail() {
                       </span>
                     ))}
                   </div>
-                  <span className="msd-like-count">
-                    {post.likes.length} 人觉得有用
-                  </span>
                 </div>
               )}
             </footer>

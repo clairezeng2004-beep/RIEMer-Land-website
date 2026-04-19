@@ -1487,7 +1487,6 @@ export default function ProcessTemplateDetail() {
                         </span>
                       ))}
                     </div>
-                    <span className="ptd-like-count">{likes.length} 人觉得有用</span>
                   </div>
                 )}
               </footer>

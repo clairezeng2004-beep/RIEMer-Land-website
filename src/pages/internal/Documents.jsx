@@ -1366,9 +1366,6 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                       </span>
                     ))}
                   </div>
-                  <span className="doc-preview__like-count">
-                    {(previewDoc.likes || []).length} 人觉得有用
-                  </span>
                 </div>
               )}
             </div>
