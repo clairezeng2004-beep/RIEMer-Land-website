@@ -120,14 +120,17 @@ body {
      浏览器默认不会为缺失的粗体自动合成，导致中文字符在 font-weight: 600/700 时看起来"没加粗"
      （而英文字符因为 Lora 有原生 600/700 字形，会显示成真粗体）。
      开启 font-synthesis: weight 后，浏览器会为没有粗体字形的中文字体合成一个"伪粗体"，
-     让中英文在视觉重量上保持一致。 */
+     让中英文在视觉重量上保持一致。
+
+     注意：之前这里曾追加过一条 `font-synthesis: none` 试图禁止合成伪粗体，
+     但它会把上面的 `weight style` 完全覆盖，反过来让中文在 600/700 字重下
+     退化为 regular，表现为"关于我们"等区域的中文比英文明显更细。
+     这里保留 weight + style，就是需要浏览器帮中文合成粗体，让中英文视觉重量一致。 */
   font-synthesis: weight style;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   /* 同上：用 clip 而非 hidden，避免 body 成为滚动容器把 sticky 挂歪。 */
   overflow-x: clip;
-  /* 禁止浏览器给缺失字重合成伪粗体/伪斜体，避免字体到位前后字形跳变 */
-  font-synthesis: none;
   /* 文本渲染优化：优先清晰度，减少回流 */
   text-rendering: optimizeLegibility;
   /* 兜底：确保最小可滚动高度（避免某些 flex 布局里 body 被压成 0 导致滚动条消失） */

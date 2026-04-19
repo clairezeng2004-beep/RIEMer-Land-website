@@ -389,6 +389,14 @@
   font-style: oblique 12deg;
 }
 
+/* 没有个性签名的成员也保留"签名行"等高的占位，
+   保证 .member-card__info 在任何情况下高度一致，
+   从而让姓名/年级/头像在带签名与不带签名的卡片中位置完全对齐。
+   1.6em 正好是一行签名（line-height: 1.6）的视觉高度。 */
+.member-card__signature--empty {
+  min-height: 1.6em;
+}
+
 .member-card__bio {
   font-size: var(--text-sm);
   color: var(--color-text-light);

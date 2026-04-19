@@ -364,8 +364,18 @@ export default function Timeline() {
                     {member.enrollment_year && (
                       <span className="member-card__year">{member.enrollment_year}级</span>
                     )}
-                    {member.signature && (
+                    {/*
+                      无论是否填写了个性签名，都渲染签名段落，
+                      让无签名用户卡片在视觉高度上与有签名用户保持一致；
+                      空态由 CSS 的 .member-card__signature--empty 提供等高占位。
+                    */}
+                    {member.signature ? (
                       <p className="member-card__signature">{member.signature}</p>
+                    ) : (
+                      <p
+                        className="member-card__signature member-card__signature--empty"
+                        aria-hidden="true"
+                      />
                     )}
                   </div>
                 </div>
