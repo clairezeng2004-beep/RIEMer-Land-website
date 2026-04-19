@@ -134,6 +134,19 @@ export async function deleteArticleFromDb(id) {
 /**
  * 将 localStorage 中的文章迁移到 Supabase
  * 迁移成功后清除 localStorage 中的文章数据
+ *
+ * ⚠️ 安全性说明（历史 bug 教训）：
+ *   曾经这里是"粗暴地把 localStorage 里所有条目都 insert 一遍回 Supabase"。
+ *   但 ARTICLES_KEY 既是"云端 → 本地缓存"的落盘 key，也是这里读取的迁移源 key，
+ *   会导致：云端数据被写进 localStorage → 下一次挂载时 migrate 又把它当"本地旧文章"
+ *   上传 → articles 表里每刷新一次就翻倍。
+ *
+ *   现在的防御策略：
+ *   (a) 只迁移"看起来确实是旧版临时本地条目"的数据：
+ *       - 有 _fromDb: true 的（云端数据回写到本地缓存）直接跳过
+ *       - id 是 UUID（明显是数据库生成过的）直接跳过
+ *   (b) 迁移前先查一次云端 (title, date) 做重复检测
+ *   (c) 迁移成功后强制清掉 localStorage，避免反复迁移
  */
 export async function migrateLocalArticlesToDb(userId) {
   if (!isSupabaseConfigured || !supabase) return 0;
@@ -141,8 +154,40 @@ export async function migrateLocalArticlesToDb(userId) {
   const localArticles = getLocalArticles();
   if (localArticles.length === 0) return 0;
 
+  // (a) 过滤：只保留"真正的本地临时文章"
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const candidates = localArticles.filter((a) => {
+    if (a && a._fromDb) return false; // 云端回写的，坚决不迁移
+    if (a && typeof a.id === 'string' && UUID_RE.test(a.id)) return false;
+    return true;
+  });
+
+  if (candidates.length === 0) {
+    // 没什么需要迁移 —— 但本地缓存里若全是 _fromDb 数据，保留不动，后续仍可作为启动缓存
+    return 0;
+  }
+
+  // (b) 查一次云端已有 (title, date) 集合，防重
+  let existing = new Set();
+  try {
+    const { data: existingRows } = await supabase
+      .from('articles')
+      .select('title,date');
+    if (Array.isArray(existingRows)) {
+      existing = new Set(existingRows.map((r) => `${r.title || ''}|${r.date || ''}`));
+    }
+  } catch {
+    // 查询失败就保守放行，但仍会靠后面的 insert 失败兜底
+  }
+
   let migrated = 0;
-  for (const article of localArticles) {
+  let skippedDup = 0;
+  for (const article of candidates) {
+    const key = `${article.title || ''}|${article.date || ''}`;
+    if (existing.has(key)) {
+      skippedDup++;
+      continue;
+    }
     try {
       const row = frontendToDb(article, userId);
       const { error } = await supabase
@@ -151,6 +196,7 @@ export async function migrateLocalArticlesToDb(userId) {
 
       if (!error) {
         migrated++;
+        existing.add(key);
       } else {
         console.warn('[ArticleDB] 迁移文章失败:', article.title, error.message);
       }
@@ -159,10 +205,14 @@ export async function migrateLocalArticlesToDb(userId) {
     }
   }
 
-  if (migrated > 0) {
-    // 清除已迁移的 localStorage 数据
+  // (c) 无论迁移了几条，只要候选集非空就清掉本地 —— 避免下次挂载再跑
+  try {
     localStorage.removeItem(LOCAL_ARTICLES_KEY);
-    console.log(`[ArticleDB] 成功迁移 ${migrated}/${localArticles.length} 篇文章到数据库`);
+  } catch { /* ignore */ }
+  if (migrated > 0 || skippedDup > 0) {
+    console.log(
+      `[ArticleDB] 迁移完成：成功 ${migrated}/${candidates.length}，去重跳过 ${skippedDup}`
+    );
   }
 
   return migrated;

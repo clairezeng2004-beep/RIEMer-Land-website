@@ -386,29 +386,51 @@ export function SiteContentProvider({ children }) {
   }, [filterOptions]);
 
   // 从 Supabase 加载文章（初始化 + 迁移本地数据）
+  //
+  // ⚠️ 关键历史 bug（已修复）：
+  //   之前的流程是：
+  //     1) fetchArticlesFromDb()  → 从云端拿到 N 条文章
+  //     2) localStorage.setItem(ARTICLES_KEY, ...)  → 把云端文章写进 localStorage
+  //     3) migrateLocalArticlesToDb()  → 把 localStorage 里的 N 条当作"待迁移的旧本地文章"
+  //                                      逐条 INSERT 回 articles 表（没有去重、没有 upsert）
+  //     → 每次刷新 DB 里就多出 N 条重复，下次刷新再 2N 条… 指数放大。
+  //   ARTICLES_KEY === LOCAL_ARTICLES_KEY（都是 'riemer_user_articles'），所以 2) 和 3) 吃的是同一个 key。
+  //   这就是"数据库只有 1 条，却冒出非常多文章"的根因。
+  //
+  // 现在的修复策略：
+  //   - migrate 只在 sessionStorage 里做"本会话至多跑一次"的标记
+  //   - migrate 仅迁移明显带"本地临时 id"的旧文章（非 UUID、没有 _fromDb 标志）
+  //   - 并且：先 migrate，再 fetch + 写入本地缓存；顺序反过来，杜绝"先把云端数据塞进 localStorage、
+  //     下一步又把它当作'本地旧文章'上传"的闭环。
   useEffect(() => {
     let cancelled = false;
     const loadArticles = async () => {
       try {
+        // ① 尝试迁移老的本地临时文章 → Supabase（幂等；跨会话也只运行一次）
+        let migrated = 0;
+        const MIGRATE_DONE_KEY = 'riemer_articles_migration_done_v2';
+        try {
+          const done = localStorage.getItem(MIGRATE_DONE_KEY);
+          if (!done) {
+            migrated = await migrateLocalArticlesToDb();
+            localStorage.setItem(MIGRATE_DONE_KEY, '1');
+          }
+        } catch {
+          // localStorage 不可用就跳过迁移
+        }
+
+        // ② 从云端拉取最新列表（真正的数据源）
         const articles = await fetchArticlesFromDb();
         if (!cancelled) {
           setUserArticles(articles);
           setArticlesLoaded(true);
-          // 写本地缓存，供下次打开即时显示
+          // ③ 最后一步才写本地缓存 —— 此时迁移已经完成，
+          //    这里写入的内容不会再被 migrate 重新 insert
           try {
             localStorage.setItem(ARTICLES_KEY, JSON.stringify(articles));
           } catch { /* ignore quota/private mode */ }
-        }
-        // 尝试迁移 localStorage 中的旧文章到 Supabase
-        const migrated = await migrateLocalArticlesToDb();
-        if (migrated > 0 && !cancelled) {
-          // 重新加载以包含迁移的数据
-          const refreshed = await fetchArticlesFromDb();
-          if (!cancelled) {
-            setUserArticles(refreshed);
-            try {
-              localStorage.setItem(ARTICLES_KEY, JSON.stringify(refreshed));
-            } catch { /* ignore */ }
+          if (migrated > 0) {
+            console.log(`[SiteContent] 迁移本地文章到云端：${migrated} 条`);
           }
         }
       } catch {
