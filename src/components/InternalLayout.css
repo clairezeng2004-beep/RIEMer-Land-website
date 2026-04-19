@@ -252,3 +252,73 @@
 .internal-layout__content thead th {
   white-space: nowrap;
 }
+
+/* ============================================
+   全局兜底：内部空间按钮/筛选项在手机端的点击反馈
+   --------------------------------------------
+   问题背景（iOS 实测）：
+   点内部空间任意 tab 的筛选项（例如"事项追踪"的状态/分类胶囊按钮、
+   InternalArticles 的分类 chip、NotificationManagement 的筛选按钮等），
+   能明显感到"一圈白边在闪" + "按钮像被放大了一下又弹回去"的跳跃感。
+
+   根因（三件事叠加）：
+   1) iOS Safari 默认会在被点的元素上盖一层半透明黑灰色方块作为 tap highlight。
+      我们的筛选按钮普遍是 border-radius:999px 的胶囊，方块高亮比胶囊大，
+      就表现为"按钮外一圈亮边闪一下"。
+   2) iPhone 上点 <button> 会触发 :hover 态，并且会被"粘住"直到点别处。
+      我们的筛选按钮普遍写了 :hover { background; border-color; color; }，
+      加 transition: all，于是点完会残留 hover 底色，在用户视觉里就是
+      "按钮膨胀了一圈再收回"。
+   3) transition: all 会让所有可过渡属性（含 UA 内部属性）都参与过渡，
+      在手机窄屏上 subpixel 对齐时会出现轻微尺寸/描边抖动。
+
+   修复：
+   - 所有内部空间 <button>/可点击控件一律去掉 iOS 默认 tap highlight。
+   - 在触屏设备（hover:none + pointer:coarse）下，关闭按钮的 :hover 态
+     视觉变化（让 :hover 等同默认态），彻底消除 iOS hover 粘连的"放大跳跃"观感。
+     当然 --active 选中样式仍然保留，因为它是 React 受控 class，不靠 :hover。
+   - 给触屏 :active 一个克制的瞬时反馈（opacity 轻变），不使用 transform:
+     scale，避免真的出现"放大"。
+
+   仅作用在 .internal-layout__content 子树，桌面端鼠标 hover 体验完全保留。
+   ============================================ */
+.internal-layout__content button,
+.internal-layout__content a,
+.internal-layout__content [role="button"],
+.internal-layout__content input,
+.internal-layout__content select,
+.internal-layout__content textarea,
+.internal-layout__content label {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  /* 触屏设备下，按钮的 :hover 等同默认态——消除 iOS hover 粘连导致的
+     "点完按钮一直像亮着"的放大感。
+
+     关键：只对"未选中"按钮关 hover；带 --active / --selected / --current
+     等 modifier 的按钮保留自己的样式不受影响。
+     用 :not([class*="--active"]):not([class*="--selected"]):not([class*="--current"])
+     精准排除，选择器权重正好 = .foo:hover（一个类 + 一个元素 + 若干 :not
+     不计入权重？—— 不，:not() 内部选择器的权重会计入）。
+     计数：.internal-layout__content(1) + button(1) + 三个 :not(属性选择器各1)
+     总计 (0,4,1)，高于 .foo:hover (0,1,1)，能稳定覆盖普通 hover 规则；
+     而 .foo--active:hover (0,2,1) 依然比它低，但我们已经排除了 --active
+     这类按钮不被匹配，互不冲突。 */
+  .internal-layout__content
+    button:not([class*="--active"]):not([class*="--selected"]):not([class*="--current"]):hover {
+    background-color: inherit;
+    border-color: inherit;
+    color: inherit;
+    box-shadow: none;
+    filter: none;
+    transform: none;
+  }
+
+  /* 触屏点击反馈：只做一次很克制的透明度变化，不用 transform scale，
+     避免任何"尺寸/位置"相关的跳跃。 */
+  .internal-layout__content button:active {
+    opacity: 0.82;
+    transition: opacity 80ms ease;
+  }
+}
