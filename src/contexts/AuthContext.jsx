@@ -1063,13 +1063,29 @@ export function AuthProvider({ children }) {
   }, [supabaseOk]);
 
   // ---- 登出 ----
+  // 为避免 supabase.auth.signOut() 在网络异常/session 失效时卡住或抛错
+  // 导致 UI 没反应，这里：
+  //   1. 先立即清本地状态（UI 立刻响应）
+  //   2. 再后台调用 Supabase signOut，带 2.5s 超时兜底
+  //   3. 任何失败都不影响本地登出
   const logout = useCallback(async () => {
-    if (isSupabaseConfigured) {
-      await supabase.auth.signOut();
-    }
+    // 1) 本地立刻清理 —— 这样 UI 马上切换到未登录态
     setUser(null);
-    localStorage.removeItem(AUTH_KEY);
-    clearProfileCache();
+    try { localStorage.removeItem(AUTH_KEY); } catch { /* ignore */ }
+    try { clearProfileCache(); } catch { /* ignore */ }
+
+    // 2) 后台撤销 Supabase session（带超时，防止按钮"点了无反应"的假象）
+    if (isSupabaseConfigured && supabase) {
+      try {
+        await Promise.race([
+          supabase.auth.signOut(),
+          new Promise((resolve) => setTimeout(resolve, 2500)),
+        ]);
+      } catch (err) {
+        console.warn('[Auth] signOut 异常（已本地登出，不影响使用）:', err?.message || err);
+      }
+    }
+    return { success: true };
   }, []);
 
   // ---- 发送密码重置验证码（通过 Resend） ----

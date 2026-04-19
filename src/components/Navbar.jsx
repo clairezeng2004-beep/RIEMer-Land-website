@@ -27,9 +27,14 @@ export default function Navbar() {
   }, [location.pathname]);
 
   const handleLogout = async () => {
-    trackEvent('logout');
-    await logout();
-    navigate('/');
+    try { trackEvent('logout'); } catch { /* ignore */ }
+    try {
+      await logout();
+    } catch (err) {
+      console.warn('[Navbar] logout 抛错（已忽略，继续跳转）:', err?.message || err);
+    }
+    setIsOpen(false);
+    navigate('/', { replace: true });
   };
 
   const isActive = (path) => location.pathname === path;
