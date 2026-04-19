@@ -34,7 +34,7 @@ const COLUMNS = [
   { key: 'hometown', label: '家乡', width: '130px', editable: true, placeholder: '如 广东广州' },
   { key: 'dream_city', label: '喜爱向往的城市与地区', width: '190px', editable: true, placeholder: '如 北京、上海、川西' },
   { key: 'hobbies', label: '爱好', width: '260px', editable: true, placeholder: '如 摄影、阅读、运动' },
-  { key: 'favorites', label: '喜欢的音乐/作家/UP主/书籍/演员/影视剧等', width: '380px', editable: true, placeholder: '如 周杰伦、村上春树、老番茄、《三体》...' },
+  { key: 'favorites', label: '喜欢的音乐/作家/UP主/书籍/演员/影视剧等', width: '240px', editable: true, placeholder: '如 周杰伦、村上春树、老番茄、《三体》...' },
   { key: 'other', label: '其他', width: '220px', editable: true, placeholder: '任何想补充的内容' },
 ];
 

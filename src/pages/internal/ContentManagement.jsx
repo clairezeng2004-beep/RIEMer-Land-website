@@ -1567,7 +1567,7 @@ export default function ContentManagement() {
                             <th className="content-mgmt__member-th" style={{ minWidth: 180 }}>感兴趣的职业方向/生活模式</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 160 }}>喜爱向往的城市与地区</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 150 }}>爱好</th>
-                            <th className="content-mgmt__member-th" style={{ minWidth: 220 }}>喜欢的音乐/作家/UP主/书籍/演员/影视剧...</th>
+                            <th className="content-mgmt__member-th" style={{ minWidth: 160 }}>喜欢的音乐/作家/UP主/书籍/演员/影视剧...</th>
                             <th className="content-mgmt__member-th" style={{ minWidth: 180 }}>其他</th>
                           </tr>
                         </thead>
