@@ -27,6 +27,16 @@
   font-size: var(--text-md);
   color: var(--color-text-light);
   line-height: 1.7;
+  /* 段落排版优化：让每行长度尽量均衡，避免"最后一行只剩一两个字"的孤字现象
+     - text-wrap: balance 让浏览器把段落均分成长度相近的几行，末行自然不会孤字
+       · Chrome 114+ / Safari 17.4+ / Firefox 121+ 支持
+       · 浏览器对 balance 有行数上限（Chrome 6 行，Safari 10 行），超出自动降级
+     - text-wrap: pretty 作为兜底：即便 balance 不生效，pretty 也会优化孤行
+       （两条规则顺序写在一起，后者会覆盖前者，但浏览器只认它能识别的那条）
+     段落整体居中仍由父容器控制；这里不加 text-align:justify 因为 balance
+     已能解决问题，加 justify 反而会让中文段落字间距变宽不自然 */
+  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 /* ============ Hero Actions (below hero bg) ============ */

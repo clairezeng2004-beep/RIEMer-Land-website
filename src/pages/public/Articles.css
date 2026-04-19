@@ -19,6 +19,9 @@
   color: var(--color-text-light);
   font-size: var(--text-md);
   line-height: 1.7;
+  /* 段落排版优化：均衡每行长度，避免孤字成段（详见 Home.css .hero__subtitle 注释） */
+  text-wrap: pretty;
+  text-wrap: balance;
 }
 
 /* ============ Filters ============ */
