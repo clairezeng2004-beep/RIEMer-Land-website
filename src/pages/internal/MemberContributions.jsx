@@ -522,7 +522,7 @@ export default function MemberContributions() {
                                   className="mc-custom__recorder"
                                   title={`由 ${recorder} 录入`}
                                 >
-                                  — {recorder}
+                                  记录人：{recorder}
                                 </span>
                               )}
                             </div>
@@ -619,7 +619,7 @@ export default function MemberContributions() {
               as="span"
             /></li>
             <li><strong>其他</strong>：<EditableText
-              value={cc.noteCustom || '手动输入的自定义贡献项，跨设备同步；每条后方显示录入人'}
+              value={cc.noteCustom || '手动输入的自定义贡献项，跨设备同步；每条后方显示"记录人：姓名"'}
               onChange={(v) => updateContribs('noteCustom', v)}
               configKey="contributions.noteCustom"
               as="span"
