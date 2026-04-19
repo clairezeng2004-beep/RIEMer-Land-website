@@ -1,8 +1,9 @@
-import { useState, useMemo, useEffect, useCallback } from 'react';
+import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { Navigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import {
   BarChart3,
@@ -76,6 +77,8 @@ export default function MemberContributions() {
   const { editing } = useWysiwyg();
   const cc = internalConfig.contributions || {};
 
+  const canUseSupabase = isSupabaseConfigured && supabaseOk === true;
+
   const updateContribs = useCallback(
     (key, val) => updateInternalConfig({ contributions: { [key]: val } }),
     [updateInternalConfig]
@@ -106,7 +109,12 @@ export default function MemberContributions() {
     setSyncing(false);
   };
 
-  // 自定义贡献（"其他"栏位）
+  // ============================================================
+  // 自定义贡献（"其他"栏位）—— 跨设备同步
+  // 存储结构：customContributions[`${memberId}_${periodKey}`] = [{ text, date }]
+  // 云端：member_contributions 表，(member_id, period_key) 唯一
+  // 本地：localStorage 作为离线/降级缓存
+  // ============================================================
   const [customContributions, setCustomContributions] = useState(() => {
     const stored = localStorage.getItem(CUSTOM_CONTRIBUTIONS_KEY);
     if (stored) {
@@ -123,9 +131,61 @@ export default function MemberContributions() {
   const [editingMember, setEditingMember] = useState(null);
   const [editText, setEditText] = useState('');
 
+  // 每次本地状态变化都写回 localStorage 作为兜底
   useEffect(() => {
     localStorage.setItem(CUSTOM_CONTRIBUTIONS_KEY, JSON.stringify(customContributions));
   }, [customContributions]);
+
+  // 启动后异步从 Supabase 拉取最新数据（如配置且可用）
+  const loadedFromServerRef = useRef(false);
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!canUseSupabase) return;
+    if (loadedFromServerRef.current) return;
+    loadedFromServerRef.current = true;
+
+    (async () => {
+      try {
+        console.log('[MemberContributions] 开始从 Supabase 拉取 member_contributions...');
+        const { data, error } = await supabase
+          .from('member_contributions')
+          .select('member_id, period_key, items');
+        if (error) throw error;
+        const map = {};
+        (data || []).forEach((row) => {
+          const key = `${row.member_id}_${row.period_key}`;
+          map[key] = Array.isArray(row.items) ? row.items : [];
+        });
+        console.log('[MemberContributions] Supabase 返回', Object.keys(map).length, '条记录');
+        // 云端即真源：直接覆盖本地
+        setCustomContributions(map);
+      } catch (err) {
+        console.warn('[MemberContributions] ❌ 从 Supabase 加载失败:', err);
+      }
+    })();
+  }, [isAuthenticated, canUseSupabase]);
+
+  // 写入云端（upsert；失败仅警告，保留本地状态）
+  const upsertContribToServer = useCallback(async (memberId, periodKey, items) => {
+    if (!canUseSupabase) return;
+    try {
+      const { error } = await supabase
+        .from('member_contributions')
+        .upsert(
+          {
+            member_id: memberId,
+            period_key: periodKey,
+            items,
+            updated_at: new Date().toISOString(),
+          },
+          { onConflict: 'member_id,period_key' }
+        );
+      if (error) throw error;
+    } catch (err) {
+      console.warn('[MemberContributions] ❌ upsert 失败:', err);
+    }
+  }, [canUseSupabase]);
+
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -223,10 +283,13 @@ export default function MemberContributions() {
     if (!editText.trim()) return;
     const periodKey = selectedPeriod;
     const customKey = `${memberId}_${periodKey}`;
-    setCustomContributions((prev) => ({
-      ...prev,
-      [customKey]: [...(prev[customKey] || []), { text: editText.trim(), date: new Date().toISOString().split('T')[0] }],
-    }));
+    const newItem = { text: editText.trim(), date: new Date().toISOString().split('T')[0] };
+    setCustomContributions((prev) => {
+      const nextItems = [...(prev[customKey] || []), newItem];
+      // 异步同步到 Supabase（成功/失败都不阻塞本地状态）
+      upsertContribToServer(memberId, periodKey, nextItems);
+      return { ...prev, [customKey]: nextItems };
+    });
     setEditText('');
     setEditingMember(null);
   };
@@ -235,10 +298,11 @@ export default function MemberContributions() {
   const handleRemoveCustom = (memberId, index) => {
     const periodKey = selectedPeriod;
     const customKey = `${memberId}_${periodKey}`;
-    setCustomContributions((prev) => ({
-      ...prev,
-      [customKey]: (prev[customKey] || []).filter((_, i) => i !== index),
-    }));
+    setCustomContributions((prev) => {
+      const nextItems = (prev[customKey] || []).filter((_, i) => i !== index);
+      upsertContribToServer(memberId, periodKey, nextItems);
+      return { ...prev, [customKey]: nextItems };
+    });
   };
 
   // 获取排名图标
@@ -528,7 +592,7 @@ export default function MemberContributions() {
               as="span"
             /></li>
             <li><strong>其他</strong>：<EditableText
-              value={cc.noteCustom || '手动输入的自定义贡献项，保存在本地'}
+              value={cc.noteCustom || '手动输入的自定义贡献项，跨设备同步'}
               onChange={(v) => updateContribs('noteCustom', v)}
               configKey="contributions.noteCustom"
               as="span"

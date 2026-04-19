@@ -924,3 +924,50 @@ CREATE POLICY "album_photos_owner_delete" ON storage.objects
       OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
     )
   );
+
+-- ============================================
+-- 成员贡献 — member_contributions（"其他"自定义项跨设备同步）
+-- ============================================
+-- 前端：src/pages/internal/MemberContributions.jsx
+-- 按 (member_id, period_key) 唯一，items 以 JSONB 数组存放 [{ text, date }]。
+CREATE TABLE IF NOT EXISTS public.member_contributions (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  member_id TEXT NOT NULL,
+  period_key TEXT NOT NULL,
+  items JSONB NOT NULL DEFAULT '[]'::jsonb,
+  updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  CONSTRAINT member_contributions_member_period_uniq UNIQUE (member_id, period_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_member_contributions_member
+  ON public.member_contributions (member_id);
+CREATE INDEX IF NOT EXISTS idx_member_contributions_period
+  ON public.member_contributions (period_key);
+
+ALTER TABLE public.member_contributions ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "认证用户可查看成员贡献" ON public.member_contributions;
+DROP POLICY IF EXISTS "认证用户可新增成员贡献" ON public.member_contributions;
+DROP POLICY IF EXISTS "认证用户可更新成员贡献" ON public.member_contributions;
+DROP POLICY IF EXISTS "认证用户可删除成员贡献" ON public.member_contributions;
+
+CREATE POLICY "认证用户可查看成员贡献"
+  ON public.member_contributions FOR SELECT
+  TO authenticated USING (true);
+CREATE POLICY "认证用户可新增成员贡献"
+  ON public.member_contributions FOR INSERT
+  TO authenticated WITH CHECK (true);
+CREATE POLICY "认证用户可更新成员贡献"
+  ON public.member_contributions FOR UPDATE
+  TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY "认证用户可删除成员贡献"
+  ON public.member_contributions FOR DELETE
+  TO authenticated USING (true);
+
+DO $$
+BEGIN
+  ALTER PUBLICATION supabase_realtime ADD TABLE public.member_contributions;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
