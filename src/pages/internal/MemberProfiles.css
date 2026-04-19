@@ -557,3 +557,45 @@
     padding: 8px var(--space-md);
   }
 }
+
+/* ============ 保存反馈（行内，不用 alert） ============ */
+.member-profiles-table__save-msg {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 6px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  max-width: 340px;
+  min-width: 200px;
+  white-space: normal;
+  word-break: break-word;
+  z-index: 20;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+}
+
+/* 让包含 save-msg 的 edit-actions 成为定位参考 */
+.member-profiles-table__edit-actions {
+  position: relative;
+}
+
+.member-profiles-table__save-msg--success {
+  background: #eaf7ef;
+  color: #2e7d3d;
+  border: 1px solid #b9e0c5;
+}
+
+.member-profiles-table__save-msg--warning {
+  background: #fff6e0;
+  color: #8a5a00;
+  border: 1px solid #f0d8a0;
+}
+
+.member-profiles-table__save-msg--error {
+  background: #fdeaea;
+  color: #a1322a;
+  border: 1px solid #f0b9b3;
+}

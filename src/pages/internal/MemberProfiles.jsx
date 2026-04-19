@@ -176,6 +176,9 @@ export default function MemberProfiles() {
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   const [saving, setSaving] = useState(false);
+  // 行内保存反馈（不用 alert，alert 可能被浏览器/扩展拦截导致"没反应"假象）
+  // 形如 { type: 'error'|'warning'|'success', text: '...' }
+  const [saveMsg, setSaveMsg] = useState(null);
   // 云端数据加载状态，用来给用户明确反馈，而不是静默失败
   //   idle:    初始/空闲
   //   loading: 正在从 Supabase 拉取
@@ -465,6 +468,7 @@ export default function MemberProfiles() {
   // 开始编辑
   const startEdit = (profile) => {
     setEditingId(profile.user_id);
+    setSaveMsg(null);
     const ym = dateToYearMonth(profile.joined_at);
     setEditData({
       ...profile,
@@ -477,24 +481,41 @@ export default function MemberProfiles() {
   const cancelEdit = () => {
     setEditingId(null);
     setEditData({});
+    setSaveMsg(null);
   };
 
   // 保存编辑
   //
-  // 关键修复：
-  //   过去仅在 `supabaseOk === true` 时才写云端，但 supabaseOk 有三态
-  //   （null=健康检查未返回 / true=可达 / false=不可达）。很多用户因广告
-  //   拦截/代理，健康 ping 被挡住，长期停在 null；而此时 REST 查询其实
-  //   是通的（列表能正常显示）。按旧逻辑会误把 `null` 当成"不可达"而
-  //   降级到本地保存，再 `loadProfiles()` 拉云端覆盖 UI → 表现为"点
-  //   对勾完全没反应，改动消失"。
-  //   现在只要配置了 Supabase，就优先尝试云端保存；仅当云端明确失败
-  //   或者未配置 Supabase 时，才写本地；任何最终失败都必须 alert 告知。
+  // 关键修复 (v2)：
+  //   * 不再用 alert（可能被浏览器/扩展/iframe 沙箱静默拦截，造成"点保存没反应"的假象）；
+  //     改为在行内显示 saveMsg（error / warning / success）。
+  //   * 给云端请求加 10s 超时保护，避免网络挂起时 saving 永远停在 true 而按钮被禁用。
+  //   * 把每一步的日志都串起来（[MemberProfiles:save] 前缀），便于用户把 console 截图反馈。
+  //   * 云端失败时容忍"数据库缺少新列"的场景：PostgREST 会抛 PGRST204 /
+  //     "Could not find the 'xxx' column"，我们把这类提示在界面上给出可操作建议
+  //     （请管理员执行 supabase-members-and-albums.sql）。
+  //   * 云端成功 / 本地成功都会退出编辑态；保留之前 "supabaseOk 三态" 的优先云端逻辑。
   const saveEdit = async () => {
     if (!editingId) return;
     setSaving(true);
+    setSaveMsg(null);
+
+    // 帮助函数：给 Promise 加超时，避免永远 pending 导致 saving 卡死
+    const withTimeout = (promise, ms, label) =>
+      Promise.race([
+        promise,
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error(`${label} 超时（${ms / 1000}s）`)), ms)
+        ),
+      ]);
 
     try {
+      console.log('[MemberProfiles:save] 开始保存', {
+        editingId,
+        isSupabaseConfigured,
+        supabaseOk,
+      });
+
       // 计算加入时间
       const newJoinedAt = yearMonthToDate(editData._joined_year, editData._joined_month);
 
@@ -509,36 +530,59 @@ export default function MemberProfiles() {
         updateData.joined_at = newJoinedAt;
       }
 
-      let savedToCloud = false;
+      console.log('[MemberProfiles:save] 将要写入的字段:', Object.keys(updateData));
 
-      // --- 优先走云端（配置了 Supabase 就试一次，不看 supabaseOk）---
+      let savedToCloud = false;
+      let cloudErrMsg = '';
+
+      // --- 优先走云端（配置了 Supabase 就试一次，不看 supabaseOk 三态）---
       if (isSupabaseConfigured && supabase) {
         try {
-          let { error } = await supabase
-            .from('member_profiles')
-            .update(updateData)
-            .eq('user_id', editingId);
+          const firstAttempt = await withTimeout(
+            supabase
+              .from('member_profiles')
+              .update(updateData)
+              .eq('user_id', editingId)
+              .select('user_id'),
+            10000,
+            '云端保存'
+          );
+          let error = firstAttempt.error;
+          let data = firstAttempt.data;
 
-          // 失败则刷新 session 后重试一次（处理 401/过期）
+          // 401 / session 过期 → 刷新后重试一次
           if (error) {
-            console.warn('[MemberProfiles] 云端保存失败，尝试刷新 session 后重试:', error.message);
+            console.warn('[MemberProfiles:save] 首次云端保存失败，尝试刷新 session:', error.message, error.code);
             try {
               await supabase.auth.refreshSession();
             } catch { /* ignore */ }
-            const retry = await supabase
-              .from('member_profiles')
-              .update(updateData)
-              .eq('user_id', editingId);
+            const retry = await withTimeout(
+              supabase
+                .from('member_profiles')
+                .update(updateData)
+                .eq('user_id', editingId)
+                .select('user_id'),
+              10000,
+              '云端保存重试'
+            );
             error = retry.error;
+            data = retry.data;
           }
 
-          if (!error) {
-            savedToCloud = true;
+          if (error) {
+            cloudErrMsg = error.message || String(error);
+            console.error('[MemberProfiles:save] 云端保存最终失败:', error);
+          } else if (!data || data.length === 0) {
+            // RLS 挡掉更新（用户没有权限改这一行），update 不报错但返回空
+            cloudErrMsg = '没有权限修改该行（可能是 RLS 策略拒绝了，请确认你是本行所属人或管理员）';
+            console.error('[MemberProfiles:save] update 返回 0 行，疑似 RLS 拒绝');
           } else {
-            console.error('[MemberProfiles] 云端保存最终失败:', error);
+            savedToCloud = true;
+            console.log('[MemberProfiles:save] 云端保存成功，影响行数:', data.length);
           }
         } catch (netErr) {
-          console.error('[MemberProfiles] 云端保存异常:', netErr);
+          cloudErrMsg = netErr?.message || String(netErr);
+          console.error('[MemberProfiles:save] 云端保存异常:', netErr);
         }
       }
 
@@ -548,8 +592,6 @@ export default function MemberProfiles() {
         const localProfiles = getLocalProfiles();
         let idx = localProfiles.findIndex((p) => p.user_id === editingId);
         if (idx < 0) {
-          // 本地缓存里还没这一行：从当前表格里把原行合成一份塞进去，
-          // 保证下次加载兜底时能看到用户刚改的内容。
           const existing = profiles.find((p) => p.user_id === editingId);
           if (existing) {
             const { id: _id, joined_at_display: _d, ...rest } = existing;
@@ -564,21 +606,42 @@ export default function MemberProfiles() {
           saveLocalProfiles(localProfiles);
         }
 
-        // 如果压根没配 Supabase，是"纯本地模式"，这是正常路径，不报错
         if (isSupabaseConfigured) {
-          alert('保存到云端失败（网络或权限问题），已暂存到本地。请稍后检查网络并重新编辑保存。');
-          // 不跳出编辑态，让用户能再试一次
+          // 根据错误信息给出针对性建议
+          let hint = '';
+          if (/Could not find the .* column|PGRST204|schema cache/i.test(cloudErrMsg)) {
+            hint = '（疑似数据库缺少新字段，请联系管理员在 Supabase 后台执行 supabase-members-and-albums.sql 完成升级）';
+          } else if (/row-level security|RLS|没有权限/i.test(cloudErrMsg)) {
+            hint = '（疑似权限不足，请确认你是该行所属人或管理员）';
+          } else if (/超时|timeout|Failed to fetch|NetworkError/i.test(cloudErrMsg)) {
+            hint = '（网络似乎不通，请检查代理 / 广告拦截插件后重试）';
+          }
+
+          setSaveMsg({
+            type: 'error',
+            text: `保存到云端失败：${cloudErrMsg || '未知错误'}${hint}。改动已暂存到本地，刷新后仍可见；点"取消"或再次点"保存"可重试。`,
+          });
           setSaving(false);
-          return;
+          return; // 保持在编辑态让用户重试
         }
       }
 
+      // --- 成功（云端或本地模式）---
       await loadProfiles();
       setEditingId(null);
       setEditData({});
+      setSaveMsg({
+        type: 'success',
+        text: savedToCloud ? '已保存到云端 ✓' : '已保存到本地 ✓',
+      });
+      // 3 秒后自动清除成功提示
+      setTimeout(() => setSaveMsg(null), 3000);
     } catch (err) {
-      console.error('[MemberProfiles] Save error:', err);
-      alert('保存失败，请重试');
+      console.error('[MemberProfiles:save] Save error:', err);
+      setSaveMsg({
+        type: 'error',
+        text: '保存失败：' + (err?.message || '未知错误') + '。请把浏览器 Console 日志（[MemberProfiles:save] 开头）截图发给管理员。',
+      });
     } finally {
       setSaving(false);
     }
@@ -903,7 +966,11 @@ export default function MemberProfiles() {
                             disabled={saving}
                             title="保存"
                           >
-                            <Check size={14} />
+                            {saving ? (
+                              <Loader2 size={14} className="member-profiles-cloud-banner__spin" />
+                            ) : (
+                              <Check size={14} />
+                            )}
                           </button>
                           <button
                             className="member-profiles-table__cancel-btn"
@@ -912,6 +979,14 @@ export default function MemberProfiles() {
                           >
                             <X size={14} />
                           </button>
+                          {saveMsg && (
+                            <div
+                              className={`member-profiles-table__save-msg member-profiles-table__save-msg--${saveMsg.type}`}
+                              role="alert"
+                            >
+                              {saveMsg.text}
+                            </div>
+                          )}
                         </div>
                       )}
                     </td>
