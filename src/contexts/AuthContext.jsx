@@ -1327,6 +1327,39 @@ export function AuthProvider({ children }) {
 
       if (!data || data.length === 0) {
         console.warn('[Auth] Supabase profiles 最终为空（可能是 RLS/session 问题）');
+
+        // ---- 额外诊断：用 HEAD/count 请求看看数据库里到底"客观"有多少行 ----
+        // 如果 head-count > 0 但 select 空 → 铁证是 RLS / session 把行过滤光了
+        // 如果 head-count 也是 0 → 数据库确实是空的
+        try {
+          const { count, error: cntErr } = await supabase
+            .from('profiles')
+            .select('*', { count: 'exact', head: true });
+          if (cntErr) {
+            console.warn('[Auth] HEAD count 查询失败:', cntErr.message, cntErr.code);
+          } else {
+            console.warn('[Auth] HEAD count 结果:', count, '行（此数已考虑 RLS）');
+            if (count > 0) {
+              // count 走的是同一个 RLS 上下文；RLS 认它就能看到 count 行，
+              // 却拿不到 select 的 data —— 这通常是"response headers 里 count
+              // 有但 body 被 accept-encoding/压缩/代理截断"的诡异场景，
+              // 或者某些 Supabase 版本的 bug。这里再追加一次 range 查询作兜底。
+              const rng = await supabase
+                .from('profiles')
+                .select('id, email, name, nickname, avatar, signature, role, authorized, created_at')
+                .range(0, Math.max(499, count - 1));
+              if (!rng.error && Array.isArray(rng.data) && rng.data.length > 0) {
+                console.log('[Auth] range 兜底查询拿到', rng.data.length, '条');
+                data = rng.data;
+              }
+            }
+          }
+        } catch (diagErr) {
+          console.warn('[Auth] 额外诊断查询异常:', diagErr?.message);
+        }
+      }
+
+      if (!data || data.length === 0) {
         return mergeLists(getLocalUsers(), currentUserProfile);
       }
 

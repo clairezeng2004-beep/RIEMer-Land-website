@@ -58,6 +58,9 @@ export default function UserManagement() {
   const [loadError, setLoadError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
+  // 诊断信息（点击"查看诊断信息"按钮展开，用于排查"0 已授权 0 待授权"问题）
+  const [diag, setDiag] = useState(null);
+  const [showDiag, setShowDiag] = useState(false);
 
   // 已授权 / 待授权用户分组（兼容 boolean / string / truthy 值）
   const isAuthorized = (u) => u.authorized === true || u.authorized === 'true' || u.authorized === 'TRUE';
@@ -136,27 +139,63 @@ export default function UserManagement() {
     setLoadError('');
 
     const loadUsers = async () => {
+      const diagInfo = {
+        startedAt: new Date().toISOString(),
+        currentUser: currentUser ? {
+          id: currentUser.id?.slice(0, 8) + '...',
+          email: currentUser.email,
+          role: currentUser.role,
+          authorized: currentUser.authorized,
+          _fallback: currentUser._fallback || false,
+        } : null,
+        isAdmin,
+        supabaseOk,
+      };
       try {
         const data = await getAllUsers();
         if (seq !== loadReqSeq.current) {
           console.log('[UserManagement] 丢弃过期请求 seq=', seq);
           return;
         }
-        console.log('[UserManagement] getAllUsers 返回:', data?.length, '条',
-          Array.isArray(data)
-            ? data.map(u => ({ id: u.id?.slice(0,8), email: u.email, authorized: u.authorized, type: typeof u.authorized }))
-            : data
-        );
         const safeData = Array.isArray(data) ? data : [];
+        diagInfo.returnedCount = safeData.length;
+        diagInfo.authorizedBreakdown = {
+          true: safeData.filter(u => u.authorized === true).length,
+          false: safeData.filter(u => u.authorized === false).length,
+          'string-true': safeData.filter(u => u.authorized === 'true' || u.authorized === 'TRUE').length,
+          'other': safeData.filter(u => u.authorized !== true && u.authorized !== false && u.authorized !== 'true' && u.authorized !== 'TRUE').length,
+        };
+        diagInfo.sample = safeData.slice(0, 3).map(u => ({
+          id: u.id?.slice(0, 8) + '...',
+          email: u.email,
+          role: u.role,
+          authorized: u.authorized,
+          authorizedType: typeof u.authorized,
+        }));
+        console.log('[UserManagement] getAllUsers 返回:', safeData.length, '条', diagInfo);
         setUsers(safeData);
-        // 如果一条都没拿到，写诊断信息到页面
+        setDiag(diagInfo);
+        // 判断诊断结论
         if (safeData.length === 0) {
-          setLoadError('未能加载到任何用户（Supabase 可能未返回数据，或 RLS / Session 异常）');
+          setLoadError(
+            'getAllUsers 返回 0 条。可能原因：' +
+            (supabaseOk === false ? '已降级本地模式且本地无缓存' :
+             supabaseOk === null ? '健康检查仍在进行' :
+             'Supabase 查询为空（RLS/Session 问题），且本地 localStorage 也为空') +
+            '。点击下方"查看诊断信息"可展开详情。'
+          );
+        } else if (safeData.length > 0 && safeData.every(u => !isAuthorized(u))) {
+          setLoadError(
+            `拉到 ${safeData.length} 条记录，但全部 authorized !== true。数据库里也许真的没人授权过；` +
+            '或者 authorized 字段类型不对（见下方诊断）。'
+          );
         }
       } catch (err) {
         if (seq !== loadReqSeq.current) return;
         console.error('[UserManagement] 加载用户异常:', err);
+        diagInfo.error = err?.message || String(err);
         setLoadError('加载失败：' + (err?.message || '未知错误'));
+        setDiag(diagInfo);
         setUsers([]);
       } finally {
         if (seq === loadReqSeq.current) setLoadingUsers(false);
@@ -502,26 +541,65 @@ export default function UserManagement() {
                   <td colSpan={isAdmin ? 5 : 4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
                     <div>暂无已授权用户</div>
                     {loadError && (
-                      <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#c17070' }}>
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#c17070', maxWidth: 680, margin: '0.75rem auto 0', lineHeight: 1.5 }}>
                         <AlertCircle size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />
                         {loadError}
                       </div>
                     )}
-                    <button
-                      onClick={() => setRefreshKey((k) => k + 1)}
-                      style={{
-                        marginTop: '0.75rem',
-                        padding: '0.35rem 0.9rem',
-                        fontSize: '0.85rem',
-                        background: 'transparent',
-                        border: '1px solid var(--color-border)',
-                        borderRadius: '6px',
-                        color: 'var(--color-text)',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      重新加载
-                    </button>
+                    <div style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem', justifyContent: 'center', flexWrap: 'wrap' }}>
+                      <button
+                        onClick={() => setRefreshKey((k) => k + 1)}
+                        style={{
+                          padding: '0.35rem 0.9rem',
+                          fontSize: '0.85rem',
+                          background: 'transparent',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '6px',
+                          color: 'var(--color-text)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        重新加载
+                      </button>
+                      {diag && (
+                        <button
+                          onClick={() => setShowDiag((v) => !v)}
+                          style={{
+                            padding: '0.35rem 0.9rem',
+                            fontSize: '0.85rem',
+                            background: 'transparent',
+                            border: '1px solid var(--color-border)',
+                            borderRadius: '6px',
+                            color: 'var(--color-text)',
+                            cursor: 'pointer',
+                          }}
+                        >
+                          {showDiag ? '收起' : '查看'}诊断信息
+                        </button>
+                      )}
+                    </div>
+                    {showDiag && diag && (
+                      <pre
+                        style={{
+                          marginTop: '0.75rem',
+                          textAlign: 'left',
+                          background: '#f6f7f8',
+                          border: '1px solid var(--color-border)',
+                          borderRadius: '6px',
+                          padding: '0.75rem 1rem',
+                          fontSize: '0.78rem',
+                          lineHeight: 1.55,
+                          color: '#444',
+                          maxWidth: 780,
+                          margin: '0.75rem auto 0',
+                          overflowX: 'auto',
+                          whiteSpace: 'pre-wrap',
+                          wordBreak: 'break-all',
+                        }}
+                      >
+                        {JSON.stringify(diag, null, 2)}
+                      </pre>
+                    )}
                   </td>
                 </tr>
               ) : (
