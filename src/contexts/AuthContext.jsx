@@ -1616,10 +1616,12 @@ export function AuthProvider({ children }) {
     list.push(newItem);
     saveLocalPreAuthEmails(list);
 
-    // Supabase 模式：同步到 pre_authorized_emails 表
+    // Supabase 模式：同步到 pre_authorized_emails 表（使用 upsert 避免 unique 冲突）
     if (!useLocal) {
       try {
-        const { error: insertErr } = await supabase.from('pre_authorized_emails').insert({ email: normalizedEmail });
+        const { error: insertErr } = await supabase
+          .from('pre_authorized_emails')
+          .upsert({ email: normalizedEmail }, { onConflict: 'email' });
         if (insertErr) {
           console.warn('[Auth] preAuthorizeByEmail: Supabase 插入预授权邮箱失败（本地已保存）:', insertErr.message);
         }
@@ -1636,9 +1638,48 @@ export function AuthProvider({ children }) {
   }, [supabaseOk]);
 
   // ---- 获取预授权邮箱列表 ----
+  // 规则：已注册的用户自动从预授权列表中移除（并清理 Supabase 的脏数据），列表内邮箱不重复。
   const getPreAuthorizedEmails = useCallback(async () => {
     const useLocal = !isSupabaseConfigured || supabaseOk === false;
     const localList = getLocalPreAuthEmails();
+
+    // 收集"已注册邮箱"集合（小写）—— 用于从预授权列表中剔除
+    const registeredSet = new Set();
+    // 本地 users
+    try {
+      getLocalUsers().forEach((u) => {
+        if (u?.email) registeredSet.add(String(u.email).toLowerCase());
+      });
+    } catch { /* ignore */ }
+    // Supabase profiles
+    if (!useLocal) {
+      try {
+        const { data: profilesData, error: profilesErr } = await supabase
+          .from('profiles')
+          .select('email');
+        if (!profilesErr && Array.isArray(profilesData)) {
+          profilesData.forEach((p) => {
+            if (p?.email) registeredSet.add(String(p.email).toLowerCase());
+          });
+        }
+      } catch { /* ignore */ }
+    }
+
+    // 按邮箱去重工具
+    const dedupByEmail = (arr) => {
+      const seen = new Set();
+      const out = [];
+      for (const item of arr) {
+        if (!item?.email) continue;
+        const key = String(item.email).toLowerCase();
+        if (seen.has(key)) continue;
+        // 跳过已注册
+        if (registeredSet.has(key)) continue;
+        seen.add(key);
+        out.push({ email: key, addedAt: item.addedAt || item.added_at || null });
+      }
+      return out;
+    };
 
     if (!useLocal) {
       try {
@@ -1649,34 +1690,46 @@ export function AuthProvider({ children }) {
 
         if (fetchErr) {
           console.warn('[Auth] getPreAuthorizedEmails: Supabase 查询失败，使用本地数据:', fetchErr.message);
-          return localList;
+          const cleanedLocal = dedupByEmail(localList);
+          saveLocalPreAuthEmails(cleanedLocal);
+          return cleanedLocal;
         }
 
-        // 合并 Supabase 数据和本地数据（以邮箱为 key 去重，Supabase 优先）
-        const remoteList = (data || []).map((d) => ({ email: d.email, addedAt: d.added_at }));
-        const remoteSet = new Set(remoteList.map((r) => r.email.toLowerCase()));
-        // 本地有但 Supabase 没有的邮箱，也保留（可能是 Supabase insert 失败的）
-        const localOnly = localList.filter((item) => !remoteSet.has(item.email.toLowerCase()));
-        const merged = [...remoteList, ...localOnly];
-
-        // 将本地缺失的邮箱同步到 Supabase（后台静默）
-        if (localOnly.length > 0) {
-          for (const item of localOnly) {
+        const remoteRaw = (data || []).map((d) => ({ email: d.email, addedAt: d.added_at }));
+        // 清理 Supabase 脏数据：已注册的邮箱从 pre_authorized_emails 表中删除
+        const remoteDirty = remoteRaw.filter((r) => registeredSet.has(String(r.email).toLowerCase()));
+        if (remoteDirty.length > 0) {
+          console.log(`[Auth] 清理 ${remoteDirty.length} 条已注册用户的预授权记录`);
+          for (const item of remoteDirty) {
             try {
-              await supabase.from('pre_authorized_emails').upsert({ email: item.email }, { onConflict: 'email' });
-            } catch { /* 忽略 */ }
+              await supabase.from('pre_authorized_emails').delete().ilike('email', item.email);
+            } catch { /* ignore */ }
           }
         }
 
-        // 更新本地缓存为合并后的完整列表
+        // 合并远程 + 本地（去重 + 过滤已注册）
+        const merged = dedupByEmail([...remoteRaw, ...localList]);
+
+        // 将本地缺失的邮箱同步到 Supabase（后台静默）
+        const remoteSet = new Set(remoteRaw.map((r) => String(r.email).toLowerCase()));
+        const localOnly = merged.filter((item) => !remoteSet.has(item.email));
+        for (const item of localOnly) {
+          try {
+            await supabase.from('pre_authorized_emails').upsert({ email: item.email }, { onConflict: 'email' });
+          } catch { /* 忽略 */ }
+        }
+
+        // 更新本地缓存为"过滤后的完整列表"
         saveLocalPreAuthEmails(merged);
         return merged;
       } catch {
-        // 网络异常，回退本地
         console.warn('[Auth] getPreAuthorizedEmails: Supabase 异常，使用本地数据');
       }
     }
-    return localList;
+
+    const cleanedLocal = dedupByEmail(localList);
+    saveLocalPreAuthEmails(cleanedLocal);
+    return cleanedLocal;
   }, [supabaseOk]);
 
   // ---- 移除预授权邮箱 ----
