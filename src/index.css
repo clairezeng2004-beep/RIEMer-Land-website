@@ -139,6 +139,26 @@ html, body {
   overflow-y: visible !important;
 }
 
+/* ============================================
+   iOS Safari 聚焦输入框自动缩放修复
+   ============================================
+   当 <input>/<textarea>/<select> 字号 < 16px 时，iOS Safari 聚焦会
+   自动把整页放大到让输入字达到 16px 的物理字号，而且之后不会自动复原，
+   表现为"登录时窗口放大、登录后也保持放大"。
+   解决方案：在触屏设备（coarse pointer，基本就是移动端）上强制所有可
+   输入控件字号 ≥ 16px，从根上规避 Safari 的自动缩放逻辑。
+   桌面端（fine pointer）不受影响，仍用各组件自己的字号。
+   注：不用 viewport 的 maximum-scale=1，因为那会禁止用户双指缩放整个
+   页面，影响可访问性。
+*/
+@media (pointer: coarse) {
+  input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
+  textarea,
+  select {
+    font-size: 16px;
+  }
+}
+
 main {
   padding-top: 72px;
 }

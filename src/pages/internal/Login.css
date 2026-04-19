@@ -150,6 +150,22 @@
   width: 100%;
 }
 
+/*
+  iOS Safari 专属修复：
+  当 <input> / <textarea> 字号 < 16px 时，iOS 聚焦会自动把整页放大
+  以使输入字达到 16px 物理字号，而且放大后不会自动还原 —— 就是用户反馈的
+  "登录时窗口放大、登录后还保持放大"的根因。
+  解决方案：在触屏设备（coarse pointer）上强制把 login 表单的 input 字号
+  提到 16px。视觉上差别极小，但彻底规避 Safari 的自动缩放逻辑。
+  桌面端保持 --text-sm 不变。
+*/
+@media (pointer: coarse) {
+  .login-card__input,
+  .login-card__input--code:placeholder-shown {
+    font-size: 16px;
+  }
+}
+
 .login-card__input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
