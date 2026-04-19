@@ -138,3 +138,100 @@
     top: 56px;
   }
 }
+
+/* ============================================
+   手机端：内部空间各 tab 的"标题行 / 描述行 / 头部按钮"统一尺寸
+   --------------------------------------------
+   问题背景：
+   - 各 tab（Tasks / Documents / Gallery / Guestbook / MemberSharing ...）
+     各自在自己的 CSS 里单独写 .xxx-page__header h1 { font-size: var(--text-2xl); }，
+     有的还在移动断点里把标题缩小（比如 Guestbook 缩到 --text-xl），
+     有的却没缩（比如 Documents / Tasks），导致在手机上肉眼看上去各 tab 标题字号不一致。
+   - "上传文档 / 发布 / 创建"等顶部按钮也是同样问题：Notifications、MemberSharing
+     给自己的按钮缩小了 padding，其它 tab 的按钮却保持默认的全局 .btn padding，
+     视觉上就显得"Documents 的按钮字也更大"。
+   修复思路：
+   - 在 InternalLayout（所有内部 tab 的公共父容器）里统一用一组选择器兜底，
+     只影响手机端、只影响"tab 头部"这一块，把 h1 / p / .btn 拉齐到同一尺寸。
+   - 特异性 0,2,2 高于各 tab 自己 0,1,1 的 .xxx-page__header h1，能稳定覆盖。
+   ============================================ */
+@media (max-width: 768px) {
+  /* 标题行：所有 tab 的 header h1 统一为 --text-xl（24px） */
+  .internal-layout__content .documents-page__header h1,
+  .internal-layout__content .tasks-page__header h1,
+  .internal-layout__content .gallery-page__header h1,
+  .internal-layout__content .guestbook-page__header h1,
+  .internal-layout__content .suggestions-page__header h1,
+  .internal-layout__content .ms-page__header h1,
+  .internal-layout__content .mc-page__header h1,
+  .internal-layout__content .member-profiles-page__header h1,
+  .internal-layout__content .notifications-page__header h1,
+  .internal-layout__content .ia-list__header h1,
+  .internal-layout__content .profile-page__header h1,
+  .internal-layout__content .users-page__header h1,
+  .internal-layout__content .notif-mgmt__header h1,
+  .internal-layout__content .content-mgmt__header h1 {
+    font-size: var(--text-xl);
+    line-height: 1.35;
+    margin-bottom: var(--space-xs);
+  }
+
+  /* 描述行：所有 tab 的 header p 统一为 --text-xs（12px），更紧凑更对齐 */
+  .internal-layout__content .documents-page__header p,
+  .internal-layout__content .tasks-page__header p,
+  .internal-layout__content .gallery-page__header p,
+  .internal-layout__content .guestbook-page__header p,
+  .internal-layout__content .suggestions-page__header p,
+  .internal-layout__content .ms-page__header p,
+  .internal-layout__content .mc-page__header p,
+  .internal-layout__content .member-profiles-page__header p,
+  .internal-layout__content .notifications-page__header p,
+  .internal-layout__content .ia-list__header p,
+  .internal-layout__content .profile-page__header p,
+  .internal-layout__content .users-page__header p,
+  .internal-layout__content .notif-mgmt__header p,
+  .internal-layout__content .content-mgmt__header p {
+    font-size: var(--text-xs);
+    line-height: 1.5;
+  }
+
+  /* 头部按钮（"上传文档 / 发布 / 创建 / 清空" 等）统一为紧凑尺寸，
+     与 Notifications / MemberSharing 的小按钮观感一致 */
+  .internal-layout__content .documents-page__header .btn,
+  .internal-layout__content .tasks-page__header .btn,
+  .internal-layout__content .gallery-page__header .btn,
+  .internal-layout__content .guestbook-page__header .btn,
+  .internal-layout__content .suggestions-page__header .btn,
+  .internal-layout__content .ms-page__header .btn,
+  .internal-layout__content .mc-page__header .btn,
+  .internal-layout__content .member-profiles-page__header .btn,
+  .internal-layout__content .notifications-page__header .btn,
+  .internal-layout__content .ia-list__header .btn,
+  .internal-layout__content .profile-page__header .btn,
+  .internal-layout__content .users-page__header .btn,
+  .internal-layout__content .notif-mgmt__header .btn,
+  .internal-layout__content .content-mgmt__header .btn {
+    padding: 0.4rem 0.95rem;
+    font-size: var(--text-sm);
+    gap: 6px;
+    align-self: flex-start;
+  }
+  /* 让按钮内的 lucide 图标也一致缩小，避免按钮本身变高 */
+  .internal-layout__content .documents-page__header .btn svg,
+  .internal-layout__content .tasks-page__header .btn svg,
+  .internal-layout__content .gallery-page__header .btn svg,
+  .internal-layout__content .guestbook-page__header .btn svg,
+  .internal-layout__content .suggestions-page__header .btn svg,
+  .internal-layout__content .ms-page__header .btn svg,
+  .internal-layout__content .mc-page__header .btn svg,
+  .internal-layout__content .member-profiles-page__header .btn svg,
+  .internal-layout__content .notifications-page__header .btn svg,
+  .internal-layout__content .ia-list__header .btn svg,
+  .internal-layout__content .profile-page__header .btn svg,
+  .internal-layout__content .users-page__header .btn svg,
+  .internal-layout__content .notif-mgmt__header .btn svg,
+  .internal-layout__content .content-mgmt__header .btn svg {
+    width: 14px;
+    height: 14px;
+  }
+}
