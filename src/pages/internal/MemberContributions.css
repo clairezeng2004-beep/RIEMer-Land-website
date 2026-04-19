@@ -249,22 +249,25 @@
   width: 11%;
 }
 
-/* 其他贡献列 */
+/* 其他贡献列 —— 缩窄这一列，让出的空间给"总计"列吸收，
+   从而在视觉上拉大"其他"与"总计"之间的距离；
+   配合下方 translateX 调整，保持"总计"气泡的视觉位置不动。 */
 .mc-table__th--custom {
-  width: auto;
+  width: 180px;
 }
 
 .mc-table__th--total {
-  width: 120px;
+  /* 原 120px；吸收"其他"列让出的 120px，变 240px，
+     将总计列中心向右推，以便 translateX 归零后气泡仍停留在原视觉位置。 */
+  width: 240px;
   text-align: center;
 }
 
-/* 总计表头：图标 + 文字一起整体向左推 */
+/* 总计表头：图标 + 文字居中，不再用 translateX 偏移 */
 .mc-table__th--total .mc-total-head {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  transform: translateX(-60px);
 }
 
 .mc-table td {
@@ -409,8 +412,6 @@
   font-size: var(--text-md);
   color: #fff;
   background: var(--color-primary);
-  /* 整体左移，和表头对齐 */
-  transform: translateX(-60px);
 }
 
 /* 其他贡献 */

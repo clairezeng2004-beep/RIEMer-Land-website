@@ -688,3 +688,37 @@ CREATE POLICY "album_photos_owner_delete" ON storage.objects
       OR (SELECT role FROM public.profiles WHERE id = auth.uid()) IN ('admin','owner')
     )
   );
+
+-- ============================================
+-- 修复 N：documents 表添加 contributor_ids 列（多贡献者）
+-- ============================================
+-- 背景：为支持"文档迁移"，发布者 ≠ 贡献者，允许多人作为贡献者。
+-- 前端在上传时会写入 contributor_ids（uuid 数组）；兼容旧数据：若此列缺失或为空，
+-- 前端回退到 [uploaded_by_id]。
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'documents'
+  ) THEN
+    IF NOT EXISTS (
+      SELECT 1 FROM information_schema.columns
+      WHERE table_schema = 'public'
+        AND table_name = 'documents'
+        AND column_name = 'contributor_ids'
+    ) THEN
+      ALTER TABLE public.documents
+        ADD COLUMN contributor_ids UUID[] NOT NULL DEFAULT ARRAY[]::UUID[];
+      -- 为旧数据回填：把 uploaded_by_id 作为默认唯一贡献者
+      UPDATE public.documents
+        SET contributor_ids = ARRAY[uploaded_by_id]::UUID[]
+        WHERE uploaded_by_id IS NOT NULL
+          AND (contributor_ids IS NULL OR array_length(contributor_ids, 1) IS NULL);
+      RAISE NOTICE '✅ 已添加 documents.contributor_ids 列并回填旧数据';
+    ELSE
+      RAISE NOTICE 'ℹ️  documents.contributor_ids 列已存在，跳过';
+    END IF;
+  ELSE
+    RAISE NOTICE 'ℹ️  documents 表不存在，跳过 contributor_ids 升级';
+  END IF;
+END $$;

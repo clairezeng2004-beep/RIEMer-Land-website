@@ -167,13 +167,18 @@ export default function MemberContributions() {
           isInPeriod(t.createdAt, currentPeriod)
       ).length;
 
-      // 4. 内部分享次数：documents 中 uploadedById 或 uploadedBy 匹配
-      const uploadCount = documentsData.filter(
-        (d) =>
-          ((d.uploadedById && d.uploadedById === member.id) ||
-            d.uploadedBy === member.name) &&
-          isInPeriod(d.date, currentPeriod)
-      ).length;
+      // 4. 内部分享次数：documents 中 contributorIds 包含该成员 id
+      //    或（旧数据兼容）uploadedById / uploadedBy 匹配
+      const uploadCount = documentsData.filter((d) => {
+        if (!isInPeriod(d.date, currentPeriod)) return false;
+        if (Array.isArray(d.contributorIds) && d.contributorIds.length > 0) {
+          return d.contributorIds.includes(member.id);
+        }
+        return (
+          (d.uploadedById && d.uploadedById === member.id) ||
+          d.uploadedBy === member.name
+        );
+      }).length;
 
       // 5. 其他贡献（自定义文本）
       const periodKey = selectedPeriod;

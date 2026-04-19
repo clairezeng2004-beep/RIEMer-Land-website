@@ -47,6 +47,12 @@ function rowToDoc(row) {
     size: row.size_text || '—',
     uploadedBy: row.uploaded_by || 'Unknown',
     uploadedById: row.uploaded_by_id || null,
+    /* 多贡献者支持：若云端列缺失（旧表结构），回退到 [uploaded_by_id] */
+    contributorIds: Array.isArray(row.contributor_ids)
+      ? row.contributor_ids
+      : row.uploaded_by_id
+        ? [row.uploaded_by_id]
+        : [],
     date: row.date || '',
     viewCount: row.view_count || 0,
     likes: Array.isArray(row.likes) ? row.likes : [],
@@ -70,6 +76,12 @@ function docToRow(doc) {
     size_text: doc.size || '—',
     uploaded_by: doc.uploadedBy || 'Unknown',
     uploaded_by_id: doc.uploadedById || null,
+    /* 多贡献者：若表未添加该列，后端会报错，此时前端会走降级
+       （云端插入失败 → 本地仍保留，跨设备不同步）。
+       升级 SQL 见 supabase-fix.sql。 */
+    contributor_ids: Array.isArray(doc.contributorIds) && doc.contributorIds.length > 0
+      ? doc.contributorIds
+      : doc.uploadedById ? [doc.uploadedById] : [],
     date: doc.date || new Date().toISOString().split('T')[0],
     view_count: doc.viewCount || 0,
     likes: Array.isArray(doc.likes) ? doc.likes : [],
@@ -218,6 +230,9 @@ export async function updateDoc(id, patch) {
     if ('fileType' in patch) update.file_type = patch.fileType;
     if ('fileUrl' in patch) update.file_url = patch.fileUrl;
     if ('likes' in patch) update.likes = patch.likes;
+    if ('contributorIds' in patch) update.contributor_ids = patch.contributorIds;
+    if ('uploadedBy' in patch) update.uploaded_by = patch.uploadedBy;
+    if ('uploadedById' in patch) update.uploaded_by_id = patch.uploadedById;
     if ('lastEditedAt' in patch) update.last_edited_at = patch.lastEditedAt;
     if ('lastEditedBy' in patch) update.last_edited_by = patch.lastEditedBy;
     update.updated_at = new Date().toISOString();

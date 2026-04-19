@@ -403,6 +403,20 @@ export default function ProcessTemplateDetail() {
     },
     [userNameMap, user],
   );
+  /* 多贡献者展示：优先读 doc.contributorIds，缺省回退到旧的单贡献者字段 */
+  const resolveContributors = useCallback(
+    (d) => {
+      const ids = Array.isArray(d?.contributorIds) ? d.contributorIds : [];
+      if (ids.length > 0) {
+        return ids
+          .map((id) => resolveContributorName(id, null))
+          .filter(Boolean)
+          .join('、');
+      }
+      return resolveContributorName(d?.uploadedById, d?.uploadedBy);
+    },
+    [resolveContributorName],
+  );
   const contentRef = useRef(null);
 
   // 访问记录弹层：点击浏览数小眼睛时打开，展示谁在什么时候看过这篇文档
@@ -1141,8 +1155,13 @@ export default function ProcessTemplateDetail() {
 
   const showToc = toc.length > 0 && hasTextContent && (doc.format === 'markdown' || doc.format === 'word');
 
-  /* ========== 编辑权限：用户发布的文档 + （管理员 或 发布者本人） ========== */
-  const canEdit = isUserDoc(doc) && (isAdmin || (user?.id && String(user.id) === String(doc.uploadedById)));
+  /* ========== 编辑权限：用户发布的文档 + （管理员 或 任一贡献者本人） ========== */
+  const canEdit =
+    isUserDoc(doc) &&
+    (isAdmin ||
+      (user?.id &&
+        (String(user.id) === String(doc.uploadedById) ||
+          (Array.isArray(doc.contributorIds) && doc.contributorIds.map(String).includes(String(user.id))))));
 
   return (
     <div className="ptd-page">
@@ -1292,7 +1311,7 @@ export default function ProcessTemplateDetail() {
               )}
 
               <div className="ptd-article__meta">
-                <span><User size={14} /> {resolveContributorName(doc.uploadedById, doc.uploadedBy)}</span>
+                <span><User size={14} /> {resolveContributors(doc)}</span>
                 <span><Clock size={14} /> {doc.date}</span>
                 <button
                   type="button"

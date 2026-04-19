@@ -159,6 +159,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
      兼容历史数据里存了昵称的情况，保证"贡献者"统一显示真名。
      ========== */
   const [userNameMap, setUserNameMap] = useState({});
+  // 所有可选贡献者（来自 getAllUsers，已授权）——用于上传表单的多选下拉
+  const [allUsers, setAllUsers] = useState([]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -170,6 +172,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           if (u?.id) map[u.id] = u.name || u.nickname || '';
         });
         setUserNameMap(map);
+        setAllUsers(list);
       } catch {
         /* 拉取失败时回退到 doc.uploadedBy 原值 */
       }
@@ -188,6 +191,22 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       return fallback || 'Unknown';
     },
     [userNameMap, user],
+  );
+
+  /* 展示贡献者：优先读 doc.contributorIds（多贡献者），
+     缺省则回退到旧的 uploadedById / uploadedBy 单贡献者逻辑。 */
+  const resolveContributors = useCallback(
+    (doc) => {
+      const ids = Array.isArray(doc?.contributorIds) ? doc.contributorIds : [];
+      if (ids.length > 0) {
+        return ids
+          .map((id) => resolveContributorName(id, null))
+          .filter(Boolean)
+          .join('、');
+      }
+      return resolveContributorName(doc?.uploadedById, doc?.uploadedBy);
+    },
+    [resolveContributorName],
   );
   const { editing } = useWysiwyg();
   const sectionKey = configSection || 'documents';
@@ -433,6 +452,16 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
   const [newDoc, setNewDoc] = useState({ title: '', type: filterTypes ? filterTypes[0] : 'course', description: '' });
+  // 贡献者多选（id 数组）。默认上传者本人，打开上传表单时用 useEffect 同步一次。
+  const [contributorIds, setContributorIds] = useState(() => (user?.id ? [user.id] : []));
+  // 打开上传表单时：若用户刚登录完（初始 state 为 []），补一次默认
+  useEffect(() => {
+    if (showUpload && user?.id && contributorIds.length === 0) {
+      setContributorIds([user.id]);
+    }
+    // 仅在打开表单的瞬间 & 用户 id 可用时触发；不监听 contributorIds 以免覆盖用户的清空操作
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [showUpload, user?.id]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -515,6 +544,21 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const fileType = selectedFile ? inferFileType(selectedFile.name) : 'pdf';
     const fileUrl = selectedFile ? URL.createObjectURL(selectedFile) : null;
 
+    // 贡献者：多选 id 数组。若空则回退到当前用户本人，保证至少有一位。
+    const finalContributorIds =
+      contributorIds.length > 0
+        ? contributorIds
+        : user?.id
+          ? [user.id]
+          : [];
+    // 主贡献者 = 第一位（默认就是当前用户，除非用户调整了顺序）
+    const primaryId = finalContributorIds[0] || null;
+    const primaryName =
+      (primaryId && (userNameMap[primaryId] || (primaryId === user?.id ? user?.name || user?.nickname : ''))) ||
+      user?.name ||
+      user?.nickname ||
+      'Unknown';
+
     const doc = {
       id: Date.now().toString(),
       title: newDoc.title,
@@ -522,9 +566,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       fileType,
       fileUrl,
       description: decodePlainText(newDoc.description),
-      // 贡献者统一使用注册时的真名（user.name），缺失时回退到昵称
-      uploadedBy: user?.name || user?.nickname || 'Unknown',
-      uploadedById: user?.id || null,
+      // 兼容旧字段：主贡献者（列表卡片 fallback 会用到）
+      uploadedBy: primaryName,
+      uploadedById: primaryId,
+      // 新：多贡献者列表
+      contributorIds: finalContributorIds,
       date: new Date().toISOString().split('T')[0],
       size: selectedFile ? formatSize(selectedFile.size) : '—',
       viewCount: 0,
@@ -532,13 +578,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     };
     setDocuments([doc, ...documents]);
     // 自动发送已读通知到通知中心
+    const uploaderLabel = finalContributorIds
+      .map((id) => userNameMap[id] || (id === user?.id ? user?.name || user?.nickname : ''))
+      .filter(Boolean)
+      .join('、') || primaryName;
     addNotification({
       title: '新内部分享',
-      message: `${doc.uploadedBy} 上传了文档「${doc.title}」（${typeLabels[doc.type]}）`,
+      message: `${uploaderLabel} 上传了文档「${doc.title}」（${typeLabels[doc.type]}）`,
       type: 'sharing',
       read: true, // 自动已读，不打扰成员
     });
     setNewDoc({ title: '', type: 'course', description: '' });
+    setContributorIds(user?.id ? [user.id] : []);
     setSelectedFile(null);
     setShowUpload(false);
   };
@@ -577,7 +628,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       }
       // 通知中显示原文档的详细信息：名称 / 类型 / 上传者 / 操作人（统一用真名）
       const operator = user?.name || user?.nickname || '管理员';
-      const uploader = resolveContributorName(target.uploadedById, target.uploadedBy) || '未知';
+      const uploader = resolveContributors(target) || '未知';
       const parts = [
         `分类：${typeLabel}`,
         `上传者：${uploader}`,
@@ -594,9 +645,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     }
   };
 
-  // 权限判断：管理员或上传者可删除/修改
+  // 权限判断：管理员或贡献者可删除/修改
   const canModify = (doc) => {
     if (isAdmin) return true;
+    if (user?.id && Array.isArray(doc.contributorIds) && doc.contributorIds.includes(user.id)) return true;
     if (doc.uploadedById && doc.uploadedById === user?.id) return true;
     // 兼容旧数据：对比上传者名称
     if (doc.uploadedBy && doc.uploadedBy === user?.name) return true;
@@ -821,6 +873,32 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   />
                 </div>
               </div>
+              {/* 贡献者（多选）——支持文档迁移：上传者本人 ≠ 贡献者，可选多人 */}
+              <div className="documents-upload__field">
+                <label>贡献者（可多选）</label>
+                <CustomSelect
+                  multiple
+                  value={contributorIds}
+                  onChange={(vals) => setContributorIds(vals)}
+                  placeholder="请选择贡献者"
+                  options={(() => {
+                    // 已授权成员优先；加上当前用户自己（确保能选到自己）
+                    const seen = new Set();
+                    const opts = [];
+                    const pushUser = (u) => {
+                      if (!u?.id || seen.has(u.id)) return;
+                      seen.add(u.id);
+                      opts.push({
+                        value: u.id,
+                        label: u.name || u.nickname || u.email || u.id,
+                      });
+                    };
+                    if (user) pushUser(user);
+                    allUsers.forEach(pushUser);
+                    return opts;
+                  })()}
+                />
+              </div>
               <div className="documents-upload__field">
                 <label>描述</label>
                 <textarea
@@ -997,7 +1075,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
                 <div className="doc-card__footer">
                   <span className="doc-card__author">
-                    <User size={12} /> 贡献者：{resolveContributorName(doc.uploadedById, doc.uploadedBy)}
+                    <User size={12} /> 贡献者：{resolveContributors(doc)}
                   </span>
                   <button
                     type="button"
@@ -1095,7 +1173,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
               <div className="doc-preview__title-area">
                 <h3>{previewDoc.title}</h3>
                 <span className="doc-preview__meta">
-                  贡献者：{resolveContributorName(previewDoc.uploadedById, previewDoc.uploadedBy)} · {previewDoc.date} · {previewDoc.size}
+                  贡献者：{resolveContributors(previewDoc)} · {previewDoc.date} · {previewDoc.size}
                 </span>
               </div>
               <div className="doc-preview__header-actions">
@@ -1225,7 +1303,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   <p className="doc-preview__no-preview-desc">{decodePlainText(previewDoc.description)}</p>
                   <div className="doc-preview__no-preview-info">
                     <span><Clock size={14} /> 上传日期: {previewDoc.date}</span>
-                    <span><User size={14} /> 贡献者：{resolveContributorName(previewDoc.uploadedById, previewDoc.uploadedBy)}</span>
+                    <span><User size={14} /> 贡献者：{resolveContributors(previewDoc)}</span>
                     <span><HardDrive size={14} /> 文件大小: {previewDoc.size}</span>
                     <button
                       type="button"

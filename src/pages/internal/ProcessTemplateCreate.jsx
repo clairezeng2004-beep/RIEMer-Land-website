@@ -79,7 +79,7 @@ function fileToDataUrl(file) {
 
 /* ====== 主组件 ====== */
 export default function ProcessTemplateCreate() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, user, getAllUsers } = useAuth();
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
   const mdEditorRef = useRef(null);
@@ -116,6 +116,37 @@ export default function ProcessTemplateCreate() {
     content: '',
     attachments: [],
   });
+
+  /* ============ 贡献者多选 ============
+     支持"文档迁移"——发布者本人不一定是贡献者，可多选。
+     默认选中当前用户本人。 */
+  const [contributorIds, setContributorIds] = useState(() => (user?.id ? [user.id] : []));
+  // 用户 async 登录完成后若仍为空则补一次
+  useEffect(() => {
+    if (user?.id && contributorIds.length === 0) {
+      setContributorIds([user.id]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+  const [allUsers, setAllUsers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getAllUsers?.()) || [];
+        if (!cancelled) setAllUsers(list);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [getAllUsers]);
+
+  const userNameMap = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      if (u?.id) map[u.id] = u.name || u.nickname || '';
+    });
+    return map;
+  }, [allUsers]);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef(null);
@@ -460,9 +491,20 @@ export default function ProcessTemplateCreate() {
       fileType: primaryAttachment ? inferFileType(primaryAttachment.name) : 'docx',
       fileUrl: primaryAttachment ? primaryAttachment.dataUrl : null,
       size: primaryAttachment ? formatFileSize(primaryAttachment.size) : '—',
-      // 贡献者统一使用注册时的真名（user.name），缺失时回退到昵称
-      uploadedBy: user?.name || user?.nickname || 'Unknown',
-      uploadedById: user?.id || null,
+      // 贡献者：主贡献者 = contributorIds[0]（默认是当前用户），
+      // uploadedBy/uploadedById 保留为主贡献者，兼容旧字段；
+      // contributorIds 新增，列表和预览会完整展示多位贡献者。
+      uploadedBy: (() => {
+        const list = contributorIds.length > 0 ? contributorIds : user?.id ? [user.id] : [];
+        const pid = list[0];
+        if (pid && userNameMap[pid]) return userNameMap[pid];
+        if (pid && pid === user?.id) return user?.name || user?.nickname || 'Unknown';
+        return user?.name || user?.nickname || 'Unknown';
+      })(),
+      uploadedById:
+        (contributorIds.length > 0 ? contributorIds[0] : user?.id) || null,
+      contributorIds:
+        contributorIds.length > 0 ? contributorIds : user?.id ? [user.id] : [],
       date: new Date().toISOString().split('T')[0],
       viewCount: 0,
       likes: [],
@@ -558,6 +600,35 @@ export default function ProcessTemplateCreate() {
                   options={typeOptions}
                 />
               </div>
+            </div>
+
+            {/* 贡献者（可多选）——支持文档迁移场景：发布者 ≠ 贡献者 */}
+            <div className="msc-form__field">
+              <label>
+                贡献者
+                <span className="msc-form__hint">可多选，默认为本人；文档迁移时请选择实际贡献者</span>
+              </label>
+              <CustomSelect
+                multiple
+                value={contributorIds}
+                onChange={(vals) => setContributorIds(vals)}
+                placeholder="请选择贡献者"
+                options={(() => {
+                  const seen = new Set();
+                  const opts = [];
+                  const pushUser = (u) => {
+                    if (!u?.id || seen.has(u.id)) return;
+                    seen.add(u.id);
+                    opts.push({
+                      value: u.id,
+                      label: u.name || u.nickname || u.email || u.id,
+                    });
+                  };
+                  if (user) pushUser(user);
+                  allUsers.forEach(pushUser);
+                  return opts;
+                })()}
+              />
             </div>
 
             {/* 简介描述 */}
