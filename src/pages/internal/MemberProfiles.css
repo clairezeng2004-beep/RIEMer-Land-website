@@ -549,13 +549,59 @@
     gap: var(--space-md);
   }
 
+  /* -----------------------------------------------------------
+     手机端滚动行为改造：
+     桌面端 .member-profiles-table-wrapper 同时吃横向 + 纵向滚动
+     （用 max-height 限制高度），但在手机上这样很难用：
+       - 表格本身就要横向滚，再套一层纵向滚动容器，行很多时
+         用户想在表格区域往下翻页，触摸手势被容器吞掉，\
+         只能横向滑或只能在容器内小范围上下滑；
+       - max-height 把表格裁成很小一块，内容看起来挤作一团。
+     手机上改为：wrapper 只保留横向滚动，纵向交给页面本身；
+     表头通过 position: sticky; top: 顶部高度 相对 viewport
+     冻结在页面顶部，用户下拉页面时表头始终可见。
+     ----------------------------------------------------------- */
+  .member-profiles-table-wrapper {
+    overflow-x: auto;
+    overflow-y: visible;
+    /* 桌面端的 max-height 在移动端需要彻底移除，否则会继续把 wrapper
+       限制成纵向滚动容器，导致 thead 的 sticky 参照是这个容器，
+       而不是 viewport，于是"下拉页面看后续行"时表头不再冻结。 */
+    max-height: none;
+  }
+
+  /* 表头相对于 viewport 冻结。内部页面顶部有全局导航栏；
+     这里给一个保守的 top: 0（如果之后要精确避让 header，
+     可以改成具体像素值）。重要的是让 thead 不再滚走。 */
+  .member-profiles-table thead th {
+    top: 0;
+  }
+
   .member-profiles-table {
+    /* 保留横向宽度（让每列能舒展），但不再被外层 wrapper 裁剪纵向。
+       用户可以在表格上滑动手指横向浏览所有列，也可以用页面自身
+       的滚动看完所有成员行。 */
     min-width: 1400px;
   }
 
-  .member-profiles-table th,
+  /* 手机端字号收紧：桌面端 td 字号是 --text-sm (14px)，
+     在多列密集表格里叠加 line-height: 1.6 + 较大 padding，
+     整体看起来字号比同页其它区域都大一截；这里下调到
+     --text-xs (12px) + 更紧凑的 padding，与内部空间其它
+     列表/卡片的视觉密度保持一致。 */
+  .member-profiles-table th {
+    padding: 0.5rem 0.625rem;
+    font-size: 11px;
+  }
   .member-profiles-table td {
-    padding: 0.55rem 0.75rem;
+    padding: 0.45rem 0.625rem;
+    font-size: var(--text-xs);
+  }
+  .member-profiles-table__cell {
+    line-height: 1.55;
+  }
+  .member-profiles-table__input {
+    font-size: var(--text-xs);
   }
 }
 
@@ -567,6 +613,12 @@
   .member-profiles-page__hint {
     font-size: var(--text-xs);
     padding: 8px var(--space-md);
+  }
+
+  /* 更窄屏下再紧一级 */
+  .member-profiles-table th,
+  .member-profiles-table td {
+    padding: 0.4rem 0.55rem;
   }
 }
 
