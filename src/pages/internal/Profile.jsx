@@ -5,7 +5,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import AvatarCropper from '../../components/AvatarCropper';
-import { User, Camera, Save, Loader2 } from 'lucide-react';
+import { User, Camera, Save, Loader2, Crop, Upload, X } from 'lucide-react';
 import './Profile.css';
 
 const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
@@ -36,6 +36,8 @@ export default function Profile() {
   const [avatarFile, setAvatarFile] = useState(null);
   // 打开裁剪弹窗用：保存用户刚选择的原始图 DataURL
   const [cropperSrc, setCropperSrc] = useState(null);
+  // 点击已有头像时弹出的选择框（调整 / 上传新图）
+  const [showAvatarActions, setShowAvatarActions] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   // 标记是否已经从 user 对象恢复过数据（避免异步 user 更新反复覆盖用户正在编辑的内容）
@@ -104,6 +106,25 @@ export default function Profile() {
   }, [user, canUseSupabase]);
 
   const handleAvatarClick = () => {
+    // 已有头像：先问是调整还是上传新图；没有头像：直接打开文件选择
+    if (avatarPreview) {
+      setShowAvatarActions(true);
+    } else {
+      fileInputRef.current?.click();
+    }
+  };
+
+  // 选择"调整当前头像"：把现有头像塞进裁剪器
+  const handleAdjustCurrent = () => {
+    setShowAvatarActions(false);
+    if (avatarPreview) {
+      setCropperSrc(avatarPreview);
+    }
+  };
+
+  // 选择"上传新图片"：触发 file input
+  const handleUploadNew = () => {
+    setShowAvatarActions(false);
     fileInputRef.current?.click();
   };
 
@@ -417,6 +438,57 @@ export default function Profile() {
           onCancel={handleCropCancel}
           onConfirm={handleCropConfirm}
         />
+      )}
+
+      {/* 点击已有头像时的选择弹窗：调整当前 / 上传新图 */}
+      {showAvatarActions && (
+        <div
+          className="avatar-actions__overlay"
+          onClick={() => setShowAvatarActions(false)}
+          role="dialog"
+          aria-label="头像操作"
+        >
+          <div
+            className="avatar-actions__sheet"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="avatar-actions__header">
+              <h3 className="avatar-actions__title">更换头像</h3>
+              <button
+                type="button"
+                className="avatar-actions__close"
+                onClick={() => setShowAvatarActions(false)}
+                aria-label="关闭"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="avatar-actions__list">
+              <button
+                type="button"
+                className="avatar-actions__item"
+                onClick={handleAdjustCurrent}
+              >
+                <span className="avatar-actions__icon"><Crop size={20} /></span>
+                <span className="avatar-actions__text">
+                  <span className="avatar-actions__label">调整当前头像</span>
+                  <span className="avatar-actions__desc">继续使用这张照片，重新裁剪和缩放</span>
+                </span>
+              </button>
+              <button
+                type="button"
+                className="avatar-actions__item"
+                onClick={handleUploadNew}
+              >
+                <span className="avatar-actions__icon"><Upload size={20} /></span>
+                <span className="avatar-actions__text">
+                  <span className="avatar-actions__label">上传新图片</span>
+                  <span className="avatar-actions__desc">从相册中选择一张新图片</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
