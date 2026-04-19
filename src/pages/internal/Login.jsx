@@ -120,7 +120,7 @@ export default function Login() {
   }, [countdown]);
 
   if (isAuthenticated && view !== 'changePassword') {
-    return <Navigate to="/internal/documents" replace />;
+    return <Navigate to="/internal/notifications" replace />;
   }
 
   const clearMessages = () => {
