@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -54,6 +54,8 @@ export default function UserManagement() {
     [updateInternalConfig]
   );
   const [users, setUsers] = useState([]);
+  const [loadingUsers, setLoadingUsers] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
 
@@ -120,19 +122,50 @@ export default function UserManagement() {
     setTimeout(() => setShowSuggestions(false), 150);
   };
 
+  // ============================================
+  // 加载用户列表
+  // 这里加入版本号校验避免竞态：多次触发 effect 时，
+  // 只有"最后一次发起的请求"才能 setUsers。
+  // 同时记录加载状态与错误，便于在 UI 上诊断。
+  // ============================================
+  const loadReqSeq = useRef(0);
   useEffect(() => {
-    if (isAuthenticated) {
-      const loadUsers = async () => {
+    if (!isAuthenticated) return;
+    const seq = ++loadReqSeq.current;
+    setLoadingUsers(true);
+    setLoadError('');
+
+    const loadUsers = async () => {
+      try {
         const data = await getAllUsers();
+        if (seq !== loadReqSeq.current) {
+          console.log('[UserManagement] 丢弃过期请求 seq=', seq);
+          return;
+        }
         console.log('[UserManagement] getAllUsers 返回:', data?.length, '条',
-          data?.map(u => ({ id: u.id?.slice(0,8), email: u.email, authorized: u.authorized, type: typeof u.authorized }))
+          Array.isArray(data)
+            ? data.map(u => ({ id: u.id?.slice(0,8), email: u.email, authorized: u.authorized, type: typeof u.authorized }))
+            : data
         );
-        setUsers(data || []);
-      };
-      loadUsers();
-      if (isAdmin) {
-        getPreAuthorizedEmails().then(setPreAuthList);
+        const safeData = Array.isArray(data) ? data : [];
+        setUsers(safeData);
+        // 如果一条都没拿到，写诊断信息到页面
+        if (safeData.length === 0) {
+          setLoadError('未能加载到任何用户（Supabase 可能未返回数据，或 RLS / Session 异常）');
+        }
+      } catch (err) {
+        if (seq !== loadReqSeq.current) return;
+        console.error('[UserManagement] 加载用户异常:', err);
+        setLoadError('加载失败：' + (err?.message || '未知错误'));
+        setUsers([]);
+      } finally {
+        if (seq === loadReqSeq.current) setLoadingUsers(false);
       }
+    };
+    loadUsers();
+
+    if (isAdmin) {
+      getPreAuthorizedEmails().then(setPreAuthList).catch(() => {});
     }
   }, [isAuthenticated, refreshKey, supabaseOk, getAllUsers, isAdmin, getPreAuthorizedEmails]);
 
@@ -457,10 +490,38 @@ export default function UserManagement() {
               </tr>
             </thead>
             <tbody>
-              {authorizedUsers.length === 0 ? (
+              {loadingUsers ? (
                 <tr>
                   <td colSpan={isAdmin ? 5 : 4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
-                    暂无已授权用户
+                    <Loader2 size={16} className="users-preauth__spinner" style={{ verticalAlign: 'middle', marginRight: '0.5rem' }} />
+                    加载中…
+                  </td>
+                </tr>
+              ) : authorizedUsers.length === 0 ? (
+                <tr>
+                  <td colSpan={isAdmin ? 5 : 4} style={{ textAlign: 'center', padding: '2rem', color: 'var(--color-text-muted)' }}>
+                    <div>暂无已授权用户</div>
+                    {loadError && (
+                      <div style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#c17070' }}>
+                        <AlertCircle size={14} style={{ verticalAlign: 'middle', marginRight: '0.25rem' }} />
+                        {loadError}
+                      </div>
+                    )}
+                    <button
+                      onClick={() => setRefreshKey((k) => k + 1)}
+                      style={{
+                        marginTop: '0.75rem',
+                        padding: '0.35rem 0.9rem',
+                        fontSize: '0.85rem',
+                        background: 'transparent',
+                        border: '1px solid var(--color-border)',
+                        borderRadius: '6px',
+                        color: 'var(--color-text)',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      重新加载
+                    </button>
                   </td>
                 </tr>
               ) : (

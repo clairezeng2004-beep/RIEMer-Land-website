@@ -1252,19 +1252,25 @@ export function AuthProvider({ children }) {
 
     // Supabase 模式（supabaseOk === true 或 null 检测中都尝试）
     try {
-      console.log('[Auth] getAllUsers: 尝试 Supabase 查询... (supabaseOk=' + supabaseOk + ')');
+      console.log('[Auth] getAllUsers: 尝试 Supabase 查询... (supabaseOk=' + supabaseOk + ', user=' + (user?.email || 'null') + ')');
 
-      // 设置独立超时：8 秒（手机端网络可能慢）
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
+      // 预检 session：如果 session 不存在或明确失效，先尝试刷新，
+      // 避免直接把 RLS 降级成 anon 角色导致 profiles 被过滤。
+      try {
+        const { data: sess } = await supabase.auth.getSession();
+        if (!sess?.session) {
+          console.warn('[Auth] getAllUsers: 当前 session 为空，先刷新...');
+          await supabase.auth.refreshSession();
+        }
+      } catch (e) {
+        console.warn('[Auth] getAllUsers: session 预检异常:', e?.message);
+      }
 
       // 第一次尝试查询
       let { data, error } = await supabase
         .from('profiles')
         .select('*')
         .order('created_at', { ascending: true });
-
-      clearTimeout(timeoutId);
 
       // 如果查询失败（可能是 401/session 过期），尝试刷新 session 后重试
       if (error) {
@@ -1295,8 +1301,32 @@ export function AuthProvider({ children }) {
         return mergeLists(getLocalUsers(), currentUserProfile);
       }
 
+      // 关键补丁：data 为空（非 null，就是 0 条）
+      //   - 可能因为 RLS 降级到 anon 角色（Authorization 头丢失）后，
+      //     策略只返回 authorized=true 的行；
+      //   - 如果预检 session 都没拿到 session，刷一次再试；
+      //   - 仍为空则回退到本地 + 当前用户兜底。
       if (!data || data.length === 0) {
-        console.warn('[Auth] Supabase profiles 查询为空（可能是 RLS/session 问题）');
+        console.warn('[Auth] Supabase profiles 查询为空，二次刷新 session 后再试一次...');
+        try {
+          const { data: refreshData } = await supabase.auth.refreshSession();
+          if (refreshData?.session) {
+            const retry2 = await supabase
+              .from('profiles')
+              .select('*')
+              .order('created_at', { ascending: true });
+            if (!retry2.error && Array.isArray(retry2.data) && retry2.data.length > 0) {
+              console.log('[Auth] 二次刷新后拿到', retry2.data.length, '条');
+              data = retry2.data;
+            }
+          }
+        } catch (e) {
+          console.warn('[Auth] 二次刷新异常:', e?.message);
+        }
+      }
+
+      if (!data || data.length === 0) {
+        console.warn('[Auth] Supabase profiles 最终为空（可能是 RLS/session 问题）');
         return mergeLists(getLocalUsers(), currentUserProfile);
       }
 
