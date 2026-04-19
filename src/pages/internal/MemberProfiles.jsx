@@ -43,11 +43,29 @@ const currentYear = new Date().getFullYear();
 const YEAR_OPTIONS = Array.from({ length: currentYear - 2015 + 2 }, (_, i) => 2015 + i);
 const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 
+// 安全解析各种后端可能返回的时间字符串（兼容 Edge / Safari）：
+//   - '2024-01-01T10:00:00+00:00'  ✅（标准 ISO）
+//   - '2024-01-01T10:00:00+00'      Edge 旧版会认不出 `+00` 单段时区
+//   - '2024-01-01 10:00:00+00'      Postgres 默认格式（带空格，Edge/Safari 早期版本 Invalid Date）
+//   - '2024-01-01 10:00:00'         无时区
+// 统一修正为浏览器都能解析的 ISO 8601。
+function safeParseDate(raw) {
+  if (!raw) return null;
+  if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
+  if (typeof raw !== 'string') return null;
+  let s = raw.trim();
+  // 把中间的空格替换为 'T'（Postgres TIMESTAMPTZ 输出常见格式）
+  s = s.replace(' ', 'T');
+  // 处理 '+00' / '-05' 这类单段时区（需补成 '+00:00'）
+  s = s.replace(/([+-])(\d{2})$/, '$1$2:00');
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d;
+}
+
 // 将 ISO 日期转为 { year, month }
 function dateToYearMonth(dateStr) {
-  if (!dateStr) return { year: '', month: '' };
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return { year: '', month: '' };
+  const d = safeParseDate(dateStr);
+  if (!d) return { year: '', month: '' };
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
@@ -75,32 +93,53 @@ function saveLocalProfiles(profiles) {
 // ============================================
 // 把 Supabase 返回的行统一转成前端需要的格式
 // （抽出来避免主路径和后台拉取两处写两遍）
+//
+// 注意：为兼容 Edge 等对 PostgREST 嵌入查询返回不稳定的浏览器
+// （实测 Edge 在某些场景下会让 p.profiles 为 null），
+// 我们同时支持：
+//   - 嵌入 JOIN 返回（p.profiles）
+//   - 显式合入的 profile map（extraProfiles[p.user_id]）
+// 两种数据源；并提供 fallbackName / fallbackCreatedAt 作为最终兜底。
 // ============================================
-function formatProfilesFromSupabase(rows) {
-  return (rows || []).map((p) => ({
-    id: p.user_id,
-    user_id: p.user_id,
-    name: p.profiles?.name || '未知用户',
-    enrollment_year: p.enrollment_year || '',
-    joined_at: p.joined_at || p.profiles?.created_at || '',
-    joined_at_display: (() => {
-      const raw = p.joined_at || p.profiles?.created_at;
-      if (!raw) return '';
-      const d = new Date(raw);
-      return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
-    })(),
-    bio: p.bio || '',
-    further_education: p.further_education || '',
-    career: p.career || '',
-    willing_to_share: p.willing_to_share || '',
-    want_to_learn: p.want_to_learn || '',
-    career_interest: p.career_interest || '',
-    hometown: p.hometown || '',
-    dream_city: p.dream_city || '',
-    hobbies: p.hobbies || '',
-    favorites: p.favorites || '',
-    other: p.other || '',
-  }));
+function formatProfilesFromSupabase(rows, {
+  extraProfiles = {},
+  fallbackNameById = {},
+  fallbackCreatedAtById = {},
+} = {}) {
+  return (rows || []).map((p) => {
+    const joined = p.profiles || extraProfiles[p.user_id] || null;
+    const name =
+      joined?.name ||
+      fallbackNameById[p.user_id] ||
+      '未知用户';
+    const createdAt =
+      joined?.created_at ||
+      fallbackCreatedAtById[p.user_id] ||
+      '';
+    return {
+      id: p.user_id,
+      user_id: p.user_id,
+      name,
+      enrollment_year: p.enrollment_year || '',
+      joined_at: p.joined_at || createdAt || '',
+      joined_at_display: (() => {
+        const raw = p.joined_at || createdAt;
+        const d = safeParseDate(raw);
+        return d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : '';
+      })(),
+      bio: p.bio || '',
+      further_education: p.further_education || '',
+      career: p.career || '',
+      willing_to_share: p.willing_to_share || '',
+      want_to_learn: p.want_to_learn || '',
+      career_interest: p.career_interest || '',
+      hometown: p.hometown || '',
+      dream_city: p.dream_city || '',
+      hobbies: p.hobbies || '',
+      favorites: p.favorites || '',
+      other: p.other || '',
+    };
+  });
 }
 
 // ============================================
@@ -122,11 +161,14 @@ export default function MemberProfiles() {
           id: p.user_id,
           name: p.name || '未知用户',
           joined_at_display: (() => {
-            if (!p.joined_at) return '';
-            const d = new Date(p.joined_at);
-            return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+            const d = safeParseDate(p.joined_at);
+            return d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : '';
           })(),
-        })).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));
+        })).sort((a, b) => {
+          const da = safeParseDate(a.joined_at);
+          const db = safeParseDate(b.joined_at);
+          return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+        });
       }
     } catch { /* ignore */ }
     return [];
@@ -193,13 +235,16 @@ export default function MemberProfiles() {
           id: p.user_id,
           name: u?.name || p.name || '未知用户',
           joined_at_display: (() => {
-            if (!p.joined_at) return '';
-            const d = new Date(p.joined_at);
-            return isNaN(d.getTime()) ? '' : `${d.getFullYear()}年${d.getMonth() + 1}月`;
+            const d = safeParseDate(p.joined_at);
+            return d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : '';
           })(),
         };
       })
-      .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at));
+      .sort((a, b) => {
+        const da = safeParseDate(a.joined_at);
+        const db = safeParseDate(b.joined_at);
+        return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+      });
 
     setProfiles(formatted);
   }, [getAllUsers]);
@@ -207,12 +252,26 @@ export default function MemberProfiles() {
   // ============================================
   // 真正从 Supabase 拉一次成员列表
   // 返回：{ ok: boolean, data?: formatted[], error?: string }
-  // 失败时尝试一次 refreshSession 再重试，再失败才算 ok=false
+  //
+  // 兼容性说明（重点：Edge 浏览器）：
+  //   PostgREST 的嵌入 JOIN（`*, profiles(name, created_at)`）在 Edge
+  //   上偶发返回 p.profiles = null（Microsoft 跟踪保护/Cookie 分区 策略
+  //   影响 Authorization 头传递，RLS 降级到 anon，authorized=false 的
+  //   行被挡掉，导致 JOIN 为 null —— 多次刷新也无法恢复）。
+  //   因此：
+  //     1. 先尝试带 JOIN 的查询（Chrome/Safari/Firefox 上一切正常）；
+  //     2. 失败时或 JOIN 为空的行补一次**显式**的 profiles 查询
+  //        （`.from('profiles').in('id', userIds)`），这是纯粹的主键
+  //        查询，不依赖外键关系推断，所有浏览器都稳定；
+  //     3. 还失败则回退 getAllUsers / localStorage 兜底姓名。
+  //   失败时尝试一次 refreshSession 再重试，再失败才算 ok=false。
   // ============================================
   const fetchFromSupabase = useCallback(async () => {
     if (!isSupabaseConfigured || !supabase) {
       return { ok: false, error: 'Supabase 未配置' };
     }
+
+    // --- Step 1: 带 JOIN 的主查询 ---
     let { data, error } = await supabase
       .from('member_profiles')
       .select('*, profiles(name, created_at)')
@@ -235,11 +294,94 @@ export default function MemberProfiles() {
       }
     }
 
+    // 如果带 JOIN 的查询整体失败，再做一次"裸"查询（不带 JOIN），
+    // 某些浏览器 + 代理会在 select 含外键嵌入时直接返回 406/400。
+    if (error) {
+      const bareRetry = await supabase
+        .from('member_profiles')
+        .select('*')
+        .order('joined_at', { ascending: true });
+      if (!bareRetry.error) {
+        data = bareRetry.data;
+        error = null;
+      }
+    }
+
     if (error) {
       return { ok: false, error: error.message || '未知错误' };
     }
-    return { ok: true, data: formatProfilesFromSupabase(data) };
-  }, []);
+
+    const rows = data || [];
+
+    // --- Step 2: 找出 JOIN 缺失姓名的行，显式查 profiles 补齐 ---
+    const missingIds = rows
+      .filter((r) => !r.profiles || !r.profiles.name)
+      .map((r) => r.user_id)
+      .filter(Boolean);
+
+    const extraProfiles = {};
+    if (missingIds.length > 0) {
+      try {
+        const { data: profRows, error: profErr } = await supabase
+          .from('profiles')
+          .select('id, name, created_at')
+          .in('id', missingIds);
+        if (!profErr && profRows) {
+          profRows.forEach((pr) => {
+            if (pr?.id) extraProfiles[pr.id] = { name: pr.name, created_at: pr.created_at };
+          });
+        } else if (profErr) {
+          console.warn('[MemberProfiles] 显式补查 profiles 失败（将继续用其它兜底）:', profErr.message);
+        }
+      } catch (e) {
+        console.warn('[MemberProfiles] 显式补查 profiles 异常:', e?.message);
+      }
+    }
+
+    // --- Step 3: 如果仍有姓名缺失，用 getAllUsers / localStorage 兜底 ---
+    const stillMissingIds = rows
+      .filter((r) => {
+        const joined = r.profiles || extraProfiles[r.user_id];
+        return !joined || !joined.name;
+      })
+      .map((r) => r.user_id)
+      .filter(Boolean);
+
+    const fallbackNameById = {};
+    const fallbackCreatedAtById = {};
+    if (stillMissingIds.length > 0) {
+      try {
+        const allUsers = await getAllUsers();
+        allUsers.forEach((u) => {
+          if (!u?.id) return;
+          if (stillMissingIds.includes(u.id)) {
+            fallbackNameById[u.id] = u.name || u.email?.split('@')[0] || '';
+            fallbackCreatedAtById[u.id] = u.createdAt || u.created_at || '';
+          }
+        });
+      } catch (e) {
+        console.warn('[MemberProfiles] getAllUsers 兜底失败:', e?.message);
+      }
+      // 再尝试从 localStorage 里拿上次的姓名
+      try {
+        const cachedRows = getLocalProfiles();
+        cachedRows.forEach((c) => {
+          if (c?.user_id && stillMissingIds.includes(c.user_id) && !fallbackNameById[c.user_id]) {
+            fallbackNameById[c.user_id] = c.name || '';
+          }
+        });
+      } catch { /* ignore */ }
+    }
+
+    return {
+      ok: true,
+      data: formatProfilesFromSupabase(rows, {
+        extraProfiles,
+        fallbackNameById,
+        fallbackCreatedAtById,
+      }),
+    };
+  }, [getAllUsers]);
 
   // 加载成员信息
   //   force=true：即便 supabaseOk !== true，也强行尝试一次真实查询（用于"重试"按钮）
