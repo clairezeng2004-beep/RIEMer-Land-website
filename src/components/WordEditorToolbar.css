@@ -1,0 +1,253 @@
+/* ============ WordEditorToolbar 下拉 / 菜单 ============ */
+.wet__dropdown-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.wet__menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: 100;
+  min-width: 220px;
+  padding: 10px 10px 8px;
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  font-size: var(--text-sm, 13px);
+  color: var(--color-text, #1f2937);
+  animation: wetMenuIn 0.15s ease;
+}
+
+@keyframes wetMenuIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.wet__menu-title {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-muted, #6b7280);
+  margin-bottom: 8px;
+  letter-spacing: 0.02em;
+}
+
+.wet__menu-group {
+  padding: 2px 0;
+}
+
+.wet__menu-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 4px;
+  border-radius: var(--radius-sm, 4px);
+  transition: background 0.15s;
+}
+
+.wet__menu-row:hover {
+  background: rgba(91, 140, 62, 0.06);
+}
+
+.wet__menu-row-label {
+  font-weight: 600;
+  color: var(--color-text, #1f2937);
+}
+
+.wet__menu-row-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.wet__menu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-primary, #5B8C3E);
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+  font-size: var(--text-xs, 12px);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wet__menu-btn:hover {
+  background: var(--color-primary-dark, #4a7332);
+  border-color: var(--color-primary-dark, #4a7332);
+}
+
+.wet__menu-btn--ghost {
+  background: transparent;
+  color: var(--color-primary, #5B8C3E);
+}
+
+.wet__menu-btn--ghost:hover {
+  background: rgba(91, 140, 62, 0.08);
+  color: var(--color-primary-dark, #4a7332);
+}
+
+.wet__menu-tip {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--color-border-light, #f0f0f0);
+  font-size: 11px;
+  color: var(--color-text-muted, #9ca3af);
+  line-height: 1.4;
+}
+
+/* ---- 表格网格选择器 ---- */
+.wet__menu--grid {
+  min-width: unset;
+  padding: 10px;
+}
+
+.wet__grid {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  background: var(--color-bg-alt, #f9fafb);
+  border-radius: var(--radius-sm, 4px);
+}
+
+.wet__grid-row {
+  display: flex;
+  gap: 2px;
+}
+
+.wet__grid-cell {
+  width: 18px;
+  height: 18px;
+  border: 1px solid var(--color-border, #d1d5db);
+  background: #fff;
+  border-radius: 2px;
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.wet__grid-cell--active {
+  background: var(--color-primary, #5B8C3E);
+  border-color: var(--color-primary, #5B8C3E);
+}
+
+/* ============ 表格 hover 控制条（仅编辑器内有效） ============ */
+.msc-table-ctl {
+  position: absolute;
+  pointer-events: none; /* 只在具体按钮上接收事件 */
+  z-index: 25;
+}
+
+.msc-table-ctl__btn {
+  position: absolute;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border-radius: 50%;
+  background: #fff;
+  border: 1px solid var(--color-primary, #5B8C3E);
+  color: var(--color-primary, #5B8C3E);
+  font-size: 16px;
+  line-height: 1;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+  pointer-events: auto;
+  transition: all 0.15s;
+}
+
+.msc-table-ctl__btn:hover {
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+  transform: scale(1.08);
+}
+
+/* 加列：右侧居中 */
+.msc-table-ctl__btn[data-act="add-col"] {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+.msc-table-ctl__btn[data-act="add-col"]:hover {
+  transform: translateY(-50%) scale(1.08);
+}
+
+/* 加行：底部居中 */
+.msc-table-ctl__btn[data-act="add-row"] {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.msc-table-ctl__btn[data-act="add-row"]:hover {
+  transform: translateX(-50%) scale(1.08);
+}
+
+/* 删列：右上，更小更淡 */
+.msc-table-ctl__btn--del-col {
+  top: -12px !important;
+  right: -12px !important;
+  border-color: var(--color-danger, #dc2626);
+  color: var(--color-danger, #dc2626);
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+}
+.msc-table-ctl__btn--del-col:hover {
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+}
+
+/* 删行：左下 */
+.msc-table-ctl__btn--del-row {
+  bottom: -12px !important;
+  left: -12px !important;
+  border-color: var(--color-danger, #dc2626);
+  color: var(--color-danger, #dc2626);
+  width: 20px;
+  height: 20px;
+  font-size: 14px;
+}
+.msc-table-ctl__btn--del-row:hover {
+  background: var(--color-danger, #dc2626);
+  color: #fff;
+}
+
+.msc-table-ctl__v,
+.msc-table-ctl__h {
+  display: inline-block;
+  line-height: 1;
+}
+
+/* ============ 编辑器内的分栏块视觉标记 ============ */
+.msc-form__word-editor .msc-cols {
+  border: 1px dashed var(--color-border-light, #e5e7eb);
+  padding: 6px;
+  border-radius: var(--radius-sm, 4px);
+}
+
+.msc-form__word-editor .msc-col {
+  border: 1px dashed transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.msc-form__word-editor .msc-col:hover {
+  border-color: var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.04);
+}
+
+.msc-form__word-editor .msc-col__placeholder:hover {
+  background: rgba(91, 140, 62, 0.1);
+  color: var(--color-primary, #5B8C3E);
+}
+
+/* 编辑器里的 td 聚焦态 */
+.msc-form__word-editor .msc-table td:focus {
+  outline: 2px solid var(--color-primary, #5B8C3E);
+  outline-offset: -2px;
+  background: rgba(91, 140, 62, 0.04);
+}

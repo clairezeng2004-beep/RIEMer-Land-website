@@ -1,6 +1,7 @@
 import { StrictMode, Component } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
+import './styles/docBlocks.css'
 import App from './App.jsx'
 
 // 全局错误边界：防止未捕获的渲染错误导致整页白屏

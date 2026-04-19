@@ -11,7 +11,6 @@ import {
   ChevronDown,
   Code2,
   FileText,
-  Clipboard,
   Eye,
   Check,
   Calendar,
@@ -24,7 +23,12 @@ import {
   FileArchive,
 } from 'lucide-react';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
+import {
+  attachTableControls,
+  attachColumnPlaceholderHandler,
+} from '../../utils/wordDocBlocks';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
+import WordEditorToolbar from '../../components/WordEditorToolbar';
 import { stripUnderline } from '../../utils/stripUnderline';
 import './MemberSharingCreate.css';
 
@@ -585,7 +589,7 @@ export default function MemberSharingCreate() {
     requestAnimationFrame(() => { syncScrollLockRef.current = null; });
   }, [syncScroll]);
 
-  /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 ============ */
+  /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 + 分栏 + 表格 ============ */
   const imageApiRef = useRef(null);
   useEffect(() => {
     if (newPost.format !== 'word') {
@@ -594,11 +598,22 @@ export default function MemberSharingCreate() {
       return undefined;
     }
     if (!wordEditorRef.current) return undefined;
-    const api = attachWordImageEditor(wordEditorRef.current, {
+    const editor = wordEditorRef.current;
+    const api = attachWordImageEditor(editor, {
       onChange: (html) => setNewPost((prev) => ({ ...prev, content: html })),
     });
     imageApiRef.current = api;
+
+    // 表格行列控制条 + 分栏占位点击补图
+    const syncHtml = () => {
+      setNewPost((prev) => ({ ...prev, content: editor.innerHTML }));
+    };
+    const detachTable = attachTableControls(editor, syncHtml);
+    const detachCols = attachColumnPlaceholderHandler(editor, syncHtml);
+
     return () => {
+      detachCols();
+      detachTable();
       api.destroy();
       imageApiRef.current = null;
     };
@@ -865,23 +880,12 @@ export default function MemberSharingCreate() {
                 </div>
               ) : (
                 <div className="msc-form__word-editor-wrapper">
-                  <div className="msc-form__editor-toolbar">
-                    <button
-                      type="button"
-                      className="msc-form__paste-btn"
-                      onClick={handleOneClickPaste}
-                    >
-                      <Clipboard size={14} /> 一键粘贴
-                    </button>
-                    <button
-                      type="button"
-                      className="msc-form__paste-btn msc-form__paste-btn--ghost"
-                      onClick={() => imageApiRef.current?.pickImage()}
-                      title="插入图片（也支持拖拽/粘贴；插入后点击图片可拖动 8 个手柄调整大小，按住 Shift 自由缩放）"
-                    >
-                      <Image size={14} /> 插入图片（也支持拖拽插入）
-                    </button>
-                  </div>
+                  <WordEditorToolbar
+                    editorRef={wordEditorRef}
+                    imageApiRef={imageApiRef}
+                    onOneClickPaste={handleOneClickPaste}
+                    onChange={(html) => setNewPost((prev) => ({ ...prev, content: html }))}
+                  />
                   <div
                     ref={wordEditorRef}
                     className="msc-form__word-editor"
