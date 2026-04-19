@@ -210,6 +210,41 @@ input, textarea, select {
   font-family: var(--font-body);
 }
 
+/* 标识符型输入框使用系统无衬线 / 等宽字体。
+ *
+ * 为什么单独处理：
+ *   全站 --font-body 的中文栈是 LXGW WenKai、英文栈是 Lora（衬线）。
+ *   Lora 这类衬线字体里，下划线 "_"、"@"、"."、数字等字符为了在连续
+ *   `____` 或 `m_n` 这种场景保持"线连续 / 不粘连"的美感，左右 side bearing
+ *   设计得比较宽——结果就是 `riemer_gzh@163.com` 在输入框里视觉上像
+ *   "riemer _gzh"（下划线前后都留空），容易被误读成"字段里多了空格"。
+ *   （这是字体的设计特征而不是我们代码的 bug。）
+ *
+ * 对邮箱 / 网址 / 电话 / 密码 这类"标识符字符串"，业界惯例就是用
+ * 等宽或现代无衬线字体渲染：字符间距紧凑、不同字符视觉宽度规整，
+ * 识别度更高。这里显式覆盖 font-family，不再继承 Lora 衬线。
+ */
+input[type='email'],
+input[type='url'],
+input[type='tel'],
+input[type='password'],
+input[type='number'] {
+  font-family:
+    ui-monospace,
+    'SF Mono',
+    'SFMono-Regular',
+    'JetBrains Mono',
+    Menlo,
+    Consolas,
+    'Liberation Mono',
+    'Courier New',
+    monospace;
+  /* 等宽字体视觉字号通常略偏大，稍微收一点，与周围 Lora 正文观感一致。 */
+  font-size: 0.95em;
+  /* 字母间略加一点字距，避免 _ 与相邻字符视觉粘连的另一个极端。 */
+  letter-spacing: 0.01em;
+}
+
 /* Utility Classes */
 .container {
   max-width: 1200px;
