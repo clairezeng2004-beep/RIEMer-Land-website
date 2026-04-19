@@ -55,15 +55,23 @@ export default function ViewLogPopover({
   const [error, setError] = useState(null);
   const overlayRef = useRef(null);
 
-  // 拉取数据
+  // 保存最新的 fetchLog，避免父组件每次渲染传入新引用导致 effect 无限重跑
+  const fetchLogRef = useRef(fetchLog);
   useEffect(() => {
-    if (!open || !fetchLog) return;
+    fetchLogRef.current = fetchLog;
+  }, [fetchLog]);
+
+  // 拉取数据（只依赖 open，避免因父组件重渲染导致 fetchLog 引用变化引发循环刷新）
+  useEffect(() => {
+    if (!open) return;
+    const fn = fetchLogRef.current;
+    if (!fn) return;
     let cancelled = false;
     setLoading(true);
     setError(null);
     (async () => {
       try {
-        const list = await fetchLog();
+        const list = await fn();
         if (!cancelled) setLogs(Array.isArray(list) ? list : []);
       } catch (err) {
         if (!cancelled) setError(err?.message || '加载访问记录失败');
@@ -74,7 +82,7 @@ export default function ViewLogPopover({
     return () => {
       cancelled = true;
     };
-  }, [open, fetchLog]);
+  }, [open]);
 
   // Esc 关闭
   useEffect(() => {
