@@ -72,7 +72,7 @@ function isInPeriod(dateStr, period) {
 }
 
 export default function MemberContributions() {
-  const { isAuthenticated, getAllUsers, supabaseOk } = useAuth();
+  const { isAuthenticated, user, getAllUsers, supabaseOk } = useAuth();
   const { userArticles, filterOptions, internalConfig, updateInternalConfig, syncTeamMembersFromDB } = useSiteContent();
   const { editing } = useWysiwyg();
   const cc = internalConfig.contributions || {};
@@ -283,7 +283,15 @@ export default function MemberContributions() {
     if (!editText.trim()) return;
     const periodKey = selectedPeriod;
     const customKey = `${memberId}_${periodKey}`;
-    const newItem = { text: editText.trim(), date: new Date().toISOString().split('T')[0] };
+    // 录入人：当前登录用户；字段兼容历史数据（无 addedBy 的老记录仍可正常显示）
+    const addedByName =
+      user?.name || user?.nickname || user?.email?.split('@')[0] || '';
+    const newItem = {
+      text: editText.trim(),
+      date: new Date().toISOString().split('T')[0],
+      addedById: user?.id || null,
+      addedByName,
+    };
     setCustomContributions((prev) => {
       const nextItems = [...(prev[customKey] || []), newItem];
       // 异步同步到 Supabase（成功/失败都不阻塞本地状态）
@@ -497,18 +505,37 @@ export default function MemberContributions() {
                   </td>
                   <td className="mc-table__td--custom">
                     <div className="mc-custom">
-                      {member.customItems.map((item, idx) => (
-                        <div key={idx} className="mc-custom__item">
-                          <span className="mc-custom__text">{item.text}</span>
-                          <button
-                            className="mc-custom__remove"
-                            onClick={() => handleRemoveCustom(member.id, idx)}
-                            title="删除"
-                          >
-                            <X size={12} />
-                          </button>
-                        </div>
-                      ))}
+                      {member.customItems.map((item, idx) => {
+                        // 录入人名显示：优先用 members 列表里按 id 查到的最新名字，
+                        // 其次用录入时保存的 addedByName，都没有则不显示。
+                        const recorder =
+                          (item.addedById &&
+                            members.find((m) => m.id === item.addedById)?.name) ||
+                          item.addedByName ||
+                          '';
+                        return (
+                          <div key={idx} className="mc-custom__item">
+                            <div className="mc-custom__body">
+                              <span className="mc-custom__text">{item.text}</span>
+                              {recorder && (
+                                <span
+                                  className="mc-custom__recorder"
+                                  title={`由 ${recorder} 录入`}
+                                >
+                                  — {recorder}
+                                </span>
+                              )}
+                            </div>
+                            <button
+                              className="mc-custom__remove"
+                              onClick={() => handleRemoveCustom(member.id, idx)}
+                              title="删除"
+                            >
+                              <X size={12} />
+                            </button>
+                          </div>
+                        );
+                      })}
                       {editingMember === member.id ? (
                         <div className="mc-custom__edit">
                           <input
@@ -592,7 +619,7 @@ export default function MemberContributions() {
               as="span"
             /></li>
             <li><strong>其他</strong>：<EditableText
-              value={cc.noteCustom || '手动输入的自定义贡献项，跨设备同步'}
+              value={cc.noteCustom || '手动输入的自定义贡献项，跨设备同步；每条后方显示录入人'}
               onChange={(v) => updateContribs('noteCustom', v)}
               configKey="contributions.noteCustom"
               as="span"

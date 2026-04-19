@@ -440,9 +440,27 @@
   font-size: var(--text-xs);
 }
 
-.mc-custom__text {
+/* 条目正文容器：文字 + 录入人；允许换行避免把表格挤宽 */
+.mc-custom__body {
   flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1.4;
+}
+
+.mc-custom__text {
   color: var(--color-text);
+  word-break: break-word;
+}
+
+/* 录入人样式：弱化显示，仅作为归属标注 */
+.mc-custom__recorder {
+  color: var(--color-text-muted);
+  font-size: 11px;
+  white-space: nowrap;
 }
 
 .mc-custom__remove {
