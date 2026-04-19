@@ -92,7 +92,10 @@
   scroll-behavior: auto;
   cursor: grab;
   position: relative;
-  padding: 220px 2rem 220px;
+  /* 轨道水平 padding = 时间节点两侧缓冲区。
+     给到 3rem 是为了 mask 渐隐区（32px）落在 padding 内，
+     不会吃进卡片本体。 */
+  padding: 220px 3rem 220px;
   -ms-overflow-style: none;
   scrollbar-width: none;
   user-select: none;
@@ -105,6 +108,30 @@
   /* 横向边界避免把整页一起带偏；纵向保持默认允许冒泡给页面滚动 */
   overscroll-behavior-x: contain;
   overscroll-behavior-y: auto;
+  /* 两侧柔和渐隐：时间轴水平可滚动，可视区内容总宽度永远无法
+     恰好等于整数个 item 宽，最右/最左那张卡片在轨道 clientWidth
+     边界处总会被 overflow: auto 硬切 1px → 视觉上就是用户反馈的
+     "卡片边框被显示区域遮挡和裁剪"。
+     这里用 CSS mask 让轨道两端柔和淡出，消除硬切边：
+     - 0 ~ 32px 从透明到不透明；中间部分完全不透明；右侧 32px 对称。
+     - 32px 渐隐宽度 < 左右 padding（3rem = 48px），所以渐隐只发生在
+       卡片区以外的缓冲带，不会让卡片自身看起来"没画完"。
+     - 不与 scroll-snap 同用：Timeline.jsx 里已有鼠标拖拽逻辑直接
+       写 scrollLeft，mandatory snap 会把拖拽强行拽回吸附点。 */
+  -webkit-mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 32px,
+    #000 calc(100% - 32px),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to right,
+    transparent 0,
+    #000 32px,
+    #000 calc(100% - 32px),
+    transparent 100%
+  );
 }
 
 .timeline__track::-webkit-scrollbar {
@@ -439,6 +466,21 @@
 
   .timeline__track {
     padding: 200px 1.5rem 200px;
+    /* 手机端 mask 渐隐宽度收窄到 16px，避免在 375px 屏上占比过大。 */
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 16px,
+      #000 calc(100% - 16px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 16px,
+      #000 calc(100% - 16px),
+      transparent 100%
+    );
   }
 
   .timeline__item {
@@ -478,6 +520,20 @@
 
   .timeline__track {
     padding: 220px 1rem 220px;
+    -webkit-mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 12px,
+      #000 calc(100% - 12px),
+      transparent 100%
+    );
+    mask-image: linear-gradient(
+      to right,
+      transparent 0,
+      #000 12px,
+      #000 calc(100% - 12px),
+      transparent 100%
+    );
   }
 
   .timeline__item {
