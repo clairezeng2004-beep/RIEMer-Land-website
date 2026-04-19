@@ -151,7 +151,7 @@ export default function FooterGuestbook() {
         aria-hidden={open}
         tabIndex={open ? -1 : 0}
       >
-        <MessageCircle size={15} />
+        <MessageCircle size={16} />
         <span>给我们留言</span>
       </button>
 

@@ -158,6 +158,8 @@
 .footer__contact-guestbook .footer-guestbook__trigger {
   width: auto;
   display: inline-flex;
+  align-items: center;
+  gap: var(--space-sm);
   font-size: var(--text-sm);
   line-height: 1.4;
   padding: 1px 0;
