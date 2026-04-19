@@ -84,18 +84,38 @@
 
 /* 轨道 - 横向滚动容器 */
 .timeline__track {
+  /*
+   * --tl-slot-h：轨道中线到上/下边缘的垂直空间。
+   *   = 一张卡片最大高度 + 连接线(20px) + 节点到卡片的间距(18px) + 余量
+   *
+   * 旧值 220px 对 3 行中文描述 + 2 行标题 + year 徽章的卡片其实已经
+   * 溢出（实测单侧需要 ~240px），再叠加轨道 overflow-y: hidden 就会把
+   * 卡片下半部分直接裁掉，表现为截图里"卡片文字没显示完整、底边被切"。
+   *
+   * 这里提升到 280px，给未来更长标题 / 更多行描述留出余量。
+   * 如果管理员后台继续输入更长的描述，可单独调这一个变量即可全局生效。
+   */
+  --tl-slot-h: 280px;
+
   display: flex;
   align-items: center;
   gap: 0;
   overflow-x: auto;
+  /* ⚠ 保留 overflow-y: hidden：
+     - CSS 规定 overflow 两轴不能一轴 visible 一轴 auto/hidden
+       （任一轴非 visible，另一轴也会被提升为 auto）。
+     - 轨道必须 overflow-x: auto 做横向滚动，所以 y 轴不能写 visible。
+     - 我们通过 --tl-slot-h 把 y 方向的可视高度直接抬到足够大，
+       让卡片完整落在轨道内，就不会被 hidden 切到。 */
   overflow-y: hidden;
   scroll-behavior: auto;
   cursor: grab;
   position: relative;
   /* 轨道水平 padding = 时间节点两侧缓冲区。
      给到 3rem 是为了 mask 渐隐区（32px）落在 padding 内，
-     不会吃进卡片本体。 */
-  padding: 220px 3rem 220px;
+     不会吃进卡片本体。
+     垂直方向用 --tl-slot-h 上下对称，保证交替布局的上下卡片都能完整显示。 */
+  padding: var(--tl-slot-h) 3rem;
   -ms-overflow-style: none;
   scrollbar-width: none;
   user-select: none;
@@ -465,7 +485,10 @@
   .timeline__arrow { display: none; }
 
   .timeline__track {
-    padding: 200px 1.5rem 200px;
+    /* 手机端：内容更容易换行，单侧高度反而可能需要比桌面更多
+       （卡片变窄后描述行数会增加）。把变量上调到 300px 保平安。 */
+    --tl-slot-h: 300px;
+    padding: var(--tl-slot-h) 1.5rem;
     /* 手机端 mask 渐隐宽度收窄到 16px，避免在 375px 屏上占比过大。 */
     -webkit-mask-image: linear-gradient(
       to right,
@@ -519,7 +542,10 @@
   }
 
   .timeline__track {
-    padding: 220px 1rem 220px;
+    /* 超小屏（<=480px）：容器更窄，卡片描述可能再多一行。
+       保守设 310px，与手机端基本持平即可。 */
+    --tl-slot-h: 310px;
+    padding: var(--tl-slot-h) 1rem;
     -webkit-mask-image: linear-gradient(
       to right,
       transparent 0,
