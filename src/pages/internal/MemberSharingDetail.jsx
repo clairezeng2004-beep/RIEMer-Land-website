@@ -24,26 +24,16 @@ import {
 import TextAnnotation from '../../components/TextAnnotation';
 import ViewLogPopover from '../../components/ViewLogPopover';
 import { recordViewLog, fetchViewLog } from '../../lib/documentsService';
+import {
+  fetchSharings,
+  subscribeSharings,
+  updateSharing,
+  fetchCategories,
+  DEFAULT_CATEGORIES,
+} from '../../services/memberSharingService';
 import './MemberSharingDetail.css';
 
-const SHARING_KEY = 'riemer_member_sharing';
 const SHARING_VIEWS_KEY = 'riemer_sharing_views';
-const CATEGORIES_KEY = 'riemer_sharing_categories';
-
-// 默认分类
-const DEFAULT_CATEGORIES = [
-  { key: 'course', label: '课程资料', color: '#5EAD8C' },
-  { key: 'history', label: '历史会议', color: '#4FBFC4' },
-  { key: 'experience', label: '成员经验分享', color: '#EC4899' },
-];
-
-function loadCategories() {
-  try {
-    const stored = localStorage.getItem(CATEGORIES_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return DEFAULT_CATEGORIES;
-}
 
 function buildCategoryMaps(cats) {
   const labels = {};
@@ -79,62 +69,6 @@ function downloadFile(attachment) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
-}
-
-// 初始示例数据（与 MemberSharing 保持一致）
-const defaultSharings = [
-  {
-    id: 'sharing-1',
-    title: '微观经济学期末复习要点整理',
-    category: 'course',
-    format: 'markdown',
-    content: `# 微观经济学期末复习要点\n\n## 一、消费者理论\n- **效用最大化**：MRS = Px/Py\n- 无差异曲线的性质：凸向原点、不相交、越远离原点效用越高\n- 恩格尔曲线与收入消费曲线\n\n## 二、生产者理论\n- 短期与长期成本\n- 利润最大化条件：MC = MR\n- 规模报酬递增、递减与不变\n\n## 三、市场结构\n| 市场类型 | 企业数量 | 产品差异 | 进入壁垒 |\n|---------|---------|---------|----------|\n| 完全竞争 | 很多 | 无 | 无 |\n| 垄断竞争 | 较多 | 有 | 低 |\n| 寡头 | 少数 | 有/无 | 高 |\n| 垄断 | 一个 | — | 极高 |\n\n> 重点关注博弈论部分（纳什均衡、囚徒困境）\n\n希望对大家有帮助！有问题欢迎在群里讨论 💪`,
-    author: '林子墨',
-    authorId: 'member-2',
-    createdAt: '2025-04-10',
-    likes: [
-      { userId: 'member-1', userName: '陈思雨' },
-      { userId: 'member-3', userName: '周悦然' },
-    ],
-  },
-  {
-    id: 'sharing-2',
-    title: '第九期分享会会议纪要',
-    category: 'history',
-    format: 'word',
-    content: `<h1>第九期 RIEMer's Space 分享会 · 会议纪要</h1><p><strong>时间：</strong>2025 年 3 月 15 日（周六）14:00-16:00</p><p><strong>形式：</strong>线上（腾讯会议）</p><p><strong>主题：</strong>数模备赛经验分享</p><h2>一、分享内容概要</h2><p>本期邀请了三位数学建模竞赛获奖选手，从<strong>选题策略</strong>、<strong>建模方法</strong>、<strong>论文撰写</strong>三个维度进行了系统分享。</p><h3>1. 选题策略</h3><ul><li>通读所有题目后再做选择，不要急于动手</li><li>评估队伍擅长的方向（优化、统计、机器学习等）</li><li>C 题（数据分析类）通常适合经管背景同学</li></ul><h3>2. 建模方法</h3><ul><li>常用模型：线性规划、层次分析法、灰色预测、TOPSIS</li><li>注意模型假设的合理性与局限性说明</li></ul><h3>3. 论文撰写</h3><ul><li>摘要是评审重点，需包含问题、方法、结果</li><li>图表清晰规范，代码放附录</li></ul><h2>二、Q&A 环节</h2><p>同学们就<em>组队建议</em>、<em>软件工具推荐</em>、<em>时间分配</em>等问题进行了互动交流。</p><h2>三、后续安排</h2><p>下期分享会暂定主题：快消行业与职业选择经验分享。</p>`,
-    author: '张一帆',
-    authorId: 'member-4',
-    createdAt: '2025-03-16',
-    likes: [{ userId: 'member-2', userName: '林子墨' }],
-  },
-  {
-    id: 'sharing-3',
-    title: '我的实习面试经验总结',
-    category: 'experience',
-    format: 'markdown',
-    content: `# 实习面试经验总结\n\n经历了大概 20+ 场面试后，总结一些通用的经验分享给大家。\n\n## 面试前准备\n\n1. **简历优化**：STAR 法则（Situation-Task-Action-Result）描述经历\n2. **公司调研**：了解业务、近期动态、竞品分析\n3. **自我介绍**：准备 1 分钟和 3 分钟两个版本\n\n## 常见问题\n\n### 行为面试\n- "说一个你面对困难/冲突的经历"\n- "说一个你主动推动的项目"\n- "你最大的优缺点是什么"\n\n### 专业知识（经管向）\n- 宏观经济热点（利率、汇率、CPI）\n- 行业分析框架（波特五力、PEST）\n- 财务报表三张表的关系\n\n## 面试中技巧\n\n- 🎯 回答要有**结构**，不要想到什么说什么\n- 🤝 保持**眼神交流**和适度的肢体语言\n- ❓ 面试最后的"你有什么想问的"一定要准备 2-3 个问题\n\n## 心态调整\n\n> 每一场面试都是一次练习，被拒绝不代表你不优秀，只是不匹配。\n\n加油！ 🌟`,
-    author: '周悦然',
-    authorId: 'member-3',
-    createdAt: '2025-04-05',
-    likes: [
-      { userId: 'member-1', userName: '陈思雨' },
-      { userId: 'member-4', userName: '张一帆' },
-      { userId: 'member-5', userName: '李明远' },
-    ],
-  },
-];
-
-function loadSharings() {
-  try {
-    const stored = localStorage.getItem(SHARING_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return defaultSharings;
-}
-
-function saveSharings(data) {
-  localStorage.setItem(SHARING_KEY, JSON.stringify(data));
 }
 
 function loadViews() {
@@ -190,10 +124,49 @@ export default function MemberSharingDetail() {
   );
 
   // 动态分类
-  const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(loadCategories());
+  const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
+  const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
 
-  const [sharings, setSharings] = useState(loadSharings);
-  const post = sharings.find((s) => s.id === id);
+  const [sharings, setSharings] = useState([]);
+  const [loaded, setLoaded] = useState(false);
+  const post = sharings.find((s) => String(s.id) === String(id));
+
+  // 首次加载：云端拉取 + 分类拉取
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const [list, cats] = await Promise.all([fetchSharings(), fetchCategories()]);
+        if (cancelled) return;
+        setSharings(list);
+        if (cats && cats.length > 0) setCategoryList(cats);
+      } catch (err) {
+        console.warn('[MemberSharingDetail] 加载失败:', err);
+      } finally {
+        if (!cancelled) setLoaded(true);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  // 订阅 member_sharing 实时变更
+  useEffect(() => {
+    const unsubscribe = subscribeSharings(({ type, newItem, oldItem }) => {
+      if (type === 'INSERT' && newItem) {
+        setSharings((prev) => {
+          if (prev.some((s) => String(s.id) === String(newItem.id))) return prev;
+          return [newItem, ...prev];
+        });
+      } else if (type === 'UPDATE' && newItem) {
+        setSharings((prev) =>
+          prev.map((s) => (String(s.id) === String(newItem.id) ? { ...s, ...newItem } : s)),
+        );
+      } else if (type === 'DELETE' && oldItem) {
+        setSharings((prev) => prev.filter((s) => String(s.id) !== String(oldItem.id)));
+      }
+    });
+    return () => unsubscribe();
+  }, []);
 
   // 浏览次数统计 + 访问日志
   // 同一个会话内重复刷新不重复计数，避免"每刷一次 +1"；
@@ -364,6 +337,23 @@ export default function MemberSharingDetail() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (!post) {
+    if (!loaded) {
+      return (
+        <div className="msd-page">
+          <div className="msd-topbar">
+            <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
+              <ChevronLeft size={20} /> 返回列表
+            </button>
+          </div>
+          <div className="msd-content">
+            <div className="msd-not-found">
+              <Share2 size={48} />
+              <h3>加载中…</h3>
+            </div>
+          </div>
+        </div>
+      );
+    }
     return (
       <div className="msd-page">
         <div className="msd-topbar">
@@ -387,19 +377,21 @@ export default function MemberSharingDetail() {
 
   const handleLike = () => {
     if (!user) return;
-    const updated = sharings.map((s) => {
-      if (s.id !== post.id) return s;
-      const likes = s.likes || [];
-      const already = likes.some((l) => l.userId === user.id);
-      return {
-        ...s,
-        likes: already
+    let newLikes = null;
+    setSharings((prev) =>
+      prev.map((s) => {
+        if (String(s.id) !== String(post.id)) return s;
+        const likes = s.likes || [];
+        const already = likes.some((l) => l.userId === user.id);
+        newLikes = already
           ? likes.filter((l) => l.userId !== user.id)
-          : [...likes, { userId: user.id, userName: user.nickname || user.name || user.email }],
-      };
-    });
-    setSharings(updated);
-    saveSharings(updated);
+          : [...likes, { userId: user.id, userName: user.nickname || user.name || user.email }];
+        return { ...s, likes: newLikes };
+      }),
+    );
+    if (newLikes) {
+      updateSharing(post.id, { likes: newLikes }).catch(() => { /* ignore */ });
+    }
   };
 
   const hasLiked = post.likes?.some((l) => l.userId === user?.id);

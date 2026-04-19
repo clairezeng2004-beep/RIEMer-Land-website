@@ -31,41 +31,13 @@ import {
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import { stripUnderline } from '../../utils/stripUnderline';
+import {
+  addSharing,
+  fetchCategories,
+  addCategory as addCategoryRemote,
+  DEFAULT_CATEGORIES,
+} from '../../services/memberSharingService';
 import './MemberSharingCreate.css';
-
-const SHARING_KEY = 'riemer_member_sharing';
-const CATEGORIES_KEY = 'riemer_sharing_categories';
-
-// 默认分类（与 MemberSharing.jsx 保持一致）
-const DEFAULT_CATEGORIES = [
-  { key: 'course', label: '课程资料', color: '#5EAD8C' },
-  { key: 'history', label: '历史会议', color: '#4FBFC4' },
-  { key: 'experience', label: '成员经验分享', color: '#EC4899' },
-];
-
-function loadCategories() {
-  try {
-    const stored = localStorage.getItem(CATEGORIES_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return DEFAULT_CATEGORIES;
-}
-
-function saveCategories(data) {
-  localStorage.setItem(CATEGORIES_KEY, JSON.stringify(data));
-}
-
-function loadSharings() {
-  try {
-    const stored = localStorage.getItem(SHARING_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return [];
-}
-
-function saveSharings(data) {
-  localStorage.setItem(SHARING_KEY, JSON.stringify(data));
-}
 
 // 生成年份列表（当前年份往前 10 年，往后 2 年）
 function getYears() {
@@ -420,8 +392,19 @@ export default function MemberSharingCreate() {
   // 避免同步滚动时相互触发形成循环
   const syncScrollLockRef = useRef(null);
 
-  // 加载动态分类
-  const [cats, setCats] = useState(loadCategories);
+  // 加载动态分类（先本地默认，然后从云端拉取）
+  const [cats, setCats] = useState(DEFAULT_CATEGORIES);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchCategories()
+      .then((list) => {
+        if (cancelled) return;
+        if (list && list.length > 0) setCats(list);
+      })
+      .catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const [newPost, setNewPost] = useState({
     title: '',
@@ -432,11 +415,10 @@ export default function MemberSharingCreate() {
     attachments: [],
   });
 
-  // 新增分类
+  // 新增分类（同步到云端）
   const handleAddCategory = (cat) => {
-    const updated = [...cats, cat];
-    setCats(updated);
-    saveCategories(updated);
+    setCats((prev) => [...prev, cat]);
+    addCategoryRemote(cat).catch(() => { /* ignore */ });
   };
 
   // 清理从 Word/网页粘贴过来的 HTML，只保留安全标签
@@ -622,7 +604,7 @@ export default function MemberSharingCreate() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  const handleCreate = (e) => {
+  const handleCreate = async (e) => {
     e.preventDefault();
     const hasContent = newPost.content.trim().length > 0;
     const hasAttachments = newPost.attachments.length > 0;
@@ -663,9 +645,11 @@ export default function MemberSharingCreate() {
       likes: [],
     };
 
-    const existing = loadSharings();
-    const updated = [post, ...existing];
-    saveSharings(updated);
+    try {
+      await addSharing(post);
+    } catch (err) {
+      console.warn('[MemberSharingCreate] 发布失败（已降级写本地）:', err?.message || err);
+    }
 
     // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
     try {
