@@ -2,6 +2,7 @@ import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import CustomSelect from '../../components/CustomSelect';
 import { marked } from 'marked';
 import {

@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import EditableText from '../../components/EditableText';
 import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';

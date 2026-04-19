@@ -256,16 +256,16 @@ export default function Gallery() {
       );
       setAlbums((prev) => [album, ...prev]);
 
-      // 发送"相册新增照片"通知（上传者自己自动已读）。
+      // 发送"相册新增照片"通知：统一走规则引擎，由用户自定义规则决定是否收到。
       // 仅当本次创建确实带了照片时才发，纯建空相册不打扰其他人。
       if (filesPayload.length > 0) {
         try {
           const uploader = user?.nickname || user?.name || '某成员';
-          addNotification({
-            title: '相册新增照片',
-            message: `${uploader} 向相册「${album.title}」上传了 ${filesPayload.length} 张照片`,
-            type: 'sharing',
-            read: true,
+          emitNotificationEvent('gallery.upload', {
+            operator: uploader,
+            operatorUserId: user?.id,
+            albumTitle: album.title,
+            count: filesPayload.length,
           });
         } catch (err) {
           console.warn('[Gallery] 发送上传通知失败:', err?.message || err);

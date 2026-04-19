@@ -3,6 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useNotifications } from '../../contexts/NotificationContext';
+import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
