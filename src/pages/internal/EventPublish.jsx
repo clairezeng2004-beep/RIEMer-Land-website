@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -19,16 +19,62 @@ import {
   EyeOff,
   ExternalLink,
   AlertCircle,
+  Settings2,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
+import {
+  SITE_KEYS,
+  fetchSetting,
+  saveSetting,
+  subscribeSetting,
+} from '../../services/siteSettingsService';
+import { isSupabaseConfigured } from '../../lib/supabase';
 import './InternalArticles.css';
 import './EventPublish.css';
 
 /**
  * 活动发布
  * - 数据源：useSiteContent().events，与首页「最新活动」实时同步（CRUD 走 addEvent）
+ * - 筛选分类：独立持久化到 site_settings.event_categories，跨设备同步，所有成员可新增
  * - 排版/输入逻辑：完全沿用「公众号历史文章归档」的 ia- 视觉语言（卡片网格 + 顶部 header + 弹窗表单）
  * - 文案：通过 EditableText 接入 internalConfig.eventPublish
  */
+
+// ---- 分类管理 ----
+// 事件分类只有文本（无颜色），存 string[]；本地 key 与 site_settings.event_categories 双写
+const EVENT_CATEGORIES_KEY = 'riemer_event_categories';
+
+const DEFAULT_EVENT_CATEGORIES = ['腾讯会议分享', '团队招新', '其他'];
+
+function loadEventCategories() {
+  try {
+    const stored = localStorage.getItem(EVENT_CATEGORIES_KEY);
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
+        return parsed;
+      }
+    }
+  } catch { /* ignore */ }
+  return [...DEFAULT_EVENT_CATEGORIES];
+}
+
+function saveEventCategoriesLocal(data) {
+  localStorage.setItem(EVENT_CATEGORIES_KEY, JSON.stringify(data));
+}
+
+// 双写：本地 + 云端（site_settings.event_categories），便于跨设备同步
+async function persistEventCategories(data, lastSyncRef) {
+  saveEventCategoriesLocal(data);
+  if (!isSupabaseConfigured) return;
+  const res = await saveSetting(SITE_KEYS.EVENT_CATEGORIES, data);
+  if (res.success && lastSyncRef) {
+    lastSyncRef.current = res.updatedAt;
+  } else if (!res.success) {
+    console.warn('[EventPublish] 分类云端同步失败:', res.error);
+  }
+}
 
 // 计算倒计时天数（活动日期晚于今天则返回天数，否则 null）
 function getCountdownDays(eventDate) {
@@ -43,7 +89,7 @@ function getCountdownDays(eventDate) {
 const EMPTY_EVENT = {
   title: '',
   date: '',
-  category: '分享会',
+  category: '腾讯会议分享',
   location: '',
   excerpt: '',
   officialUrl: '',
@@ -66,10 +112,55 @@ export default function EventPublish() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
 
+  // ---- 分类管理（跨设备同步：事件分类单独存 site_settings.event_categories）----
+  const [categoryList, setCategoryList] = useState(loadEventCategories);
+  const lastCatSyncRef = useRef(null);
+
+  // 首次拉云 + 订阅变更（与 InternalArticles 的 ARTICLE_CATEGORIES 同款模式）
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+
+    fetchSetting(SITE_KEYS.EVENT_CATEGORIES).then(({ value, updatedAt, error }) => {
+      if (cancelled || error) return;
+      if (Array.isArray(value) && value.length > 0 && value.every((x) => typeof x === 'string')) {
+        lastCatSyncRef.current = updatedAt;
+        setCategoryList(value);
+        saveEventCategoriesLocal(value);
+      }
+    });
+
+    const unsub = subscribeSetting(SITE_KEYS.EVENT_CATEGORIES, (value, updatedAt) => {
+      if (updatedAt && lastCatSyncRef.current === updatedAt) return; // 自己的回流
+      if (!Array.isArray(value)) return;
+      lastCatSyncRef.current = updatedAt;
+      setCategoryList(value);
+      saveEventCategoriesLocal(value);
+    });
+
+    return () => {
+      cancelled = true;
+      if (unsub) unsub();
+    };
+  }, []);
+
+  // ---- 普通成员快速新增分类弹窗 ----
+  const [showAddCatModal, setShowAddCatModal] = useState(false);
+  const [quickCatLabel, setQuickCatLabel] = useState('');
+  const [quickCatError, setQuickCatError] = useState('');
+
+  // ---- 管理员（编辑模式）分类管理面板 ----
+  const [showCatManager, setShowCatManager] = useState(false);
+  const [editingCatLabel, setEditingCatLabel] = useState(null); // 正在编辑的分类原名
+  const [editCatDraft, setEditCatDraft] = useState('');
+  const [newCatLabel, setNewCatLabel] = useState('');
+
   // ---- 新建活动弹窗 ----
   const [showModal, setShowModal] = useState(false);
   const [draft, setDraft] = useState(EMPTY_EVENT);
   const [formError, setFormError] = useState('');
+  // 新建活动弹窗内"其他"自定义分类临时值
+  const [customCategoryInput, setCustomCategoryInput] = useState('');
 
   // ---- 回放密码弹窗（点击有回放的卡片）----
   const [replayModal, setReplayModal] = useState(null);
@@ -79,12 +170,20 @@ export default function EventPublish() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  // 分类（"全部" + 出现过的所有 category）
+  // 分类（"全部" + 预设分类 + events 中出现但不在预设里的历史分类）
+  // 历史分类（老活动里 category 是 "分享会 / 经验分享"）保留在列表末尾，
+  // 避免老数据筛不到。分类按插入顺序去重。
   const categories = useMemo(() => {
-    const set = new Set();
-    events.forEach((e) => e.category && set.add(e.category));
-    return ['全部', ...set];
-  }, [events]);
+    const result = ['全部', ...categoryList];
+    const set = new Set(result);
+    events.forEach((e) => {
+      if (e.category && !set.has(e.category)) {
+        result.push(e.category);
+        set.add(e.category);
+      }
+    });
+    return result;
+  }, [events, categoryList]);
 
   // 排序：未来活动优先（按日期升序），过去活动按降序
   const sortedEvents = useMemo(() => {
@@ -116,9 +215,78 @@ export default function EventPublish() {
     });
   }, [sortedEvents, searchTerm, selectedCategory]);
 
+  // ---- 分类 CRUD ----
+  // 普通成员快速新增（打开弹窗）
+  const openAddCatModal = () => {
+    setQuickCatLabel('');
+    setQuickCatError('');
+    setShowAddCatModal(true);
+  };
+  const closeAddCatModal = () => {
+    setShowAddCatModal(false);
+    setQuickCatError('');
+  };
+  const handleQuickAddCategory = () => {
+    const label = quickCatLabel.trim();
+    if (!label) {
+      setQuickCatError('请输入分类名称');
+      return;
+    }
+    if (categoryList.includes(label)) {
+      setQuickCatError('该分类已存在');
+      return;
+    }
+    const updated = [...categoryList, label];
+    setCategoryList(updated);
+    persistEventCategories(updated, lastCatSyncRef);
+    setShowAddCatModal(false);
+  };
+
+  // 管理员在编辑模式下 —— 重命名 / 删除 / 追加
+  const startEditCategory = (label) => {
+    setEditingCatLabel(label);
+    setEditCatDraft(label);
+  };
+  const saveEditCategory = () => {
+    const next = editCatDraft.trim();
+    if (!next) return;
+    if (next !== editingCatLabel && categoryList.includes(next)) {
+      // 重名，终止
+      return;
+    }
+    const updated = categoryList.map((c) => (c === editingCatLabel ? next : c));
+    setCategoryList(updated);
+    persistEventCategories(updated, lastCatSyncRef);
+    // 如果当前选中的正是被改名的分类，同步选中到新名
+    if (selectedCategory === editingCatLabel) setSelectedCategory(next);
+    setEditingCatLabel(null);
+    setEditCatDraft('');
+  };
+  const handleDeleteCategory = (label) => {
+    if (!window.confirm(`确定要删除分类「${label}」吗？\n（已有活动的分类值不会被删除，仅从筛选项中移除）`)) return;
+    const updated = categoryList.filter((c) => c !== label);
+    setCategoryList(updated);
+    persistEventCategories(updated, lastCatSyncRef);
+    if (selectedCategory === label) setSelectedCategory('全部');
+  };
+  const handleAddCategoryInManager = () => {
+    const label = newCatLabel.trim();
+    if (!label || categoryList.includes(label)) {
+      setNewCatLabel('');
+      return;
+    }
+    const updated = [...categoryList, label];
+    setCategoryList(updated);
+    persistEventCategories(updated, lastCatSyncRef);
+    setNewCatLabel('');
+  };
+
   // ---- 弹窗操作 ----
   const openModal = () => {
-    setDraft(EMPTY_EVENT);
+    // 新建默认选第一个预设分类
+    const defaultCat = categoryList[0] || '其他';
+    setDraft({ ...EMPTY_EVENT, category: defaultCat });
+    setCustomCategoryInput('');
     setFormError('');
     setShowModal(true);
   };
@@ -126,6 +294,7 @@ export default function EventPublish() {
   const closeModal = () => {
     setShowModal(false);
     setDraft(EMPTY_EVENT);
+    setCustomCategoryInput('');
     setFormError('');
   };
 
@@ -142,8 +311,25 @@ export default function EventPublish() {
       setFormError('已勾选「有回放」，请填写回放链接');
       return;
     }
+    // 如果选了"__custom__"（自定义），用输入的文本作为分类
+    let finalCategory = draft.category;
+    if (draft.category === '__custom__') {
+      const custom = customCategoryInput.trim();
+      if (!custom) {
+        setFormError('请输入自定义分类名称');
+        return;
+      }
+      finalCategory = custom;
+      // 若新分类不在分类列表，顺带添加进去（让它成为可筛选项）
+      if (!categoryList.includes(custom)) {
+        const updated = [...categoryList, custom];
+        setCategoryList(updated);
+        persistEventCategories(updated, lastCatSyncRef);
+      }
+    }
     addEvent({
       ...draft,
+      category: finalCategory,
       id: `evt-${Date.now()}`,
       title: draft.title.trim(),
       location: draft.location.trim(),
@@ -246,8 +432,115 @@ export default function EventPublish() {
                   {cat}
                 </button>
               ))}
+              {/* 所有登录成员可用：快速新增分类 */}
+              <button
+                className="ia-list__cat ia-list__cat--add"
+                onClick={openAddCatModal}
+                title="新增筛选分类（所有成员可用）"
+              >
+                <Plus size={14} /> 新增筛选
+              </button>
             </div>
+            {/* 管理员编辑模式：进入分类管理（重命名/删除） */}
+            {isAdmin && editing && (
+              <button
+                className={`ia-list__manage-btn ${showCatManager ? 'ia-list__manage-btn--active' : ''}`}
+                onClick={() => setShowCatManager(!showCatManager)}
+                title="管理筛选分类"
+              >
+                <Settings2 size={16} />
+              </button>
+            )}
           </div>
+
+          {/* 分类管理面板（仅管理员 + 编辑模式）*/}
+          {isAdmin && editing && showCatManager && (
+            <div className="ia-cat-manager card">
+              <div className="ia-cat-manager__header">
+                <h4><Settings2 size={16} /> 筛选分类管理</h4>
+                <button className="ia-cat-manager__close" onClick={() => setShowCatManager(false)}>
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* 现有分类列表 */}
+              <div className="ia-cat-manager__list">
+                {categoryList.map((label) => (
+                  <div key={label} className="ia-cat-item">
+                    {editingCatLabel === label ? (
+                      <div className="ia-cat-item__edit">
+                        <div className="ia-cat-item__edit-row">
+                          <input
+                            type="text"
+                            className="ia-cat-item__edit-input"
+                            value={editCatDraft}
+                            onChange={(e) => setEditCatDraft(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && saveEditCategory()}
+                            autoFocus
+                          />
+                          <button
+                            className="ia-cat-item__action ia-cat-item__action--save"
+                            onClick={saveEditCategory}
+                            title="保存"
+                          >
+                            <Check size={14} />
+                          </button>
+                          <button
+                            className="ia-cat-item__action"
+                            onClick={() => { setEditingCatLabel(null); setEditCatDraft(''); }}
+                            title="取消"
+                          >
+                            <X size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="ia-cat-item__display">
+                        <span className="ia-cat-item__label">{label}</span>
+                        <div className="ia-cat-item__actions">
+                          <button
+                            className="ia-cat-item__action"
+                            onClick={() => startEditCategory(label)}
+                            title="重命名"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            className="ia-cat-item__action ia-cat-item__action--danger"
+                            onClick={() => handleDeleteCategory(label)}
+                            title="删除"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* 新建分类 */}
+              <div className="ia-cat-manager__add">
+                <div className="ia-cat-manager__add-row">
+                  <input
+                    type="text"
+                    className="ia-cat-manager__add-input"
+                    placeholder="输入新分类名称..."
+                    value={newCatLabel}
+                    onChange={(e) => setNewCatLabel(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddCategoryInManager()}
+                  />
+                  <button
+                    className="ia-cat-manager__add-btn"
+                    onClick={handleAddCategoryInManager}
+                    disabled={!newCatLabel.trim() || categoryList.includes(newCatLabel.trim())}
+                  >
+                    <Plus size={14} /> 添加
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* 活动卡片列表（沿用 ia-card 视觉） */}
@@ -357,13 +650,33 @@ export default function EventPublish() {
                   </div>
                   <div className="ia-modal__field">
                     <label className="ia-modal__label">分类</label>
-                    <input
-                      type="text"
+                    <select
                       className="ia-modal__text-input"
-                      placeholder="如：分享会 / 经验分享 / 团队招新"
                       value={draft.category}
                       onChange={(e) => setDraft({ ...draft, category: e.target.value })}
-                    />
+                    >
+                      {categoryList.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      {/* 若当前 draft.category 是历史分类（不在预设里），先把它显示为选项 */}
+                      {draft.category &&
+                        !categoryList.includes(draft.category) &&
+                        draft.category !== '__custom__' && (
+                          <option value={draft.category}>{draft.category}</option>
+                        )}
+                      <option value="__custom__">＋ 自定义…</option>
+                    </select>
+                    {draft.category === '__custom__' && (
+                      <input
+                        type="text"
+                        className="ia-modal__text-input"
+                        placeholder="请输入新分类名称，保存时将自动加入筛选项"
+                        value={customCategoryInput}
+                        onChange={(e) => setCustomCategoryInput(e.target.value)}
+                        style={{ marginTop: 8 }}
+                        maxLength={20}
+                      />
+                    )}
                   </div>
                 </div>
 
@@ -522,6 +835,67 @@ export default function EventPublish() {
               </button>
               <button className="btn btn-ghost" onClick={closeReplayModal}>
                 取消
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 普通成员快速新增分类弹窗 ========== */}
+      {showAddCatModal && (
+        <div className="ia-modal-overlay" onClick={closeAddCatModal}>
+          <div
+            className="ia-modal"
+            style={{ maxWidth: 420 }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="ia-modal__header">
+              <h2><Plus size={18} /> 新增筛选分类</h2>
+              <button className="ia-modal__close" onClick={closeAddCatModal}>
+                <X size={20} />
+              </button>
+            </div>
+            <div className="ia-modal__body">
+              <div className="ia-modal__field">
+                <label className="ia-modal__label">分类名称</label>
+                <input
+                  type="text"
+                  className="ia-modal__text-input"
+                  placeholder="例如：读书会、线下聚会…"
+                  value={quickCatLabel}
+                  onChange={(e) => {
+                    setQuickCatLabel(e.target.value);
+                    setQuickCatError('');
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && handleQuickAddCategory()}
+                  autoFocus
+                  maxLength={20}
+                />
+                {quickCatError && (
+                  <div className="ia-modal__error" style={{ marginTop: 8 }}>
+                    <AlertCircle size={14} /> {quickCatError}
+                  </div>
+                )}
+                <p style={{
+                  fontSize: 12,
+                  color: 'var(--color-text-muted)',
+                  marginTop: 8,
+                  lineHeight: 1.6,
+                }}>
+                  新增的分类会立即同步给所有成员。只有管理员在编辑模式下才能重命名或删除分类。
+                </p>
+              </div>
+            </div>
+            <div className="ia-modal__footer">
+              <button className="btn btn-ghost" onClick={closeAddCatModal}>
+                取消
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleQuickAddCategory}
+                disabled={!quickCatLabel.trim()}
+              >
+                <Plus size={16} /> 新增
               </button>
             </div>
           </div>
