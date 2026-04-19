@@ -291,8 +291,19 @@ export function SiteContentProvider({ children }) {
     return getDefaultFilters();
   });
 
-  // 用户添加的文章（初始为空，从 Supabase 加载）
-  const [userArticles, setUserArticles] = useState([]);
+  // 用户添加的文章
+  // 策略：先从 localStorage 的缓存 key 恢复（SWR 模式），
+  //      打开页面立刻显示上一次的数据；后台再向 Supabase 拉取最新覆盖。
+  const [userArticles, setUserArticles] = useState(() => {
+    try {
+      const raw = localStorage.getItem(ARTICLES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) return parsed;
+      }
+    } catch { /* ignore */ }
+    return [];
+  });
   const [articlesLoaded, setArticlesLoaded] = useState(false);
 
   // 内部空间配置持久化开关：true 时暂停自动写 localStorage（编辑模式下使用）
@@ -383,13 +394,22 @@ export function SiteContentProvider({ children }) {
         if (!cancelled) {
           setUserArticles(articles);
           setArticlesLoaded(true);
+          // 写本地缓存，供下次打开即时显示
+          try {
+            localStorage.setItem(ARTICLES_KEY, JSON.stringify(articles));
+          } catch { /* ignore quota/private mode */ }
         }
         // 尝试迁移 localStorage 中的旧文章到 Supabase
         const migrated = await migrateLocalArticlesToDb();
         if (migrated > 0 && !cancelled) {
           // 重新加载以包含迁移的数据
           const refreshed = await fetchArticlesFromDb();
-          if (!cancelled) setUserArticles(refreshed);
+          if (!cancelled) {
+            setUserArticles(refreshed);
+            try {
+              localStorage.setItem(ARTICLES_KEY, JSON.stringify(refreshed));
+            } catch { /* ignore */ }
+          }
         }
       } catch {
         if (!cancelled) {
@@ -423,6 +443,16 @@ export function SiteContentProvider({ children }) {
     });
     return () => unsubscribe();
   }, []);
+
+  // ---- userArticles 变化时同步写本地缓存，供下次打开即时显示 ----
+  // 等首批数据已加载完成（articlesLoaded=true）后再开始写回，
+  // 避免初始化 state 为空（云端还没拉回）时误把缓存清空。
+  useEffect(() => {
+    if (!articlesLoaded) return;
+    try {
+      localStorage.setItem(ARTICLES_KEY, JSON.stringify(userArticles));
+    } catch { /* ignore */ }
+  }, [userArticles, articlesLoaded]);
 
   useEffect(() => {
     if (internalConfigPersistPaused) return;

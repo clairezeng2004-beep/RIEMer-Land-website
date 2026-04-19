@@ -92,6 +92,31 @@ const daysInMonth = (year, month) => {
 
 /* ---------- 空状态由接口/本地缓存提供，不再 seed 示例数据 ---------- */
 
+/**
+ * 相册列表的本地缓存（SWR 模式）
+ * - 打开页面先读缓存，立刻显示上次的列表，避免白屏等待；
+ * - 后台再调 fetchAlbumList() 拉最新，拉到后覆盖并同步写回缓存。
+ * 只缓存封面 + 数量（fetchAlbumList 的 _partial 结构），不缓存详情里的全量照片。
+ */
+const ALBUM_LIST_CACHE_KEY = 'riemer_album_list_cache_v1';
+
+const readAlbumListCache = () => {
+  try {
+    const raw = localStorage.getItem(ALBUM_LIST_CACHE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeAlbumListCache = (list) => {
+  try {
+    localStorage.setItem(ALBUM_LIST_CACHE_KEY, JSON.stringify(list));
+  } catch { /* quota/private mode 忽略 */ }
+};
+
 
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
@@ -104,8 +129,12 @@ export default function Gallery() {
     (key, val) => updateInternalConfig({ gallery: { [key]: val } }),
     [updateInternalConfig]
   );
-  const [albums, setAlbums] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // 初始值优先用本地缓存（SWR）：有缓存立刻显示；没有则 loading=true 等接口
+  const [albums, setAlbums] = useState(() => readAlbumListCache() || []);
+  const [loading, setLoading] = useState(() => {
+    const cached = readAlbumListCache();
+    return !cached || cached.length === 0;
+  });
   const [submitting, setSubmitting] = useState(false);
   // 上传进度：{ done, total }，total=0 表示无进度条（如纯元信息创建）
   const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
@@ -132,13 +161,17 @@ export default function Gallery() {
   const albumFileInputRef = useRef(null);
   const createAlbumFileRef = useRef(null);
 
-  /* ---- 初次加载：只拉相册列表 + 封面（不拉全部照片，避免卡顿） ---- */
+  /* ---- 初次加载：只拉相册列表 + 封面（不拉全部照片，避免卡顿）
+         已有本地缓存时 loading=false，此处的拉取为"后台静默刷新"，
+         拉到新数据再覆盖 state + 同步写回缓存。 ---- */
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const list = await fetchAlbumList();
-        if (alive) setAlbums(list);
+        if (!alive) return;
+        setAlbums(list);
+        writeAlbumListCache(list);
       } catch (err) {
         console.warn('[Gallery] 加载相册失败：', err);
       } finally {
@@ -149,6 +182,13 @@ export default function Gallery() {
       alive = false;
     };
   }, []);
+
+  /* ---- albums 发生任何本地变更（创建/删除/改名/新增照片等）后，
+         同步写回本地缓存，保证下次打开首屏即是最新。---- */
+  useEffect(() => {
+    if (loading) return; // 首批拉取完成之前不覆盖缓存
+    writeAlbumListCache(albums);
+  }, [albums, loading]);
 
   /* ---- 打开相册详情：若当前是 _partial 数据，懒加载全部照片 ---- */
   const openAlbum = useCallback(async (album) => {
