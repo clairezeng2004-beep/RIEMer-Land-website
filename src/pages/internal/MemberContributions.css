@@ -303,16 +303,24 @@
   background: var(--color-bg-hover, #E4ECE0);
 }
 
+/* 前三名行底色：
+   旧方案直接套金/银/铜（rgba 255,215,0 / 192,192,192 / 205,127,50 @ 0.04），
+   在以绿色(--color-primary #5B8C3E) + 青(#4FBFC4)为主调的站点里显得突兀：
+   金色偏暖黄、铜色偏橙粉，都和站点主色不在一个色相区间；银色又太接近
+   白底，几乎看不出差别。用户反馈"颜色不是很协调"。
+   改为同主色系(绿)的明度梯度，越靠前底色越重，既保留"前三名"视觉层级，
+   又与 .mc-table__row:hover(#E4ECE0) 同色系，整体调性统一。
+   金/银/铜的身份信号由单元格内的 🥇🥈🥉 emoji 继续承担，不依赖背景色。 */
 .mc-table__row--top1 {
-  background: rgba(255, 215, 0, 0.04);
+  background: #E9F2E1;
 }
 
 .mc-table__row--top2 {
-  background: rgba(192, 192, 192, 0.04);
+  background: #EFF5EA;
 }
 
 .mc-table__row--top3 {
-  background: rgba(205, 127, 50, 0.04);
+  background: #F4F8EF;
 }
 
 /* ---- sticky 列在特殊行背景下的补齐 ----
@@ -328,17 +336,17 @@
 
 .mc-table__row--top1 .mc-table__td--rank,
 .mc-table__row--top1 .mc-table__td--member {
-  background: #fffef6; /* rgba(255,215,0,0.04) on #FFFFFF */
+  background: #E9F2E1; /* 与 .mc-table__row--top1 行背景一致 */
 }
 
 .mc-table__row--top2 .mc-table__td--rank,
 .mc-table__row--top2 .mc-table__td--member {
-  background: #fafafa; /* rgba(192,192,192,0.04) on #FFFFFF */
+  background: #EFF5EA; /* 与 .mc-table__row--top2 行背景一致 */
 }
 
 .mc-table__row--top3 .mc-table__td--rank,
 .mc-table__row--top3 .mc-table__td--member {
-  background: #fefaf6; /* rgba(205,127,50,0.04) on #FFFFFF */
+  background: #F4F8EF; /* 与 .mc-table__row--top3 行背景一致 */
 }
 
 /* 排名 */
@@ -414,8 +422,14 @@
   color: inherit;
 }
 
-.mc-member-link:hover .mc-member-name {
-  color: var(--color-primary);
+/* 静态态（不再是链接）：去掉 hover 变绿，避免给用户
+   "还能点"的错觉；保留 default 态样式继承基础规则。 */
+.mc-member-link--static {
+  cursor: default;
+}
+
+.mc-member-link--static:hover .mc-member-name {
+  color: inherit;
 }
 
 .mc-member-avatar {

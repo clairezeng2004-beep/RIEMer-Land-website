@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Navigate, Link } from 'react-router-dom';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -479,9 +479,19 @@ export default function MemberContributions() {
                 >
                   <td className="mc-table__td--rank">{getRankDisplay(index)}</td>
                   <td className="mc-table__td--member">
-                    <Link to={member.profileUrl} className="mc-member-link">
+                    {/*
+                      点击人名不再跳转到个人主页 / timeline。
+                      原实现用 <Link to={member.profileUrl}> 会让每个人名
+                      变成链接，鼠标悬停时左下角还会显示目标 URL（如
+                      https://riemerland.com/timeline#team），用户反馈
+                      不希望在成员贡献表里点名字就跳转。
+                      改为纯文本 <span>，保留 mc-member-link 的样式
+                      （颜色、字重、间距）以免视觉变化；mc-member-name
+                      内层 span 不动。
+                    */}
+                    <span className="mc-member-link mc-member-link--static">
                       <span className="mc-member-name">{member.name}</span>
-                    </Link>
+                    </span>
                   </td>
                   <td className="mc-table__td--num">
                     <span className={member.shareEvents > 0 ? 'mc-num mc-num--active' : 'mc-num'}>
