@@ -218,16 +218,21 @@
 }
 
 .mc-table thead {
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover, #E4ECE0);
 }
 
 /* 表头冻结：thead th 相对 wrapper 吸顶。
-   sticky 元素自身必须带不透明背景色，否则滚动时下方行内容会透上来。 */
+   sticky 元素自身必须带不透明背景色，否则滚动时下方行内容会透上来。
+   注意 background 必须写 fallback：历史上 --color-bg-hover 曾经没有在
+   设计系统定义过，变量解析失败会直接降级为 transparent，thead 变透明
+   → 上滑时下方行（比如"test / 记录人：曾子煜 / +添加"）文字会穿透
+   冻结表头，叠在统计卡片 / 表头上方，观感上像"字体重叠"。
+   即便现在 index.css 已补上变量，这里仍保留显式 fallback 做双保险。 */
 .mc-table thead th {
   position: sticky;
   top: 0;
   z-index: 4;
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover, #E4ECE0);
 }
 
 .mc-table th {
@@ -295,7 +300,7 @@
 }
 
 .mc-table__row:hover {
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover, #E4ECE0);
 }
 
 .mc-table__row--top1 {
@@ -318,7 +323,7 @@
    sticky 元素被当作独立层叠上下文时透出下方内容。 */
 .mc-table__row:hover .mc-table__td--rank,
 .mc-table__row:hover .mc-table__td--member {
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover, #E4ECE0);
 }
 
 .mc-table__row--top1 .mc-table__td--rank,
@@ -357,7 +362,7 @@
 .mc-table thead .mc-table__th--rank {
   /* 交叉格：高于普通表头(4) 与 tbody sticky 列(2) */
   z-index: 6;
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover, #E4ECE0);
 }
 
 .mc-rank {
@@ -401,7 +406,7 @@
 
 .mc-table thead .mc-table__th--member {
   z-index: 6;
-  background: var(--color-bg-hover);
+  background: var(--color-bg-hover, #E4ECE0);
 }
 
 .mc-member-link {

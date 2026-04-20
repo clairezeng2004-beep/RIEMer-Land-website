@@ -22,6 +22,15 @@
   --color-bg: #F7FAF5;
   --color-bg-alt: #EFF5ED;
   --color-bg-card: #FFFFFF;
+  /* --color-bg-hover：悬停 / 表头背景统一色。
+     历史问题：此前多处 CSS 使用了 var(--color-bg-hover) 但该变量从未在
+     设计系统中定义，导致变量解析失败 → 背景降级为 transparent。
+     在 MemberContributions 表格里表现尤其明显：表头 thead 做了 sticky
+     冻结，但背景色实际是透明，上滑时下方行的姓名 / "+ 添加" 等内容会
+     穿透表头文字，造成"叠字"错觉。
+     这里补上一个与页面淡绿色调协调的中性浅色（比 --color-bg-alt 略深
+     一档），同时消除所有 hover / sticky 表头背景失效问题。 */
+  --color-bg-hover: #E4ECE0;
   --color-text: #2C3E2D;
   --color-text-light: #5A6B5C;
   --color-text-muted: #8A9A8C;
