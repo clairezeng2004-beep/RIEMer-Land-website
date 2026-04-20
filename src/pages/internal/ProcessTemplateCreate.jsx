@@ -34,6 +34,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import { stripUnderline } from '../../utils/stripUnderline';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
+import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './MemberSharingCreate.css';
 import './DraftAutosave.css';
 
@@ -151,12 +152,14 @@ export default function ProcessTemplateCreate() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+  // 贡献者可选列表：走模块级 30s 缓存（getCachedAllUsers），和评论区、
+  // 详情页共用同一份 profiles 查询，避免每次打开发布页就触发一次全表拉取。
   const [allUsers, setAllUsers] = useState([]);
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const list = (await getAllUsers?.()) || [];
+        const list = (await getCachedAllUsers(getAllUsers)) || [];
         if (!cancelled) setAllUsers(list);
       } catch { /* ignore */ }
     })();
@@ -616,14 +619,20 @@ export default function ProcessTemplateCreate() {
             <div className="msc-form__field">
               <label>
                 贡献者
-                <span className="msc-form__hint">可多选，默认为本人；文档迁移时请选择实际贡献者</span>
+                <span className="msc-form__hint">可多选，默认为本人</span>
               </label>
               <CustomSelect
                 multiple
+                searchable
+                searchPlaceholder="搜索成员（支持中文/拼音/首字母）"
                 value={contributorIds}
                 onChange={(vals) => setContributorIds(vals)}
                 placeholder="请选择贡献者"
                 options={(() => {
+                  // 候选项 = 所有「已授权」成员 ∪ 当前用户本人（兜底，
+                  // 防止账号 authorized 字段缺失时连自己都选不到）。
+                  // 按注册时间顺序展示，CustomSelect 内部 pinyinMatch 支持
+                  // 中文名 / 拼音全拼 / 首字母三种搜索方式。
                   const seen = new Set();
                   const opts = [];
                   const pushUser = (u) => {
@@ -635,7 +644,9 @@ export default function ProcessTemplateCreate() {
                     });
                   };
                   if (user) pushUser(user);
-                  allUsers.forEach(pushUser);
+                  allUsers
+                    .filter((u) => u && u.authorized === true)
+                    .forEach(pushUser);
                   return opts;
                 })()}
               />

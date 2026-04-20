@@ -50,6 +50,7 @@ import {
   subscribeDeletedDefaults,
 } from '../../lib/documentsService';
 import ViewLogPopover from '../../components/ViewLogPopover';
+import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './Documents.css';
 
 const defaultTypeLabels = {
@@ -165,7 +166,9 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     let cancelled = false;
     (async () => {
       try {
-        const list = (await getAllUsers?.()) || [];
+        // 走模块级 30s 缓存，和评论区 / 文档详情页共享同一份 profiles 查询，
+        // 避免每次打开上传表单都触发一次全表拉取。
+        const list = (await getCachedAllUsers(getAllUsers)) || [];
         if (cancelled) return;
         const map = {};
         list.forEach((u) => {
@@ -1007,11 +1010,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 <label>贡献者（可多选）</label>
                 <CustomSelect
                   multiple
+                  searchable
+                  searchPlaceholder="搜索成员（支持中文/拼音/首字母）"
                   value={contributorIds}
                   onChange={(vals) => setContributorIds(vals)}
                   placeholder="请选择贡献者"
                   options={(() => {
-                    // 已授权成员优先；加上当前用户自己（确保能选到自己）
+                    // 候选项 = 所有「已授权」成员 ∪ 当前用户本人（兜底，
+                    // 防止账号 authorized 字段缺失时自己也选不到）。
+                    // CustomSelect 内部 pinyinMatch 支持中文 / 拼音全拼 / 首字母三种搜索。
                     const seen = new Set();
                     const opts = [];
                     const pushUser = (u) => {
@@ -1023,7 +1030,9 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                       });
                     };
                     if (user) pushUser(user);
-                    allUsers.forEach(pushUser);
+                    allUsers
+                      .filter((u) => u && u.authorized === true)
+                      .forEach(pushUser);
                     return opts;
                   })()}
                 />
