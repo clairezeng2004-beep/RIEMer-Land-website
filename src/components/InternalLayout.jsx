@@ -23,8 +23,13 @@ function MobileInternalNav() {
   const scrollRef = useRef(null);
   const location = useLocation();
 
+  // 手机端导航条的顺序必须与电脑端 InternalSidebar 保持一致，
+  // 否则用户在两种设备间切换时会找不到同一个入口。分组依据同样是
+  // 「日常管理 / 成员 / 管理」三段，段内顺序严格 follow InternalSidebar.jsx
+  // 里的 dailyItems / memberItems / adminItems。修改侧边栏顺序时，
+  // 这里也必须一并同步。
   const navItems = [
-    // 日常管理
+    // 日常管理（对齐 InternalSidebar.dailyItems）
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
     { to: '/internal/notifications', icon: Bell, label: sc.labelNotifications, badge: unreadCount > 0 ? unreadCount : null },
     { to: '/internal/process-templates', icon: FolderOpen, label: sc.labelProcessTemplates },
@@ -32,13 +37,13 @@ function MobileInternalNav() {
     { to: '/internal/event-publish', icon: CalendarRange, label: sc.labelEventPublish },
     { to: '/internal/contributions', icon: BarChart3, label: sc.labelContributions },
     { to: '/internal/guestbook', icon: MessageCircle, label: sc.labelGuestbook },
-    // 成员
-    { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
-    { to: '/internal/profile', icon: UserCircle, label: sc.labelProfile },
-    { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
-    { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
+    // 成员（对齐 InternalSidebar.memberItems：内部分享 → 通讯录 → 建设建议 → 互动相册 → 个人主页）
     { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
-    // 管理
+    { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
+    { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
+    { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
+    { to: '/internal/profile', icon: UserCircle, label: sc.labelProfile },
+    // 管理（对齐 InternalSidebar.adminItems）
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
     { to: '/internal/notification-management', icon: BellRing, label: sc.labelNotificationMgmt },
