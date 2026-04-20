@@ -716,7 +716,8 @@
   }
 
   .mc-table-wrapper {
-    font-size: 12px;
+    /* 字号继承 .mc-table 的 --text-sm，与事项追踪 (.tasks-table) 对齐；
+       此前写死 12px 会比 Tasks 表整整小一档，观感不统一。 */
     -webkit-overflow-scrolling: touch;
     /* 手机端：wrapper 只横向滚，纵向交给页面本身，
        桌面端的 max-height 必须撤掉——否则 thead sticky 会以 wrapper
@@ -790,7 +791,8 @@
 
   .mc-table th {
     padding: 10px 10px;
-    font-size: 11px;
+    /* 与 .tasks-table th 一致：font-size 不在手机端降级，
+       继承 .mc-table 本身的 --text-sm。 */
   }
 
   .mc-table td {

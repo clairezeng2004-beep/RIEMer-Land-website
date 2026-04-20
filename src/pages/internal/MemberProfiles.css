@@ -200,7 +200,9 @@
   background: var(--color-bg);
   padding: 0.75rem 1rem;
   text-align: left;
-  font-size: var(--text-xs);
+  /* 与 .tasks-table th 对齐到 --text-sm，避免表头比正文小一档；
+     之前 --text-xs 配合大写字距看起来偏细弱。 */
+  font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text-muted);
   /* sticky 下用 box-shadow 模拟底边（border 在 sticky 时会随滚动消失） */
@@ -586,24 +588,23 @@
     min-width: 1400px;
   }
 
-  /* 手机端字号收紧：桌面端 td 字号是 --text-sm (14px)，
-     在多列密集表格里叠加 line-height: 1.6 + 较大 padding，
-     整体看起来字号比同页其它区域都大一截；这里下调到
-     --text-xs (12px) + 更紧凑的 padding，与内部空间其它
-     列表/卡片的视觉密度保持一致。 */
+  /* 手机端字号与事项追踪表 (.tasks-table) 对齐到 --text-sm (14px)。
+     之前下调到 11px / --text-xs 是为了"视觉密度"，但和同内部空间的
+     Tasks 表放在一起比字号明显小一档，用户要求统一。padding 保持
+     紧凑以照顾列数较多的横向滚动。 */
   .member-profiles-table th {
     padding: 0.5rem 0.625rem;
-    font-size: 11px;
+    font-size: var(--text-sm);
   }
   .member-profiles-table td {
     padding: 0.45rem 0.625rem;
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
   }
   .member-profiles-table__cell {
     line-height: 1.55;
   }
   .member-profiles-table__input {
-    font-size: var(--text-xs);
+    font-size: var(--text-sm);
   }
 }
 
