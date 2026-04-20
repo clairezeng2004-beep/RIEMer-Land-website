@@ -50,7 +50,9 @@ import {
   subscribeDeletedDefaults,
 } from '../../lib/documentsService';
 import ViewLogPopover from '../../components/ViewLogPopover';
+import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
+import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
@@ -915,6 +917,19 @@ export default function ProcessTemplateDetail() {
   // 'cloud-failed'：本地已保存但云端同步失败（不阻塞，提示用户）
   const [saveHint, setSaveHint] = useState(null);
 
+  /* ========== Markdown 编辑态同步滚动 ==========
+   * 与 MemberSharingCreate / ProcessTemplateCreate 行为完全一致：
+   *   默认关闭 → 点按钮显式开启 → 再点关闭。
+   * 保证无论从哪个入口进入 Markdown 编辑，都能看到同一个开关。 */
+  const {
+    syncScroll: mdSyncScroll,
+    toggleSyncScroll: toggleMdSyncScroll,
+    editorRef: mdSyncEditorRef,
+    previewRef: mdSyncPreviewRef,
+    handleEditorScroll: handleMdEditorScroll,
+    handlePreviewScroll: handleMdPreviewScroll,
+  } = useMarkdownSyncScroll(false);
+
   /* ========== 编辑草稿自动保存 ========== */
   const editDraftKey = doc?.id && user?.id
     ? `process-template-edit:${doc.id}:${user.id}`
@@ -1351,11 +1366,14 @@ export default function ProcessTemplateDetail() {
                       <div className="msc-md-split__pane">
                         <div className="msc-md-split__label">
                           <Code2 size={14} /> 编辑
+                          <SyncScrollToggle on={mdSyncScroll} onToggle={toggleMdSyncScroll} />
                         </div>
                         <textarea
+                          ref={mdSyncEditorRef}
                           className="msc-md-split__editor"
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
+                          onScroll={handleMdEditorScroll}
                           placeholder={'# 文档标题\n\n## 一、xxx\n\n正文内容…'}
                           spellCheck={false}
                         />
@@ -1365,7 +1383,9 @@ export default function ProcessTemplateDetail() {
                           <Eye size={14} /> 预览
                         </div>
                         <div
+                          ref={mdSyncPreviewRef}
                           className="msc-md-split__preview"
+                          onScroll={handleMdPreviewScroll}
                           dangerouslySetInnerHTML={{
                             __html:
                               editMarkdownPreview ||

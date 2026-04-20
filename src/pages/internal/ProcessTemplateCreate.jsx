@@ -30,6 +30,8 @@ import {
 } from '../../utils/wordDocBlocks';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
+import SyncScrollToggle from '../../components/SyncScrollToggle';
+import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import { stripUnderline } from '../../utils/stripUnderline';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import './MemberSharingCreate.css';
@@ -89,9 +91,18 @@ export default function ProcessTemplateCreate() {
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
 
-  // 同步滚动开关（默认 false：编辑和预览各自独立滚动）
-  const [syncScroll, setSyncScroll] = useState(false);
-  const syncScrollLockRef = useRef(null);
+  /* ============ Markdown 同步滚动 ============
+   * 使用公共 hook 管理，默认关闭。和其他 Markdown 编辑入口
+   * （MemberSharingCreate / ProcessTemplateDetail 编辑态）保持一致。
+   * mdEditorRef 仍保留，供 FloatingTextToolbar 定位浮动工具条。 */
+  const {
+    syncScroll,
+    toggleSyncScroll,
+    editorRef: syncEditorRef,
+    previewRef: syncPreviewRef,
+    handleEditorScroll,
+    handlePreviewScroll,
+  } = useMarkdownSyncScroll(false);
 
   const { filterOptions } = useSiteContent();
 
@@ -404,39 +415,6 @@ export default function ProcessTemplateCreate() {
     marked.setOptions({ breaks: true, gfm: true });
     return marked.parse(newDoc.content);
   }, [newDoc.format, newDoc.content]);
-
-  /* ============ Markdown 同步滚动（可关闭） ============
-   * 默认关闭，两侧可各自独立滚动；开启后按滚动百分比联动。
-   * ========================================================= */
-  const handleEditorScroll = useCallback(() => {
-    if (!syncScroll) return;
-    const src = mdEditorRef.current;
-    const dst = mdPreviewRef.current;
-    if (!src || !dst) return;
-    if (syncScrollLockRef.current === 'preview') return;
-    syncScrollLockRef.current = 'editor';
-    const srcMax = src.scrollHeight - src.clientHeight;
-    const dstMax = dst.scrollHeight - dst.clientHeight;
-    if (srcMax > 0 && dstMax > 0) {
-      dst.scrollTop = (src.scrollTop / srcMax) * dstMax;
-    }
-    requestAnimationFrame(() => { syncScrollLockRef.current = null; });
-  }, [syncScroll]);
-
-  const handlePreviewScroll = useCallback(() => {
-    if (!syncScroll) return;
-    const src = mdPreviewRef.current;
-    const dst = mdEditorRef.current;
-    if (!src || !dst) return;
-    if (syncScrollLockRef.current === 'editor') return;
-    syncScrollLockRef.current = 'preview';
-    const srcMax = src.scrollHeight - src.clientHeight;
-    const dstMax = dst.scrollHeight - dst.clientHeight;
-    if (srcMax > 0 && dstMax > 0) {
-      dst.scrollTop = (src.scrollTop / srcMax) * dstMax;
-    }
-    requestAnimationFrame(() => { syncScrollLockRef.current = null; });
-  }, [syncScroll]);
 
   /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 + 分栏 + 表格 ============ */
   const imageApiRef = useRef(null);
@@ -784,18 +762,16 @@ export default function ProcessTemplateCreate() {
                   <div className="msc-md-split__pane">
                     <div className="msc-md-split__label">
                       <Code2 size={14} /> 编辑
-                      <button
-                        type="button"
-                        className={`msc-md-split__sync-btn ${syncScroll ? 'msc-md-split__sync-btn--on' : ''}`}
-                        onClick={() => setSyncScroll((v) => !v)}
-                        title={syncScroll ? '已开启同步滚动：编辑与预览一起滚动。点击关闭后可分别滚动。' : '未开启同步滚动：编辑与预览可分别滚动。点击开启同步。'}
-                      >
-                        <span className="msc-md-split__sync-dot" />
-                        同步滚动{syncScroll ? '（已开启）' : '（已关闭）'}
-                      </button>
+                      <SyncScrollToggle on={syncScroll} onToggle={toggleSyncScroll} />
                     </div>
                     <textarea
-                      ref={mdEditorRef}
+                      ref={(el) => {
+                        // 同时写入两个 ref：
+                        //   - mdEditorRef：FloatingTextToolbar 用
+                        //   - syncEditorRef：useMarkdownSyncScroll hook 用
+                        mdEditorRef.current = el;
+                        syncEditorRef.current = el;
+                      }}
                       className="msc-md-split__editor"
                       value={newDoc.content}
                       onChange={(e) => setNewDoc({ ...newDoc, content: e.target.value })}
@@ -815,7 +791,10 @@ export default function ProcessTemplateCreate() {
                       <Eye size={14} /> 预览
                     </div>
                     <div
-                      ref={mdPreviewRef}
+                      ref={(el) => {
+                        mdPreviewRef.current = el;
+                        syncPreviewRef.current = el;
+                      }}
                       className="msc-md-split__preview"
                       onScroll={handlePreviewScroll}
                       dangerouslySetInnerHTML={{
