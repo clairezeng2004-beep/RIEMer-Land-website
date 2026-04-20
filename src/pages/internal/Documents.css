@@ -291,9 +291,13 @@
 
 /* 重命名输入 */
 .documents-filters__rename {
+  /* flex-shrink:0 防止被父级 flex 容器挤压导致输入框被截断；
+     max-width + 手机端再次收紧，见下方 @media。 */
   display: inline-flex;
+  flex-shrink: 0;
   align-items: center;
   gap: 0.25rem;
+  max-width: 100%;
 }
 
 .documents-filters__rename-input {
@@ -302,7 +306,25 @@
   border-radius: var(--radius-full);
   font-size: var(--text-sm);
   outline: none;
-  width: 120px;
+  /* 宽度跟随文字（v2）：
+     原先硬编码 width: 120px —— 用户反馈"编辑筛选项时胶囊固定宽度、
+     文字长了会和下面内容重叠，手机端电脑端都有"。根因就是这里。
+     现在：
+       - width: auto  让 HTML 原生的 <input size="N"> 真正生效
+                      （JSX 里根据 value.length 动态计算 size）。
+                      若去掉 width: auto，size 在大多数浏览器里
+                      会被作者样式里的 width 覆盖而失效。
+       - min-width    值为空或极短时不塌成一条缝，空态也能点进去。
+       - max-width    中文分类名再长也不会破掉页面；
+                      用 min(20rem, 60vw) 自适应窄屏；
+                      超出这个上限会在输入框内自己横向滚，
+                      不会推挤同一行其它 chip。
+       - box-sizing: content-box  让 size 属性的字符宽度不再被
+                      padding 吞掉（否则视觉上会比 size 指定的短一截）。*/
+  width: auto;
+  min-width: 4.5rem;
+  max-width: min(20rem, 60vw);
+  box-sizing: content-box;
   color: var(--color-text);
   background: var(--color-bg-card);
   transition: border-color var(--transition-fast), box-shadow var(--transition-fast);

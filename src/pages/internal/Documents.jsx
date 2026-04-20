@@ -1094,6 +1094,16 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                         if (e.key === 'Escape') { setRenamingType(null); setRenameValue(''); }
                       }}
                       autoFocus
+                      /* 宽度跟随文字长度（自适应 chip）：
+                         用户反馈"编辑筛选项时胶囊一直是固定宽度，文字变长就
+                         和下面的内容重叠，手机端电脑端都有"。根因是 CSS 里
+                         .documents-filters__rename-input 写死了 width: 120px。
+                         这里用原生 <input size> 属性（以字符数为单位，近似
+                         按当前字号撑宽度），配合 CSS 里 width: auto 让它
+                         真正按 size 展开。min 8 字符兜底，避免空值时塌成极窄。
+                         +2 给中英文混排留呼吸；中文在 size 单位下会略偏窄，
+                         +2 的富余能把中文标题撑完整。 */
+                      size={Math.max(8, renameValue.length + 2)}
                     />
                     <button
                       className="documents-filters__rename-confirm"
