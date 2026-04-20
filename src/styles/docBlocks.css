@@ -38,7 +38,9 @@
   max-width: 100%;
 }
 
-/* 占位（仅编辑器里会出现；预览页若正常使用不会留下占位 span） */
+/* 占位（仅编辑器里会出现；预览页若正常使用不会留下占位节点） */
+
+/* 旧版单占位 span（历史文档兼容） */
 .msc-col__placeholder {
   display: flex;
   align-items: center;
@@ -52,6 +54,70 @@
   cursor: pointer;
   user-select: none;
   transition: background 0.15s, color 0.15s;
+}
+
+/* 新版：空栏同时提供"插图"和"写文字"两个入口 */
+.msc-col__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 96px;
+  padding: 10px;
+  border-radius: var(--radius-sm, 4px);
+  background: rgba(91, 140, 62, 0.04);
+  user-select: none;
+}
+
+.msc-col__act {
+  appearance: none;
+  border: 1px dashed var(--color-border, #d1d5db);
+  background: #fff;
+  color: var(--color-text-muted, #6b7280);
+  font-size: var(--text-sm, 13px);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm, 4px);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  font-family: inherit;
+  line-height: 1.3;
+}
+
+.msc-col__act:hover {
+  border-color: var(--color-primary, #5B8C3E);
+  color: var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.06);
+}
+
+/* 栏内正文：用户点"输入文字"后出现的 <p>，以及图文混排时 <img> 周围的段落 */
+.msc-col > p,
+.msc-col > h1,
+.msc-col > h2,
+.msc-col > h3,
+.msc-col > h4,
+.msc-col > ul,
+.msc-col > ol,
+.msc-col > blockquote {
+  width: 100%;
+  margin: 0.25em 0;
+  text-align: left;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* 文字栏让 flex 从顶部对齐，避免单段文字被居中导致看起来是垂直居中图片预览 */
+.msc-col:has(> p),
+.msc-col:has(> h1),
+.msc-col:has(> h2),
+.msc-col:has(> h3),
+.msc-col:has(> h4),
+.msc-col:has(> ul),
+.msc-col:has(> ol),
+.msc-col:has(> blockquote) {
+  align-items: flex-start;
+  justify-content: flex-start;
 }
 
 /* ---------- 表格 ---------- */

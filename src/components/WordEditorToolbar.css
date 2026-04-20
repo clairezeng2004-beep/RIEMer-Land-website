@@ -245,6 +245,11 @@
   color: var(--color-primary, #5B8C3E);
 }
 
+/* 新版空栏两键占位：鼠标悬停整个栏时给一点视觉反馈（按钮自己也有 hover） */
+.msc-form__word-editor .msc-col:hover .msc-col__empty {
+  background: rgba(91, 140, 62, 0.08);
+}
+
 /* 编辑器里的 td 聚焦态 */
 .msc-form__word-editor .msc-table td:focus {
   outline: 2px solid var(--color-primary, #5B8C3E);

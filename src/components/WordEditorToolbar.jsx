@@ -177,7 +177,7 @@ export default function WordEditorToolbar({
                 </div>
               </div>
             ))}
-            <div className="wet__menu-tip">提示：空分栏中每一栏可点击「点此添加图片」补图</div>
+            <div className="wet__menu-tip">提示：空分栏中每一栏可点击「点此添加图片」补图，或点「输入文字」改为文字栏</div>
           </div>
         )}
       </div>

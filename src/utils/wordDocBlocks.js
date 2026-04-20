@@ -5,16 +5,28 @@
  *
  *   1) insertColumnsIntoEditor(editor, { count, files })
  *      —— 插入一个多栏并排容器（类似飞书的图片分栏），
- *         每栏可以是图片或空占位。
+ *         每栏既可以放图片，也可以输入文字。
  *         结构：
  *         <div class="msc-cols msc-cols--2" data-cols="2">
  *           <div class="msc-col">
  *             <img class="msc-img" src="..." />
  *           </div>
  *           <div class="msc-col">
- *             <span class="msc-col__placeholder">点此添加图片</span>
+ *             <!-- 未填充的空栏：提供"插图"和"写文字"两个占位按钮 -->
+ *             <div class="msc-col__empty" contenteditable="false">
+ *               <button class="msc-col__act msc-col__act--img">点此添加图片</button>
+ *               <button class="msc-col__act msc-col__act--text">输入文字</button>
+ *             </div>
+ *           </div>
+ *           <div class="msc-col">
+ *             <!-- 填了文字的栏：一个可编辑 <p>（和正文一样的富文本行为） -->
+ *             <p>这里是任意文字…</p>
  *           </div>
  *         </div>
+ *
+ *      兼容历史数据：如果发现旧结构里的 <span class="msc-col__placeholder">，
+ *      placeholder handler 仍会把它当作"插图"按钮处理（点击 → 选图填充），
+ *      保证早期文档打开后依然可用。
  *
  *   2) insertTableIntoEditor(editor, { rows, cols })
  *      —— 插入一个可编辑表格（类似飞书的表格），
@@ -117,11 +129,28 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
       img.alt = '';
       col.appendChild(img);
     } else {
-      const placeholder = document.createElement('span');
-      placeholder.className = 'msc-col__placeholder';
-      placeholder.textContent = '点此添加图片';
-      placeholder.setAttribute('contenteditable', 'false');
-      col.appendChild(placeholder);
+      // 空栏：给两个占位按钮（均 contenteditable=false，
+      // 不会被当做可编辑内容，避免光标进入按钮本身）。
+      //   - "点此添加图片" → 弹文件选择器，选完后替换为 <img>
+      //   - "输入文字"     → 把占位替换成一个可编辑的 <p>，光标自动进入
+      // 两个交互都由 attachColumnPlaceholderHandler 统一拦截。
+      const empty = document.createElement('div');
+      empty.className = 'msc-col__empty';
+      empty.setAttribute('contenteditable', 'false');
+
+      const btnImg = document.createElement('button');
+      btnImg.type = 'button';
+      btnImg.className = 'msc-col__act msc-col__act--img';
+      btnImg.textContent = '点此添加图片';
+
+      const btnText = document.createElement('button');
+      btnText.type = 'button';
+      btnText.className = 'msc-col__act msc-col__act--text';
+      btnText.textContent = '输入文字';
+
+      empty.appendChild(btnImg);
+      empty.appendChild(btnText);
+      col.appendChild(empty);
     }
     container.appendChild(col);
   }
@@ -130,20 +159,19 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
 }
 
 /**
- * 为编辑器挂载"分栏列占位点击 → 选图填充"的交互。
+ * 为编辑器挂载"分栏列占位点击 → 选图 / 改为文字输入"的交互。
  * 返回 destroy 函数。
+ *
+ * 兼容三种点击目标（都在空分栏里）：
+ *   - 新版「点此添加图片」按钮：.msc-col__act--img
+ *   - 新版「输入文字」按钮    ：.msc-col__act--text
+ *   - 旧版占位 span            ：.msc-col__placeholder（当作"添加图片"处理）
  */
 export function attachColumnPlaceholderHandler(editor, onChange) {
   if (!editor) return () => {};
-  const handler = async (e) => {
-    const t = e.target;
-    if (!(t instanceof HTMLElement)) return;
-    if (!t.classList.contains('msc-col__placeholder')) return;
-    e.preventDefault();
-    e.stopPropagation();
-    const col = t.closest('.msc-col');
-    if (!col) return;
-    // 弹起文件选择器
+
+  /** 把指定 col 的内容替换为一张图片（通过文件选择器） */
+  const pickAndInsertImage = (col) => {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
@@ -151,7 +179,6 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       const file = input.files?.[0];
       if (!file) return;
       const url = await fileToDataUrl(file);
-      // 替换 placeholder 为 <img>
       col.innerHTML = '';
       const img = document.createElement('img');
       img.src = url;
@@ -162,6 +189,60 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       onChange?.();
     };
     input.click();
+  };
+
+  /** 把指定 col 的内容替换为一个可编辑的 <p>，并把光标放进去 */
+  const switchColToText = (col) => {
+    col.innerHTML = '';
+    const p = document.createElement('p');
+    // 用 <br> 占位，保证空 <p> 在 contentEditable 里有可落脚的基线
+    p.innerHTML = '<br />';
+    col.appendChild(p);
+    try {
+      const range = document.createRange();
+      range.setStart(p, 0);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    } catch { /* ignore */ }
+    onChange?.();
+  };
+
+  const handler = (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+
+    // 1) 新版「输入文字」按钮
+    const textBtn = t.closest('.msc-col__act--text');
+    if (textBtn && editor.contains(textBtn)) {
+      const col = textBtn.closest('.msc-col');
+      if (!col) return;
+      e.preventDefault();
+      e.stopPropagation();
+      switchColToText(col);
+      return;
+    }
+
+    // 2) 新版「点此添加图片」按钮
+    const imgBtn = t.closest('.msc-col__act--img');
+    if (imgBtn && editor.contains(imgBtn)) {
+      const col = imgBtn.closest('.msc-col');
+      if (!col) return;
+      e.preventDefault();
+      e.stopPropagation();
+      pickAndInsertImage(col);
+      return;
+    }
+
+    // 3) 旧版占位 span（历史文档兼容）
+    if (t.classList.contains('msc-col__placeholder')) {
+      const col = t.closest('.msc-col');
+      if (!col) return;
+      e.preventDefault();
+      e.stopPropagation();
+      pickAndInsertImage(col);
+    }
   };
   editor.addEventListener('click', handler);
   return () => editor.removeEventListener('click', handler);
