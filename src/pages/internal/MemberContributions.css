@@ -727,6 +727,25 @@
     max-height: none;
   }
 
+  /* 表头手机端冻结：wrapper 已改成 overflow-y: visible，
+     sticky 参照上升到 viewport。但页面顶部有两层固定栏：
+       1) 全局 Navbar (position: fixed; top: 0)，手机端 ~64px；
+       2) 内部空间的 .internal-mobile-nav (sticky; top: 64px)，
+          本身 padding+item 约 46px。
+     合起来顶部约 110px 被这两层占掉，所以 thead 的 top: 0 会被遮住。
+     这里把 top 显式设成 110px，让表头刚好贴在移动导航条下方滚动时
+     始终可见。同时提一下 z-index，确保它在 sticky 的排名/成员列之上。 */
+  .mc-table thead th {
+    top: 110px;
+    z-index: 5;
+  }
+  /* 排名列 / 成员列的 thead 交叉格，z-index 仍需高于普通 thead(5) 与
+     tbody sticky 列(2)，保持原有的 6。 */
+  .mc-table thead .mc-table__th--rank,
+  .mc-table thead .mc-table__th--member {
+    z-index: 7;
+  }
+
   .mc-table {
     /* 关键：继续保留 table-layout: fixed。
        之前写的是 auto，浏览器会按内容自动分配列宽 ——
@@ -782,6 +801,12 @@
 @media (max-width: 480px) {
   .mc-page {
     padding-top: var(--space-xl);
+  }
+
+  /* 窄屏下 Navbar 缩成 ~56px、移动导航条 top 也改成 56px 且自身 ~44px，
+     顶部固定区合计 ~100px，表头 sticky top 同步下调。 */
+  .mc-table thead th {
+    top: 100px;
   }
 }
 

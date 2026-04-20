@@ -570,11 +570,13 @@
     max-height: none;
   }
 
-  /* 表头相对于 viewport 冻结。内部页面顶部有全局导航栏；
-     这里给一个保守的 top: 0（如果之后要精确避让 header，
-     可以改成具体像素值）。重要的是让 thead 不再滚走。 */
+  /* 表头相对于 viewport 冻结。手机端页面顶部有两层固定元素：
+       1) 全局 Navbar（position: fixed; top: 0）≈ 64px；
+       2) 内部空间 .internal-mobile-nav（sticky; top: 64px）自身 ≈ 46px。
+     合起来约 110px 会遮住 thead 的 top: 0。这里把 top 显式设成
+     110px，让表头吸附在移动导航条正下方，下拉页面时始终可见。 */
   .member-profiles-table thead th {
-    top: 0;
+    top: 110px;
   }
 
   .member-profiles-table {
@@ -619,6 +621,11 @@
   .member-profiles-table th,
   .member-profiles-table td {
     padding: 0.4rem 0.55rem;
+  }
+
+  /* 窄屏 Navbar 与移动导航条合计约 100px，表头 sticky top 同步下调 */
+  .member-profiles-table thead th {
+    top: 100px;
   }
 }
 
