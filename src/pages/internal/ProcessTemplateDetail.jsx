@@ -53,6 +53,7 @@ import ViewLogPopover from '../../components/ViewLogPopover';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
+import useTocScroll from '../../hooks/useTocScroll';
 import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
@@ -581,58 +582,25 @@ export default function ProcessTemplateDetail() {
     return stripUnderline(doc.content); // word 格式：已是 HTML
   }, [doc]);
 
-  /* ========== 目录（TOC） ========== */
-  const [toc, setToc] = useState([]);
-  const [activeTocId, setActiveTocId] = useState('');
-  const [tocOpenMobile, setTocOpenMobile] = useState(false);
-
-  useEffect(() => {
-    if (!contentRef.current) return;
-    const root = contentRef.current;
-    // 扩展到 h1-h4，兼容更深层标题的目录跳转
-    const headings = root.querySelectorAll('h1, h2, h3, h4');
-    const items = [];
-    const slugCount = {};
-    headings.forEach((el, idx) => {
-      const raw = (el.textContent || '').trim();
-      if (!raw) return;
-      let slug = raw
-        .toLowerCase()
-        .replace(/[\s\u3000]+/g, '-')
-        .replace(/[^\w\u4e00-\u9fa5-]/g, '')
-        .slice(0, 50) || `heading-${idx}`;
-      if (slugCount[slug]) {
-        slugCount[slug] += 1;
-        slug = `${slug}-${slugCount[slug]}`;
-      } else {
-        slugCount[slug] = 1;
-      }
-      el.id = slug;
-      el.classList.add('ptd-heading-anchor');
-      items.push({ id: slug, text: raw, level: Number(el.tagName.substring(1)) });
-    });
-    setToc(items);
-    setActiveTocId(items[0]?.id || '');
-  }, [renderedContent]);
-
-  useEffect(() => {
-    if (!toc.length || !contentRef.current) return;
-    const headings = toc.map((t) => document.getElementById(t.id)).filter(Boolean);
-    if (!headings.length) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top);
-        if (visible[0]) setActiveTocId(visible[0].target.id);
-      },
-      { rootMargin: '-80px 0px -70% 0px', threshold: 0 },
-    );
-    headings.forEach((h) => observer.observe(h));
-    return () => observer.disconnect();
-  }, [toc]);
+  /* ========== 目录（TOC） ==========
+   * 实现下沉到 useTocScroll 公共 hook，与 MemberSharingDetail
+   * 共用同一套逻辑。这里扩展到 h1-h4，是流程手册的历史约定。 */
+  const {
+    toc,
+    activeTocId,
+    tocOpenMobile,
+    setTocOpenMobile,
+    handleTocClick,
+  } = useTocScroll({
+    contentRef,
+    renderedContent,
+    headingSelector: 'h1, h2, h3, h4',
+    anchorClassName: 'ptd-heading-anchor',
+    scrollOffset: 80,
+  });
 
   // 首次渲染若 URL 带 hash，自动滚到对应锚点（支持分享链接）
+  // 这条路径不是点目录触发，保留为独立 effect：进入页面就尝试一次
   useEffect(() => {
     if (!toc.length) return;
     const hash = decodeURIComponent(window.location.hash || '').replace(/^#/, '');
@@ -644,64 +612,8 @@ export default function ProcessTemplateDetail() {
       const offset = 80;
       const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
       window.scrollTo({ top, behavior: 'auto' });
-      setActiveTocId(hash);
     });
   }, [toc]);
-
-  const handleTocClick = useCallback((tocId) => {
-    // 优先用最新的内容区 DOM 查找，避免旧文档的同名 id 残留到其它页面元素上
-    const root = contentRef.current;
-    const el = (root && root.querySelector(`#${CSS.escape(tocId)}`))
-      || document.getElementById(tocId);
-    if (!el) {
-      console.warn('[TOC] 未找到对应标题元素：', tocId);
-      return;
-    }
-
-    // 找到真正的"可滚动祖先"：从 el 向上冒泡，谁的 overflow-y 是 auto/scroll
-    // 并且 scrollHeight > clientHeight 谁就是滚动容器；否则退回 window。
-    // 这样无论将来是否把 .internal-layout__content 改成内部滚动，都能正确跳转。
-    const findScrollParent = (node) => {
-      let p = node?.parentElement;
-      while (p && p !== document.body) {
-        const style = window.getComputedStyle(p);
-        const oy = style.overflowY;
-        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
-          return p;
-        }
-        p = p.parentElement;
-      }
-      return null;
-    };
-
-    const offset = 80; // 顶部 sticky topbar 的高度补偿
-    const scrollParent = findScrollParent(el);
-
-    try {
-      if (scrollParent) {
-        // 容器内滚动：按相对偏移算
-        const containerRect = scrollParent.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        const target = scrollParent.scrollTop + (elRect.top - containerRect.top) - offset;
-        scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
-      } else {
-        // 全局 window 滚动
-        const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      }
-    } catch {
-      // 极老浏览器兜底：直接跳
-      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo(0, Math.max(0, top));
-    }
-
-    // 写入 hash，便于分享/刷新保留锚点
-    try {
-      window.history.replaceState(null, '', `#${tocId}`);
-    } catch { /* ignore */ }
-    setActiveTocId(tocId);
-    setTocOpenMobile(false);
-  }, []);
 
   /* 编辑历史小矩形：展示在目录下方。默认折叠显示最近 3 条，点击"更多"展开全部。
      折叠时不隐藏整卡片，只限制展示条数，保证入口始终可见。 */

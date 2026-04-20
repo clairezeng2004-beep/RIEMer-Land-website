@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
 import ViewLogPopover from '../../components/ViewLogPopover';
+import useTocScroll from '../../hooks/useTocScroll';
 import { recordViewLog, fetchViewLog } from '../../lib/documentsService';
 import {
   fetchSharings,
@@ -206,133 +207,23 @@ export default function MemberSharingDetail() {
     return stripUnderline(post.content);
   }, [post]);
 
-  // ========== 目录导航（TOC） ==========
-  const [toc, setToc] = useState([]);           // [{ id, text, level }]
-  const [activeTocId, setActiveTocId] = useState('');
-  const [tocOpenMobile, setTocOpenMobile] = useState(false);
-
-  // 内容渲染完毕后提取标题，并给每个标题打 id
-  useEffect(() => {
-    if (!contentRef.current) return;
-    const root = contentRef.current;
-    const headings = root.querySelectorAll('h1, h2, h3');
-    const items = [];
-    const slugCount = {};
-    headings.forEach((el, idx) => {
-      const raw = (el.textContent || '').trim();
-      if (!raw) return;
-      // 生成稳定的 id
-      let slug = raw
-        .toLowerCase()
-        .replace(/[\s\u3000]+/g, '-')
-        .replace(/[^\w\u4e00-\u9fa5-]/g, '')
-        .slice(0, 50) || `heading-${idx}`;
-      if (slugCount[slug]) {
-        slugCount[slug] += 1;
-        slug = `${slug}-${slugCount[slug]}`;
-      } else {
-        slugCount[slug] = 1;
-      }
-      el.id = slug;
-      el.classList.add('msd-heading-anchor');
-      items.push({
-        id: slug,
-        text: raw,
-        level: Number(el.tagName.substring(1)), // 1/2/3
-      });
-    });
-    setToc(items);
-    setActiveTocId(items[0]?.id || '');
-  }, [renderedContent]);
-
-  // 滚动时高亮当前章节
-  useEffect(() => {
-    if (!toc.length || !contentRef.current) return;
-    const headings = toc
-      .map((t) => document.getElementById(t.id))
-      .filter(Boolean);
-    if (!headings.length) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        // 所有交叉中的标题，取最接近顶部的那个
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort((a, b) => a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top);
-        if (visible[0]) {
-          setActiveTocId(visible[0].target.id);
-        }
-      },
-      {
-        rootMargin: '-80px 0px -70% 0px',
-        threshold: 0,
-      },
-    );
-    headings.forEach((h) => observer.observe(h));
-    return () => observer.disconnect();
-  }, [toc]);
-
-  const handleTocClick = useCallback((id) => {
-    // 优先用最新的内容区 DOM 查找，避免同名 id 残留到页面其它地方
-    const root = contentRef.current;
-    let el = null;
-    try {
-      el = root && root.querySelector(`#${CSS.escape(id)}`);
-    } catch {
-      el = null;
-    }
-    if (!el) el = document.getElementById(id);
-    // 兜底：按文本内容匹配（id 可能因为 DOM 被其它副作用重置或被 sanitize 而丢失）
-    if (!el && root) {
-      const item = toc.find((t) => t.id === id);
-      if (item) {
-        const headings = Array.from(root.querySelectorAll('h1, h2, h3'));
-        el = headings.find((h) => (h.textContent || '').trim() === item.text) || null;
-        if (el && !el.id) el.id = id;
-      }
-    }
-    if (!el) {
-      console.warn('[TOC] 未找到对应标题元素：', id);
-      return;
-    }
-
-    // 找到真正的"可滚动祖先"：谁的 overflow-y 是 auto/scroll 且确实在滚就是它
-    const findScrollParent = (node) => {
-      let p = node?.parentElement;
-      while (p && p !== document.body) {
-        const style = window.getComputedStyle(p);
-        const oy = style.overflowY;
-        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
-          return p;
-        }
-        p = p.parentElement;
-      }
-      return null;
-    };
-
-    const offset = 80;
-    const scrollParent = findScrollParent(el);
-    try {
-      if (scrollParent) {
-        const containerRect = scrollParent.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        const target = scrollParent.scrollTop + (elRect.top - containerRect.top) - offset;
-        scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
-      } else {
-        const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
-      }
-    } catch {
-      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo(0, Math.max(0, top));
-    }
-
-    try {
-      window.history.replaceState(null, '', `#${id}`);
-    } catch { /* ignore */ }
-    setActiveTocId(id);
-    setTocOpenMobile(false);
-  }, [toc]);
+  /* ========== 目录导航（TOC） ==========
+   * 实现下沉到 useTocScroll 公共 hook，与 ProcessTemplateDetail
+   * 共用同一套逻辑（强兜底：id 丢失时按文本内容重找；rect=0 时
+   * rAF 重试；探测真实滚动容器等），避免两边行为漂移。 */
+  const {
+    toc,
+    activeTocId,
+    tocOpenMobile,
+    setTocOpenMobile,
+    handleTocClick,
+  } = useTocScroll({
+    contentRef,
+    renderedContent,
+    headingSelector: 'h1, h2, h3',
+    anchorClassName: 'msd-heading-anchor',
+    scrollOffset: 80,
+  });
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
