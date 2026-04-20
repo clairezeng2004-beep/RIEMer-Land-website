@@ -303,50 +303,56 @@
   background: var(--color-bg-hover, #E4ECE0);
 }
 
-/* 前三名行底色：
-   旧方案直接套金/银/铜（rgba 255,215,0 / 192,192,192 / 205,127,50 @ 0.04），
-   在以绿色(--color-primary #5B8C3E) + 青(#4FBFC4)为主调的站点里显得突兀：
-   金色偏暖黄、铜色偏橙粉，都和站点主色不在一个色相区间；银色又太接近
-   白底，几乎看不出差别。用户反馈"颜色不是很协调"。
-   改为同主色系(绿)的明度梯度，越靠前底色越重，既保留"前三名"视觉层级，
-   又与 .mc-table__row:hover(#E4ECE0) 同色系，整体调性统一。
-   金/银/铜的身份信号由单元格内的 🥇🥈🥉 emoji 继续承担，不依赖背景色。 */
-.mc-table__row--top1 {
-  background: #E9F2E1;
-}
-
-.mc-table__row--top2 {
-  background: #EFF5EA;
-}
-
+/* 前三名行的视觉方案（第三版）：
+   历史：
+   v1 直接套金/银/铜 rgba(@0.04)：暖黄+橙粉和站点主色绿/青不在一个色相
+       区间，用户反馈"不协调"。
+   v2 改成同色系绿三档淡底(#E9F2E1 / #EFF5EA / #F4F8EF)：和 hover 的
+      #E4ECE0 太接近，远看像整片染色，第二名第三名差别几乎看不出，层级
+      语义丢失，用户仍反馈"不协调"。
+   v3（当前）改为"左侧强调色条"：
+       行背景回归卡片白（跟普通行一致），不再整片染色；
+       在最左侧 rank 列内用 box-shadow: inset 画一条 3px 金/银/铜竖条。
+       —— 细色条承担"前三名"的标识和层级信号，但面积极小，不会和主色
+          绿 + 青形成大面积冲突；
+       —— rank 列本身是 sticky left:0，色条跟随冻结，始终可见；
+       —— 不新增 DOM，不影响现有 z-index 层叠，也不破坏 hover 背景。
+   金/银/铜 emoji 继续保留在单元格内，和左侧色条呼应。 */
+.mc-table__row--top1,
+.mc-table__row--top2,
 .mc-table__row--top3 {
-  background: #F4F8EF;
+  /* 背景保持和普通行一致 —— 具体色由各 td 的卡片底色承担。
+     这里显式写 background: transparent，避免浏览器默认渲染与
+     v2 残留样式造成行级染色。 */
+  background: transparent;
+}
+
+.mc-table__row--top1 .mc-table__td--rank {
+  /* 金：#E0A106（比纯 gold 更沉稳，与站点暖色 accent 同调） */
+  box-shadow: inset 3px 0 0 #E0A106;
+}
+
+.mc-table__row--top2 .mc-table__td--rank {
+  /* 银：#8A98A8（冷灰蓝，避免纯灰在白底上完全消失） */
+  box-shadow: inset 3px 0 0 #8A98A8;
+}
+
+.mc-table__row--top3 .mc-table__td--rank {
+  /* 铜：#B5703A（与 v1 的橙粉相比更偏棕、更沉） */
+  box-shadow: inset 3px 0 0 #B5703A;
 }
 
 /* ---- sticky 列在特殊行背景下的补齐 ----
    冻结的"排名/成员"列自身有不透明 background（卡片底色）用于
-   遮挡横向滚时中间列文字。但这会遮住 tr 级别的 hover / top1/2/3 背景。
-   下面把行级背景色"复刻"一份到两个 sticky td 上，保持视觉一致。
-   色值采用和 rgba over #FFFFFF 视觉等效的不透明值，避免
-   sticky 元素被当作独立层叠上下文时透出下方内容。 */
+   遮挡横向滚时中间列文字。
+   v3 行背景已回归透明，不再需要为 top1/2/3 复刻整片染色；
+   这里只保留 hover 态的同步——hover 时 sticky 列如果不染色会
+   露出下方卡片底色，造成"中间列变深、sticky 列还是白"的脏视觉。
+   前三名的金/银/铜色条画在 rank td 内部（inset box-shadow），
+   和 sticky 层叠无冲突，也不需要 member td 额外处理。 */
 .mc-table__row:hover .mc-table__td--rank,
 .mc-table__row:hover .mc-table__td--member {
   background: var(--color-bg-hover, #E4ECE0);
-}
-
-.mc-table__row--top1 .mc-table__td--rank,
-.mc-table__row--top1 .mc-table__td--member {
-  background: #E9F2E1; /* 与 .mc-table__row--top1 行背景一致 */
-}
-
-.mc-table__row--top2 .mc-table__td--rank,
-.mc-table__row--top2 .mc-table__td--member {
-  background: #EFF5EA; /* 与 .mc-table__row--top2 行背景一致 */
-}
-
-.mc-table__row--top3 .mc-table__td--rank,
-.mc-table__row--top3 .mc-table__td--member {
-  background: #F4F8EF; /* 与 .mc-table__row--top3 行背景一致 */
 }
 
 /* 排名 */
