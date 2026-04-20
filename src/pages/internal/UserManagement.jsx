@@ -139,8 +139,23 @@ export default function UserManagement() {
   // 这里加入版本号校验避免竞态：多次触发 effect 时，
   // 只有"最后一次发起的请求"才能 setUsers。
   // 同时记录加载状态与错误，便于在 UI 上诊断。
+  //
+  // 重要：不要把 getAllUsers / getPreAuthorizedEmails / isAdmin 放进依赖数组。
+  // 这些值都会随 AuthContext 内 setUser / setSupabaseOk 的频繁触发而拿到新引用，
+  // 一旦进依赖 → effect 反复重跑 → 上一次的 getAllUsers 请求被 seq 判为过期 → 丢弃，
+  // 新请求又还没回来就被下一次 effect 替换 → setHasLoadedOnce(true) 永远不执行 →
+  // 顶部"已授权/待授权"数字永远停在占位符 —，这就是"数字同步不上"的真正原因。
+  // 用 ref 把这些函数"冻结"，effect 只跟最原子的触发条件走：
+  //   - isAuthenticated：是否登录
+  //   - refreshKey：手动触发刷新（授权/撤销/删除用户后 +1）
+  //   - supabaseOk：云端可达性从 null→true/false 切换时需要重拉
   // ============================================
   const loadReqSeq = useRef(0);
+  const getAllUsersRef = useRef(getAllUsers);
+  const getPreAuthorizedEmailsRef = useRef(getPreAuthorizedEmails);
+  useEffect(() => { getAllUsersRef.current = getAllUsers; }, [getAllUsers]);
+  useEffect(() => { getPreAuthorizedEmailsRef.current = getPreAuthorizedEmails; }, [getPreAuthorizedEmails]);
+
   useEffect(() => {
     if (!isAuthenticated) return;
     const seq = ++loadReqSeq.current;
@@ -161,12 +176,19 @@ export default function UserManagement() {
         supabaseOk,
       };
       try {
-        const data = await getAllUsers();
+        const data = await getAllUsersRef.current();
+        // 即使本次 seq 已过期（用户很快又触发了下一次加载），
+        // 只要这次确实拿到了数据，就把"至少成功过一次"标志设上——
+        // 它是全局标志，不属于某一个 seq，设早一点只会让占位符更快变成真实数字，
+        // 不会导致数据错乱（数据错乱由 seq 校验的 setUsers 负责兜底）。
+        const safeData = Array.isArray(data) ? data : [];
+        if (safeData.length >= 0) {
+          setHasLoadedOnce(true);
+        }
         if (seq !== loadReqSeq.current) {
           console.log('[UserManagement] 丢弃过期请求 seq=', seq);
           return;
         }
-        const safeData = Array.isArray(data) ? data : [];
         diagInfo.returnedCount = safeData.length;
         diagInfo.authorizedBreakdown = {
           true: safeData.filter(u => u.authorized === true).length,
@@ -184,8 +206,6 @@ export default function UserManagement() {
         console.log('[UserManagement] getAllUsers 返回:', safeData.length, '条', diagInfo);
         setUsers(safeData);
         setDiag(diagInfo);
-        // 标记"至少成功加载过一次"，让统计数字从占位符切换为真实值
-        setHasLoadedOnce(true);
         // 判断诊断结论
         if (safeData.length === 0) {
           setLoadError(
@@ -217,9 +237,11 @@ export default function UserManagement() {
     loadUsers();
 
     if (isAdmin) {
-      getPreAuthorizedEmails().then(setPreAuthList).catch(() => {});
+      getPreAuthorizedEmailsRef.current().then(setPreAuthList).catch(() => {});
     }
-  }, [isAuthenticated, refreshKey, supabaseOk, getAllUsers, isAdmin, getPreAuthorizedEmails]);
+    // 见上方注释：故意不把 getAllUsers / getPreAuthorizedEmails / currentUser 放进依赖。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, refreshKey, supabaseOk, isAdmin]);
 
   // 页面变为可见时自动刷新用户列表（手机端切回浏览器/切换 TAB 时触发）
   useEffect(() => {
