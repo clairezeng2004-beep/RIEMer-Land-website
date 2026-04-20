@@ -7,13 +7,13 @@
 }
 
 /* ============ Top Bar ============ */
-/* 创建/编辑页顶栏：position: fixed 钉在 navbar 下沿。
+/* 创建/编辑页顶栏：普通流（非 fixed）。
    本样式被两个编辑页复用：MemberSharingCreate（发布分享）、
    ProcessTemplateCreate（发布流程/模版文件），对两页同时生效。
 
    历史修复点：
    1. 最早 background: transparent + sticky，能"透出"下方内容背景；
-      改 fixed 后必须有实底色兜底，否则文字会穿透遮挡。
+      曾改 fixed 后必须有实底色兜底，否则文字会穿透遮挡。
    2. 原 padding: 0.75rem 2rem 的左边距过大，用户反馈"返回列表按钮
       没放在最左边"——2rem(32px) 的内缩把按钮挤到离 sidebar 右沿
       很远的地方。现调整为 padding-left: 1rem，让"返回列表"紧贴
@@ -22,13 +22,19 @@
    3. 原 z-index: 90 一般够用，但若子组件（如自定义 Select 下拉）
       在层叠上下文中创建出局部 z-index，滚动时容易透出。现提到 95，
       仍低于全站 Navbar(1000)，高于页内常见层（Select dropdown 200
-      属于 topbar 下方兄弟，不会被遮）。 */
+      属于 topbar 下方兄弟，不会被遮）。
+   4. v4：用户反馈"下滑时'返回列表'按钮固定遮挡内容"——把整条 topbar
+      从 position: fixed 改回普通流。这样：
+        - 左上角"返回列表"仍在页面最左上（不动位置）；
+        - 下滑时 topbar（含返回 + 右侧发布按钮）一起随页面滚走，
+          不再悬浮遮挡表单内容；
+        - 右侧"发布/取消"按钮不再 sticky，需要时用户滚回顶部即可，
+          跟绝大多数"长表单 + 顶部操作"的惯例一致。
+      因为 fixed 取消，.msc-content 原本为 fixed topbar 让出的
+      padding-top 补偿同步移除（见下方 .msc-content 注释）。*/
 .msc-topbar {
-  position: fixed;
-  top: 72px;
-  left: 220px;
-  right: 0;
-  z-index: 95;
+  position: relative;
+  z-index: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -67,14 +73,10 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  /* 顶栏 fixed 高度 = padding(0.75rem×2=24px) + 按钮高(~36px) + border(1px)
-     ≈ 61px。再加上 <main> 的 padding-top:72px 已经给 navbar 让位，但
-     navbar 下还叠了这条 fixed topbar，所以 .msc-content 本身必须再让出
-     topbar 的高度。之前写的是 calc(60px)，刚好卡在 topbar 底边，若内容
-     顶部有 margin 或用户稍微滚动，就会透到 topbar 下方（用户反馈：
-     "下滑时会出现遮挡"）。现在加到 calc(72px + 0.5rem)=80px，留出视觉
-     缓冲，确保任何情况下滚动内容都不会露到 topbar 下方。 */
-  padding: calc(72px + 0.5rem) 2rem 1.5rem;
+  /* v4：topbar 不再 fixed，内容区不需要再为它的"悬浮高度"让路；
+     只保留常规的上下左右 padding。上方 1rem 缓冲让 topbar 底边
+     到第一个表单项之间有呼吸空间。 */
+  padding: 1rem 2rem 1.5rem;
 }
 
 .msc-content__inner {
@@ -1079,17 +1081,15 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .msc-topbar {
-    top: 108px;
-    left: 0;
-    /* 手机端左侧无 sidebar，恢复对称的 1rem padding，
-       返回列表按钮自然贴近屏幕左缘。 */
+    /* 手机端 topbar 跟桌面端一样普通流。原来为 fixed 设的 top/left
+       在 static 下无意义，留着也不生效，这里索性显式清零让样式更干净。
+       左右 padding 统一 1rem，贴合手机屏窄空间；返回按钮自然贴近屏幕左缘。*/
     padding: 0.75rem 1rem;
   }
 
   .msc-content {
-    /* 手机端同样需要给 fixed topbar 让出完整高度 + 缓冲，
-       原 60px 会被正文穿透。 */
-    padding: calc(72px + 0.5rem) 0.75rem 0.75rem;
+    /* 手机端也只保留常规缓冲，不再为 fixed topbar 让出 72px。 */
+    padding: 0.5rem 0.75rem 0.75rem;
   }
 
   .msc-content__inner {
