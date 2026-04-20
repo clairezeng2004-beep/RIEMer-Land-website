@@ -728,8 +728,45 @@
   }
 
   .mc-table {
-    table-layout: auto;
+    /* 关键：继续保留 table-layout: fixed。
+       之前写的是 auto，浏览器会按内容自动分配列宽 ——
+       但 .mc-table__td--member 是 sticky 且 left: 50px（硬编码，
+       假设"排名列"实际 50px 宽）。一旦排名列被自动缩成 ~36px，
+       成员列的 sticky 起点还停在 50px，就会出现：
+         • 姓名文字被排名列右边缘遮挡，视觉上"重叠"；
+         • 横滑时排名列盖不住成员列左沿，中间列内容透上来。
+       这就是手机端左滑\"字样重叠\"的真正原因。
+       改回 fixed + 在下方给排名 / 成员列显式 width，让实际渲染宽度
+       与 sticky left 对齐即可。 */
+    table-layout: fixed;
     min-width: 680px;
+  }
+
+  /* 手机端：排名列、成员列的 sticky 锚点必须与各自实际宽度对齐。
+     这里把排名列锁到 44px，成员列 left 也同步改到 44px，彻底消除
+     "左滑时姓名与排名号重叠 / 被中间列穿透" 的问题。
+     宽度稍作缩减是为了把更多空间留给数据列，手机屏更不挤。 */
+  .mc-table__th--rank,
+  .mc-table__td--rank {
+    width: 44px;
+    min-width: 44px;
+    padding-left: 6px;
+    padding-right: 6px;
+  }
+
+  .mc-table__th--member,
+  .mc-table__td--member {
+    left: 44px;
+    width: 110px;
+    min-width: 110px;
+  }
+
+  /* 成员名超长时在手机端截断，避免撑宽 sticky 列打破上面的对齐假设 */
+  .mc-member-name {
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .mc-table th {
