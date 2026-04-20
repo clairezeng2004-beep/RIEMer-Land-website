@@ -668,6 +668,59 @@ export default function MemberProfiles() {
     }
   };
 
+  /* ============================================
+     单元格智能滚入视口（最小平移量）
+     ============================================
+     背景：用户进入编辑态后，点击一个被右侧截断的文本框时，希望
+     表格自动水平滚动，让该文本框完整可见；但不要"过度滚动"跳到
+     其它位置——滚动完成后的视口仍然以用户点击的单元格为锚点。
+
+     实现要点：
+     1) 以 .member-profiles-table-wrapper 为滚动容器；
+     2) 左侧 sticky 列（#）、右侧 sticky 列（操作）会遮挡目标单元格，
+        需要从容器"左右可视区"里扣掉它们的宽度，以免"单元格在容器
+        内但其实被 sticky 挡住"的假阳性；
+     3) 如果单元格左边出界：向左滚动到左可视区起点；
+        如果单元格右边出界：向右滚动到右可视区终点；
+        否则（已完全可见）不动。 */
+  const ensureCellVisible = useCallback((cellEl) => {
+    const wrapper = tableRef.current;
+    if (!wrapper || !cellEl) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    const cellRect = cellEl.getBoundingClientRect();
+
+    // 左侧 sticky 列（该单元格所在 <tr> 里 left: 0 的 td）
+    const tr = cellEl.closest('tr');
+    let leftStickyWidth = 0;
+    let rightStickyWidth = 0;
+    if (tr) {
+      const leftSticky = tr.querySelector('.member-profiles-table__sticky-col');
+      const rightSticky = tr.querySelector('.member-profiles-table__action-col');
+      if (leftSticky) leftStickyWidth = leftSticky.getBoundingClientRect().width;
+      if (rightSticky) rightStickyWidth = rightSticky.getBoundingClientRect().width;
+    }
+
+    // 有效可视区（相对视口）：扣除左右 sticky 列
+    const visibleLeft = wrapperRect.left + leftStickyWidth;
+    const visibleRight = wrapperRect.right - rightStickyWidth;
+
+    // 一些缓冲，避免文本紧贴 sticky 边缘阅读吃力
+    const gap = 8;
+
+    let delta = 0;
+    if (cellRect.left < visibleLeft + gap) {
+      delta = cellRect.left - (visibleLeft + gap);
+    } else if (cellRect.right > visibleRight - gap) {
+      // 目标右边超出可视区，向右滑（整体视口向右）即 scrollLeft 变大
+      delta = cellRect.right - (visibleRight - gap);
+    }
+
+    if (delta !== 0) {
+      wrapper.scrollBy({ left: delta, behavior: 'smooth' });
+    }
+  }, []);
+
   // ============================================
   // 列宽自适应：文本超过 4 行时自动加宽所在列（而不是省略）
   // ============================================
@@ -921,6 +974,15 @@ export default function MemberProfiles() {
                                 const el = e.target;
                                 el.style.height = 'auto';
                                 el.style.height = `${el.scrollHeight}px`;
+                                // 将点击的文本框最小量滚入视口（考虑左右 sticky 列遮挡）
+                                const td = el.closest('td[data-col-key]');
+                                if (td) ensureCellVisible(td);
+                              }}
+                              onMouseDown={(e) => {
+                                // 指针一按下就先把目标单元格滚入视口，
+                                // 避免"先触发 focus 再 layout"期间光标落点对不上。
+                                const td = e.currentTarget.closest('td[data-col-key]');
+                                if (td) ensureCellVisible(td);
                               }}
                               ref={(el) => {
                                 // 每次渲染后根据当前内容撑开高度
@@ -930,7 +992,12 @@ export default function MemberProfiles() {
                                 }
                               }}
                               placeholder={col.placeholder}
-                              autoFocus={col.key === 'enrollment_year'}
+                              // 不用 autoFocus：
+                              //   autoFocus 会让浏览器自动聚焦在 enrollment_year（表格最左），
+                              //   触发 ensureCellVisible 把视口拉回表格开头，
+                              //   用户看到的效果就是"刚点编辑，视口就跳走了"。
+                              //   改为让用户自己点击想编辑的文本框——此时 onFocus / onMouseDown
+                              //   会精确把点击的单元格滚入视口，不打扰其他列的阅读焦点。
                             />
                           )
                         ) : (
