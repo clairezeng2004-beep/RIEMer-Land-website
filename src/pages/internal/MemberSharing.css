@@ -322,6 +322,143 @@
   color: white;
 }
 
+/* ============ 就地编辑（管理员） ===========================================
+ * 与 Documents 页 "+ 添加分类" 体验对齐：分类标签右侧紧跟铅笔/✗ 按钮，
+ * 点铅笔后 pill 原位变为输入框；末尾的虚线 "+ 添加分类" 管理员点一次即进入输入。
+ */
+.ms-filters__cat--add {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-primary);
+  border-style: dashed;
+  border-color: var(--color-primary);
+  background: transparent;
+  opacity: 0.85;
+}
+.ms-filters__cat--add:hover {
+  background: rgba(91, 140, 62, 0.08);
+  opacity: 1;
+}
+
+.ms-filters__cat-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ms-filters__cat-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.ms-filters__cat-edit,
+.ms-filters__cat-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  padding: 0;
+}
+
+.ms-filters__cat-edit:hover {
+  background: rgba(91, 140, 62, 0.15);
+  color: var(--color-primary);
+}
+
+.ms-filters__cat-delete:hover {
+  background: rgba(192, 57, 43, 0.12);
+  color: var(--color-danger);
+}
+
+/* 就地输入框（重命名 / 新增共用底色） */
+.ms-filters__cat-rename,
+.ms-filters__cat-add-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ms-filters__cat-rename-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.ms-filters__cat-rename-input,
+.ms-filters__cat-add-input {
+  padding: 0.25rem 0.6rem;
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: var(--text-sm);
+  outline: none;
+  width: 140px;
+  color: var(--color-text);
+  background: var(--color-bg-card);
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+}
+
+.ms-filters__cat-rename-input:focus,
+.ms-filters__cat-add-input:focus {
+  box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.15);
+}
+
+.ms-filters__cat-rename-confirm,
+.ms-filters__cat-rename-cancel,
+.ms-filters__cat-add-confirm,
+.ms-filters__cat-add-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  padding: 0;
+}
+
+.ms-filters__cat-rename-confirm,
+.ms-filters__cat-add-confirm {
+  background: rgba(91, 140, 62, 0.12);
+  color: var(--color-primary);
+}
+
+.ms-filters__cat-rename-confirm:hover,
+.ms-filters__cat-add-confirm:hover {
+  background: rgba(91, 140, 62, 0.22);
+}
+
+.ms-filters__cat-rename-confirm:disabled,
+.ms-filters__cat-add-confirm:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.ms-filters__cat-rename-cancel,
+.ms-filters__cat-add-cancel {
+  background: rgba(200, 200, 200, 0.15);
+  color: var(--color-text-muted);
+}
+
+.ms-filters__cat-rename-cancel:hover,
+.ms-filters__cat-add-cancel:hover {
+  background: rgba(200, 200, 200, 0.3);
+  color: var(--color-text);
+}
+
 .ms-filters__manage-btn {
   display: flex;
   align-items: center;

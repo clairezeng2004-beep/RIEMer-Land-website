@@ -156,6 +156,8 @@ export default function EventPublish() {
   const [editingCatLabel, setEditingCatLabel] = useState(null); // 正在编辑的分类原名
   const [editCatDraft, setEditCatDraft] = useState('');
   const [newCatLabel, setNewCatLabel] = useState('');
+  // 管理员：就地新增分类（对齐流程模板文件页的"+添加分类"体验，管理员不必先打开面板）
+  const [showInlineAddCat, setShowInlineAddCat] = useState(false);
 
   // ---- 新建活动弹窗 ----
   const [showModal, setShowModal] = useState(false);
@@ -428,30 +430,164 @@ export default function EventPublish() {
           </div>
           <div className="ia-list__filter-bar">
             <div className="ia-list__categories">
-              {categories.map((cat) => (
+              {categories.map((cat) => {
+                if (cat === '全部') {
+                  return (
+                    <button
+                      key={cat}
+                      className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      全部
+                    </button>
+                  );
+                }
+                // 只有托管在 categoryList 里的才可就地改/删；
+                // events 里动态派生出来的老 category 值（categoryList 里没有）不给编辑入口
+                const canEditInline = isAdmin && categoryList.includes(cat);
+                const isRenaming = canEditInline && editingCatLabel === cat;
+
+                if (isRenaming) {
+                  return (
+                    <span key={cat} className="ia-list__cat-rename">
+                      <input
+                        type="text"
+                        className="ia-list__cat-rename-input"
+                        value={editCatDraft}
+                        onChange={(e) => setEditCatDraft(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEditCategory();
+                          if (e.key === 'Escape') {
+                            setEditingCatLabel(null);
+                            setEditCatDraft('');
+                          }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        className="ia-list__cat-rename-confirm"
+                        onClick={saveEditCategory}
+                        disabled={!editCatDraft.trim()}
+                        title="确认"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        className="ia-list__cat-rename-cancel"
+                        onClick={() => { setEditingCatLabel(null); setEditCatDraft(''); }}
+                        title="取消"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  );
+                }
+
+                return (
+                  <div key={cat} className="ia-list__cat-wrapper">
+                    <button
+                      className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {cat}
+                    </button>
+                    {canEditInline && (
+                      <div className="ia-list__cat-actions">
+                        <button
+                          className="ia-list__cat-edit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditCategory(cat);
+                          }}
+                          title="重命名"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          className="ia-list__cat-delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCategory(cat);
+                          }}
+                          title="删除分类"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* 就地新增：管理员 inline 输入（对齐流程模板文件页）；普通成员走原 modal */}
+              {isAdmin ? (
+                showInlineAddCat ? (
+                  <span className="ia-list__cat-add-inline">
+                    <input
+                      type="text"
+                      className="ia-list__cat-add-input"
+                      placeholder="新分类名称"
+                      value={newCatLabel}
+                      onChange={(e) => setNewCatLabel(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          handleAddCategoryInManager();
+                          setShowInlineAddCat(false);
+                        }
+                        if (e.key === 'Escape') {
+                          setShowInlineAddCat(false);
+                          setNewCatLabel('');
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <button
+                      className="ia-list__cat-add-confirm"
+                      onClick={() => {
+                        handleAddCategoryInManager();
+                        setShowInlineAddCat(false);
+                      }}
+                      disabled={!newCatLabel.trim() || categoryList.includes(newCatLabel.trim())}
+                      title="确认添加"
+                    >
+                      <Check size={14} />
+                    </button>
+                    <button
+                      className="ia-list__cat-add-cancel"
+                      onClick={() => {
+                        setShowInlineAddCat(false);
+                        setNewCatLabel('');
+                      }}
+                      title="取消"
+                    >
+                      <X size={14} />
+                    </button>
+                  </span>
+                ) : (
+                  <button
+                    className="ia-list__cat ia-list__cat--add"
+                    onClick={() => setShowInlineAddCat(true)}
+                    title="添加新分类"
+                  >
+                    <Plus size={14} /> 添加分类
+                  </button>
+                )
+              ) : (
                 <button
-                  key={cat}
-                  className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
-                  onClick={() => setSelectedCategory(cat)}
+                  className="ia-list__cat ia-list__cat--add"
+                  onClick={openAddCatModal}
+                  title="新增筛选分类（所有成员可用）"
                 >
-                  {cat}
+                  <Plus size={14} /> 新增筛选
                 </button>
-              ))}
-              {/* 所有登录成员可用：快速新增分类 */}
-              <button
-                className="ia-list__cat ia-list__cat--add"
-                onClick={openAddCatModal}
-                title="新增筛选分类（所有成员可用）"
-              >
-                <Plus size={14} /> 新增筛选
-              </button>
+              )}
             </div>
-            {/* 管理员编辑模式：进入分类管理（重命名/删除） */}
+            {/* 管理员编辑模式：进入分类管理（面板式批量管理，作为就地编辑的备用入口） */}
             {isAdmin && editing && (
               <button
                 className={`ia-list__manage-btn ${showCatManager ? 'ia-list__manage-btn--active' : ''}`}
                 onClick={() => setShowCatManager(!showCatManager)}
-                title="管理筛选分类"
+                title="管理筛选分类（批量）"
               >
                 <Settings2 size={16} />
               </button>

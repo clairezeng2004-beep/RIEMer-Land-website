@@ -181,6 +181,8 @@ export default function MemberSharing() {
   const [editingCatKey, setEditingCatKey] = useState(null);
   const [editCatLabel, setEditCatLabel] = useState('');
   const [editCatColor, setEditCatColor] = useState('');
+  // 就地新增分类（对齐流程模板文件页，所有成员可用；管理员还可在分类标签上就地编辑/删除）
+  const [showInlineAddCat, setShowInlineAddCat] = useState(false);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -355,20 +357,157 @@ export default function MemberSharing() {
           </div>
           <div className="ms-filters__bar">
             <div className="ms-filters__categories">
-              {categories.map((cat) => (
+              {categories.map((cat) => {
+                if (cat === '全部') {
+                  return (
+                    <button
+                      key={cat}
+                      className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      全部
+                    </button>
+                  );
+                }
+                // cat 是 categoryList[i].key；只有管理员且该 key 在托管列表里时才开就地编辑
+                const managed = categoryList.find((c) => c.key === cat);
+                const canEditInline = !!managed && isAdmin;
+                const isRenaming = canEditInline && editingCatKey === managed.key;
+
+                if (isRenaming) {
+                  return (
+                    <span key={managed.key} className="ms-filters__cat-rename">
+                      <span
+                        className="ms-filters__cat-rename-dot"
+                        style={{ background: editCatColor }}
+                      />
+                      <input
+                        type="text"
+                        className="ms-filters__cat-rename-input"
+                        value={editCatLabel}
+                        onChange={(e) => setEditCatLabel(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') saveEditCategory();
+                          if (e.key === 'Escape') setEditingCatKey(null);
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        className="ms-filters__cat-rename-confirm"
+                        onClick={saveEditCategory}
+                        disabled={!editCatLabel.trim()}
+                        title="确认"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        className="ms-filters__cat-rename-cancel"
+                        onClick={() => setEditingCatKey(null)}
+                        title="取消"
+                      >
+                        <X size={14} />
+                      </button>
+                    </span>
+                  );
+                }
+
+                return (
+                  <div key={cat} className="ms-filters__cat-wrapper">
+                    <button
+                      className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
+                      onClick={() => setSelectedCategory(cat)}
+                    >
+                      {categoryLabels[cat] || cat}
+                    </button>
+                    {canEditInline && (
+                      <div className="ms-filters__cat-actions">
+                        <button
+                          className="ms-filters__cat-edit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            startEditCategory(managed);
+                          }}
+                          title="重命名"
+                        >
+                          <Pencil size={12} />
+                        </button>
+                        <button
+                          className="ms-filters__cat-delete"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCategory(managed.key);
+                          }}
+                          title="删除分类"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+
+              {/* 就地新增（管理员、非管理员均可——该页原本允许所有成员加分类） */}
+              {showInlineAddCat ? (
+                <span className="ms-filters__cat-add-inline">
+                  <span
+                    className="ms-filters__cat-rename-dot"
+                    style={{ background: newCatColor }}
+                  />
+                  <input
+                    type="text"
+                    className="ms-filters__cat-add-input"
+                    placeholder="新分类名称"
+                    value={newCatLabel}
+                    onChange={(e) => setNewCatLabel(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddCategory();
+                        setShowInlineAddCat(false);
+                      }
+                      if (e.key === 'Escape') {
+                        setShowInlineAddCat(false);
+                        setNewCatLabel('');
+                      }
+                    }}
+                    autoFocus
+                  />
+                  <button
+                    className="ms-filters__cat-add-confirm"
+                    onClick={() => {
+                      handleAddCategory();
+                      setShowInlineAddCat(false);
+                    }}
+                    disabled={!newCatLabel.trim()}
+                    title="确认添加"
+                  >
+                    <Check size={14} />
+                  </button>
+                  <button
+                    className="ms-filters__cat-add-cancel"
+                    onClick={() => {
+                      setShowInlineAddCat(false);
+                      setNewCatLabel('');
+                    }}
+                    title="取消"
+                  >
+                    <X size={14} />
+                  </button>
+                </span>
+              ) : (
                 <button
-                  key={cat}
-                  className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
-                  onClick={() => setSelectedCategory(cat)}
+                  className="ms-filters__cat ms-filters__cat--add"
+                  onClick={() => setShowInlineAddCat(true)}
+                  title="添加新分类"
                 >
-                  {cat === '全部' ? '全部' : categoryLabels[cat] || cat}
+                  <Plus size={14} /> 添加分类
                 </button>
-              ))}
+              )}
             </div>
             <button
               className={`ms-filters__manage-btn ${showCatManager ? 'ms-filters__manage-btn--active' : ''}`}
               onClick={() => setShowCatManager(!showCatManager)}
-              title="管理筛选分类"
+              title="管理筛选分类（含颜色/批量）"
             >
               <Settings2 size={16} />
             </button>
