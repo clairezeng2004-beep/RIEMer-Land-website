@@ -64,7 +64,10 @@
     "nav about contact qrcode";
   column-gap: var(--space-xl);
   row-gap: var(--space-2xl);
-  align-items: start;
+  /* 关键：让所有列高度一致（= 最高列），这样每列的"最后一行文字"
+     可以通过 margin-top:auto 推到同一基准线，实现底部对齐。
+     只在桌面/中等宽度并排时需要，手机端单列堆叠会在 media query 覆盖。 */
+  align-items: stretch;
 }
 
 /* 公开页面中等宽度（769–960px）：4 列会挤压文字，降级为 2 列 */
@@ -96,6 +99,18 @@
   gap: 8px;
 }
 
+/* 桌面端：让每列的"内容列表容器"吸收剩余空间并把内容贴底排列，
+   这样无论哪列最高（通常是带二维码的那列），其它列的最后一行
+   文字都会与之底部对齐。手机端堆叠时由 media query 重置。 */
+@media (min-width: 769px) {
+  .footer__grid > .footer__nav > .footer__nav-links-row,
+  .footer__grid > .footer__nav > .footer__about-texts,
+  .footer__grid > .footer__nav--contact > .footer__contact-list {
+    flex: 1;
+    justify-content: flex-end;
+  }
+}
+
 /* 联系方式内容容器：与左侧两栏 (.footer__nav-links-row / .footer__about-texts) 结构对称 */
 .footer__contact-list {
   display: flex;
@@ -125,13 +140,25 @@
 
 /* 二维码图片 */
 .footer__qrcode-img {
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   object-fit: cover;
   border-radius: 8px;
   border: 1px solid var(--color-border-light);
   cursor: pointer;
   transition: opacity var(--transition-fast);
+}
+
+/* 桌面端：把二维码图垂直居中、文字贴底，
+   使"微信扫码关注"与联系方式列的"给我们留言"底对齐。
+   手机端单列堆叠无需此分布，由 media query 覆盖 margin-top。 */
+@media (min-width: 769px) {
+  .footer__grid > .footer__qrcode > .footer__qrcode-img {
+    margin-top: auto;
+  }
+  .footer__grid > .footer__qrcode > .footer__qrcode-text {
+    margin-top: auto;
+  }
 }
 
 .footer__qrcode-img:hover {
