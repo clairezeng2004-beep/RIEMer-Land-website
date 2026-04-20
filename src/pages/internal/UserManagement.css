@@ -743,3 +743,118 @@ input.users-preauth__input::placeholder {
     justify-content: center;
   }
 }
+
+/* ============================================
+   诊断抽屉
+   - 折叠时只显示一行摘要（拉到 N 条 / 已授权判定 M / supabaseOk=xxx），不突出
+   - 展开后给出完整 diag JSON + 强制刷新 session 按钮
+   - 任何时候都可展开（不再像旧版那样要等到表格为空才出现）
+   ============================================ */
+.users-diag-drawer {
+  margin: 0 0 var(--space-lg) 0;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  background: #fafbfa;
+  font-size: var(--text-sm);
+}
+
+.users-diag-drawer > summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--color-text);
+  user-select: none;
+}
+
+.users-diag-drawer > summary::-webkit-details-marker {
+  display: none;
+}
+
+.users-diag-drawer > summary::before {
+  content: '▸';
+  display: inline-block;
+  width: 10px;
+  color: var(--color-text-muted);
+  transition: transform 0.15s;
+}
+
+.users-diag-drawer[open] > summary::before {
+  transform: rotate(90deg);
+}
+
+.users-diag-drawer__hint {
+  margin-left: auto;
+  color: var(--color-text-muted);
+  font-size: 0.78rem;
+  font-family: var(--font-mono, ui-monospace, monospace);
+}
+
+.users-diag-drawer__body {
+  padding: 0 12px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.users-diag-drawer__err {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 8px 10px;
+  background: #fdf2f2;
+  border: 1px solid #f2c9c9;
+  border-radius: 6px;
+  color: #9a3f3f;
+  line-height: 1.5;
+}
+
+.users-diag-drawer__actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.users-diag-drawer__actions button {
+  padding: 5px 12px;
+  font-size: 0.85rem;
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.users-diag-drawer__actions button:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.users-diag-drawer__actions button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.users-diag-drawer__pre {
+  margin: 0;
+  padding: 10px 12px;
+  background: #f4f5f4;
+  border: 1px solid var(--color-border-light);
+  border-radius: 6px;
+  font-size: 0.78rem;
+  line-height: 1.55;
+  color: #444;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 320px;
+  overflow: auto;
+}
+
+.users-diag-drawer__empty {
+  color: var(--color-text-muted);
+  font-size: 0.82rem;
+  padding: 6px 0;
+}

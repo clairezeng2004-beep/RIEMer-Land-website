@@ -155,8 +155,10 @@ export default function UserManagement() {
   const loadReqSeq = useRef(0);
   const getAllUsersRef = useRef(getAllUsers);
   const getPreAuthorizedEmailsRef = useRef(getPreAuthorizedEmails);
+  const isAdminRef = useRef(isAdmin);
   useEffect(() => { getAllUsersRef.current = getAllUsers; }, [getAllUsers]);
   useEffect(() => { getPreAuthorizedEmailsRef.current = getPreAuthorizedEmails; }, [getPreAuthorizedEmails]);
+  useEffect(() => { isAdminRef.current = isAdmin; }, [isAdmin]);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -238,12 +240,13 @@ export default function UserManagement() {
     };
     loadUsers();
 
-    if (isAdmin) {
+    if (isAdminRef.current) {
       getPreAuthorizedEmailsRef.current().then(setPreAuthList).catch(() => {});
     }
-    // 见上方注释：故意不把 getAllUsers / getPreAuthorizedEmails / currentUser 放进依赖。
+    // 见上方注释：故意不把 getAllUsers / getPreAuthorizedEmails / currentUser / isAdmin 放进依赖。
+    // isAdmin 也用 ref 读，避免 user 对象引用变化 → isAdmin 派生值引用"看起来变了" → effect 反复重跑 → seq 永远被覆盖。
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, refreshKey, supabaseOk, isAdmin]);
+  }, [isAuthenticated, refreshKey, supabaseOk]);
 
   // 页面变为可见时自动刷新用户列表（手机端切回浏览器/切换 TAB 时触发）
   useEffect(() => {
@@ -493,6 +496,73 @@ export default function UserManagement() {
             />
           </div>
         </div>
+
+        {/*
+          顶部诊断抽屉（仅管理员可见）
+          -----------------------------------------
+          背景：多次出现"加载不出已授权用户数 / 列表看不到其他成员"的反馈，
+          但以前的诊断面板只在 authorizedUsers.length === 0 且表格为空时才出现，
+          用户看到的症状常常是 stats 一直 "—" 或表格转圈，根本点不到诊断按钮。
+
+          这里把诊断独立到顶部，任何时候都可展开，并多给一个"强制刷新 session
+          后重查"的兜底入口。它会：
+            1) supabase.auth.refreshSession() —— 修复 session 过期 / anon 降级；
+            2) refreshKey++ —— 触发 loadUsers 重跑；
+            3) 如果本地缓存 supabaseOk === false（上次降级过），也强制重置为 null，
+               让 loadUsers 再次尝试 Supabase 而不是只读本地缓存。
+        */}
+        {isAdmin && (
+          <details className="users-diag-drawer">
+            <summary>
+              <Shield size={14} />
+              <span>用户列表诊断</span>
+              <span className="users-diag-drawer__hint">
+                拉到 {users.length} 条 / 已授权判定 {authorizedUsers.length} / supabaseOk={String(supabaseOk)}
+              </span>
+            </summary>
+            <div className="users-diag-drawer__body">
+              {loadError && (
+                <div className="users-diag-drawer__err">
+                  <AlertCircle size={14} /> {loadError}
+                </div>
+              )}
+              <div className="users-diag-drawer__actions">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      if (isSupabaseConfigured && supabase) {
+                        console.log('[UserManagement] 强制 refreshSession…');
+                        await supabase.auth.refreshSession();
+                      }
+                    } catch (e) {
+                      console.warn('[UserManagement] refreshSession 失败:', e?.message);
+                    }
+                    setRefreshKey((k) => k + 1);
+                  }}
+                >
+                  强制刷新 session 后重查
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setRefreshKey((k) => k + 1)}
+                  disabled={loadingUsers}
+                >
+                  {loadingUsers ? '刷新中…' : '重新加载'}
+                </button>
+              </div>
+              {diag ? (
+                <pre className="users-diag-drawer__pre">
+                  {JSON.stringify(diag, null, 2)}
+                </pre>
+              ) : (
+                <div className="users-diag-drawer__empty">
+                  尚未产生诊断信息（页面刚加载或正在请求中）
+                </div>
+              )}
+            </div>
+          </details>
+        )}
 
         {/* 待授权用户面板 */}
         {showPendingPanel && pendingUsers.length > 0 && (
