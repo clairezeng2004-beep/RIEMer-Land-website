@@ -14,6 +14,7 @@ import {
   CheckCircle2,
   FileText,
   ArrowRight,
+  UserCheck,
 } from 'lucide-react';
 import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
@@ -281,6 +282,10 @@ export default function Tasks() {
   const [showForm, setShowForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState('全部');
   const [filterCategory, setFilterCategory] = useState('全部');
+  // 「只看我负责的」开关：开启后仅展示当前登录用户作为负责人（assignee）的事项。
+  // 协助人（helpers）不计入——产品口径里"我负责的"= 我被指派为主 owner 的事项。
+  // 未登录场景下这个开关不会出现（isAuthenticated 早就重定向到 /login 了）。
+  const [filterMineOnly, setFilterMineOnly] = useState(false);
   const [newTask, setNewTask] = useState({
     title: '',
     description: '',
@@ -313,7 +318,16 @@ export default function Tasks() {
   const filtered = tasks.filter((task) => {
     const matchesStatus = filterStatus === '全部' || task.status === filterStatus;
     const matchesCategory = filterCategory === '全部' || task.category === filterCategory;
-    return matchesStatus && matchesCategory;
+    // 「只看我负责的」：把 task.assignee 规范成数组后判断是否包含当前 user.id；
+    // 兼容历史数据里 assignee 为单个字符串 id 的情况。
+    let matchesMine = true;
+    if (filterMineOnly) {
+      const assigneeIds = Array.isArray(task.assignee)
+        ? task.assignee
+        : task.assignee ? [task.assignee] : [];
+      matchesMine = !!user?.id && assigneeIds.includes(user.id);
+    }
+    return matchesStatus && matchesCategory && matchesMine;
   });
 
   const handleAddTask = async (e) => {
@@ -608,6 +622,20 @@ export default function Tasks() {
 
         {/* Filters */}
         <div className="tasks-filters">
+          {/* 「只看我负责的」视图切换：开启后仅展示 assignee 包含当前登录用户的事项。
+              产品上这是一个独立维度，跟「状态 / 分类」是 AND 关系，所以单独成组。 */}
+          <div className="tasks-filters__group">
+            <span className="tasks-filters__label">视图：</span>
+            <button
+              type="button"
+              className={`tasks-filters__btn ${filterMineOnly ? 'tasks-filters__btn--active' : ''}`}
+              onClick={() => setFilterMineOnly((v) => !v)}
+              title="只看我作为负责人的事项"
+            >
+              <UserCheck size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />
+              只看我负责的
+            </button>
+          </div>
           <div className="tasks-filters__group">
             <span className="tasks-filters__label">状态：</span>
             {['全部', ...taskStatuses.filter((s) => tasks.some((t) => t.status === s))].map((s) => (
@@ -819,7 +847,11 @@ export default function Tasks() {
           <div className="tasks-empty">
             <CheckSquare size={48} />
             <h3>暂无事项</h3>
-            <p>点击"新建事项"按钮创建新任务</p>
+            <p>
+              {filterMineOnly
+                ? '当前没有以你为负责人的事项，可以关闭「只看我负责的」查看全部，或点击「新建事项」创建。'
+                : '点击"新建事项"按钮创建新任务'}
+            </p>
           </div>
         )}
       </div>
