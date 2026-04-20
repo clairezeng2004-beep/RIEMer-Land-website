@@ -7,20 +7,32 @@
 }
 
 /* ============ Top Bar ============ */
-/* 创建/编辑页顶栏：同样改成 position: fixed 避免内容滚动时抖动。
-   原先 background: transparent 配合 sticky 能"透出"下方 .msc-content 的
-   背景；改 fixed 后内容会从下方穿过，必须给顶栏一个实底色兜底，
-   否则会出现文字穿透遮挡的视觉问题。 */
+/* 创建/编辑页顶栏：position: fixed 钉在 navbar 下沿。
+   本样式被两个编辑页复用：MemberSharingCreate（发布分享）、
+   ProcessTemplateCreate（发布流程/模版文件），对两页同时生效。
+
+   历史修复点：
+   1. 最早 background: transparent + sticky，能"透出"下方内容背景；
+      改 fixed 后必须有实底色兜底，否则文字会穿透遮挡。
+   2. 原 padding: 0.75rem 2rem 的左边距过大，用户反馈"返回列表按钮
+      没放在最左边"——2rem(32px) 的内缩把按钮挤到离 sidebar 右沿
+      很远的地方。现调整为 padding-left: 1rem，让"返回列表"紧贴
+      内部空间的左内边；右边保持 2rem 让"取消 / 发布"按钮和
+      页面右内缘距离不变。
+   3. 原 z-index: 90 一般够用，但若子组件（如自定义 Select 下拉）
+      在层叠上下文中创建出局部 z-index，滚动时容易透出。现提到 95，
+      仍低于全站 Navbar(1000)，高于页内常见层（Select dropdown 200
+      属于 topbar 下方兄弟，不会被遮）。 */
 .msc-topbar {
   position: fixed;
   top: 72px;
   left: 220px;
   right: 0;
-  z-index: 90;
+  z-index: 95;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 2rem;
+  padding: 0.75rem 2rem 0.75rem 1rem;
   background: var(--color-bg, #f9fafb);
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
@@ -55,8 +67,14 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  /* 顶栏 fixed 化后让出其视觉高度（~60px），避免标题被盖 */
-  padding: calc(60px) 2rem 1.5rem;
+  /* 顶栏 fixed 高度 = padding(0.75rem×2=24px) + 按钮高(~36px) + border(1px)
+     ≈ 61px。再加上 <main> 的 padding-top:72px 已经给 navbar 让位，但
+     navbar 下还叠了这条 fixed topbar，所以 .msc-content 本身必须再让出
+     topbar 的高度。之前写的是 calc(60px)，刚好卡在 topbar 底边，若内容
+     顶部有 margin 或用户稍微滚动，就会透到 topbar 下方（用户反馈：
+     "下滑时会出现遮挡"）。现在加到 calc(72px + 0.5rem)=80px，留出视觉
+     缓冲，确保任何情况下滚动内容都不会露到 topbar 下方。 */
+  padding: calc(72px + 0.5rem) 2rem 1.5rem;
 }
 
 .msc-content__inner {
@@ -1063,11 +1081,15 @@
   .msc-topbar {
     top: 108px;
     left: 0;
+    /* 手机端左侧无 sidebar，恢复对称的 1rem padding，
+       返回列表按钮自然贴近屏幕左缘。 */
     padding: 0.75rem 1rem;
   }
 
   .msc-content {
-    padding: 60px 0.75rem 0.75rem;
+    /* 手机端同样需要给 fixed topbar 让出完整高度 + 缓冲，
+       原 60px 会被正文穿透。 */
+    padding: calc(72px + 0.5rem) 0.75rem 0.75rem;
   }
 
   .msc-content__inner {
