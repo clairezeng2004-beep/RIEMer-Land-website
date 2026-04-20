@@ -222,7 +222,8 @@ export default function MemberSharingDetail() {
     renderedContent,
     headingSelector: 'h1, h2, h3',
     anchorClassName: 'msd-heading-anchor',
-    scrollOffset: 80,
+    // navbar(72) + fixed topbar(~60) + 缓冲(~12)
+    scrollOffset: 144,
   });
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;

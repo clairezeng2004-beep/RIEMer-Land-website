@@ -7,15 +7,22 @@
 }
 
 /* ============ Top Bar ============ */
+/* 创建/编辑页顶栏：同样改成 position: fixed 避免内容滚动时抖动。
+   原先 background: transparent 配合 sticky 能"透出"下方 .msc-content 的
+   背景；改 fixed 后内容会从下方穿过，必须给顶栏一个实底色兜底，
+   否则会出现文字穿透遮挡的视觉问题。 */
 .msc-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: fixed;
+  top: 72px;
+  left: 220px;
+  right: 0;
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 2rem;
-  background: transparent;
+  background: var(--color-bg, #f9fafb);
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
 
 .msc-topbar__back {
@@ -48,7 +55,8 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  padding: 0 2rem 1.5rem;
+  /* 顶栏 fixed 化后让出其视觉高度（~60px），避免标题被盖 */
+  padding: calc(60px) 2rem 1.5rem;
 }
 
 .msc-content__inner {
@@ -1053,11 +1061,13 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .msc-topbar {
+    top: 108px;
+    left: 0;
     padding: 0.75rem 1rem;
   }
 
   .msc-content {
-    padding: 0 0.75rem 0.75rem;
+    padding: 60px 0.75rem 0.75rem;
   }
 
   .msc-content__inner {

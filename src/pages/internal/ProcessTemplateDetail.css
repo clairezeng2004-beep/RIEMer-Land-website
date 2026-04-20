@@ -7,19 +7,32 @@
 }
 
 /* ============ Top Bar ============ */
-/* 顶部操作栏：sticky 吸附，始终随滚动固定在视口顶部；
-   背景与页面背景保持一致，不再显示独立的白色条 + 阴影分割，
-   让顶栏与内容区视觉上完全融合（无额外色块） */
+/* 顶部操作栏：改为 position: fixed，真正钉死在视口顶部，
+   不随页面滚动、不随目录锚点跳转产生任何位移。
+
+   历史背景：之前用的是 position: sticky; top: 0。理论上 sticky 也会粘顶，
+   但全站 .navbar 是 fixed（高 72px）盖在视口 0–72px，而主文档流 <main>
+   通过 padding-top: 72px 让位；于是 sticky 顶栏被 navbar 的 z-index:1000
+   盖住一部分，点目录跳转时窗口 scroll 改变，顶栏在 navbar 背后若隐若现，
+   用户侧看到的就是"返回列表 / 编辑"按钮跳来跳去。
+
+   改 fixed 后，配合下面 .ptd-content 的 padding-top 让出垂直空间，
+   按钮位置永远稳定（top: 72px，贴 navbar 下沿；桌面端留 220px 侧边栏）。
+
+   手机端 (<= 768px) 见文件末尾的媒体查询单独覆盖为 left:0，配合
+   InternalLayout 的 .internal-mobile-nav 错开垂直位置。 */
 .ptd-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: fixed;
+  top: 72px;
+  left: 220px; /* 桌面侧边栏宽度，避免盖住导航 */
+  right: 0;
+  z-index: 90; /* 低于全站 navbar(1000) 高于内容层 */
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 2rem;
   background: var(--color-bg, #f9fafb);
-  border-bottom: none;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
   box-shadow: none;
 }
 
@@ -56,7 +69,10 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  padding: 1.5rem 2rem;
+  /* 顶部多留一条 topbar 高度（约 60px = 按钮高 + 上下 0.75rem padding）。
+     .ptd-topbar 改为 fixed 后不再占据文档流，这里手动让位，
+     防止文章标题被顶栏盖住。 */
+  padding: calc(1.5rem + 60px) 2rem 1.5rem;
 }
 
 .ptd-content__inner {
@@ -112,8 +128,9 @@
 /* 右侧：划线评论栏（inline TextAnnotation 面板的外壳） */
 .ptd-comments {
   position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 100px);
+  /* 与 .ptd-toc 对齐：navbar 72 + fixed topbar ~60 + 间距 8 */
+  top: 140px;
+  max-height: calc(100vh - 160px);
   display: flex;
   flex-direction: column;
   min-height: 0;
@@ -126,8 +143,9 @@
 /* ============ 目录（TOC）侧栏 ============ */
 .ptd-toc {
   position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 100px);
+  /* navbar 72 + 详情页 fixed topbar ~60 + 视觉间距 8 */
+  top: 140px;
+  max-height: calc(100vh - 160px);
   overflow-y: auto;
   padding: var(--space-md, 16px);
   background: var(--color-bg-card, #fff);
@@ -770,12 +788,17 @@
 }
 
 @media (max-width: 768px) {
+  /* 手机端：侧边栏收起（margin-left: 0），topbar 占满屏宽；
+     位置挪到 navbar(64) + internal-mobile-nav(~44) 下方，避免被遮挡。 */
   .ptd-topbar {
+    top: 108px;
+    left: 0;
     padding: 0.75rem 1rem;
   }
 
   .ptd-content {
-    padding: 0.75rem;
+    /* topbar 高 ~60，加原本 0.75rem 间距 */
+    padding: calc(0.75rem + 60px) 0.75rem 0.75rem;
   }
 
   .ptd-article {
@@ -819,7 +842,7 @@
 
 @media (max-width: 480px) {
   .ptd-content {
-    padding: 0.5rem;
+    padding: calc(0.5rem + 60px) 0.5rem 0.5rem;
   }
 
   .ptd-article__content {

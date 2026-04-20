@@ -956,7 +956,9 @@ export default function ProcessTemplateDetail() {
       isEditing && doc?.format === 'markdown' ? editMarkdownPreview : renderedContent,
     headingSelector: 'h1, h2, h3, h4',
     anchorClassName: 'ptd-heading-anchor',
-    scrollOffset: 80,
+    // navbar(72) + 详情页 fixed topbar(~60) + 视觉缓冲(~12)。
+    // 保证点目录跳转到标题时，标题不会滑到 fixed 顶栏后面被挡住。
+    scrollOffset: 144,
   });
 
   // 首次渲染若 URL 带 hash，自动滚到对应锚点（支持分享链接）

@@ -7,16 +7,21 @@
 }
 
 /* ============ Top Bar ============ */
+/* 顶部操作栏：position: fixed，钉死在视口顶部（navbar 下沿），
+   不随页面滚动或目录锚点跳转发生任何位移。详细说明见
+   ProcessTemplateDetail.css 对应注释。 */
 .msd-topbar {
-  position: sticky;
-  top: 0;
-  z-index: 100;
+  position: fixed;
+  top: 72px;
+  left: 220px;
+  right: 0;
+  z-index: 90;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 0.75rem 2rem;
   background: var(--color-bg, #f9fafb);
-  border-bottom: none;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
   box-shadow: none;
 }
 
@@ -44,7 +49,8 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  padding: 1.5rem 2rem;
+  /* 顶部让出 fixed topbar 的高度，避免内容被盖住 */
+  padding: calc(1.5rem + 60px) 2rem 1.5rem;
 }
 
 .msd-content__inner {
@@ -90,8 +96,9 @@
 /* ============ 目录（TOC）侧栏 ============ */
 .msd-toc {
   position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 100px);
+  /* navbar 72 + fixed topbar ~60 + 间距 8 */
+  top: 140px;
+  max-height: calc(100vh - 160px);
   overflow-y: auto;
   padding: var(--space-md, 16px);
   background: var(--color-bg-card, #fff);
@@ -679,11 +686,13 @@
 
 @media (max-width: 768px) {
   .msd-topbar {
+    top: 108px;
+    left: 0;
     padding: 0.75rem 1rem;
   }
 
   .msd-content {
-    padding: 0.75rem;
+    padding: calc(0.75rem + 60px) 0.75rem 0.75rem;
   }
 
   .msd-article {
@@ -727,7 +736,7 @@
 
 @media (max-width: 480px) {
   .msd-content {
-    padding: 0.5rem;
+    padding: calc(0.5rem + 60px) 0.5rem 0.5rem;
   }
 
   .msd-article__content {
