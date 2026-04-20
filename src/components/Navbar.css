@@ -100,8 +100,8 @@
   color: var(--color-primary);
   font-weight: 500;
   background: rgba(91, 140, 62, 0.10);
-  /* 用 text-shadow 模拟加粗，不改变 font-weight 以避免文字变宽 */
-  text-shadow: 0 0 0.5px currentColor, 0 0 0.5px currentColor;
+  /* 选中态仅通过「变色 + 浅绿底」提示，不再用 text-shadow 模拟加粗，
+     保持和未选中项完全相同的字重与字形宽度。 */
 }
 
 .navbar__nav-item--active:hover {
