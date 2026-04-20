@@ -5,6 +5,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import {
   Users,
   Shield,
@@ -21,6 +22,7 @@ import {
   ChevronDown,
   Clock,
   User,
+  RefreshCw,
 } from 'lucide-react';
 import './UserManagement.css';
 
@@ -255,6 +257,69 @@ export default function UserManagement() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isAuthenticated]);
 
+  // ============================================
+  // 多端 / 多管理员实时同步：订阅 Supabase realtime
+  //
+  // 背景：此前本页只在下列时机刷新用户列表——
+  //   1. 首次挂载；
+  //   2. 本设备 refreshKey++（授权 / 撤销 / 删除 / 预授权后手动触发）；
+  //   3. visibilitychange（从其他标签页切回来）。
+  //
+  // 这导致一个很明显的"同步不上"的观感：
+  //   - 另一个管理员在别的设备上授权 / 撤销 / 删除了某个用户；
+  //   - 这边页面保持打开并处于前台，既不刷新也收不到推送；
+  //   - 表格里仍然是"旧数据"，用户看起来像"待授权 / 已授权 都同步不了"。
+  //
+  // 方案：给 profiles 表和 pre_authorized_emails 表都加 realtime 订阅，
+  //   任何 INSERT / UPDATE / DELETE 事件都触发 refreshKey++ → 重新拉数据。
+  // 实现参考项目里已有的 subscribeSharings / subscribeCategories 模式。
+  //
+  // 注意：
+  //   - 必须确认 Supabase 已配置且本次未降级到 local 模式才订阅；
+  //   - 卸载时通过 removeChannel 清理，避免泄漏；
+  //   - 任何订阅异常都不应该影响页面其它功能，用 try/catch 兜底。
+  // ============================================
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    if (!isSupabaseConfigured || !supabase) return;
+    if (supabaseOk === false) return; // 明确不可达时不必订阅
+
+    let profilesChannel = null;
+    let preAuthChannel = null;
+    try {
+      profilesChannel = supabase
+        .channel('user_management_profiles_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'profiles' },
+          (payload) => {
+            console.log('[UserManagement] profiles realtime 事件:', payload.eventType || payload.type);
+            setRefreshKey((k) => k + 1);
+          }
+        )
+        .subscribe();
+
+      preAuthChannel = supabase
+        .channel('user_management_pre_auth_realtime')
+        .on(
+          'postgres_changes',
+          { event: '*', schema: 'public', table: 'pre_authorized_emails' },
+          (payload) => {
+            console.log('[UserManagement] pre_authorized_emails realtime 事件:', payload.eventType || payload.type);
+            setRefreshKey((k) => k + 1);
+          }
+        )
+        .subscribe();
+    } catch (err) {
+      console.warn('[UserManagement] realtime 订阅失败（不影响主流程）:', err?.message);
+    }
+
+    return () => {
+      try { if (profilesChannel) supabase.removeChannel(profilesChannel); } catch { /* ignore */ }
+      try { if (preAuthChannel) supabase.removeChannel(preAuthChannel); } catch { /* ignore */ }
+    };
+  }, [isAuthenticated, supabaseOk]);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -353,20 +418,40 @@ export default function UserManagement() {
     <div className="users-page">
       <div className="container">
         <div className="users-page__header">
-          <h1>
-            <Users size={28} /> <EditableText
-              value={uc.pageTitle}
-              onChange={(v) => updateUsers('pageTitle', v)}
-              configKey="users.pageTitle"
+          <div className="users-page__header-main">
+            <h1>
+              <Users size={28} /> <EditableText
+                value={uc.pageTitle}
+                onChange={(v) => updateUsers('pageTitle', v)}
+                configKey="users.pageTitle"
+                as="span"
+              />
+            </h1>
+            <p><EditableText
+              value={uc.pageDesc}
+              onChange={(v) => updateUsers('pageDesc', v)}
+              configKey="users.pageDesc"
               as="span"
+            /></p>
+          </div>
+          {/* 手动刷新按钮：
+              realtime 订阅是多端同步的首选方式，但某些部署未启用 Supabase
+              realtime、或订阅在网络抖动后失联时仍可能漏消息。这里给用户一个
+              常驻的"刷新"入口作为兜底——不必等 visibilitychange 也不必整页
+              刷新即可拉到最新数据。 */}
+          <button
+            type="button"
+            className="users-page__refresh-btn"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            disabled={loadingUsers}
+            title="刷新用户列表"
+          >
+            <RefreshCw
+              size={14}
+              className={loadingUsers ? 'users-page__refresh-btn-icon--spinning' : undefined}
             />
-          </h1>
-          <p><EditableText
-            value={uc.pageDesc}
-            onChange={(v) => updateUsers('pageDesc', v)}
-            configKey="users.pageDesc"
-            as="span"
-          /></p>
+            <span>{loadingUsers ? '刷新中' : '刷新'}</span>
+          </button>
         </div>
 
         {!isAdmin && (

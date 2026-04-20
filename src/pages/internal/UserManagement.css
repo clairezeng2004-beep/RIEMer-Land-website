@@ -6,6 +6,16 @@
 
 .users-page__header {
   margin-bottom: var(--space-2xl);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  flex-wrap: wrap;
+}
+
+.users-page__header-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .users-page__header h1 {
@@ -19,6 +29,48 @@
 .users-page__header p {
   color: var(--color-text-muted);
   font-size: var(--text-sm);
+}
+
+/* 手动刷新按钮：右上角轻量次要按钮，和页面整体淡绿色调协调。
+   与加载状态强关联：
+   - loadingUsers=true 时按钮被 disable 且图标旋转；
+   - 点击即触发 refreshKey++，走正常加载路径。 */
+.users-page__refresh-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  color: var(--color-text);
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast), color var(--transition-fast);
+  /* 不被 header 的 flex 拉伸，贴在标题行右侧顶部 */
+  align-self: flex-start;
+  margin-top: 4px;
+  white-space: nowrap;
+}
+
+.users-page__refresh-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.users-page__refresh-btn:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+@keyframes users-refresh-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.users-page__refresh-btn-icon--spinning {
+  animation: users-refresh-spin 0.9s linear infinite;
 }
 
 /* Stats */
@@ -499,29 +551,44 @@
   pointer-events: none;
 }
 
-.users-preauth__input {
+/* 选择器故意写成 input.users-preauth__input：
+   全局 src/index.css 里为了让"邮箱 / 网址 / 电话 / 密码"这类标识符型
+   输入框统一使用等宽字体，写了一条：
+     input[type='email'], input[type='url'], ... { font-family: ui-monospace, ... }
+   这条规则的特异性是 0,1,1（元素 + 属性选择器），比单个类选择器
+   `.users-preauth__input`（0,1,0）高，因此本文件里旧的 `font: inherit`
+   会被全局规则反向覆盖——结果就是"邮箱授权"面板里输入框占位符和内容
+   变成等宽字体，与同一块面板里的中文标题 / 说明文字 / 按钮文本字体
+   完全不同，视觉上像"字体不一致"。
+   这里通过 input.users-preauth__input 把特异性提升到 0,2,1，明确地把
+   字体栈切回页面正文字体，让整个面板字体保持一致。 */
+input.users-preauth__input {
   width: 100%;
   padding: 10px 12px 10px 38px;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
-  /* 浏览器对 <input>/<button>/<textarea> 默认不继承父级 font-family，
-     而是用系统 UA 字体（Mac 上 Helvetica、Win 上 Segoe UI），
-     因此即便全局 body 设定了苹方/Inter，这个邮箱输入框里的占位符和
-     用户输入依然会显得"字重更细、字形偏西文"，与旁边中文不一致。
-     显式 font: inherit 让它回到页面统一字体栈。 */
-  font: inherit;
+  /* 明确使用页面正文字体，覆盖全局等宽策略。 */
+  font-family: var(--font-body);
   font-size: var(--text-sm);
+  /* 清除全局等宽规则留下的 letter-spacing / em 级 font-size 偏移。 */
+  letter-spacing: 0;
+  line-height: 1.5;
   background: var(--color-bg);
   color: var(--color-text);
   outline: none;
   transition: border-color var(--transition-fast);
 }
 
-.users-preauth__input:focus {
+input.users-preauth__input:focus {
   border-color: var(--color-primary);
 }
 
-.users-preauth__input::placeholder {
+input.users-preauth__input::placeholder {
+  /* 占位符也要明确跟随正文字体，否则在某些浏览器里占位符仍会继承
+     UA 默认字体，出现"占位符一种字体、实际输入一种字体"。 */
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  letter-spacing: 0;
   color: var(--color-text-muted);
 }
 
