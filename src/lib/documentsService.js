@@ -153,9 +153,11 @@ export async function fetchAllFromCloud() {
       : (deletedRes.data || []).map((r) => String(r.default_id));
 
     // 写入本地缓存，用于下次首屏快速渲染
+    // 注意：本地缓存同时持有"用户发布的新文档"与"内置示例被覆盖后的最新版"，
+    // 两类都以 id 为键落到 localStorage 的 DOCUMENTS_KEY，Documents / ProcessTemplateDetail
+    // 渲染时会按 id 去重保证同一文档只显示一份。
     try {
-      const userDocs = docs.filter((d) => String(d.id).startsWith('doc-'));
-      saveLocalDocs(userDocs);
+      saveLocalDocs(docs);
       saveLocalDeletedIds(deletedIds);
     } catch { /* ignore */ }
 

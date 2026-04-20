@@ -275,8 +275,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const [documents, setDocuments] = useState(() => {
     const userDocs = loadUserDocs();
     const deletedIds = new Set(loadDeletedDefaultIds());
-    // 过滤掉被管理员删除过的默认模拟文档
-    const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
+    const userIds = new Set(userDocs.map((d) => String(d.id)));
+    // 过滤掉被管理员删除过 + 被 userDocs 覆盖（同 id）的默认模拟文档
+    const defaults = documentsData.filter(
+      (d) => !deletedIds.has(String(d.id)) && !userIds.has(String(d.id))
+    );
     const base = filterTypes
       ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
       : [...userDocs, ...defaults];
@@ -294,7 +297,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const refreshDocs = useCallback(() => {
     const userDocs = loadUserDocs();
     const deletedIds = new Set(loadDeletedDefaultIds());
-    const defaults = documentsData.filter((d) => !deletedIds.has(String(d.id)));
+    const userIds = new Set(userDocs.map((d) => String(d.id)));
+    const defaults = documentsData.filter(
+      (d) => !deletedIds.has(String(d.id)) && !userIds.has(String(d.id))
+    );
     const base = filterTypes
       ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
       : [...userDocs, ...defaults];
@@ -330,14 +336,17 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       if (cancelled || !cloud) return;
       const { docs: cloudDocs, deletedIds: cloudDeletedIds } = cloud;
 
-      // 合并云端用户文档 + 默认数据（过滤被删除的）
+      // cloudDocs 可能同时包含 doc-* 用户文档 与 内置示例的"覆盖层"（id 同 siteData）
       const deletedSet = new Set(cloudDeletedIds.map(String));
-      const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
-      const userDocs = cloudDocs.filter((d) => String(d.id).startsWith('doc-'));
+      const cloudIds = new Set(cloudDocs.map((d) => String(d.id)));
+      // 默认示例：排除"已删除"和"已被 cloudDocs 覆盖"两类
+      const defaults = documentsData.filter(
+        (d) => !deletedSet.has(String(d.id)) && !cloudIds.has(String(d.id))
+      );
 
       const base = filterTypes
-        ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
-        : [...userDocs, ...defaults];
+        ? [...defaults, ...cloudDocs].filter((d) => filterTypes.includes(d.type))
+        : [...cloudDocs, ...defaults];
 
       const sorted = base.sort((a, b) => {
         const aIsUser = isUserDoc(a);
@@ -347,7 +356,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         return 0;
       });
       setDocuments(sorted);
-      console.log('[Documents] 从云端同步', userDocs.length, '条用户文档，', cloudDeletedIds.length, '条默认删除记录');
+      console.log('[Documents] 从云端同步', cloudDocs.length, '条文档(含覆盖层)，', cloudDeletedIds.length, '条默认删除记录');
 
       // 同步浏览计数
       const merged = await fetchViewsFromCloud();
@@ -376,11 +385,13 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         if (!cloud) return;
         const { docs: cloudDocs, deletedIds: cloudDeletedIds } = cloud;
         const deletedSet = new Set(cloudDeletedIds.map(String));
-        const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
-        const userDocs = cloudDocs.filter((d) => String(d.id).startsWith('doc-'));
+        const cloudIds = new Set(cloudDocs.map((d) => String(d.id)));
+        const defaults = documentsData.filter(
+          (d) => !deletedSet.has(String(d.id)) && !cloudIds.has(String(d.id))
+        );
         const base = filterTypes
-          ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
-          : [...userDocs, ...defaults];
+          ? [...defaults, ...cloudDocs].filter((d) => filterTypes.includes(d.type))
+          : [...cloudDocs, ...defaults];
         const sorted = base.sort((a, b) => {
           const aIsUser = isUserDoc(a);
           const bIsUser = isUserDoc(b);
@@ -391,7 +402,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         setDocuments(sorted);
         // 同时更新本地缓存，供其它组件及下次打开时的首屏使用
         try {
-          saveUserDocs(userDocs);
+          // 本地 userDocs 缓存仅存放有实际持久化意义的记录（含覆盖层）
+          saveUserDocs(cloudDocs);
           localStorage.setItem(DELETED_DEFAULT_IDS_KEY, JSON.stringify(cloudDeletedIds));
         } catch { /* ignore */ }
       }, 200);
@@ -604,19 +616,24 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const confirmMsg = `确定要删除文档「${target.title}」吗？`;
     if (window.confirm(confirmMsg)) {
       setDocuments((prev) => prev.filter((d) => d.id !== id));
-      if (String(id).startsWith('doc-')) {
-        // 用户发布的文档：本地 + 云端同步删除
-        const userDocs = loadUserDocs().filter((d) => d.id !== id);
-        saveUserDocs(userDocs);
+      const sid = String(id);
+      const isUser = sid.startsWith('doc-');
+      // userDocs 中可能存在同 id 的覆盖层（即便 id 不以 doc- 开头），
+      // 一并从本地/云端删除，避免删除后因覆盖层残留仍然显示。
+      const userDocs = loadUserDocs();
+      const hasOverrideRow = userDocs.some((d) => String(d.id) === sid);
+      if (hasOverrideRow) {
+        saveUserDocs(userDocs.filter((d) => String(d.id) !== sid));
         if (isProcessTemplateMode && canUseSupabase()) {
           deleteUserDoc(id).catch((err) => {
-            console.warn('[Documents] 云端删除用户文档失败:', err);
+            console.warn('[Documents] 云端删除文档失败:', err);
           });
         }
-      } else {
-        // 默认模拟数据：本地 + 云端同步标记
+      }
+      // 若本来就是默认模拟数据（id 不以 doc- 开头），再额外写一条"已删除"标记，
+      // 保证其它设备拉取时不再渲染该默认示例。
+      if (!isUser) {
         const deletedIds = loadDeletedDefaultIds();
-        const sid = String(id);
         if (!deletedIds.includes(sid)) {
           deletedIds.push(sid);
           saveDeletedDefaultIds(deletedIds);
@@ -712,6 +729,65 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const hasLiked = (doc) => {
     if (!user || !doc.likes) return false;
     return doc.likes.some((l) => l.userId === user.id);
+  };
+
+  /* ==========
+     智能下载：按优先级处理不同形态的文档
+     1) doc.fileUrl：单个原文件（老版本上传）—— 直接触发 <a download>
+     2) doc.attachments[]（发布页上传的附件列表）——有几个就逐个触发下载
+     3) doc.content（富文本 / Markdown 正文）—— 把正文打包成 .md 或 .html 文件下载
+     4) 以上都没有（纯占位示例）—— 给出清晰 toast 提示，避免按钮"静默无反应"
+     ========== */
+  const triggerDownload = (href, filename) => {
+    const a = document.createElement('a');
+    a.href = href;
+    a.download = filename || '下载';
+    // 跨源 blob / dataURL 在新 tab 打开更稳；同源可直接 click
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const handleDownload = (doc, e) => {
+    if (e) e.stopPropagation();
+    if (!doc) return;
+
+    // 1) 有主文件
+    if (doc.fileUrl) {
+      triggerDownload(doc.fileUrl, doc.title);
+      return;
+    }
+
+    // 2) 有附件列表
+    const atts = Array.isArray(doc.attachments) ? doc.attachments.filter((a) => a?.dataUrl || a?.url) : [];
+    if (atts.length > 0) {
+      // 多个附件时按顺序触发（浏览器会弹"是否允许下载多个文件"一次，之后静默）
+      atts.forEach((f, idx) => {
+        setTimeout(() => triggerDownload(f.dataUrl || f.url, f.name || `${doc.title}-${idx + 1}`), idx * 150);
+      });
+      return;
+    }
+
+    // 3) 只有正文 content（富文本/Markdown）—— 把正文导出为文件
+    const content = typeof doc.content === 'string' ? doc.content.trim() : '';
+    if (content) {
+      const isMd = doc.format === 'markdown';
+      const mime = isMd ? 'text/markdown;charset=utf-8' : 'text/html;charset=utf-8';
+      const ext = isMd ? 'md' : 'html';
+      // HTML 情况下包装成完整 HTML 文档，确保本地浏览器/Word 打开时能显示样式
+      const body = isMd
+        ? content
+        : `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${doc.title || ''}</title></head><body>${content}</body></html>`;
+      const blob = new Blob([body], { type: mime });
+      const url = URL.createObjectURL(blob);
+      triggerDownload(url, `${doc.title || 'document'}.${ext}`);
+      // 释放 blob URL
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      return;
+    }
+
+    // 4) 真的没有任何可下载内容
+    window.alert('该文档暂无可下载的原文件或正文内容。');
   };
 
   const openPreview = (doc) => {
@@ -1124,15 +1200,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 <div className="doc-card__bottom-right">
                   <button
                     className="doc-card__action-icon"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      if (doc.fileUrl) {
-                        const a = document.createElement('a');
-                        a.href = doc.fileUrl;
-                        a.download = doc.title;
-                        a.click();
-                      }
-                    }}
+                    onClick={(e) => handleDownload(doc, e)}
                     title="下载原文件"
                   >
                     <Download size={14} />
@@ -1178,15 +1246,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 </span>
               </div>
               <div className="doc-preview__header-actions">
-                {previewDoc.fileUrl && (
+                {(previewDoc.fileUrl ||
+                  (Array.isArray(previewDoc.attachments) && previewDoc.attachments.length > 0) ||
+                  (typeof previewDoc.content === 'string' && previewDoc.content.trim().length > 0)) && (
                   <button
                     className="doc-preview__download"
-                    onClick={() => {
-                      const a = document.createElement('a');
-                      a.href = previewDoc.fileUrl;
-                      a.download = previewDoc.title;
-                      a.click();
-                    }}
+                    onClick={() => handleDownload(previewDoc)}
                     title="下载原文件"
                   >
                     <Download size={16} /> 下载
@@ -1327,12 +1392,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   {previewDoc.fileUrl && (
                     <button
                       className="btn btn-secondary"
-                      onClick={() => {
-                        const a = document.createElement('a');
-                        a.href = previewDoc.fileUrl;
-                        a.download = previewDoc.title;
-                        a.click();
-                      }}
+                      onClick={() => handleDownload(previewDoc)}
                     >
                       <Download size={16} /> 下载文件
                     </button>

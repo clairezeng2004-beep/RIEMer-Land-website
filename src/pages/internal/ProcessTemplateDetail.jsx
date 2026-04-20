@@ -44,6 +44,7 @@ import {
   recordEditLog,
   fetchEditLog,
   subscribeEditLog,
+  createDoc as cloudCreateDoc,
   updateDoc as cloudUpdateDoc,
   canUseSupabase,
   subscribeDocuments,
@@ -455,7 +456,11 @@ export default function ProcessTemplateDetail() {
     (async () => {
       const cloud = await fetchAllFromCloud();
       if (cancelled || !cloud) return;
-      const userDocs = cloud.docs.filter((d) => String(d.id).startsWith('doc-'));
+      // 云端 documents 表可能包含两类记录：
+      // - 用户发布的新文档（id 以 doc- 开头）
+      // - 内置示例被管理员编辑后写入的"覆盖层"（id 与 siteData.documentsData 中一致，如 '1'、'5'）
+      // 两类都需要进入本地渲染集合。
+      const userDocs = cloud.docs;
       setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
       // 浏览计数合并
       await fetchViewsFromCloud();
@@ -475,8 +480,8 @@ export default function ProcessTemplateDetail() {
       timer = setTimeout(async () => {
         const cloud = await fetchAllFromCloud();
         if (!cloud) return;
-        const userDocs = cloud.docs.filter((d) => String(d.id).startsWith('doc-'));
-        setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
+        // 同 fetch 首拉逻辑：用户文档 + 内置示例覆盖层都要收
+        setCloudData({ userDocs: cloud.docs, deletedIds: cloud.deletedIds.map(String) });
       }, 200);
     };
     const unsubDocs = subscribeDocuments(() => refetch());
@@ -490,17 +495,24 @@ export default function ProcessTemplateDetail() {
 
   const allDocs = useMemo(() => {
     void docsVersion;
+    // 合并规则：userDocs 与 defaults 可能存在同 id（内置示例覆盖层），
+    // userDocs 优先覆盖同 id 的 default，避免同一文档出现两份。
+    const dedupe = (userDocs, defaults) => {
+      const userIds = new Set(userDocs.map((d) => String(d.id)));
+      const overriddenDefaults = defaults.filter((d) => !userIds.has(String(d.id)));
+      return [...userDocs, ...overriddenDefaults];
+    };
+
     if (cloudData) {
-      // 云端数据优先
       const deletedSet = new Set(cloudData.deletedIds);
       const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
-      return [...cloudData.userDocs, ...defaults];
+      return dedupe(cloudData.userDocs, defaults);
     }
     // 退回本地缓存
     const userDocs = loadUserDocs();
     const deletedSet = new Set(loadDeletedDefaultIds().map(String));
     const defaults = documentsData.filter((d) => !deletedSet.has(String(d.id)));
-    return [...userDocs, ...defaults];
+    return dedupe(userDocs, defaults);
   }, [docsVersion, cloudData]);
 
   const doc = useMemo(() => allDocs.find((d) => String(d.id) === String(id)), [allDocs, id]);
@@ -947,11 +959,19 @@ export default function ProcessTemplateDetail() {
     setSaving(true);
     try {
       const userDocs = loadUserDocs();
-      const idx = userDocs.findIndex((d) => String(d.id) === String(doc.id));
+      let idx = userDocs.findIndex((d) => String(d.id) === String(doc.id));
+      // 内置示例（非 doc-* 开头）首次编辑：在 userDocs 中新增一条同 id 的覆盖层，
+      // 列表合并时 userDoc 优先，相当于管理员对内置示例就地做了版本修订。
+      const isFirstOverride = idx === -1 && !isUserDoc(doc);
       if (idx === -1) {
-        alert('仅支持编辑用户发布的文档');
-        setSaving(false);
-        return;
+        if (!isUserDoc(doc)) {
+          userDocs.unshift({ ...doc });
+          idx = 0;
+        } else {
+          alert('文档数据不一致，请刷新页面后重试');
+          setSaving(false);
+          return;
+        }
       }
       const nowDate = new Date().toISOString().split('T')[0];
       // 最后编辑人统一使用真名（user.name）优先
@@ -1010,13 +1030,19 @@ export default function ProcessTemplateDetail() {
 
       // —— 云端异步同步（不阻塞 UI） ——
       if (canUseSupabase()) {
-        cloudUpdateDoc(doc.id, {
-          title,
-          description: editDescription,
-          content: cleanContent,
-          lastEditedAt: nowDate,
-          lastEditedBy: editor,
-        })
+        // 首次覆盖内置示例：云端原本无记录，必须用 insert（createDoc）；
+        // 后续再编辑走普通 update。
+        const cloudPromise = isFirstOverride
+          ? cloudCreateDoc(updated)
+          : cloudUpdateDoc(doc.id, {
+              title,
+              description: editDescription,
+              content: cleanContent,
+              lastEditedAt: nowDate,
+              lastEditedBy: editor,
+            });
+
+        cloudPromise
           .then((result) => {
             if (!result.remote) {
               console.warn('[ProcessTemplateDetail] 云端编辑同步失败，其他设备暂不可见', result.error);
@@ -1028,14 +1054,15 @@ export default function ProcessTemplateDetail() {
               // 云端成功后同步刷新 cloudData，避免下次重新进入页面读到旧版
               setCloudData((prev) => {
                 if (!prev) return prev;
-                return {
-                  ...prev,
-                  userDocs: prev.userDocs.map((d) =>
-                    String(d.id) === String(doc.id)
-                      ? { ...d, title, description: editDescription, content: cleanContent, lastEditedAt: nowDate, lastEditedBy: editor }
-                      : d
-                  ),
-                };
+                const existsInCloud = prev.userDocs.some((d) => String(d.id) === String(doc.id));
+                const nextUserDocs = existsInCloud
+                  ? prev.userDocs.map((d) =>
+                      String(d.id) === String(doc.id)
+                        ? { ...d, title, description: editDescription, content: cleanContent, lastEditedAt: nowDate, lastEditedBy: editor }
+                        : d
+                    )
+                  : [updated, ...prev.userDocs]; // 首次覆盖，追加到云端快照
+                return { ...prev, userDocs: nextUserDocs };
               });
             }
           })
@@ -1101,13 +1128,18 @@ export default function ProcessTemplateDetail() {
     // 编辑 Markdown 态有实时预览，目录基于预览 DOM 工作。
     (!isEditing || doc.format === 'markdown');
 
-  /* ========== 编辑权限：用户发布的文档 + （管理员 或 任一贡献者本人） ========== */
-  const canEdit =
-    isUserDoc(doc) &&
-    (isAdmin ||
-      (user?.id &&
-        (String(user.id) === String(doc.uploadedById) ||
-          (Array.isArray(doc.contributorIds) && doc.contributorIds.map(String).includes(String(user.id))))));
+  /* ========== 编辑权限 ==========
+     允许编辑的情况：
+     1) 用户发布的文档（doc-* 开头）：管理员 / 任一贡献者本人 可编辑
+     2) 内置示例文档（id 不以 doc- 开头，来自 siteData.documentsData）：
+        仅管理员可编辑，编辑后会以"覆盖层"形式写入 userDocs（id 保持不变），
+        列表合并时 userDoc 优先于同 id 的内置示例。*/
+  const canEdit = isUserDoc(doc)
+    ? (isAdmin ||
+       (user?.id &&
+         (String(user.id) === String(doc.uploadedById) ||
+           (Array.isArray(doc.contributorIds) && doc.contributorIds.map(String).includes(String(user.id))))))
+    : isAdmin; // 内置示例：仅管理员
 
   return (
     <div className="ptd-page">
