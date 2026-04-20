@@ -294,6 +294,133 @@
   box-shadow: inset 0 -1px 0 var(--color-border-light);
 }
 
+/* ---- 表头列内筛选器 ---------------------------------------------------
+ * 布局：表头文字 + 漏斗图标按钮横向并排；用 inline-flex，不改变 th 的外部盒模型，
+ *       保证和通讯录表头高度仍然一致（see .tasks-table th 注释）。
+ * 视觉：漏斗默认灰色描边、hover 主色；当该列处于筛选中（value !== '全部'）时，
+ *       图标整体变主色 + 右上角红点小点提示。
+ */
+.tasks-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tasks-column-filter {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tasks-column-filter__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  position: relative;
+}
+
+.tasks-column-filter__btn:hover {
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.08);
+}
+
+.tasks-column-filter__btn--active {
+  color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.12);
+}
+
+/* 小红点：当前列已筛选时在漏斗右上角显示，快速吸引注意力 */
+.tasks-column-filter__dot {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #C0392B;
+  pointer-events: none;
+}
+
+/* 下拉面板：通过 React Portal 渲染到 document.body，用 fixed 定位，
+ * 避免被 .tasks-table-wrapper 的 overflow 裁切；top/left 由 JS 按按钮
+ * 的 getBoundingClientRect 计算后通过 inline style 设置。
+ */
+.tasks-column-filter__panel {
+  position: fixed;
+  min-width: 160px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--color-bg-card);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  animation: tasksColumnFilterFadeIn 0.15s ease;
+}
+
+@keyframes tasksColumnFilterFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tasks-column-filter__option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: var(--text-sm);
+  font-weight: 400;                 /* 覆盖 th 的 600，菜单里用常规字重 */
+  color: var(--color-text);
+  white-space: normal;              /* 覆盖 th 的 nowrap，让长分类名能换行 */
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tasks-column-filter__option:hover {
+  background: rgba(91, 140, 62, 0.08);
+  color: var(--color-primary);
+}
+
+.tasks-column-filter__option--active {
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.tasks-column-filter__option-label {
+  flex: 1;
+  min-width: 0;
+  /* 超长名字（很少见，但真有）优雅截断 */
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tasks-column-filter__option-check {
+  flex-shrink: 0;
+  color: var(--color-primary);
+}
+
 .tasks-table td {
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--color-border-light);

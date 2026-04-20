@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Navigate, Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -15,6 +16,8 @@ import {
   FileText,
   ArrowRight,
   UserCheck,
+  Filter,
+  Check,
 } from 'lucide-react';
 import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
@@ -29,6 +32,127 @@ const statusColors = {
   '已完成': '#3A6B35',
   '已取消': '#C0392B',
 };
+
+/**
+ * TaskColumnFilter — 表头列筛选器
+ *
+ * 表格"状态 / 分类 / 负责人"三列都复用这个组件：表头文字右侧显示一个
+ * 漏斗图标，点击后在表头正下方弹出一个小面板，允许用户从候选项里挑选
+ * 一个值来过滤本列（单选，"全部"表示清空该列筛选）。
+ *
+ * Props:
+ *   value        当前选中值（字符串；'全部' 表示未筛选）
+ *   onChange     选择回调 (nextValue) => void
+ *   options      选项数组 [{ value, label }]，调用方自行在头部拼接 '全部'
+ *   title        漏斗按钮的 title 提示（屏幕朗读 / hover 提示）
+ *
+ * 设计要点：
+ *  - 已筛选（value !== '全部'）时漏斗图标变主色 + 右上角红点，提示当前列有筛选；
+ *  - 点击图标切换开合；点击外部关闭；按 ESC 关闭；
+ *  - ⚠️ 下拉面板用 React Portal 渲染到 document.body，原因是
+ *    .tasks-table-wrapper 设了 overflow: auto（承载水平/垂直滚动 + sticky thead），
+ *    如果面板留在 th 内部 DOM，会被 wrapper 的 overflow 裁切。
+ *    定位靠按钮的 getBoundingClientRect，滚动/窗口变化时重新计算。
+ */
+function TaskColumnFilter({ value, onChange, options, title }) {
+  const [open, setOpen] = useState(false);
+  const [panelPos, setPanelPos] = useState({ top: 0, left: 0 });
+  const btnRef = useRef(null);
+  const panelRef = useRef(null);
+  const active = value && value !== '全部';
+
+  // 计算面板位置：紧贴按钮下方、右对齐到按钮右边缘
+  const recalcPosition = useCallback(() => {
+    const btn = btnRef.current;
+    if (!btn) return;
+    const rect = btn.getBoundingClientRect();
+    const PANEL_MIN_WIDTH = 160;
+    // 右对齐：panel.right = btn.right；换算成 left
+    const left = Math.max(8, rect.right - PANEL_MIN_WIDTH);
+    const top = rect.bottom + 6;
+    setPanelPos({ top, left });
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    recalcPosition();
+    const onScroll = () => recalcPosition();
+    const onResize = () => recalcPosition();
+    // 表格 wrapper 滚动时也要跟随 —— 监听 true 捕获阶段即可捕到任意祖先滚动
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('resize', onResize);
+    return () => {
+      window.removeEventListener('scroll', onScroll, true);
+      window.removeEventListener('resize', onResize);
+    };
+  }, [open, recalcPosition]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e) => {
+      // 点击按钮本身或面板内部都不关闭；点击其它地方关闭
+      if (btnRef.current && btnRef.current.contains(e.target)) return;
+      if (panelRef.current && panelRef.current.contains(e.target)) return;
+      setOpen(false);
+    };
+    const onKey = (e) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    document.addEventListener('mousedown', onDown);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDown);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [open]);
+
+  return (
+    <span className="tasks-column-filter">
+      <button
+        ref={btnRef}
+        type="button"
+        className={`tasks-column-filter__btn ${active ? 'tasks-column-filter__btn--active' : ''}`}
+        onClick={() => setOpen((v) => !v)}
+        title={title || '筛选'}
+        aria-label={title || '筛选'}
+        aria-expanded={open}
+      >
+        <Filter size={13} />
+        {active && <span className="tasks-column-filter__dot" />}
+      </button>
+      {open && createPortal(
+        <div
+          ref={panelRef}
+          className="tasks-column-filter__panel"
+          role="menu"
+          style={{ top: panelPos.top, left: panelPos.left }}
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === (value ?? '全部');
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                role="menuitemradio"
+                aria-checked={isSelected}
+                className={`tasks-column-filter__option ${isSelected ? 'tasks-column-filter__option--active' : ''}`}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                title={opt.label}
+              >
+                <span className="tasks-column-filter__option-label">{opt.label}</span>
+                {isSelected && <Check size={13} className="tasks-column-filter__option-check" />}
+              </button>
+            );
+          })}
+        </div>,
+        document.body
+      )}
+    </span>
+  );
+}
 
 // 持久化键：本地缓存 + 是否已初始化示例数据的标记
 const TASKS_LS_KEY = 'riemer_tasks';
@@ -282,6 +406,12 @@ export default function Tasks() {
   const [showForm, setShowForm] = useState(false);
   const [filterStatus, setFilterStatus] = useState('全部');
   const [filterCategory, setFilterCategory] = useState('全部');
+  // 表头「负责人」列筛选：'全部' 表示不筛选；否则为某个 user.id，仅展示该人为负责人的事项。
+  // 和「只看我负责的」是互斥维度：
+  //   - 选择某个具体负责人 → 自动关闭 filterMineOnly（否则两层条件可能矛盾）；
+  //   - 开启 filterMineOnly → 自动把 filterAssignee 重置回 '全部'。
+  // 两个 setter 对应的切换在各自的 onChange 里处理。
+  const [filterAssignee, setFilterAssignee] = useState('全部');
   // 「只看我负责的」开关：开启后仅展示当前登录用户作为负责人（assignee）的事项。
   // 协助人（helpers）不计入——产品口径里"我负责的"= 我被指派为主 owner 的事项。
   // 未登录场景下这个开关不会出现（isAuthenticated 早就重定向到 /login 了）。
@@ -318,16 +448,18 @@ export default function Tasks() {
   const filtered = tasks.filter((task) => {
     const matchesStatus = filterStatus === '全部' || task.status === filterStatus;
     const matchesCategory = filterCategory === '全部' || task.category === filterCategory;
-    // 「只看我负责的」：把 task.assignee 规范成数组后判断是否包含当前 user.id；
+    // 统一把 assignee 规范成数组，负责人筛选和「只看我负责的」都基于此。
     // 兼容历史数据里 assignee 为单个字符串 id 的情况。
-    let matchesMine = true;
-    if (filterMineOnly) {
-      const assigneeIds = Array.isArray(task.assignee)
-        ? task.assignee
-        : task.assignee ? [task.assignee] : [];
-      matchesMine = !!user?.id && assigneeIds.includes(user.id);
-    }
-    return matchesStatus && matchesCategory && matchesMine;
+    const assigneeIds = Array.isArray(task.assignee)
+      ? task.assignee
+      : task.assignee ? [task.assignee] : [];
+    // 表头「负责人」筛选：选中某个 user.id 时，只保留 assignee 包含该 id 的事项。
+    const matchesAssignee =
+      filterAssignee === '全部' || assigneeIds.includes(filterAssignee);
+    // 「只看我负责的」：仅保留 assignee 包含当前登录 user.id 的事项。
+    const matchesMine =
+      !filterMineOnly || (!!user?.id && assigneeIds.includes(user.id));
+    return matchesStatus && matchesCategory && matchesAssignee && matchesMine;
   });
 
   const handleAddTask = async (e) => {
@@ -629,7 +761,12 @@ export default function Tasks() {
             <button
               type="button"
               className={`tasks-filters__btn ${filterMineOnly ? 'tasks-filters__btn--active' : ''}`}
-              onClick={() => setFilterMineOnly((v) => !v)}
+              onClick={() => setFilterMineOnly((v) => {
+                // 开启「只看我负责的」时，清除表头「负责人」列上可能已有的具体筛选，
+                // 避免两层语义冲突（例如选了"张三"又勾上"只看我负责的"）。
+                if (!v) setFilterAssignee('全部');
+                return !v;
+              })}
               title="只看我作为负责人的事项"
             >
               <UserCheck size={14} style={{ verticalAlign: '-2px', marginRight: 4 }} />
@@ -706,10 +843,53 @@ export default function Tasks() {
           <table className="tasks-table">
             <thead>
               <tr>
-                <th>状态</th>
-                <th>分类</th>
+                <th>
+                  <span className="tasks-th">
+                    <span>状态</span>
+                    <TaskColumnFilter
+                      value={filterStatus}
+                      onChange={setFilterStatus}
+                      options={[
+                        { value: '全部', label: '全部状态' },
+                        ...taskStatuses.map((s) => ({ value: s, label: s })),
+                      ]}
+                      title="按状态筛选"
+                    />
+                  </span>
+                </th>
+                <th>
+                  <span className="tasks-th">
+                    <span>分类</span>
+                    <TaskColumnFilter
+                      value={filterCategory}
+                      onChange={setFilterCategory}
+                      options={[
+                        { value: '全部', label: '全部分类' },
+                        ...orderedTaskCategories.map((c) => ({ value: c, label: c })),
+                      ]}
+                      title="按分类筛选"
+                    />
+                  </span>
+                </th>
                 <th>标题</th>
-                <th>负责人</th>
+                <th>
+                  <span className="tasks-th">
+                    <span>负责人</span>
+                    <TaskColumnFilter
+                      value={filterAssignee}
+                      onChange={(val) => {
+                        setFilterAssignee(val);
+                        // 选中具体负责人时，关闭「只看我负责的」开关，避免两个维度打架
+                        if (val !== '全部') setFilterMineOnly(false);
+                      }}
+                      options={[
+                        { value: '全部', label: '全部负责人' },
+                        ...assigneeOptions,
+                      ]}
+                      title="按负责人筛选"
+                    />
+                  </span>
+                </th>
                 <th>协助人</th>
                 <th>亮点总结</th>
                 <th>经验复盘</th>
@@ -850,7 +1030,9 @@ export default function Tasks() {
             <p>
               {filterMineOnly
                 ? '当前没有以你为负责人的事项，可以关闭「只看我负责的」查看全部，或点击「新建事项」创建。'
-                : '点击"新建事项"按钮创建新任务'}
+                : (filterAssignee !== '全部'
+                    ? '所选负责人暂无匹配事项，可以在表头「负责人」列切换为"全部负责人"。'
+                    : '点击"新建事项"按钮创建新任务')}
             </p>
           </div>
         )}
