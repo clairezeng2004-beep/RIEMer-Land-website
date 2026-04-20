@@ -543,13 +543,17 @@ export default function MemberProfiles() {
       // --- 优先走云端（配置了 Supabase 就试一次，不看 supabaseOk 三态）---
       if (isSupabaseConfigured && supabase) {
         try {
+          // 第一次尝试：20 秒
+          // 注意：底层 supabase fetch 全局超时是 30 秒（见 src/lib/supabase.js）。
+          // 外层 withTimeout 必须 < 30s 才能在 abort 之前抛出可读的错误信息，
+          // 否则用户只会看到原生 AbortError / "signal is aborted without reason"。
           const firstAttempt = await withTimeout(
             supabase
               .from('member_profiles')
               .update(updateData)
               .eq('user_id', editingId)
               .select('user_id'),
-            25000,
+            20000,
             '云端保存'
           );
           let error = firstAttempt.error;
@@ -561,6 +565,7 @@ export default function MemberProfiles() {
             try {
               await supabase.auth.refreshSession();
             } catch { /* ignore */ }
+            // 重试：25 秒（刷 token + 慢后端冷启动双重保险）
             const retry = await withTimeout(
               supabase
                 .from('member_profiles')
@@ -618,13 +623,14 @@ export default function MemberProfiles() {
             hint = '（疑似数据库缺少新字段，请联系管理员在 Supabase 后台执行 supabase-members-and-albums.sql 完成升级）';
           } else if (/row-level security|RLS|没有权限/i.test(cloudErrMsg)) {
             hint = '（疑似权限不足，请确认你是该行所属人或管理员）';
-          } else if (/超时|timeout|Failed to fetch|NetworkError|AbortError|aborted/i.test(cloudErrMsg)) {
-            // 之前这里直接断言"网络不通"，但实际上更常见的原因是：
-            //   - Supabase 免费层冷启动 / 当前并发高，单次请求耗时较长
-            //   - 浏览器正在刷新 token 或 session 同步进行中
-            //   - 本地 DNS / 路由抖动一小段时间
-            // 用中性措辞，避免让网络其实正常的用户陷入"以为自己网络坏了"。
-            hint = '（云端响应较慢或暂时不可达；稍等几秒再点"保存"通常即可恢复。若持续失败可检查代理 / 广告拦截插件）';
+          } else if (/超时|timeout|Failed to fetch|NetworkError|AbortError|aborted|signal/i.test(cloudErrMsg)) {
+            // 这里不再断言"网络不通"。常见原因优先级：
+            //   1) Supabase 免费层/冷启动，首次请求就是会慢（5~15s 非常常见）；
+            //   2) 本次改动字段很多 / 含大段富文本，往返时间被拉长；
+            //   3) 浏览器正在刷新 token、对同一连接并行发多个请求排队；
+            //   4) 本地 DNS / 路由短暂抖动（网速正常也会出现）。
+            // 给出可自救的建议，不要把用户吓到以为"自己网络有问题"。
+            hint = '（云端响应较慢；通常 10 秒后再点一次"保存"即可成功。若一次改动很多长文本字段，可以先保存一部分列再继续；持续失败才需检查代理 / 广告拦截插件）';
           }
 
           setSaveMsg({

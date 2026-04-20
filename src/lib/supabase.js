@@ -17,8 +17,15 @@ if (!supabaseUrl || !supabaseAnonKey) {
   );
 }
 
-// 全局请求超时：10 秒（给 token refresh 留足时间）
-const FETCH_TIMEOUT_MS = 10000;
+// 全局请求超时：30 秒
+// 之前 10 秒在以下场景会误伤：
+//   1) Supabase 免费层冷启动（首次请求 5~12s 很常见）；
+//   2) 单行 update 字段较多且含长文本（比如成员信息里自我介绍 / 分享内容）；
+//   3) token 刷新与业务请求串行时叠加耗时；
+// 一旦 fetch 被 AbortController 提前掐掉，上层所有 withTimeout(25s) 都无效，
+// 用户侧表现就是"保存按钮 loading 很久后失败"。30s 留足余量；
+// 真正的"网络离线"场景由 checkSupabaseHealth() 判定，不靠这里的超时兜底。
+const FETCH_TIMEOUT_MS = 30000;
 
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
