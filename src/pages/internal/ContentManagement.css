@@ -942,3 +942,22 @@
   font-weight: 600;
   color: var(--color-text, #111827);
 }
+
+/* ============================================
+   错误态 toast（云端同步失败专用）
+   - 跟绿色保存成功的 toast 同结构，但换红绿灯
+   - 允许多行内容（失败明细列表 + 操作按钮），align-items 从 center 改成 flex-start
+   ============================================ */
+.content-mgmt__toast--error {
+  align-items: flex-start;
+  background: rgba(220, 53, 69, 0.08);
+  border-color: rgba(220, 53, 69, 0.25);
+  color: #8b2a33;
+}
+.content-mgmt__toast--error strong {
+  font-weight: 600;
+  line-height: 1.5;
+}
+.content-mgmt__toast--error code {
+  font-family: var(--font-mono, ui-monospace, monospace);
+}

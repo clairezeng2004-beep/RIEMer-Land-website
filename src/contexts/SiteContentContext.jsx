@@ -638,21 +638,80 @@ export function SiteContentProvider({ children }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // ============================================
+  // 云端同步状态（让上层 UI 能真实知道"保存到云"成功还是失败）
+  // ============================================
+  // 形状：{ [key]: { status: 'idle'|'syncing'|'ok'|'error', error?: string, updatedAt?: string, at: number } }
+  // - 初始 idle；每次 push 开始 → syncing；成功 → ok；失败 → error（携带 error message）
+  // 用这个 state 替代原先只往 console.warn 吞错的策略，避免"跨设备不同步"时用户无感。
+  const [cloudSyncStatus, setCloudSyncStatus] = useState({});
+
   // 去抖写云端：state 变化后 400ms 再 upsert，避免连续编辑刷爆 DB
   const pushDebouncedRef = useRef({});
   const pushToCloud = useCallback((key, value) => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      // 未配置 Supabase：明确标记，上层可据此提示用户"当前无云端，仅本设备生效"
+      setCloudSyncStatus((prev) => ({
+        ...prev,
+        [key]: { status: 'error', error: 'supabase-not-configured', at: Date.now() },
+      }));
+      return;
+    }
     // 必须等该 key 从云端 hydrate 完成后才允许回写，否则初始化阶段的本地 mock 会覆盖云端真实数据
     if (!hydratedKeysRef.current[key]) return;
     if (pushDebouncedRef.current[key]) clearTimeout(pushDebouncedRef.current[key]);
+    setCloudSyncStatus((prev) => ({ ...prev, [key]: { status: 'syncing', at: Date.now() } }));
     pushDebouncedRef.current[key] = setTimeout(async () => {
       const res = await saveSetting(key, value);
       if (res.success) {
         siteSyncRefs.current[key] = res.updatedAt;
+        setCloudSyncStatus((prev) => ({
+          ...prev,
+          [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
+        }));
       } else {
         console.warn(`[SiteContent] ${key} 云端同步失败:`, res.error);
+        setCloudSyncStatus((prev) => ({
+          ...prev,
+          [key]: { status: 'error', error: res.error || '未知错误', at: Date.now() },
+        }));
       }
     }, 400);
+  }, []);
+
+  /**
+   * 立即（不去抖）把某个 key 的当前值推到云端，等待返回。
+   * 适用于"用户点了保存按钮，需要立刻知道成不成"的场景。
+   * 返回：{ success, error, updatedAt }
+   */
+  const flushSettingToCloud = useCallback(async (key, value) => {
+    if (!isSupabaseConfigured) {
+      setCloudSyncStatus((prev) => ({
+        ...prev,
+        [key]: { status: 'error', error: 'supabase-not-configured', at: Date.now() },
+      }));
+      return { success: false, error: 'supabase-not-configured' };
+    }
+    // 取消掉可能正在排队的去抖 push，避免它覆盖我们立即推的结果
+    if (pushDebouncedRef.current[key]) {
+      clearTimeout(pushDebouncedRef.current[key]);
+      pushDebouncedRef.current[key] = null;
+    }
+    setCloudSyncStatus((prev) => ({ ...prev, [key]: { status: 'syncing', at: Date.now() } }));
+    const res = await saveSetting(key, value);
+    if (res.success) {
+      siteSyncRefs.current[key] = res.updatedAt;
+      setCloudSyncStatus((prev) => ({
+        ...prev,
+        [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
+      }));
+    } else {
+      setCloudSyncStatus((prev) => ({
+        ...prev,
+        [key]: { status: 'error', error: res.error || '未知错误', at: Date.now() },
+      }));
+    }
+    return res;
   }, []);
 
   // state 变化 → 去抖 push 云端
@@ -887,6 +946,11 @@ export function SiteContentProvider({ children }) {
       events, addEvent, updateEvent, deleteEvent,
       timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline,
       syncTeamMembersFromDB,
+      // 云端同步状态暴露
+      // cloudSyncStatus：{ [key]: { status, error?, updatedAt?, at } }，上层可据此展示"已同步/同步失败"提示
+      // flushSettingToCloud(key, value)：立即推送某个 key 的值到云端，返回 { success, error, updatedAt }
+      // SITE_KEYS：所有可同步的 key 常量（避免硬编码）
+      cloudSyncStatus, flushSettingToCloud, SITE_KEYS,
     }}>
       {children}
     </SiteContentContext.Provider>

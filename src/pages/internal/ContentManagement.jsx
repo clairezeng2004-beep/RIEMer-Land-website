@@ -47,7 +47,7 @@ import './ContentManagement.css';
 
 export default function ContentManagement() {
   const { isAuthenticated, isAdmin, user, getAllUsers, supabaseOk } = useAuth();
-  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline, syncTeamMembersFromDB } = useSiteContent();
+  const { content, updateContent, resetContent, filterOptions, updateFilterOptions, resetFilterOptions, userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig, resetInternalConfig, events, addEvent, updateEvent, deleteEvent, timeline, updateTimeline, addTimelineNode, updateTimelineNode, deleteTimelineNode, resetTimeline, syncTeamMembersFromDB, cloudSyncStatus, flushSettingToCloud, SITE_KEYS } = useSiteContent();
   const { addNotification } = useNotifications();
 
   // 本地编辑状态
@@ -55,6 +55,10 @@ export default function ContentManagement() {
   const [filtersForm, setFiltersForm] = useState({ ...filterOptions });
   const [internalForm, setInternalForm] = useState(JSON.parse(JSON.stringify(internalConfig)));
   const [saved, setSaved] = useState(false);
+  // 保存后展示的"云同步"结果：
+  //   null = 未保存；'syncing' = 正在推云；'ok' = 全部成功；'partial' = 本地存了但云失败
+  //   failureDetail：失败时的错误明细数组（按 key 分条），给出人话定位根因
+  const [cloudSaveState, setCloudSaveState] = useState({ phase: null, failures: [] });
   const [activeTab, setActiveTab] = useState('hero');
 
   // 编辑中的成员索引
@@ -182,12 +186,45 @@ export default function ContentManagement() {
     return <Navigate to="/login" replace />;
   }
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    // 1) 先把本地 state 写入 context（触发 localStorage + 原有去抖 push）
     updateContent(form);
     updateFilterOptions(filtersForm);
     updateInternalConfig(internalForm);
     setSaved(true);
-    setTimeout(() => setSaved(false), 2500);
+
+    // 2) 再显式 await 关键 key 的云端写入，这样我们能**真实**知道成没成
+    //    重点是筛选项 / 公开内容 / 建议 / 活动 / 时间轴这类"所有成员都会看到"的配置；
+    //    internalConfig 走的是原本的 flushInternalConfig，在编辑器退出时触发，不在这里管。
+    setCloudSaveState({ phase: 'syncing', failures: [] });
+    const targets = [
+      { key: SITE_KEYS.PUBLIC_CONTENT, value: form,        label: '首页内容' },
+      { key: SITE_KEYS.FILTER_OPTIONS, value: filtersForm, label: '筛选项' },
+    ];
+    const failures = [];
+    for (const t of targets) {
+      // flushSettingToCloud 会取消掉正在排队的去抖 push，走立即 upsert 并等待回包
+      // 串行以便错误信息顺序稳定，目标数量很少（2~3 条），开销可忽略
+      // eslint-disable-next-line no-await-in-loop
+      const res = await flushSettingToCloud(t.key, t.value);
+      if (!res?.success) {
+        failures.push({ label: t.label, key: t.key, error: res?.error || '未知错误' });
+      }
+    }
+    setCloudSaveState({
+      phase: failures.length === 0 ? 'ok' : 'partial',
+      failures,
+    });
+    // 绿条 / 错误条分别决定消失时间：成功 2.5s 收起，失败留着让用户看清
+    if (failures.length === 0) {
+      setTimeout(() => {
+        setSaved(false);
+        setCloudSaveState({ phase: null, failures: [] });
+      }, 2500);
+    } else {
+      // 把顶部绿色"已保存"去掉，只留下失败的红条
+      setSaved(false);
+    }
   };
 
   const handleReset = () => {
@@ -257,10 +294,68 @@ export default function ContentManagement() {
           </div>
         )}
 
-        {saved && (
+        {saved && cloudSaveState.phase !== 'partial' && (
           <div className="content-mgmt__toast">
             <CheckCircle size={18} />
-            <span>内容已保存，刷新首页即可查看更改</span>
+            <span>
+              {cloudSaveState.phase === 'syncing'
+                ? '已保存到本设备，正在同步到云端…'
+                : cloudSaveState.phase === 'ok'
+                  ? '内容已保存并同步到云端，其他设备将在几秒内更新'
+                  : '内容已保存，刷新首页即可查看更改'}
+            </span>
+          </div>
+        )}
+
+        {/*
+          云端同步失败明细横幅
+          -----------------------------------------
+          背景：多次反馈"筛选项编辑后在另一台设备看不到新值"。
+          根因 99% 在三件事上：
+            1) Supabase 里 site_settings 表不存在 / RLS 没建好 → saveSetting 返 error
+            2) 当前登录账号的 profiles.role 不是 'admin' → write policy 拒绝
+            3) 未开启 site_settings 的 realtime 发布 → 第二台设备要手动刷新才更新
+          之前代码只 console.warn 吞掉，用户以为保存成功就离开页面；
+          现在把错误原文直接挂在顶部红条里，让用户一眼看到"保存到本地、但云端失败"。
+          同时给到"再次尝试同步"按钮，避免因为网络抖动造成的一次性失败。
+        */}
+        {cloudSaveState.phase === 'partial' && (
+          <div className="content-mgmt__toast content-mgmt__toast--error">
+            <AlertCircle size={18} />
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <strong>已保存到本设备，但云端同步失败，其他设备可能看不到此次修改</strong>
+              <ul style={{ margin: 0, paddingLeft: 18, fontSize: '13px', lineHeight: 1.55 }}>
+                {cloudSaveState.failures.map((f) => (
+                  <li key={f.key}>
+                    <code style={{ background: 'rgba(0,0,0,0.05)', padding: '1px 5px', borderRadius: 3 }}>{f.label}</code>
+                    ：{f.error}
+                  </li>
+                ))}
+              </ul>
+              <div style={{ fontSize: '12px', color: 'var(--color-text-muted)', marginTop: 2 }}>
+                常见原因：Supabase 未登录 / 当前账号不是 admin / site_settings 表未建 → 可用
+                仓库根目录的 <code>supabase-debug-site-settings.sql</code> 在 Supabase
+                SQL Editor 里一键诊断 + 修复。
+              </div>
+              <div style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: '4px 12px', fontSize: 13 }}
+                  onClick={() => handleSave()}
+                >
+                  再次尝试同步
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-ghost"
+                  style={{ padding: '4px 12px', fontSize: 13 }}
+                  onClick={() => setCloudSaveState({ phase: null, failures: [] })}
+                >
+                  关闭
+                </button>
+              </div>
+            </div>
           </div>
         )}
 
