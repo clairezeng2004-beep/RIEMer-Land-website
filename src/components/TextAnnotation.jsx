@@ -8,6 +8,7 @@ import {
   getComments, addComment, replyToComment,
   toggleResolve, deleteComment, deleteReply,
 } from '../services/commentService';
+import { getCachedAllUsers } from '../lib/userDirectoryCache';
 import './TextAnnotation.css';
 
 // ---- 头像背景色（统一主题色） ----
@@ -54,13 +55,16 @@ export default function TextAnnotation({
   const [showResolved, setShowResolved] = useState(false);
 
   // 评论作者真名映射（id → 真名），保证评论始终显示注册时的真名而非昵称。
-  // 来源：AuthContext.getAllUsers()（合并 Supabase + 本地）。
+  // 来源：AuthContext.getAllUsers()（合并 Supabase + 本地），经 getCachedAllUsers
+  // 做了 30s 模块级缓存 + 并发去重——同一页面里其它组件（如 ProcessTemplateDetail）
+  // 同时调用时只会真正触发一次 profiles 全表拉取，解决打开文档时「加载评论中…」
+  // 被冗余的用户目录请求拖慢的问题。
   const [userNameMap, setUserNameMap] = useState({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const list = (await getAllUsers?.()) || [];
+        const list = await getCachedAllUsers(getAllUsers);
         if (cancelled) return;
         const map = {};
         list.forEach((u) => {

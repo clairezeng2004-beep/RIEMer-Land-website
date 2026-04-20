@@ -334,7 +334,11 @@ export function saveLocalViews(map) {
 export async function fetchViewsFromCloud() {
   if (!canUseSupabase() || !supabase) return null;
   try {
-    const { data, error } = await supabase.from('document_views').select('*');
+    // 只拉需要的两个字段（document_id + view_count）——避免被新加列或大字段
+    // （比如后续若加 metadata jsonb）拖慢全表扫描。
+    const { data, error } = await supabase
+      .from('document_views')
+      .select('document_id,view_count');
     if (error) {
       console.warn('[documentsService] 拉取浏览计数失败:', error.message);
       return null;
@@ -371,7 +375,25 @@ export async function incrementView(documentId) {
   if (!canUseSupabase() || !supabase) return { remote: false };
 
   try {
-    // 先读当前云端值，再 upsert 新值（简单但非原子；并发冲突对于浏览计数可接受）
+    // ① 优先用 Postgres 原子 RPC（见 supabase-performance-indexes.sql 中的
+    //    increment_document_view）——一次网络往返、原子 +1，避免经典的
+    //    "select → upsert" 两次 RT 并发覆盖问题。
+    //    如果数据库里还没部署这个 RPC，Supabase 会返回函数不存在错误，
+    //    自动降级到下面的 select + upsert 路径，保持向后兼容。
+    const rpc = await supabase.rpc('increment_document_view', {
+      p_document_id: documentId,
+    });
+    if (!rpc.error) {
+      const nextCount = Number(rpc.data) || 0;
+      return { remote: true, count: nextCount };
+    }
+    // RPC 不可用（未部署 / 权限问题）— 走兜底路径
+    if (rpc.error.code !== '42883' /* undefined_function */) {
+      // 非"函数不存在"错误只在开发环境提示，避免污染用户控制台
+      console.debug('[documentsService] increment_document_view RPC 失败，降级:', rpc.error.message);
+    }
+
+    // ② 兜底：先读当前云端值，再 upsert 新值（非原子，并发冲突对于浏览计数可接受）
     const { data: existing } = await supabase
       .from('document_views')
       .select('view_count')

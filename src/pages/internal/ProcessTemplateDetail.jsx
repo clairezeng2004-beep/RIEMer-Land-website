@@ -55,6 +55,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useTocScroll from '../../hooks/useTocScroll';
+import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
@@ -375,13 +376,17 @@ export default function ProcessTemplateDetail() {
      贡献者真名映射：Supabase + 本地成员的 id → 真名
      历史数据中 uploadedBy 可能存的是昵称，这里通过 uploadedById 动态解析回真名，
      保证"贡献者"展示始终是注册时的真名。
+
+     注意：这里走 getCachedAllUsers 包装，和 TextAnnotation 里调用的是同一份
+     模块级 30s TTL 缓存——打开一篇文档时两个组件并发请求，底层只真正打一次
+     profiles 查询，直接砍掉一次全表 RT。
      ========== */
   const [userNameMap, setUserNameMap] = useState({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const list = (await getAllUsers?.()) || [];
+        const list = await getCachedAllUsers(getAllUsers);
         if (cancelled) return;
         const map = {};
         list.forEach((u) => {
@@ -525,6 +530,7 @@ export default function ProcessTemplateDetail() {
   */
   useEffect(() => {
     if (!doc) return;
+    let cancelled = false;
     try {
       const SESSION_KEY = 'riemer_ptd_session_viewed';
       const sessionViewed = new Set(
@@ -533,54 +539,75 @@ export default function ProcessTemplateDetail() {
       if (sessionViewed.has(String(doc.id))) {
         return;
       }
-      // 本地即时 +1（incrementView 内部会同时写云端，异步不阻塞）
+      // 本地即时 +1（UI 立刻显示新浏览数）
       const views = loadViews();
       views[doc.id] = (views[doc.id] || 0) + 1;
       saveViews(views);
       sessionViewed.add(String(doc.id));
       sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
 
-      // 云端同步（Supabase 可用时）
-      if (canUseSupabase()) {
-        incrementView(String(doc.id)).catch((err) => {
-          console.warn('[ProcessTemplateDetail] 云端浏览计数同步失败:', err);
+      // ====== 云端写入延迟 1.5s ======
+      // 原本进入页面立刻并发打 incrementView（select + upsert 两次 RT）+
+      // recordViewLog（insert）共 3 次写相关请求，会和评论 / 编辑历史的拉取
+      // 请求抢 Supabase 连接池，体感上导致"加载评论中…"转很久。
+      // 浏览统计本身对时效要求极低（谁统计时差个 1-2s 都无所谓），所以整体
+      // 挪到 setTimeout 之外，等主链路读完再写——刷新访客数据只在用户点开
+      // 小眼睛时才读，延迟写入完全不影响展示。
+      const timer = setTimeout(() => {
+        if (cancelled) return;
+        if (canUseSupabase()) {
+          incrementView(String(doc.id)).catch((err) => {
+            console.warn('[ProcessTemplateDetail] 云端浏览计数同步失败:', err);
+          });
+        }
+        recordViewLog(String(doc.id), user).catch((err) => {
+          console.warn('[ProcessTemplateDetail] 访问日志写入失败:', err);
         });
-      }
-      // 记录访问日志（谁在什么时候看过）—— 云端可用时写 document_view_logs，
-      // 不可用时降级到本地。失败不影响计数
-      recordViewLog(String(doc.id), user).catch((err) => {
-        console.warn('[ProcessTemplateDetail] 访问日志写入失败:', err);
-      });
+      }, 1500);
+      return () => {
+        cancelled = true;
+        clearTimeout(timer);
+      };
     } catch { /* ignore */ }
+    return undefined;
   }, [doc?.id]);
 
-  /* 编辑历史：拉取 + 订阅实时新增 */
+  /* 编辑历史：拉取 + 订阅实时新增。
+     延迟 400ms 启动，避让文档主内容 / 评论 / 用户目录的首屏请求——
+     编辑历史在侧栏是次要信息，晚半拍渲染对用户几乎无感知，但能显著减少
+     打开文档瞬间抢 Supabase 连接池导致的"加载中…"卡顿。
+     realtime 订阅也一起延后，避免 WebSocket 建连和 fetch 同时冲高。 */
   useEffect(() => {
     if (!doc?.id) return undefined;
     let cancelled = false;
-    setEditLogLoading(true);
-    fetchEditLog(String(doc.id))
-      .then((list) => {
-        if (cancelled) return;
-        setEditLog(list || []);
-      })
-      .finally(() => {
-        if (!cancelled) setEditLogLoading(false);
+    let unsubscribe = null;
+    const timer = setTimeout(() => {
+      if (cancelled) return;
+      setEditLogLoading(true);
+      fetchEditLog(String(doc.id))
+        .then((list) => {
+          if (cancelled) return;
+          setEditLog(list || []);
+        })
+        .finally(() => {
+          if (!cancelled) setEditLogLoading(false);
+        });
+      // 实时订阅：其它设备保存后当前设备自动追加一条
+      unsubscribe = subscribeEditLog(String(doc.id), (entry) => {
+        setEditLog((prev) => {
+          // 去重：同 editedAt 同 editorId 视为同一条（本地乐观插入 + realtime 回流）
+          const exists = prev.some(
+            (p) => p.editedAt === entry.editedAt && p.editorId === entry.editorId
+          );
+          if (exists) return prev;
+          return [entry, ...prev];
+        });
       });
-    // 实时订阅：其它设备保存后当前设备自动追加一条
-    const unsubscribe = subscribeEditLog(String(doc.id), (entry) => {
-      setEditLog((prev) => {
-        // 去重：同 editedAt 同 editorId 视为同一条（本地乐观插入 + realtime 回流）
-        const exists = prev.some(
-          (p) => p.editedAt === entry.editedAt && p.editorId === entry.editorId
-        );
-        if (exists) return prev;
-        return [entry, ...prev];
-      });
-    });
+    }, 400);
     return () => {
       cancelled = true;
-      unsubscribe();
+      clearTimeout(timer);
+      if (unsubscribe) unsubscribe();
     };
   }, [doc?.id]);
 
