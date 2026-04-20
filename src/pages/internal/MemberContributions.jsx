@@ -313,11 +313,15 @@ export default function MemberContributions() {
     });
   };
 
-  // 获取排名图标
+  // 获取排名显示
+  // v4 变更：前三名不再用金/银/铜奖牌 emoji（🥇🥈🥉 在不同系统字体差异极大，
+  //   macOS/Windows/Linux 渲染不一致，且颜色撞不上页面主色；用户反馈想更克制）。
+  //   改成纯数字，由 CSS .mc-rank--top{1,2,3} 给出不同配色，
+  //   强调方式从"图标 + 左竖线"换到"整行底色"（见 CSS）。
   const getRankDisplay = (index) => {
-    if (index === 0) return <span className="mc-rank mc-rank--gold">🥇</span>;
-    if (index === 1) return <span className="mc-rank mc-rank--silver">🥈</span>;
-    if (index === 2) return <span className="mc-rank mc-rank--bronze">🥉</span>;
+    if (index < 3) {
+      return <span className={`mc-rank mc-rank--top${index + 1}`}>{index + 1}</span>;
+    }
     return <span className="mc-rank">{index + 1}</span>;
   };
 
