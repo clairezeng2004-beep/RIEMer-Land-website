@@ -348,7 +348,9 @@ export default function MemberSharingDetail() {
 
               {post.period && (
                 <div className="msd-article__period">
-                  <Clock size={13} /> 时间段：{post.period}
+                  {/* 历史会议存的是单个年月点（如 "2025.06"），用"会议时间"更贴切；
+                      其它分类（目前只有"成员经验分享"会用）仍叫"时间段"。 */}
+                  <Clock size={13} /> {post.category === 'history' ? '会议时间' : '时间段'}：{post.period}
                 </div>
               )}
 

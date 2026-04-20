@@ -159,7 +159,7 @@ function CategorySelect({ cats, value, onChange, onAddCategory }) {
   );
 }
 
-/* ====== 时间段选择器 ====== */
+/* ====== 时间段选择器（成员经验分享用：从年月 至 年月） ====== */
 function PeriodPicker({ value, onChange }) {
   const { startYear, startMonth, endYear, endMonth } = value || {};
 
@@ -209,6 +209,43 @@ function PeriodPicker({ value, onChange }) {
           placeholder="月份"
           value={endMonth ? String(endMonth) : ''}
           onChange={(v) => update('endMonth', v ? Number(v) : null)}
+          options={[{ value: '', label: '月份' }, ...MONTHS.map((m) => ({ value: String(m), label: String(m) }))]}
+        />
+        <span className="msc-period__sep">月</span>
+      </div>
+    </div>
+  );
+}
+
+/* ====== 单点日期选择器（历史会议用：某年某月） ======
+ * 与 PeriodPicker 共享 period 对象结构，但只读写 startYear / startMonth，
+ * endYear / endMonth 始终留 null。这样切换分类时不会丢失已填的 start，
+ * 切回"成员经验分享"时用户原先输入的起点月份还在。 */
+function SinglePointPicker({ value, onChange }) {
+  const { startYear, startMonth } = value || {};
+
+  const update = (field, val) => {
+    onChange({ ...value, [field]: val || null });
+  };
+
+  return (
+    <div className="msc-period">
+      <div className="msc-period__group">
+        <CustomSelect
+          size="sm"
+          className="msc-period__select"
+          placeholder="年份"
+          value={startYear ? String(startYear) : ''}
+          onChange={(v) => update('startYear', v ? Number(v) : null)}
+          options={[{ value: '', label: '年份' }, ...YEARS.map((y) => ({ value: String(y), label: String(y) }))]}
+        />
+        <span className="msc-period__sep">年</span>
+        <CustomSelect
+          size="sm"
+          className="msc-period__select"
+          placeholder="月份"
+          value={startMonth ? String(startMonth) : ''}
+          onChange={(v) => update('startMonth', v ? Number(v) : null)}
           options={[{ value: '', label: '月份' }, ...MONTHS.map((m) => ({ value: String(m), label: String(m) }))]}
         />
         <span className="msc-period__sep">月</span>
@@ -602,13 +639,26 @@ export default function MemberSharingCreate() {
     }
 
     // 构建时间段字符串（如果有填写）
+    // 规则：
+    //   - category === 'history'   → 单个时间点 "YYYY.MM" 或 "YYYY"
+    //     （UI 上只有一组年/月选择，endYear/endMonth 永远为 null）
+    //   - category === 'experience' → 区间 "YYYY.MM - YYYY.MM"
+    //     （任一端缺失时退化为单端；两端全空则不输出）
+    //   - 其它分类（不显示时间段 UI）→ 强制不带 period，避免切分类时残留旧值
     const { startYear, startMonth, endYear, endMonth } = newPost.period || {};
     let periodStr = '';
-    if (startYear || endYear) {
-      const start = startYear ? `${startYear}${startMonth ? '.' + String(startMonth).padStart(2, '0') : ''}` : '';
-      const end = endYear ? `${endYear}${endMonth ? '.' + String(endMonth).padStart(2, '0') : ''}` : '';
-      periodStr = start && end ? `${start} - ${end}` : start || end;
+    if (newPost.category === 'history') {
+      if (startYear) {
+        periodStr = `${startYear}${startMonth ? '.' + String(startMonth).padStart(2, '0') : ''}`;
+      }
+    } else if (newPost.category === 'experience') {
+      if (startYear || endYear) {
+        const start = startYear ? `${startYear}${startMonth ? '.' + String(startMonth).padStart(2, '0') : ''}` : '';
+        const end = endYear ? `${endYear}${endMonth ? '.' + String(endMonth).padStart(2, '0') : ''}` : '';
+        periodStr = start && end ? `${start} - ${end}` : start || end;
+      }
     }
+    // 其它分类：periodStr 保持空字符串，post.period 最终会是 null
 
     // 附件元信息（保留 dataUrl 以支持下载）
     const attachments = newPost.attachments.map((f) => ({
@@ -709,17 +759,36 @@ export default function MemberSharingCreate() {
               </div>
             </div>
 
-            {/* 第二行：时间段 */}
-            <div className="msc-form__field">
-              <label>
-                <Calendar size={14} /> 时间段
-                <span className="msc-form__hint">选填，标注分享内容的时间范围，例如 2025 年 6 月到 9 月实习则标注 2025 年 6 月 至 2025 年 9 月</span>
-              </label>
-              <PeriodPicker
-                value={newPost.period}
-                onChange={(period) => setNewPost({ ...newPost, period })}
-              />
-            </div>
+            {/* 第二行：时间段 —— 仅对两类分类显示：
+                  - 成员经验分享 (experience)：从年月 至 年月（时间范围）
+                  - 历史会议     (history)   ：某年某月（单个时间点）
+                其它分类（如"课程资料"或用户自建分类）暂不需要时间段字段。
+                切换分类时保留 period state 里已填的 startYear/startMonth，
+                允许用户在两种分类间切换而不丢数据；但提交时由 handleCreate
+                再次按分类裁剪，避免把多余的 endYear/endMonth 带出去。 */}
+            {(newPost.category === 'experience' || newPost.category === 'history') && (
+              <div className="msc-form__field">
+                <label>
+                  <Calendar size={14} /> {newPost.category === 'history' ? '会议时间' : '时间段'}
+                  <span className="msc-form__hint">
+                    {newPost.category === 'history'
+                      ? '选填，标注会议发生的具体年份和月份，例如 2025 年 6 月'
+                      : '选填，标注分享内容的时间范围，例如 2025 年 6 月到 9 月实习则标注 2025 年 6 月 至 2025 年 9 月'}
+                  </span>
+                </label>
+                {newPost.category === 'history' ? (
+                  <SinglePointPicker
+                    value={newPost.period}
+                    onChange={(period) => setNewPost({ ...newPost, period })}
+                  />
+                ) : (
+                  <PeriodPicker
+                    value={newPost.period}
+                    onChange={(period) => setNewPost({ ...newPost, period })}
+                  />
+                )}
+              </div>
+            )}
 
             {/* 格式切换 + 附件上传（同一行） */}
             <div className="msc-form__field">
