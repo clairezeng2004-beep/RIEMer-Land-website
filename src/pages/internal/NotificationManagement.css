@@ -669,6 +669,16 @@
     gap: var(--space-md);
   }
 
+  /* 手机端顶部「发送新通知」按钮尺寸与「成员内部分享 → 发布分享」保持一致。
+     基准来自 MemberSharing.css 的 `.ms-page__header .btn`。 */
+  .notif-mgmt__header .btn {
+    align-self: flex-start;
+    flex-shrink: 0;
+    padding: 0.5rem 1.2rem;
+    font-size: var(--text-sm);
+    margin-top: 4px;
+  }
+
   .notif-mgmt__stats {
     grid-template-columns: repeat(2, 1fr);
     gap: var(--space-sm);

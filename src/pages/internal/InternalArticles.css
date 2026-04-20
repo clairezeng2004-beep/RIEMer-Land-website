@@ -1047,8 +1047,16 @@
     gap: var(--space-sm);
   }
 
+  /* 手机端顶部「新建归档 / 新建活动」按钮尺寸与「成员内部分享 → 发布分享」
+     保持一致。EventPublish 也 import 了本样式，复用同一规则，确保活动发布
+     TAB 的顶部按钮在手机端和基准一致。基准来自 MemberSharing.css 的
+     `.ms-page__header .btn`。 */
   .ia-list__header .btn {
     align-self: flex-start;
+    flex-shrink: 0;
+    padding: 0.5rem 1.2rem;
+    font-size: var(--text-sm);
+    margin-top: 4px;
   }
 
   .ia-list__header-actions {

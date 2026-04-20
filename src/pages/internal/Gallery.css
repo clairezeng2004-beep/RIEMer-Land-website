@@ -675,6 +675,17 @@
     gap: var(--space-md);
   }
 
+  /* 手机端顶部「新建相册」按钮尺寸与「成员内部分享 → 发布分享」保持一致，
+     避免同一内部空间下不同 TAB 的主按钮大小不统一。基准来自
+     MemberSharing.css 的 `.ms-page__header .btn`。 */
+  .gallery-page__header .btn {
+    align-self: flex-start;
+    flex-shrink: 0;
+    padding: 0.5rem 1.2rem;
+    font-size: var(--text-sm);
+    margin-top: 4px;
+  }
+
   .gallery-detail__header {
     flex-direction: column;
     gap: var(--space-md);
