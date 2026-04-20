@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -55,6 +55,10 @@ export default function UserManagement() {
   );
   const [users, setUsers] = useState([]);
   const [loadingUsers, setLoadingUsers] = useState(true);
+  // 是否至少成功完成过一次加载。用 state 以驱动渲染更新：
+  // - false：首次加载未完成，统计数字显示占位符 "—"，避免从 0 跳到真实值产生闪动
+  // - true：已加载过（后续刷新），继续展示旧数字，等新数据回来后平滑替换
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
   const [loadError, setLoadError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
@@ -63,9 +67,14 @@ export default function UserManagement() {
   const [showDiag, setShowDiag] = useState(false);
 
   // 已授权 / 待授权用户分组（兼容 boolean / string / truthy 值）
+  // 用 useMemo 稳定引用，避免在 users 未变时每次渲染都重新过滤。
   const isAuthorized = (u) => u.authorized === true || u.authorized === 'true' || u.authorized === 'TRUE';
-  const authorizedUsers = users.filter(isAuthorized);
-  const pendingUsers = users.filter((u) => !isAuthorized(u));
+  const authorizedUsers = useMemo(() => users.filter(isAuthorized), [users]);
+  const pendingUsers = useMemo(() => users.filter((u) => !isAuthorized(u)), [users]);
+
+  // 首次加载尚未完成时，用占位符替代数字 0，避免"0 → 真实数字"的跳变闪动
+  const authorizedDisplay = hasLoadedOnce ? authorizedUsers.length : '—';
+  const pendingDisplay = hasLoadedOnce ? pendingUsers.length : '—';
 
   // 预授权相关状态
   const [preAuthEmail, setPreAuthEmail] = useState('');
@@ -175,6 +184,8 @@ export default function UserManagement() {
         console.log('[UserManagement] getAllUsers 返回:', safeData.length, '条', diagInfo);
         setUsers(safeData);
         setDiag(diagInfo);
+        // 标记"至少成功加载过一次"，让统计数字从占位符切换为真实值
+        setHasLoadedOnce(true);
         // 判断诊断结论
         if (safeData.length === 0) {
           setLoadError(
@@ -197,6 +208,8 @@ export default function UserManagement() {
         setLoadError('加载失败：' + (err?.message || '未知错误'));
         setDiag(diagInfo);
         setUsers([]);
+        // 出错也视为"加载已完成"，让占位符切回 0，避免永远悬在 —
+        setHasLoadedOnce(true);
       } finally {
         if (seq === loadReqSeq.current) setLoadingUsers(false);
       }
@@ -347,7 +360,7 @@ export default function UserManagement() {
             <UserCheck size={20} />
             <div>
               <div className="users-stat__value">
-                {authorizedUsers.length}
+                {authorizedDisplay}
               </div>
               <div className="users-stat__label">已授权</div>
             </div>
@@ -361,16 +374,16 @@ export default function UserManagement() {
             <UserX size={20} />
             <div>
               <div className="users-stat__value">
-                {pendingUsers.length}
+                {pendingDisplay}
               </div>
               <div className="users-stat__label">待授权</div>
             </div>
-            {pendingUsers.length > 0 && (
-              <ChevronDown
-                size={16}
-                className={`users-stat__chevron${showPendingPanel ? ' users-stat__chevron--open' : ''}`}
-              />
-            )}
+            {/* chevron 槽位始终占位，避免"有/无待授权"切换时卡片宽度跳变 */}
+            <ChevronDown
+              size={16}
+              className={`users-stat__chevron${showPendingPanel ? ' users-stat__chevron--open' : ''}${pendingUsers.length > 0 ? '' : ' users-stat__chevron--hidden'}`}
+              aria-hidden={pendingUsers.length === 0}
+            />
           </div>
         </div>
 

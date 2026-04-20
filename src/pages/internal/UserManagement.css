@@ -61,17 +61,28 @@
 .users-stat__chevron {
   margin-left: auto;
   color: var(--color-text-muted);
-  transition: transform 0.25s ease;
+  transition: transform 0.25s ease, opacity 0.2s ease;
 }
 
 .users-stat__chevron--open {
   transform: rotate(180deg);
 }
 
+/* 待授权数为 0 时仍占位，避免卡片宽度抖动；同时视觉上隐藏 */
+.users-stat__chevron--hidden {
+  opacity: 0;
+  pointer-events: none;
+}
+
 .users-stat__value {
   font-size: var(--text-xl);
   font-weight: 700;
   color: var(--color-text);
+  /* 等宽数字：切换位数时字符宽度一致，避免轻微抖动 */
+  font-variant-numeric: tabular-nums;
+  /* 预留一个字符宽度的最小宽度，保证 "—" → 实际数字时不撑开布局 */
+  min-width: 1ch;
+  line-height: 1.2;
 }
 
 .users-stat__label {
