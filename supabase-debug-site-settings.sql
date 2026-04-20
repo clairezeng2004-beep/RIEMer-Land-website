@@ -4,46 +4,48 @@
 -- 使用场景：
 --   某位管理员在 A 设备改了「内容管理 → 筛选项」，但 B 设备（或其他成员）
 --   看不到新值。这个脚本会：
---     1) 诊断 site_settings 表是否存在、结构是否正确
---     2) 诊断 RLS 策略（SELECT / 写入）是否配齐
---     3) 诊断 realtime publication 是否包含 site_settings
---     4) 展示当前 filter_options 条目的 value 片段，判断"是本地没推上去"
---        还是"推上去了但另一台设备没拉"
---     5) 如果 1~3 缺失，自动用 IF NOT EXISTS / DROP POLICY IF EXISTS
---        的幂等方式补全，跑完就修好（不会误覆盖已有数据）
+--     1) 诊断 + 修复 site_settings 表结构
+--     2) 诊断 + 修复 RLS 策略（SELECT / 写入）
+--     3) 诊断 + 修复 realtime publication
+--     4) 展示当前 filter_options 的写入状态（判断是"没推上去"还是"没拉下来"）
+--     5) 展示 site_settings 的所有条目更新时间
 --
 -- 使用方式：
 --   打开 Supabase Dashboard → SQL Editor → 粘贴本脚本整体 Run。
---   结果会分段输出（NOTICE 里说了每一步是 OK 还是 FIXED）。
+--   也可在 DBeaver / TablePlus / DataGrip 等桌面客户端整体执行，
+--   本版本不使用 DO $$ ... $$ 匿名块，纯 DDL + SELECT，
+--   任何 PostgreSQL 客户端都能逐句执行或整体执行。
 --
--- 跑完之后请立刻做：
---   A 设备：退出内容管理 → 重新进 → 改一项筛选值 → 保存，看顶部 toast
---           应当是绿色的"内容已保存并同步到云端…"
---   B 设备：不用手动刷新（加进 realtime 后应当秒级拉到），等 2-3s 见效
+-- 历史：
+--   v1 用 DO $$ ... DECLARE v_count INT ... $$ 做诊断输出，
+--   在 Supabase SQL Editor 里 OK，但在第三方客户端会把 DECLARE 块
+--   里的 v_count 当成"表名"解析，报 42P01 relation "v_count" does not exist。
+--   v2（当前）改为纯 SQL 输出：每一步返回一行/多行结果，直观可见。
 -- ============================================================
 
 
--- ===== STEP 1. 确保 site_settings 表存在 =====
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM information_schema.tables
-    WHERE table_schema = 'public' AND table_name = 'site_settings'
-  ) THEN
-    CREATE TABLE public.site_settings (
-      key TEXT PRIMARY KEY,
-      value JSONB NOT NULL,
-      updated_at TIMESTAMPTZ DEFAULT NOW(),
-      updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
-    );
-    RAISE NOTICE '🛠  [FIXED] site_settings 表已创建';
-  ELSE
-    RAISE NOTICE '✅ [OK] site_settings 表已存在';
-  END IF;
-END $$;
+-- ============================================================
+-- STEP 1. 确保 site_settings 表存在（幂等）
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  key        TEXT PRIMARY KEY,
+  value      JSONB NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_by UUID REFERENCES auth.users(id) ON DELETE SET NULL
+);
+
+-- 验证：应当返回一行，table_name = 'site_settings'
+SELECT
+  '[STEP 1] site_settings 表'                               AS step,
+  table_name,
+  'OK: 表已存在（已通过 CREATE IF NOT EXISTS 确保）'         AS status
+FROM information_schema.tables
+WHERE table_schema = 'public' AND table_name = 'site_settings';
 
 
--- ===== STEP 2. 确保 RLS 开启 + 策略齐全 =====
+-- ============================================================
+-- STEP 2. 确保 RLS 开启 + 策略齐全（幂等）
+-- ============================================================
 ALTER TABLE public.site_settings ENABLE ROW LEVEL SECURITY;
 
 -- 2.1 读策略：所有已登录用户
@@ -58,86 +60,97 @@ DROP POLICY IF EXISTS "site_settings write admin" ON public.site_settings;
 CREATE POLICY "site_settings write admin"
   ON public.site_settings
   FOR ALL
-  USING ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin')
+  USING      ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin')
   WITH CHECK ((SELECT role FROM public.profiles WHERE id = auth.uid()) = 'admin');
 
-DO $$
-BEGIN
-  RAISE NOTICE '✅ [OK] site_settings RLS 策略已重建：登录可读，admin 可写';
-END $$;
-
-
--- ===== STEP 3. 确保 realtime publication 包含本表 =====
-DO $$
-BEGIN
-  -- 如果 publication 里已有 site_settings，这一句会抛 duplicate_object 被吃掉
-  ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
-  RAISE NOTICE '🛠  [FIXED] site_settings 已加入 realtime 发布';
-EXCEPTION
-  WHEN duplicate_object THEN
-    RAISE NOTICE '✅ [OK] site_settings 已在 realtime 发布中';
-  WHEN undefined_object THEN
-    -- 自建库没有 supabase_realtime publication 的情况（非云实例），给出明确提示
-    RAISE NOTICE '⚠  当前数据库不存在 supabase_realtime publication；realtime 无法生效（仅刷新后可见）';
-END $$;
-
-
--- ===== STEP 4. 诊断：当前的 filter_options 条目长啥样？ =====
--- 如果返回 0 行 → 说明 A 设备保存时从未成功 insert 过，问题在写入路径（看 STEP 5）
--- 如果有 1 行且 updated_at 很新 → 说明云端存的是最新的，问题在 B 设备的读取/订阅
-DO $$
-DECLARE
-  v_count INT;
-  v_updated TIMESTAMPTZ;
-  v_preview TEXT;
-BEGIN
-  SELECT COUNT(*) INTO v_count FROM public.site_settings WHERE key = 'filter_options';
-
-  IF v_count = 0 THEN
-    RAISE NOTICE '❌ site_settings 里不存在 key=filter_options 的记录';
-    RAISE NOTICE '   → 说明 A 设备那次"保存"从未真正写进云（多半是 RLS 拒绝或未登录）';
-    RAISE NOTICE '   → 现在 RLS 已修好，请重新登录 admin → 内容管理 → 改一项 → 保存';
-  ELSE
-    SELECT updated_at, LEFT(value::text, 200)
-      INTO v_updated, v_preview
-      FROM public.site_settings WHERE key = 'filter_options';
-    RAISE NOTICE '✅ site_settings.filter_options 存在，updated_at=%', v_updated;
-    RAISE NOTICE '   value 预览（前 200 字符）：%', v_preview;
-    RAISE NOTICE '   → 如果该值就是 A 设备最新修改，那问题在 B 设备读取（看 STEP 5）';
-  END IF;
-END $$;
-
-
--- ===== STEP 5. 诊断：当前登录账号是不是 admin？ =====
--- 只有 admin 才能写 site_settings。如果当前会话 role ≠ admin，页面保存就会
--- 返回 "new row violates row-level security policy"，前端只 console.warn，
--- 对用户是无感的 —— 这次改动已经把这种失败明文弹到 toast 里了。
-DO $$
-DECLARE
-  v_uid UUID := auth.uid();
-  v_role TEXT;
-BEGIN
-  IF v_uid IS NULL THEN
-    RAISE NOTICE 'ℹ  当前在 SQL Editor 内 auth.uid() 为 NULL（这是正常的，SQL Editor 以 service_role 运行）';
-    RAISE NOTICE '   若要验证"真实用户是否为 admin"，请在浏览器控制台执行：';
-    RAISE NOTICE '     (await window.supabase.auth.getUser()).data.user.id';
-    RAISE NOTICE '   再到这里用：';
-    RAISE NOTICE '     SELECT id, email, role FROM public.profiles WHERE id = ''<上面的 uid>'';';
-  ELSE
-    SELECT role INTO v_role FROM public.profiles WHERE id = v_uid;
-    IF v_role = 'admin' THEN
-      RAISE NOTICE '✅ 当前会话 uid=% 的 role=admin，可写 site_settings', v_uid;
-    ELSE
-      RAISE NOTICE '❌ 当前会话 uid=% 的 role=%（不是 admin）→ 会被写策略拒绝', v_uid, v_role;
-      RAISE NOTICE '   请让有数据库 admin 权限的人把该账号 role 改为 admin';
-    END IF;
-  END IF;
-END $$;
-
-
--- ===== STEP 6. 一键检查所有 site_settings 条目的更新时间 =====
--- 让管理员一眼看出"筛选项最后一次成功写云"是什么时候
+-- 验证：应当输出两条策略（read + write admin）
 SELECT
+  '[STEP 2] site_settings RLS 策略' AS step,
+  policyname,
+  cmd,
+  CASE
+    WHEN policyname IN ('site_settings read', 'site_settings write admin')
+      THEN 'OK'
+    ELSE '其它策略（保留）'
+  END AS status
+FROM pg_policies
+WHERE schemaname = 'public' AND tablename = 'site_settings'
+ORDER BY policyname;
+
+
+-- ============================================================
+-- STEP 3. 确保 realtime publication 包含 site_settings
+-- ============================================================
+-- 直接 ALTER PUBLICATION，如果已加入会抛 duplicate_object 错。
+-- 为避免报错打断脚本，这里改用 "如果未加入就加入" 的条件判断。
+-- （仍然是纯 SQL，无 DO 块）
+ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+-- ^ 如果上一句报 "relation is already member of publication" 或
+--   "publication supabase_realtime does not exist"，请忽略，
+--   继续往下跑。前者说明本来就在，后者说明当前库不是 Supabase 云（非问题）。
+
+-- 验证：应当输出一行，说明 site_settings 在 supabase_realtime 里
+SELECT
+  '[STEP 3] realtime publication' AS step,
+  p.pubname,
+  c.relname AS table_name,
+  'OK: 已在 publication 内' AS status
+FROM pg_publication p
+JOIN pg_publication_rel pr ON pr.prpubid = p.oid
+JOIN pg_class c ON c.oid = pr.prrelid
+WHERE p.pubname = 'supabase_realtime'
+  AND c.relname = 'site_settings';
+
+
+-- ============================================================
+-- STEP 4. 诊断：当前 filter_options 条目状态
+-- ============================================================
+-- 返回 0 行 → A 设备保存时从未成功写入（RLS 拒绝 / 未登录 / 其它）
+-- 返回 1 行且 updated_at 很新 → 云端存的是最新的，问题在 B 设备读取/订阅
+SELECT
+  '[STEP 4] filter_options 记录' AS step,
+  key,
+  updated_at,
+  updated_by,
+  LENGTH(value::text) AS value_bytes,
+  LEFT(value::text, 200) AS value_preview
+FROM public.site_settings
+WHERE key = 'filter_options';
+
+-- 如果上一条返回 0 行，执行这个可以显式看到"没记录"
+SELECT
+  '[STEP 4] filter_options 是否存在' AS step,
+  EXISTS (
+    SELECT 1 FROM public.site_settings WHERE key = 'filter_options'
+  ) AS filter_options_exists;
+
+
+-- ============================================================
+-- STEP 5. 诊断：当前 SQL 会话的身份
+-- ============================================================
+-- SQL Editor / 桌面客户端通常以 service_role 运行，auth.uid() 是 NULL，
+-- 不等于"前端用户不是 admin"；要验证前端那个账号，按下方 NOTE。
+SELECT
+  '[STEP 5] 当前会话身份' AS step,
+  auth.uid() AS auth_uid,
+  CASE
+    WHEN auth.uid() IS NULL
+      THEN 'SQL Editor / 桌面客户端通常以 service_role 跑，auth.uid() 为 NULL 是正常的'
+    ELSE (SELECT 'role=' || COALESCE(role::text, 'NULL')
+            FROM public.profiles WHERE id = auth.uid())
+  END AS note;
+
+-- NOTE：要验证"前端那个登录账号是不是 admin"，在浏览器控制台取到 uid：
+--   (await window.supabase.auth.getUser()).data.user.id
+-- 然后在这里执行（替换 <uid>）：
+--   SELECT id, email, role FROM public.profiles WHERE id = '<uid>';
+
+
+-- ============================================================
+-- STEP 6. 一键检查所有 site_settings 条目的更新时间
+-- ============================================================
+SELECT
+  '[STEP 6] 所有 site_settings 条目' AS step,
   key,
   updated_at,
   LENGTH(value::text) AS value_bytes,
@@ -149,7 +162,7 @@ ORDER BY updated_at DESC;
 -- ============================================================
 -- 跑完之后的判断指引
 -- ============================================================
--- 情况 A（最常见）：STEP 4 输出"不存在 key=filter_options"
+-- 情况 A（最常见）：STEP 4 两条都显示"不存在 key=filter_options"
 --   → 写入路径从来没成功过。现在表和 RLS 都已修好，
 --     去 A 设备（管理员）重试保存，前端顶部 toast 会明确给出成功/失败。
 --
@@ -157,6 +170,7 @@ ORDER BY updated_at DESC;
 --   → realtime 问题。STEP 3 已修复 publication，B 设备刷新一次即可。
 --     今后 A 改完 B 应当 2-3s 内自动更新。
 --
--- 情况 C：STEP 5 显示 role ≠ admin
---   → 当前账号不是 admin，自然写不了。请换 admin 账号再保存。
+-- 情况 C：STEP 5 里 auth_uid 不为 NULL 且 role ≠ admin
+--   → 当前会话账号不是 admin，自然写不了。换 admin 账号再保存。
+--     （如果 auth_uid 为 NULL，请按 NOTE 用浏览器控制台查前端账号）
 -- ============================================================
