@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
+// 把"其他"沉到筛选列表最末，符合产品"所有筛选中'其他'永远最后一位"的约定
+import { sortWithOtherLast } from '../../utils/sortWithOtherLast';
 import '../../components/CrossLinkToast.css';
 import './Tasks.css';
 
@@ -133,6 +135,15 @@ export default function Tasks() {
   const taskCategories = filterOptions.taskCategories;
   const taskStatuses = filterOptions.taskStatuses;
   const teamMembers = filterOptions.teamMembers;
+
+  // 渲染用的分类列表：把"其他"沉到末尾。
+  // 注意：这里只是展示层的顺序调整，taskCategories 原顺序依旧保存在
+  // filterOptions 里（内容管理页编辑的原始顺序），不会被覆写。
+  // 新建事项弹窗的下拉和顶部筛选条复用同一份排序结果，保证两处观感一致。
+  const orderedTaskCategories = useMemo(
+    () => sortWithOtherLast(taskCategories),
+    [taskCategories],
+  );
 
   // 已注册已授权用户列表（动态获取）
   const [authorizedMembers, setAuthorizedMembers] = useState([]);
@@ -585,7 +596,7 @@ export default function Tasks() {
                 <CustomSelect
                   value={newTask.category}
                   onChange={(val) => setNewTask({ ...newTask, category: val })}
-                  options={taskCategories}
+                  options={orderedTaskCategories}
                 />
               </div>
               <button type="submit" className="btn btn-primary">
@@ -611,7 +622,7 @@ export default function Tasks() {
           </div>
           <div className="tasks-filters__group">
             <span className="tasks-filters__label">分类：</span>
-            {['全部', ...taskCategories].map((c) => (
+            {['全部', ...orderedTaskCategories].map((c) => (
               <button
                 key={c}
                 className={`tasks-filters__btn ${filterCategory === c ? 'tasks-filters__btn--active' : ''}`}

@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+// 把"其他"沉到筛选列表最末，符合产品"所有筛选中'其他'永远最后一位"的约定
+import { sortWithOtherLast } from '../../utils/sortWithOtherLast';
 import {
   CalendarRange,
   Search,
@@ -173,6 +175,9 @@ export default function EventPublish() {
   // 分类（"全部" + 预设分类 + events 中出现但不在预设里的历史分类）
   // 历史分类（老活动里 category 是 "分享会 / 经验分享"）保留在列表末尾，
   // 避免老数据筛不到。分类按插入顺序去重。
+  // 最后再 sortWithOtherLast 把"其他"沉到末尾 —— 需求：所有筛选项中
+  // "其他"永远是最后一个，无论它是出现在默认分类、用户新增还是历史
+  // 动态补回的位置。"全部"因为不是"其他"会保持在首位不受影响。
   const categories = useMemo(() => {
     const result = ['全部', ...categoryList];
     const set = new Set(result);
@@ -182,7 +187,7 @@ export default function EventPublish() {
         set.add(e.category);
       }
     });
-    return result;
+    return sortWithOtherLast(result);
   }, [events, categoryList]);
 
   // 排序：未来活动优先（按日期升序），过去活动按降序
