@@ -199,7 +199,11 @@
 
 /* 表格 */
 .mc-table-wrapper {
-  overflow-x: auto;
+  /* 同时允许水平与垂直滚动，作为 thead/排名列/成员列 sticky 的参照容器。
+     max-height 让表格内部出现纵向滚动条，这样表头才能相对 wrapper 冻结；
+     手机端在 media query 里会改回 "只横向滚，纵向交给页面"。 */
+  overflow: auto;
+  max-height: calc(100vh - 280px);
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
   border-radius: 12px;
@@ -217,6 +221,15 @@
   background: var(--color-bg-hover);
 }
 
+/* 表头冻结：thead th 相对 wrapper 吸顶。
+   sticky 元素自身必须带不透明背景色，否则滚动时下方行内容会透上来。 */
+.mc-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  background: var(--color-bg-hover);
+}
+
 .mc-table th {
   padding: 12px 14px;
   text-align: center;
@@ -224,7 +237,8 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   white-space: nowrap;
-  border-bottom: 1px solid var(--color-border-light);
+  /* sticky 下 border-bottom 会随滚动消失，改用 inset box-shadow 模拟底边 */
+  box-shadow: inset 0 -1px 0 var(--color-border-light);
 }
 
 .mc-table th svg {
@@ -296,9 +310,54 @@
   background: rgba(205, 127, 50, 0.04);
 }
 
+/* ---- sticky 列在特殊行背景下的补齐 ----
+   冻结的"排名/成员"列自身有不透明 background（卡片底色）用于
+   遮挡横向滚时中间列文字。但这会遮住 tr 级别的 hover / top1/2/3 背景。
+   下面把行级背景色"复刻"一份到两个 sticky td 上，保持视觉一致。
+   色值采用和 rgba over #FFFFFF 视觉等效的不透明值，避免
+   sticky 元素被当作独立层叠上下文时透出下方内容。 */
+.mc-table__row:hover .mc-table__td--rank,
+.mc-table__row:hover .mc-table__td--member {
+  background: var(--color-bg-hover);
+}
+
+.mc-table__row--top1 .mc-table__td--rank,
+.mc-table__row--top1 .mc-table__td--member {
+  background: #fffef6; /* rgba(255,215,0,0.04) on #FFFFFF */
+}
+
+.mc-table__row--top2 .mc-table__td--rank,
+.mc-table__row--top2 .mc-table__td--member {
+  background: #fafafa; /* rgba(192,192,192,0.04) on #FFFFFF */
+}
+
+.mc-table__row--top3 .mc-table__td--rank,
+.mc-table__row--top3 .mc-table__td--member {
+  background: #fefaf6; /* rgba(205,127,50,0.04) on #FFFFFF */
+}
+
 /* 排名 */
 .mc-table__td--rank {
   text-align: center;
+}
+
+/* 冻结左侧"排名"列：
+   tbody 的 td 以 wrapper 为参照 sticky，背景用卡片底色避免横向滚时
+   中间列内容透上来；thead 的同列由 .mc-table thead th 规则已设置
+   top:0，再加 left:0 并把 z-index 拉到最高，保证"左上角交叉格"
+   永远在所有 sticky 元素之上。 */
+.mc-table__td--rank,
+.mc-table__th--rank {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  background: var(--color-bg-card);
+}
+
+.mc-table thead .mc-table__th--rank {
+  /* 交叉格：高于普通表头(4) 与 tbody sticky 列(2) */
+  z-index: 6;
+  background: var(--color-bg-hover);
 }
 
 .mc-rank {
@@ -327,6 +386,22 @@
 /* 成员信息 */
 .mc-table__td--member {
   text-align: left;
+}
+
+/* 冻结左侧"成员"列（紧贴在排名列右侧）。
+   left 值 = 排名列宽度 50px。右侧加一条淡阴影，暗示"被冻结"。 */
+.mc-table__td--member,
+.mc-table__th--member {
+  position: sticky;
+  left: 50px;
+  z-index: 2;
+  background: var(--color-bg-card);
+  box-shadow: 4px 0 8px rgba(0, 0, 0, 0.04);
+}
+
+.mc-table thead .mc-table__th--member {
+  z-index: 6;
+  background: var(--color-bg-hover);
 }
 
 .mc-member-link {
@@ -358,7 +433,8 @@
 }
 
 .mc-member-name {
-  font-weight: 600;
+  /* 去除加粗，和其它正文字号保持一致的视觉权重 */
+  font-weight: 400;
   font-size: var(--text-sm);
   color: var(--color-text);
   white-space: nowrap;
@@ -642,6 +718,13 @@
   .mc-table-wrapper {
     font-size: 12px;
     -webkit-overflow-scrolling: touch;
+    /* 手机端：wrapper 只横向滚，纵向交给页面本身，
+       桌面端的 max-height 必须撤掉——否则 thead sticky 会以 wrapper
+       为参照，而 wrapper 被 max-height 裁得很小，下拉页面看后续行
+       时 thead 不再冻结，还会出现 "表格只占一小块" 的局促观感。 */
+    overflow-x: auto;
+    overflow-y: visible;
+    max-height: none;
   }
 
   .mc-table {
