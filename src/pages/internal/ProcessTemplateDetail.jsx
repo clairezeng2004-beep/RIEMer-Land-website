@@ -582,38 +582,9 @@ export default function ProcessTemplateDetail() {
     return stripUnderline(doc.content); // word 格式：已是 HTML
   }, [doc]);
 
-  /* ========== 目录（TOC） ==========
-   * 实现下沉到 useTocScroll 公共 hook，与 MemberSharingDetail
-   * 共用同一套逻辑。这里扩展到 h1-h4，是流程手册的历史约定。 */
-  const {
-    toc,
-    activeTocId,
-    tocOpenMobile,
-    setTocOpenMobile,
-    handleTocClick,
-  } = useTocScroll({
-    contentRef,
-    renderedContent,
-    headingSelector: 'h1, h2, h3, h4',
-    anchorClassName: 'ptd-heading-anchor',
-    scrollOffset: 80,
-  });
-
-  // 首次渲染若 URL 带 hash，自动滚到对应锚点（支持分享链接）
-  // 这条路径不是点目录触发，保留为独立 effect：进入页面就尝试一次
-  useEffect(() => {
-    if (!toc.length) return;
-    const hash = decodeURIComponent(window.location.hash || '').replace(/^#/, '');
-    if (!hash) return;
-    const el = document.getElementById(hash);
-    if (!el) return;
-    // 下一帧再滚，确保布局已完成
-    requestAnimationFrame(() => {
-      const offset = 80;
-      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
-      window.scrollTo({ top, behavior: 'auto' });
-    });
-  }, [toc]);
+  /* 目录（TOC）的初始化被挪到后面（editMarkdownPreview 之后），
+   * 因为编辑态下目录需要基于实时预览 DOM 扫描标题，
+   * 必须在 isEditing / editMarkdownPreview 声明完成后再调用 hook。 */
 
   /* 编辑历史小矩形：展示在目录下方。默认折叠显示最近 3 条，点击"更多"展开全部。
      折叠时不隐藏整卡片，只限制展示条数，保证入口始终可见。 */
@@ -923,6 +894,48 @@ export default function ProcessTemplateDetail() {
     return stripUnderline(marked.parse(stripUnderline(editContent)));
   }, [editContent, doc?.format, doc]);
 
+  /* ========== 目录（TOC） ==========
+   * 下沉到 useTocScroll 公共 hook。这里支持两种场景：
+   *   - 阅读态：标题来源是 .ptd-article__content（contentRef）
+   *   - 编辑 Markdown 态：标题来源是实时预览区 .msc-md-split__preview
+   *     （contentRef 在 JSX 里通过 callback ref 同时挂在预览节点上）
+   * 两种场景切换时 renderedContent 参数会变（正文 HTML vs 预览 HTML），
+   * hook 内部的标题扫描 useEffect 会自动重新跑一遍。
+   * 编辑 Word 态是纯 textarea、没有可跳的 DOM，目录在 showToc 里被关掉。
+   * headingSelector 保留 h1-h4 是流程手册的历史约定。 */
+  const {
+    toc,
+    activeTocId,
+    tocOpenMobile,
+    setTocOpenMobile,
+    handleTocClick,
+  } = useTocScroll({
+    contentRef,
+    // 编辑 Markdown 态使用实时预览 HTML 作为重扫描触发；
+    // 阅读态使用 renderedContent。其它情况传空串避免无意义扫描。
+    renderedContent:
+      isEditing && doc?.format === 'markdown' ? editMarkdownPreview : renderedContent,
+    headingSelector: 'h1, h2, h3, h4',
+    anchorClassName: 'ptd-heading-anchor',
+    scrollOffset: 80,
+  });
+
+  // 首次渲染若 URL 带 hash，自动滚到对应锚点（支持分享链接）
+  // 这条路径不是点目录触发，保留为独立 effect：进入页面就尝试一次
+  useEffect(() => {
+    if (!toc.length) return;
+    const hash = decodeURIComponent(window.location.hash || '').replace(/^#/, '');
+    if (!hash) return;
+    const el = document.getElementById(hash);
+    if (!el) return;
+    // 下一帧再滚，确保布局已完成
+    requestAnimationFrame(() => {
+      const offset = 80;
+      const top = el.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top, behavior: 'auto' });
+    });
+  }, [toc]);
+
   const saveEdit = useCallback(async () => {
     if (!doc) return;
     const title = editTitle.trim();
@@ -1080,7 +1093,13 @@ export default function ProcessTemplateDetail() {
   const hasAttachments = Array.isArray(doc.attachments) && doc.attachments.length > 0;
   const hasFileUrl = Boolean(doc.fileUrl);
 
-  const showToc = toc.length > 0 && hasTextContent && (doc.format === 'markdown' || doc.format === 'word');
+  const showToc =
+    toc.length > 0 &&
+    hasTextContent &&
+    (doc.format === 'markdown' || doc.format === 'word') &&
+    // 编辑 Word 态是纯 textarea、没有可跳的 DOM，不给目录；
+    // 编辑 Markdown 态有实时预览，目录基于预览 DOM 工作。
+    (!isEditing || doc.format === 'markdown');
 
   /* ========== 编辑权限：用户发布的文档 + （管理员 或 任一贡献者本人） ========== */
   const canEdit =
@@ -1295,7 +1314,14 @@ export default function ProcessTemplateDetail() {
                           <Eye size={14} /> 预览
                         </div>
                         <div
-                          ref={mdSyncPreviewRef}
+                          ref={(el) => {
+                            // 同时挂三处：
+                            //   - mdSyncPreviewRef: 同步滚动 hook
+                            //   - contentRef: useTocScroll 扫描标题的根；
+                            //     编辑态下预览区即目录的 DOM 源
+                            mdSyncPreviewRef.current = el;
+                            contentRef.current = el;
+                          }}
                           className="msc-md-split__preview"
                           onScroll={handleMdPreviewScroll}
                           dangerouslySetInnerHTML={{
