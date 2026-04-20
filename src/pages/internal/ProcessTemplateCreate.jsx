@@ -104,7 +104,7 @@ export default function ProcessTemplateCreate() {
     handlePreviewScroll,
   } = useMarkdownSyncScroll(false);
 
-  const { filterOptions } = useSiteContent();
+  const { filterOptions, internalConfig } = useSiteContent();
 
   // 动态类型（从 siteContent 中读取，兼容管理员自定义）+ 默认的流程/规章类型
   const docTypes = filterOptions.documentTypes || [];
@@ -114,14 +114,22 @@ export default function ProcessTemplateCreate() {
     return labels;
   }, [docTypes]);
 
-  // 只展示流程模板相关的两个类型（和 ProcessTemplates.filterTypes 保持一致）
+  // 流程模板发布页的类型下拉，必须与 ProcessTemplates 列表页的 tab 一致：
+  //   白名单内置 ['process', 'regulation']（可能被隐藏的除外）
+  //   + 用户在列表页编辑模式下新增的 extraTypeKeys（custom_*）
+  // 读取来源：internalConfig.processTemplates.extraTypeKeys / hiddenBuiltinKeys
   const typeOptions = useMemo(() => {
-    const allowedKeys = ['process', 'regulation'];
-    return allowedKeys.map((key) => ({
+    const pt = internalConfig?.processTemplates || {};
+    const extraKeys = Array.isArray(pt.extraTypeKeys) ? pt.extraTypeKeys : [];
+    const hiddenBuiltin = Array.isArray(pt.hiddenBuiltinKeys) ? pt.hiddenBuiltinKeys : [];
+    const builtin = ['process', 'regulation'].filter((k) => !hiddenBuiltin.includes(k));
+    // extraKeys 必须仍然存在于全局文档类型池中
+    const extras = extraKeys.filter((k) => docTypes.some((t) => t.key === k));
+    return [...builtin, ...extras].map((key) => ({
       value: key,
       label: typeLabelsMap[key] || key,
     }));
-  }, [typeLabelsMap]);
+  }, [internalConfig, docTypes, typeLabelsMap]);
 
   const [newDoc, setNewDoc] = useState({
     title: '',

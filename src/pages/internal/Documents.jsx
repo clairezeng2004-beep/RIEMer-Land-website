@@ -212,6 +212,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const { editing } = useWysiwyg();
   const sectionKey = configSection || 'documents';
   const dc = internalConfig[sectionKey] || internalConfig.documents;
+  // 页面级筛选扩展（仅 filterTypes 模式下有意义）：
+  // - extraTypeKeys: 本页新增出来、但还不在 filterTypes 白名单里的分类 key
+  // - hiddenBuiltinKeys: 本页被"删除（隐藏）"的白名单内置分类 key
+  // 两者配合 filterTypes 白名单，构成当前 tab 实际可见的 types 列表。
+  const extraTypeKeys = useMemo(
+    () => (Array.isArray(dc?.extraTypeKeys) ? dc.extraTypeKeys : []),
+    [dc]
+  );
+  const hiddenBuiltinKeys = useMemo(
+    () => (Array.isArray(dc?.hiddenBuiltinKeys) ? dc.hiddenBuiltinKeys : []),
+    [dc]
+  );
 
   // 从 filterOptions 获取动态文档类型
   const docTypes = filterOptions.documentTypes || [];
@@ -246,9 +258,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     // 随机颜色
     const palette = ['#5EAD8C', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899', '#F59E0B', '#3B82F6', '#EF4444', '#10B981', '#6366F1'];
     const color = palette[docTypes.length % palette.length];
+    // ① 先在全局文档类型池里注册（保证其它通过 filterOptions 读取的地方拿到 label/color）
     updateFilterOptions({
       documentTypes: [...docTypes, { key, label: trimmed, color }],
     });
+    // ② 对 filterTypes 模式（例如"流程模板文件"页）：filterTypes 是写死的白名单
+    //   (['process', 'regulation'])，新 key 不在白名单里就不会被 types 数组采纳。
+    //   这里用页面级 extraTypeKeys 把新 key 补进来，避免污染其它不受 filterTypes 约束
+    //   的 Documents 页（例如"文档管理"总入口会看到所有全局分类，互不干扰）。
+    if (filterTypes) {
+      const nextExtra = [...extraTypeKeys, key];
+      updateDocs('extraTypeKeys', nextExtra);
+    }
     setNewTypeLabel('');
     setShowAddType(false);
   };
@@ -267,9 +288,32 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
   const handleDeleteType = (typeKey) => {
     if (!window.confirm('确定要删除这个筛选分类吗？')) return;
-    updateFilterOptions({
-      documentTypes: docTypes.filter((t) => t.key !== typeKey),
-    });
+    if (filterTypes) {
+      // filterTypes 模式（例如"流程模板文件"页）：
+      // - 若删除的是白名单内置 key（process/regulation），不动全局 filterOptions
+      //   ——因为其它 Documents 页可能仍在使用这些分类的 label/color；只在本页加一条
+      //   hiddenBuiltinKeys 记录，让本 tab 视觉上不再显示该分类。
+      // - 若删除的是本页添加的 custom_*，则同步从 extraTypeKeys 和全局池移除。
+      if (filterTypes.includes(typeKey)) {
+        const nextHidden = hiddenBuiltinKeys.includes(typeKey)
+          ? hiddenBuiltinKeys
+          : [...hiddenBuiltinKeys, typeKey];
+        updateDocs('hiddenBuiltinKeys', nextHidden);
+      } else {
+        updateDocs(
+          'extraTypeKeys',
+          extraTypeKeys.filter((k) => k !== typeKey)
+        );
+        updateFilterOptions({
+          documentTypes: docTypes.filter((t) => t.key !== typeKey),
+        });
+      }
+    } else {
+      // 无 filterTypes 约束的总入口：沿用原行为——直接从全局池删除。
+      updateFilterOptions({
+        documentTypes: docTypes.filter((t) => t.key !== typeKey),
+      });
+    }
     if (selectedType === typeKey) setSelectedType('全部');
   };
   const [documents, setDocuments] = useState(() => {
@@ -489,7 +533,17 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   }
 
   const types = filterTypes
-    ? ['全部', ...filterTypes.filter((ft) => docTypes.some((t) => t.key === ft) || defaultTypeLabels[ft])]
+    ? [
+        '全部',
+        // 白名单内置分类：必须仍然存在于 docTypes / 默认 typeLabels 中，且未被本页隐藏
+        ...filterTypes.filter(
+          (ft) =>
+            !hiddenBuiltinKeys.includes(ft) &&
+            (docTypes.some((t) => t.key === ft) || defaultTypeLabels[ft])
+        ),
+        // 页面级新增分类：key 需仍在全局 docTypes 中（避免全局被删后此处变成孤儿）
+        ...extraTypeKeys.filter((k) => docTypes.some((t) => t.key === k)),
+      ]
     : ['全部', ...docTypes.map((t) => t.key)];
 
   // 把用户在描述里粘贴进来的 HTML 实体（&nbsp; / &amp; / &lt; 等）还原为真实字符，
