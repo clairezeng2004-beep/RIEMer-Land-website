@@ -629,8 +629,11 @@ export default function ProcessTemplateCreate() {
                 onChange={(vals) => setContributorIds(vals)}
                 placeholder="请选择贡献者"
                 options={(() => {
-                  // 候选项 = 所有「已授权」成员 ∪ 当前用户本人（兜底，
-                  // 防止账号 authorized 字段缺失时连自己都选不到）。
+                  // 候选项 = 所有注册成员 ∪ 当前用户本人（兜底）。
+                  // 放宽原因：文档迁移场景下，历史贡献者可能还没走完授权流程，
+                  // 且 authorized 字段类型漂移（布尔 / 字符串 'true' / 1）会把合法成员
+                  // 也挡掉，表现为「搜索范围只能看到自己」。这里不再按 authorized 过滤，
+                  // 登录权限控制仍由 UserManagement 负责，两者解耦。
                   // 按注册时间顺序展示，CustomSelect 内部 pinyinMatch 支持
                   // 中文名 / 拼音全拼 / 首字母三种搜索方式。
                   const seen = new Set();
@@ -644,9 +647,7 @@ export default function ProcessTemplateCreate() {
                     });
                   };
                   if (user) pushUser(user);
-                  allUsers
-                    .filter((u) => u && u.authorized === true)
-                    .forEach(pushUser);
+                  allUsers.forEach(pushUser);
                   return opts;
                 })()}
               />

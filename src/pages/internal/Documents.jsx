@@ -1016,8 +1016,13 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   onChange={(vals) => setContributorIds(vals)}
                   placeholder="请选择贡献者"
                   options={(() => {
-                    // 候选项 = 所有「已授权」成员 ∪ 当前用户本人（兜底，
-                    // 防止账号 authorized 字段缺失时自己也选不到）。
+                    // 候选项 = 所有注册成员 ∪ 当前用户本人（兜底）。
+                    // 之前这里过滤了 u.authorized === true，导致：
+                    //   1) 文档迁移场景下，历史贡献者还没走完授权流程就选不到；
+                    //   2) authorized 字段类型漂移（布尔 / 字符串 'true' / 1 都真实出现过）
+                    //      会把合法已授权成员也挡掉，表现为"只看得到自己"。
+                    // 放宽到全部 getAllUsers() 结果即可——UserManagement 的授权控制依然有效，
+                    // 只是"能否被列为贡献者"与"能否登录后台"解耦。
                     // CustomSelect 内部 pinyinMatch 支持中文 / 拼音全拼 / 首字母三种搜索。
                     const seen = new Set();
                     const opts = [];
@@ -1030,9 +1035,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                       });
                     };
                     if (user) pushUser(user);
-                    allUsers
-                      .filter((u) => u && u.authorized === true)
-                      .forEach(pushUser);
+                    allUsers.forEach(pushUser);
                     return opts;
                   })()}
                 />
