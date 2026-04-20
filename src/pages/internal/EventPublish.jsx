@@ -102,7 +102,7 @@ const EMPTY_EVENT = {
 
 export default function EventPublish() {
   const { isAuthenticated, isAdmin } = useAuth();
-  const { events, addEvent, internalConfig, updateInternalConfig } = useSiteContent();
+  const { events, addEvent, updateEvent, internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const ep = internalConfig.eventPublish || {};
   const updateEP = useCallback(
@@ -257,23 +257,57 @@ export default function EventPublish() {
   const saveEditCategory = () => {
     const next = editCatDraft.trim();
     if (!next) return;
-    if (next !== editingCatLabel && categoryList.includes(next)) {
-      // 重名，终止
+    const prev = editingCatLabel;
+    if (next === prev) {
+      setEditingCatLabel(null);
+      setEditCatDraft('');
       return;
     }
-    const updated = categoryList.map((c) => (c === editingCatLabel ? next : c));
+    // 重名校验（与其他托管分类冲突则拒绝）
+    if (categoryList.includes(next) && next !== prev) {
+      alert('该分类已存在');
+      return;
+    }
+
+    // 1) 更新 categoryList：
+    //    - 若 prev 是托管分类 → 原地改名
+    //    - 若 prev 是派生分类（不在 categoryList 里）→ 把新 label 领养进 categoryList
+    let updated;
+    if (categoryList.includes(prev)) {
+      updated = categoryList.map((c) => (c === prev ? next : c));
+    } else {
+      updated = [...categoryList, next];
+    }
     setCategoryList(updated);
     persistEventCategories(updated, lastCatSyncRef);
+
+    // 2) 同步把所有引用旧 label 的活动 category 改成新 label
+    //    （托管/派生都要做；跨设备持久化由 SiteContentContext 的 pushToCloud(events) 自动完成）
+    events
+      .filter((e) => e.category === prev)
+      .forEach((e) => updateEvent(e.id, { category: next }));
+
     // 如果当前选中的正是被改名的分类，同步选中到新名
-    if (selectedCategory === editingCatLabel) setSelectedCategory(next);
+    if (selectedCategory === prev) setSelectedCategory(next);
     setEditingCatLabel(null);
     setEditCatDraft('');
   };
   const handleDeleteCategory = (label) => {
-    if (!window.confirm(`确定要删除分类「${label}」吗？\n（已有活动的分类值不会被删除，仅从筛选项中移除）`)) return;
-    const updated = categoryList.filter((c) => c !== label);
-    setCategoryList(updated);
-    persistEventCategories(updated, lastCatSyncRef);
+    const affected = events.filter((e) => e.category === label);
+    const msg = affected.length > 0
+      ? `确定要删除分类「${label}」吗？\n该分类下有 ${affected.length} 个活动，删除后这些活动的分类会被清空（活动本身保留）。`
+      : `确定要删除分类「${label}」吗？`;
+    if (!window.confirm(msg)) return;
+
+    // 1) 从托管列表移除（如果是托管的）
+    if (categoryList.includes(label)) {
+      const updated = categoryList.filter((c) => c !== label);
+      setCategoryList(updated);
+      persistEventCategories(updated, lastCatSyncRef);
+    }
+    // 2) 级联清空受影响活动的 category → 派生分类随之消失
+    affected.forEach((e) => updateEvent(e.id, { category: '' }));
+
     if (selectedCategory === label) setSelectedCategory('全部');
   };
   const handleAddCategoryInManager = () => {
@@ -442,9 +476,12 @@ export default function EventPublish() {
                     </button>
                   );
                 }
-                // 只有托管在 categoryList 里的才可就地改/删；
-                // events 里动态派生出来的老 category 值（categoryList 里没有）不给编辑入口
-                const canEditInline = isAdmin && categoryList.includes(cat);
+                // 管理员对所有非"全部"的分类都可就地编辑/删除：
+                //   - 托管分类：已在 categoryList 数组里
+                //   - 动态派生分类：来自 events[].category 但 categoryList 里还没有；
+                //     重命名时会自动"领养"进 categoryList；删除时会同步把引用该分类的活动
+                //     category 清空，让派生分类真正消失
+                const canEditInline = isAdmin;
                 const isRenaming = canEditInline && editingCatLabel === cat;
 
                 if (isRenaming) {

@@ -364,29 +364,98 @@ export default function InternalArticles() {
   };
 
   const startEditCategory = (cat) => {
+    // cat 可能是 categoryList 里的托管项（有 key/color），
+    // 也可能是从文章 article.category 动态派生的"裸 label"（没 key，构造一个 __dyn__ 占位 key）
     setEditingCatKey(cat.key);
     setEditCatLabel(cat.label);
-    setEditCatColor(cat.color);
+    setEditCatColor(cat.color || PRESET_COLORS[0]);
   };
 
-  const saveEditCategory = () => {
-    if (!editCatLabel.trim()) return;
-    const updated = categoryList.map((c) =>
-      c.key === editingCatKey ? { ...c, label: editCatLabel.trim(), color: editCatColor } : c,
-    );
-    setCategoryList(updated);
-    persistCategories(updated, lastCatSyncRef);
+  const saveEditCategory = async () => {
+    const nextLabel = editCatLabel.trim();
+    if (!nextLabel) return;
+
+    // 找到当前被编辑的分类（托管分类走 key 匹配；动态派生分类 key 以 __dyn__ 打头）
+    const isDynamic = typeof editingCatKey === 'string' && editingCatKey.startsWith('__dyn__');
+    const managed = !isDynamic ? categoryList.find((c) => c.key === editingCatKey) : null;
+    // 改名前的旧 label（用于同步更新 article.category）
+    const prevLabel = isDynamic
+      ? editingCatKey.slice('__dyn__'.length)
+      : managed?.label;
+
+    if (!prevLabel) { setEditingCatKey(null); return; }
+
+    // 重名校验（和其他分类冲突时拒绝）
+    const clash =
+      (nextLabel !== prevLabel) &&
+      (
+        categoryList.some((c) => c.label === nextLabel && c.key !== editingCatKey) ||
+        allArticles.some((a) => a.category === nextLabel && a.category !== prevLabel)
+      );
+    if (clash) {
+      alert('该分类名称已存在');
+      return;
+    }
+
+    // 1) 更新/补齐 categoryList
+    if (managed) {
+      // 托管分类：原地改名 + 可选的 color
+      const updated = categoryList.map((c) =>
+        c.key === editingCatKey ? { ...c, label: nextLabel, color: editCatColor } : c,
+      );
+      setCategoryList(updated);
+      persistCategories(updated, lastCatSyncRef);
+    } else if (isDynamic) {
+      // 动态派生分类被改名：把这个 label 正式"领养"进 categoryList，
+      // 这样下次就能直接作为托管分类参与批量管理
+      const key = 'acat_' + Date.now();
+      const updated = [...categoryList, { key, label: nextLabel, color: editCatColor }];
+      setCategoryList(updated);
+      persistCategories(updated, lastCatSyncRef);
+    }
+
+    // 2) 同步改写所有旧 label 的文章 article.category（托管 & 派生都要做，
+    //    这样筛选项、文章明细上的分类标签才会真正改名）
+    if (nextLabel !== prevLabel) {
+      const affected = allArticles.filter((a) => a.category === prevLabel);
+      await Promise.all(
+        affected.map((a) => updateArticle(a.id, { category: nextLabel })),
+      );
+      // 如果当前选中的正是被改名的分类，把选中项同步切到新名
+      if (selectedCategory === prevLabel) setSelectedCategory(nextLabel);
+    }
+
     setEditingCatKey(null);
   };
 
+  // 通过 label 删除分类（既适用于托管分类，也适用于动态派生分类）
+  const handleDeleteCategoryByLabel = async (label) => {
+    if (!label) return;
+    const managed = categoryList.find((c) => c.label === label);
+    const affected = allArticles.filter((a) => a.category === label);
+    const msg = affected.length > 0
+      ? `确定要删除分类「${label}」吗？\n该分类下有 ${affected.length} 篇文章，删除后这些文章的分类会被清空（文章本身保留）。`
+      : `确定要删除分类「${label}」吗？`;
+    if (!window.confirm(msg)) return;
+
+    // 1) 从 categoryList 中移除（如果是托管项）
+    if (managed) {
+      const updated = categoryList.filter((c) => c.key !== managed.key);
+      setCategoryList(updated);
+      persistCategories(updated, lastCatSyncRef);
+    }
+    // 2) 把所有引用该分类的文章 category 清空，使派生分类真正消失
+    await Promise.all(
+      affected.map((a) => updateArticle(a.id, { category: '' })),
+    );
+    if (selectedCategory === label) setSelectedCategory('全部');
+  };
+
+  // 旧签名（按 key 删）保留给齿轮面板等已有调用点，内部委托到 byLabel
   const handleDeleteCategory = (key) => {
     const cat = categoryList.find((c) => c.key === key);
     if (!cat) return;
-    if (!window.confirm(`确定要删除分类「${cat.label}」吗？该分类下的文章不会被删除。`)) return;
-    const updated = categoryList.filter((c) => c.key !== key);
-    setCategoryList(updated);
-    persistCategories(updated, lastCatSyncRef);
-    if (selectedCategory === cat.label) setSelectedCategory('全部');
+    handleDeleteCategoryByLabel(cat.label);
   };
 
   // ---- 普通成员快速新增分类（所有登录成员可用） ----
@@ -719,10 +788,18 @@ export default function InternalArticles() {
                     </button>
                   );
                 }
-                // 只有 categoryList 里托管的分类才可就地编辑 / 删除；
-                // dynamicCats（从文章动态派生的 category 名）没有稳定 key，不做就地编辑入口
-                const managed = categoryList.find((c) => c.label === cat);
-                const canEditInline = !!managed && isAdmin;
+                // 管理员对所有非"全部"的分类都可就地编辑/删除：
+                //   - 托管分类：从 categoryList 找到，有稳定 key
+                //   - 动态派生分类：从文章 article.category 派生而来，没有 key；
+                //     此时构造一个 __dyn__<label> 的占位 key，重命名时会自动"领养"进 categoryList，
+                //     删除时批量把引用该分类的文章 category 清空。
+                const managedReal = categoryList.find((c) => c.label === cat);
+                const managed = managedReal || {
+                  key: '__dyn__' + cat,
+                  label: cat,
+                  color: PRESET_COLORS[0],
+                };
+                const canEditInline = isAdmin;
                 const isRenaming = canEditInline && editingCatKey === managed.key;
 
                 // 就地重命名：沿用 editCatLabel / saveEditCategory，只是 UI 从面板搬到标签原位
@@ -783,7 +860,7 @@ export default function InternalArticles() {
                           className="ia-list__cat-delete"
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDeleteCategory(managed.key);
+                            handleDeleteCategoryByLabel(managed.label);
                           }}
                           title="删除分类"
                         >
