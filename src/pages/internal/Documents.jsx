@@ -33,7 +33,6 @@ import {
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
-import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import { stripUnderline } from '../../utils/stripUnderline';
@@ -209,7 +208,6 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     },
     [resolveContributorName],
   );
-  const { editing } = useWysiwyg();
   const sectionKey = configSection || 'documents';
   const dc = internalConfig[sectionKey] || internalConfig.documents;
   // 页面级筛选扩展（仅 filterTypes 模式下有意义）：
@@ -1060,9 +1058,19 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
             />
           </div>
           <div className="documents-filters__types">
+            {/*
+              管理分类的三个入口（新增 / 重命名 / 删除）原先只在 WYSIWYG
+              编辑模式(editing)下显示，普通管理员打开页面看不到\"添加分类\"
+              按钮，体验上像\"无法自定义\"。
+              现在把这三个入口的显示条件从 `editing` 改为 `isAdmin`：
+                - 只要是管理员就能直接在本页管理筛选分类；
+                - EditableText（页面标题 / 描述 / 按钮文案）仍然只有在
+                  editing 下才可编辑，避免普通操作时误改页面文案。
+              仅管理员生效，普通成员看到的始终是只读分类条。
+            */}
             {types.map((type) => (
               <div key={type} className="documents-filters__type-wrapper">
-                {editing && renamingType === type && type !== '全部' ? (
+                {isAdmin && renamingType === type && type !== '全部' ? (
                   <div className="documents-filters__rename">
                     <input
                       type="text"
@@ -1101,7 +1109,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                     {type === '全部' ? '全部' : typeLabels[type] || type}
                   </button>
                 )}
-                {editing && type !== '全部' && renamingType !== type && (
+                {isAdmin && type !== '全部' && renamingType !== type && (
                   <div className="documents-filters__type-actions">
                     <button
                       className="documents-filters__type-edit"
@@ -1121,7 +1129,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 )}
               </div>
             ))}
-            {editing && (
+            {isAdmin && (
               showAddType ? (
                 <div className="documents-filters__add-type">
                   <input
