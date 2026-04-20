@@ -24,6 +24,15 @@ const MIN_SCALE = 1;    // 下限：图片刚好铺满裁剪框
 const MAX_SCALE = 3;    // 上限：放大 3 倍（过去是 4，触屏上灵敏度过高）
 const SCALE_STEP = 0.05; // 滑杆步长：过去 0.01 太灵敏，0.05 更稳
 
+// 手势灵敏度阻尼（值越小手势越"钝"）：
+//  - PINCH_DAMP：双指 pinch 的倍率放大系数，原始 ratio = dist/startDist 会被压平，
+//    两指张开 2 倍时实际只放大约 1.5 倍，避免一捏就顶到 MAX_SCALE。
+//  - WHEEL_STEP：鼠标滚轮每一格的增量（过去 0.1，现在 0.04）。
+//  - BUTTON_STEP：点击 +/- 按钮的每次增量（过去 SCALE_STEP*2=0.1，现在 0.05）。
+const PINCH_DAMP = 0.5;
+const WHEEL_STEP = 0.04;
+const BUTTON_STEP = 0.05;
+
 export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
   // 原图尺寸
   const [natural, setNatural] = useState({ w: 0, h: 0 });
@@ -135,10 +144,16 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
       const dx = e.touches[0].clientX - e.touches[1].clientX;
       const dy = e.touches[0].clientY - e.touches[1].clientY;
       const dist = Math.hypot(dx, dy);
+      // 原始 ratio = dist / startDist（双指张开 2 倍 → ratio = 2）。
+      // 直接乘到 scale 上在小屏触屏上太灵敏，这里用 PINCH_DAMP 做阻尼：
+      //   damped = 1 + (ratio - 1) * PINCH_DAMP
+      // 当 ratio=2、PINCH_DAMP=0.5 时，damped=1.5；ratio=0.5 时，damped=0.75。
+      // 相当于"捏合一倍距离只放大/缩小半倍"，手感更稳。
       const ratio = dist / pinchRef.current.startDist;
+      const damped = 1 + (ratio - 1) * PINCH_DAMP;
       const nextScale = Math.min(
         MAX_SCALE,
-        Math.max(MIN_SCALE, pinchRef.current.startScale * ratio)
+        Math.max(MIN_SCALE, pinchRef.current.startScale * damped)
       );
       setScale(nextScale);
       setOffset((prev) => clampOffset(prev, nextScale));
@@ -149,7 +164,10 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
   // 鼠标滚轮缩放
   const onWheel = (e) => {
     e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    // 过去用 ±0.1，滚一格就跳 10%，桌面端用户觉得太跳。
+    // 改用 WHEEL_STEP（默认 0.04），同时仅取符号而忽略浏览器上报的
+    // deltaY 绝对值（不同滚轮/触控板差异很大），保证每格步长恒定。
+    const delta = e.deltaY > 0 ? -WHEEL_STEP : WHEEL_STEP;
     const nextScale = Math.min(
       MAX_SCALE,
       Math.max(MIN_SCALE, scale + delta)
@@ -263,7 +281,9 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
             type="button"
             className="avatar-cropper__icon-btn"
             onClick={() => {
-              const next = Math.max(MIN_SCALE, scale - SCALE_STEP * 2);
+              // 每次点一下增量改成 BUTTON_STEP（0.05），过去是 SCALE_STEP*2=0.1，
+              // 连点几次就顶到边界，手感太跳。
+              const next = Math.max(MIN_SCALE, scale - BUTTON_STEP);
               setScale(next);
               setOffset((prev) => clampOffset(prev, next));
             }}
@@ -284,7 +304,8 @@ export default function AvatarCropper({ imageSrc, onCancel, onConfirm }) {
             type="button"
             className="avatar-cropper__icon-btn"
             onClick={() => {
-              const next = Math.min(MAX_SCALE, scale + SCALE_STEP * 2);
+              // 同上，用 BUTTON_STEP 统一控制 +/- 按钮的步长。
+              const next = Math.min(MAX_SCALE, scale + BUTTON_STEP);
               setScale(next);
               setOffset((prev) => clampOffset(prev, next));
             }}
