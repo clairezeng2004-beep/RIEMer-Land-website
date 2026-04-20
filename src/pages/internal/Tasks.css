@@ -277,15 +277,20 @@
 
 .tasks-table th {
   background: var(--color-bg);
+  /* 盒模型必须与 .member-profiles-table th 完全一致，否则并排看
+     两张表表头列高会差 1px（用户反馈"列高不一致"）。
+     对齐项：padding / font-size / font-weight / box-shadow 底边 /
+     white-space / 不使用 border-bottom（border 会占 1px 盒高，
+     而 box-shadow inset 不占）。 */
   padding: 0.8rem 1rem;
   text-align: left;
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text-muted);
-  border-bottom: 1px solid var(--color-border-light);
   /* 防止"负责人/协助人/标题"这种 2~3 字的中文表头被逐字折行 */
   white-space: nowrap;
-  /* sticky 下用 box-shadow 模拟底边，避免滚动时 border 被吞 */
+  /* sticky 下用 box-shadow 模拟底边，避免滚动时 border 被吞；
+     与通讯录表头保持同一种底边画法，确保两表 th 高度像素级一致。 */
   box-shadow: inset 0 -1px 0 var(--color-border-light);
 }
 
