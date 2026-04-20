@@ -290,6 +290,8 @@
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
   padding: 4px 24px 4px 8px;
+  /* 同样的原因：<select> 默认不继承父级字体，会掉到系统 UA 字体。 */
+  font: inherit;
   font-size: var(--text-sm);
   font-weight: 500;
   background: var(--color-bg-card);
@@ -502,6 +504,12 @@
   padding: 10px 12px 10px 38px;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
+  /* 浏览器对 <input>/<button>/<textarea> 默认不继承父级 font-family，
+     而是用系统 UA 字体（Mac 上 Helvetica、Win 上 Segoe UI），
+     因此即便全局 body 设定了苹方/Inter，这个邮箱输入框里的占位符和
+     用户输入依然会显得"字重更细、字形偏西文"，与旁边中文不一致。
+     显式 font: inherit 让它回到页面统一字体栈。 */
+  font: inherit;
   font-size: var(--text-sm);
   background: var(--color-bg);
   color: var(--color-text);
