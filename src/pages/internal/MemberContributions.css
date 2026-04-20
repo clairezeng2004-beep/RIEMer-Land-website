@@ -485,24 +485,27 @@
   text-align: center;
 }
 
+/* 数据列数字样式：
+   历史上这里是 \"胶囊圈\"（inline-flex + min-width + height + padding +
+   border-radius + background），每个数字外面都会有一圈浅绿底色。
+   用户反馈"去掉外面的圈圈，除了总计那一列"，所以现在退化成纯文本：
+   - 不再有背景/圆角/固定尺寸；
+   - 仅保留字号、字重、等宽数字体，让列里数字竖向对齐；
+   - active 态（数值>0）继续用主色突出，仅改文字色，不再填色底。
+   总计列 (.mc-total) 的胶囊样式保留，承担"重点合计值"的视觉语义。 */
 .mc-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 8px;
-  border-radius: 14px;
+  display: inline-block;
   font-weight: 600;
   font-size: var(--text-sm);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* 等宽数字，确保 10 / 100 / 1000 在列里竖向视觉对齐 */
+  font-variant-numeric: tabular-nums;
   color: var(--color-text-muted);
-  background: var(--color-bg-hover);
 }
 
 .mc-num--active {
   color: var(--color-primary);
-  background: var(--color-primary-bg);
+  /* 去掉 background，纯主色文字足以表达"有贡献"的状态 */
 }
 
 /* 总计 */
