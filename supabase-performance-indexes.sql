@@ -55,6 +55,18 @@ CREATE INDEX IF NOT EXISTS idx_annotation_replies_annotation_id
 
 -- ========== 5) document_views 主键已是 document_id，不需要额外索引 ==========
 
+-- ========== 6) guestbook_entries 的时间索引 ==========
+-- 热点查询（内部留言板页面加载）：
+--   SELECT id,nickname,message,contact,show_contact,created_at
+--   FROM guestbook_entries
+--   ORDER BY created_at DESC
+--   LIMIT 200;
+-- 没有索引时，即使只取前 200 条，PostgreSQL 也要把整张表读出来排序，
+-- 表体小的时候无感，一旦留言累积到几百条以上就会显著拖慢内部页加载。
+-- 这里加一个单列降序索引，查询直接走索引顺序扫描，O(log N)。
+CREATE INDEX IF NOT EXISTS idx_guestbook_entries_created_at
+  ON public.guestbook_entries (created_at DESC);
+
 -- ============================================
 -- 6) 原子浏览计数 RPC：increment_document_view
 -- ============================================
