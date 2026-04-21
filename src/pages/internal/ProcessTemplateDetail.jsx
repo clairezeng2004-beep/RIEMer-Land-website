@@ -52,10 +52,12 @@ import {
 } from '../../lib/documentsService';
 import ViewLogPopover from '../../components/ViewLogPopover';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
+import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useTocScroll from '../../hooks/useTocScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
+import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
@@ -1116,6 +1118,24 @@ export default function ProcessTemplateDetail() {
     }
   }, [doc, editTitle, editDescription, editContent, user, editDraft]);
 
+  /* ========== 上一篇 / 下一篇 ==========
+   * - 列表序来自 allDocs（与 Documents.jsx 的"用户发布在前"一致）；
+   * - 作者匹配键用 uploadedById（内置示例没有该字段时会回退到不做同作者优先，
+   *   只按相邻取）。
+   * - 必须放在 early return 之前，保证 hook 数量稳定。
+   */
+  const {
+    prev: prevDoc,
+    next: nextDoc,
+    prevSameAuthor: prevDocSameAuthor,
+    nextSameAuthor: nextDocSameAuthor,
+  } = useAdjacentItems({
+    items: allDocs,
+    currentId: id,
+    getId: (d) => d?.id,
+    getAuthorKey: (d) => d?.uploadedById || null,
+  });
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   if (!doc) {
@@ -1516,6 +1536,21 @@ export default function ProcessTemplateDetail() {
                   </div>
                 )}
               </footer>
+            )}
+
+            {/* 上一篇 / 下一篇 —— 阅读态才显示，编辑态下隐藏避免干扰。
+                同贡献者优先推荐（按 uploadedById 匹配，内置示例缺字段时回退为相邻取） */}
+            {!isEditing && (
+              <PrevNextNavigator
+                prev={prevDoc}
+                next={nextDoc}
+                prevSameAuthor={prevDocSameAuthor}
+                nextSameAuthor={nextDocSameAuthor}
+                getHref={(d) => `/internal/process-templates/view/${d.id}`}
+                getTitle={(d) => d.title}
+                getAuthor={(d) => resolveContributors(d) || ''}
+                sameAuthorHint="同贡献者推荐"
+              />
             )}
           </article>
 

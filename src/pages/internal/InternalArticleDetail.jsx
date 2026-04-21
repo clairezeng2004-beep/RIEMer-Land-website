@@ -5,6 +5,8 @@ import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useAuth } from '../../contexts/AuthContext';
 import TextAnnotation from '../../components/TextAnnotation';
+import PrevNextNavigator from '../../components/PrevNextNavigator';
+import useAdjacentItems from '../../hooks/useAdjacentItems';
 import './InternalArticleDetail.css';
 
 export default function InternalArticleDetail() {
@@ -13,16 +15,30 @@ export default function InternalArticleDetail() {
   const { isAuthenticated } = useAuth();
   const contentRef = useRef(null);
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
-
+  // ⚠️ 所有 hooks 必须集中在 early return 之前，避免未登录路径命中 Navigate
+  // 后下一次渲染 hook 数量不一致（Rules of Hooks）。
   const allArticles = useMemo(
-    () => [...userArticles, ...articlesData],
+    // 与 InternalArticles 列表页保持同样的排序：按 date 降序
+    () => [...userArticles, ...articlesData].sort((a, b) =>
+      String(b?.date || '').localeCompare(String(a?.date || ''))
+    ),
     [userArticles]
   );
 
   const article = allArticles.find((a) => a.id === id);
+
+  // 上/下一篇：按列表顺序取，优先推荐同作者（InternalArticle 目前只有 author 字符串，
+  // 没有 authorId，这里按作者名做归一化匹配即可）
+  const { prev, next, prevSameAuthor, nextSameAuthor } = useAdjacentItems({
+    items: allArticles,
+    currentId: id,
+    getId: (x) => x?.id,
+    getAuthorKey: (x) => x?.author || null,
+  });
+
+  if (!isAuthenticated) {
+    return <Navigate to="/login" replace />;
+  }
 
   if (!article) {
     return <Navigate to="/internal/articles" replace />;
@@ -109,6 +125,17 @@ export default function InternalArticleDetail() {
             targetType="article"
             targetId={article.id}
             contentRef={contentRef}
+          />
+
+          {/* 上一篇 / 下一篇 导航（同作者优先） */}
+          <PrevNextNavigator
+            prev={prev}
+            next={next}
+            prevSameAuthor={prevSameAuthor}
+            nextSameAuthor={nextSameAuthor}
+            getHref={(a) => `/internal/article/${a.id}`}
+            getTitle={(a) => a.title}
+            getAuthor={(a) => a.author || ''}
           />
         </article>
 

@@ -23,7 +23,9 @@ import {
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
 import ViewLogPopover from '../../components/ViewLogPopover';
+import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useTocScroll from '../../hooks/useTocScroll';
+import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { recordViewLog, fetchViewLog } from '../../lib/documentsService';
 import {
   fetchSharings,
@@ -207,6 +209,15 @@ export default function MemberSharingDetail() {
     // word (HTML) 格式直接返回（清掉下划线）
     return stripUnderline(post.content);
   }, [post]);
+
+  // 上/下一篇：sharings 已按 created_at 降序；同作者优先（authorId 可能为 null，
+  // hook 会自动 fallback 到按 author 字符串匹配）
+  const { prev: prevSharing, next: nextSharing, prevSameAuthor, nextSameAuthor } = useAdjacentItems({
+    items: sharings,
+    currentId: id,
+    getId: (s) => s?.id,
+    getAuthorKey: (s) => s?.authorId || s?.author || null,
+  });
 
   /* ========== 目录导航（TOC） ==========
    * 实现下沉到 useTocScroll 公共 hook，与 ProcessTemplateDetail
@@ -427,6 +438,17 @@ export default function MemberSharingDetail() {
                 </div>
               )}
             </footer>
+
+            {/* 上一篇 / 下一篇 —— 同作者优先推荐；两端到尽头时对应卡位会隐去 */}
+            <PrevNextNavigator
+              prev={prevSharing}
+              next={nextSharing}
+              prevSameAuthor={prevSameAuthor}
+              nextSameAuthor={nextSameAuthor}
+              getHref={(s) => `/internal/member-sharing/view/${s.id}`}
+              getTitle={(s) => s.title}
+              getAuthor={(s) => s.author || ''}
+            />
           </article>
         </div>
       </div>
