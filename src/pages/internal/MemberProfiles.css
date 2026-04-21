@@ -564,33 +564,41 @@
   }
 
   /* -----------------------------------------------------------
-     手机端滚动行为改造：
-     桌面端 .member-profiles-table-wrapper 同时吃横向 + 纵向滚动
-     （用 max-height 限制高度），但在手机上这样很难用：
-       - 表格本身就要横向滚，再套一层纵向滚动容器，行很多时
-         用户想在表格区域往下翻页，触摸手势被容器吞掉，\
-         只能横向滑或只能在容器内小范围上下滑；
-       - max-height 把表格裁成很小一块，内容看起来挤作一团。
-     手机上改为：wrapper 只保留横向滚动，纵向交给页面本身；
-     表头通过 position: sticky; top: 顶部高度 相对 viewport
-     冻结在页面顶部，用户下拉页面时表头始终可见。
+     手机端滚动行为：恢复 wrapper 自身的纵向滚动容器。
+     用户反馈："手机端的成员通讯录，表头不在第一行，第一行似乎变成了
+              当前登录者的信息。"
+     根因：之前为了"让 thead 吸附到 viewport 110px 处"，把 wrapper
+           改成了 overflow-x: auto + overflow-y: visible + max-height: none。
+           但 CSS 规范规定：当一个轴是 auto/scroll、另一个轴是 visible，
+           浏览器会把 visible 那一侧也强制按 auto 处理，wrapper 仍然是
+           "两个方向都能滚"的滚动容器，且因为 max-height: none，纵向
+           高度等于全部表格内容（很高）。于是：
+             1) thead 的 sticky 参照系是这个 wrapper，不是 viewport；
+             2) wrapper 整体会跟页面一起向上滚出 viewport；
+             3) 一旦 wrapper 顶边滚过了 thead，thead 不再可见——
+                此时屏幕上"第一行"就是 tbody 的第一行，
+                而排序是 joined_at ASC，刚好把加入最早的当前登录者
+                顶在了第一位 → 视觉上"第一行变成了我"。
+     修复：放弃跨容器 sticky 的方案，让 wrapper 自己在手机端就是一个
+          有 max-height 的纵向滚动容器（和桌面端思路一致）。这样
+          thead 相对 wrapper sticky 到 top: 0 就稳定可见，不再依赖
+          全局 navbar / 移动 nav 的高度计算。
+          代价：表格区是一个独立滚动区，需要在表格内上下滑才能翻行。
+                考虑到本表本来就需要左右滑（min-width 1400px），
+                双轴滚动容器对用户已是常态，反而比"刷新就看不到表头"
+                的体感问题轻得多。
      ----------------------------------------------------------- */
   .member-profiles-table-wrapper {
-    overflow-x: auto;
-    overflow-y: visible;
-    /* 桌面端的 max-height 在移动端需要彻底移除，否则会继续把 wrapper
-       限制成纵向滚动容器，导致 thead 的 sticky 参照是这个容器，
-       而不是 viewport，于是"下拉页面看后续行"时表头不再冻结。 */
-    max-height: none;
+    overflow: auto;
+    /* 视口高度减去：全局 Navbar(64px) + 内部 mobile-nav(46px) +
+       页面 header / hint / 控件按钮 ≈ 200px 余量，
+       让表格在屏幕上至少占据约 60% 高度。 */
+    max-height: calc(100vh - 220px);
   }
 
-  /* 表头相对于 viewport 冻结。手机端页面顶部有两层固定元素：
-       1) 全局 Navbar（position: fixed; top: 0）≈ 64px；
-       2) 内部空间 .internal-mobile-nav（sticky; top: 64px）自身 ≈ 46px。
-     合起来约 110px 会遮住 thead 的 top: 0。这里把 top 显式设成
-     110px，让表头吸附在移动导航条正下方，下拉页面时始终可见。 */
+  /* 表头相对 wrapper sticky（参照系明确，不会被外层滚动推走） */
   .member-profiles-table thead th {
-    top: 110px;
+    top: 0;
   }
 
   .member-profiles-table {
@@ -635,9 +643,12 @@
     padding: 0.4rem 0.55rem;
   }
 
-  /* 窄屏 Navbar 与移动导航条合计约 100px，表头 sticky top 同步下调 */
+  /* 窄屏 wrapper 高度再压一点（顶部 hint 在窄屏更紧凑，
+     但 mobile-nav top 从 64 → 56，整体节省不多，
+     与 768px 断点保持一致即可，无需再覆盖 max-height）。
+     thead 仍相对 wrapper sticky，top: 0 已由上方规则继承。 */
   .member-profiles-table thead th {
-    top: 100px;
+    top: 0;
   }
 }
 
