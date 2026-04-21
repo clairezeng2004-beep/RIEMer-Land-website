@@ -23,18 +23,19 @@
       在层叠上下文中创建出局部 z-index，滚动时容易透出。现提到 95，
       仍低于全站 Navbar(1000)，高于页内常见层（Select dropdown 200
       属于 topbar 下方兄弟，不会被遮）。
-   4. v4：用户反馈"下滑时'返回列表'按钮固定遮挡内容"——把整条 topbar
-      从 position: fixed 改回普通流。这样：
-        - 左上角"返回列表"仍在页面最左上（不动位置）；
-        - 下滑时 topbar（含返回 + 右侧发布按钮）一起随页面滚走，
-          不再悬浮遮挡表单内容；
-        - 右侧"发布/取消"按钮不再 sticky，需要时用户滚回顶部即可，
-          跟绝大多数"长表单 + 顶部操作"的惯例一致。
-      因为 fixed 取消，.msc-content 原本为 fixed topbar 让出的
-      padding-top 补偿同步移除（见下方 .msc-content 注释）。*/
+   4. v4：曾把 topbar 从 fixed 改回普通流（随页面滚走），避免"悬浮遮挡内容"。
+   5. v5（当前）：用户反馈"编辑长文档时，顶部这一行要一直固定在页面最上方，
+      不要随下滑消失"。改用 position: sticky + top: 72px（全站 Navbar 高度）。
+      sticky 相比 fixed 的好处：
+        - 初始仍在文档流中占位，不需要给 .msc-content 额外补 padding-top；
+        - 滚到阈值后才吸附到视口顶端，不会在首屏"腾空"遮挡任何东西；
+        - 停留位置就在全站 Navbar 下方，和 ProcessTemplateDetail 的 .ptd-topbar 视觉统一。
+      生效前提：祖先 .internal-layout__content 用 overflow-x: clip（非 hidden），
+      不会成为滚动容器；真正的滚动容器是 window，sticky 以 viewport 为参照。*/
 .msc-topbar {
-  position: relative;
-  z-index: 1;
+  position: sticky;
+  top: 72px; /* 紧贴全站 Navbar 下沿 */
+  z-index: 95; /* 低于全站 Navbar(1000)，高于页内 Select dropdown(~200) 等 */
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1092,9 +1093,9 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .msc-topbar {
-    /* 手机端 topbar 跟桌面端一样普通流。原来为 fixed 设的 top/left
-       在 static 下无意义，留着也不生效，这里索性显式清零让样式更干净。
-       左右 padding 统一 1rem，贴合手机屏窄空间；返回按钮自然贴近屏幕左缘。*/
+    /* 手机端 sticky 吸附位置要避开全站 Navbar(64) + 内部空间手机端导航条(~44)，
+       取 108px，与 .ptd-topbar 的 mobile 偏移保持一致。 */
+    top: 108px;
     padding: 0.75rem 1rem;
   }
 
