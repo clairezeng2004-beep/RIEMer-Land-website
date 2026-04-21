@@ -14,23 +14,25 @@ const SUGGESTIONS_KEY = 'riemer_site_suggestions';
 const EVENTS_KEY = 'riemer_site_events';
 const TIMELINE_KEY = 'riemer_site_timeline';
 
-// site_settings 每个 key 最近一次成功写云的 updated_at 兜底存 localStorage。
-// 用途：页面卸载后再打开时，内存里的 lastPushedUpdatedAtRef 归零，若云端 fetch
-// 回来一条比本地最新编辑还旧的值（例如本地 push 因卸载没来得及写，或云端延迟），
-// 仍然可以据此判定"这条是旧版本，别覆盖本地 state"，避免刷新即丢新值。
+// 历史上为了防止"旧 fetch 回包覆盖刚 flush 的新值"，曾经把每个 key 本地最近一次
+// 成功推云的 updated_at 写进 localStorage，挂载时读出填进 lastPushedUpdatedAtRef。
+// 问题：这份持久化是"本设备的墓碑"，并不代表云端当前权威版本。B 设备之前某次
+// 自己推过云（留下 lastPushed=Tb），之后云端被 A 继续编辑、B 本地再也没推过，
+// 下次 B 挂载时 fetchSetting 拿回的 updated_at 只要满足 "Tb 在 A 所有推送的最晚
+// 时间之后"，B 就会把云端真实最新的 A 版本判定为"比我旧的事件，丢弃"，结果
+// 本地 state 继续用 localStorage 里的老 filterOptions，整设备再也拿不到 A 的
+// 更新 —— 用户视角就是"跨设备不同步"。
+//
+// 修复策略：lastPushedUpdatedAtRef 改为纯内存、纯会话级。挂载时清零 → 本设备
+// 还没推过任何东西之前，任何 fetch/订阅回包都应当如实覆盖本地，这才是正确的
+// "跨设备可见"语义。只有当 **当前会话内** 本设备已经推过云，才需要防御"旧事件
+// 晚到冲掉刚保存的新值"这种窄竞态。跨会话的持久化因此不再需要。
+//
+// LAST_PUSHED_AT_KEY 的历史值需要清理，否则老设备上残留的那份 localStorage 会
+// 继续污染本次挂载（如果后续代码又读回来）。这里保留 key 常量仅供一次性清理。
 const LAST_PUSHED_AT_KEY = 'riemer_site_settings_last_pushed_at';
-const readLastPushedAtMap = () => {
-  try {
-    const raw = localStorage.getItem(LAST_PUSHED_AT_KEY);
-    return raw ? JSON.parse(raw) : {};
-  } catch { return {}; }
-};
-const writeLastPushedAt = (key, updatedAt) => {
-  try {
-    const map = readLastPushedAtMap();
-    map[key] = updatedAt;
-    localStorage.setItem(LAST_PUSHED_AT_KEY, JSON.stringify(map));
-  } catch { /* 存储失败不是致命错误 */ }
+const purgeLegacyLastPushedAt = () => {
+  try { localStorage.removeItem(LAST_PUSHED_AT_KEY); } catch { /* ignore */ }
 };
 
 // 建设建议初始模拟数据（包含网站改进与组织建设两类）
@@ -590,7 +592,15 @@ export function SiteContentProvider({ children }) {
   const localDirtyRef = useRef({});
   // 最近一次我们成功推到云端的 updatedAt（包含去抖 push 和 flush 两种路径）。
   // hydrate 和订阅回来的数据，只有 updatedAt 比这个值新，才允许覆盖本地。
+  // ⚠️ 只保留**本会话**语义，挂载时清零。跨会话持久化会导致另一台设备把云端真实
+  //    最新的值误判为"旧事件"拒绝覆盖，这正是"跨设备不同步"的典型根因。
   const lastPushedUpdatedAtRef = useRef({});
+  // 本设备刚从 hydrate / 订阅回调把云端值 setState 进本地时，紧接着 state 变化
+  // 会触发 useEffect 调 pushToCloud —— 我们刚刚接收的就是云端最新值，不应当再回推。
+  // 否则会产生 A 改 → B 订阅收到 → B 回推 → A 订阅收到 → A 回推 的乒乓循环，
+  // 把 updated_at 不断推晚，拉爆频次并且可能让双方都判定"别人的修改比我旧"。
+  // 这里用一次性抑制标志：hydrate/subscribe 覆盖前置位，紧随其后的 push 消费它并跳过。
+  const suppressNextPushRef = useRef({});
   // 每条 state 的 setter + 默认值生成器 + 是否为合并型（对象）或替换型（数组）
   const syncDefs = [
     { key: SITE_KEYS.PUBLIC_CONTENT, setter: setContent,        fallback: getDefaultContent,  kind: 'object' },
@@ -607,15 +617,11 @@ export function SiteContentProvider({ children }) {
       syncDefs.forEach(({ key }) => { hydratedKeysRef.current[key] = true; });
       return;
     }
-    // 从 localStorage 恢复"本会话之前最后一次成功推云"的 updatedAt，
-    // 作为本次挂载的 lastPushedUpdatedAtRef 起点。配合下面 hydrate 的
-    // 迟到过滤，可以避免"刚在上一会话 push 成功 → 立刻刷新 → 云端 replica
-    // 延迟一点点 → 新挂载 fetch 到的是 push 前的旧 updated_at → 覆盖本地
-    // 新值"这种极端时序。
-    const persistedLastPushed = readLastPushedAtMap();
-    Object.entries(persistedLastPushed).forEach(([k, v]) => {
-      if (v) lastPushedUpdatedAtRef.current[k] = v;
-    });
+    // 注意：lastPushedUpdatedAtRef 只保留会话内语义，挂载时一定是空的。
+    // 这里顺手把历史版本遗留在 localStorage 的 LAST_PUSHED_AT_KEY 清掉，
+    // 防止"老设备残留的本地时间戳 ≥ 云端当前 updated_at → hydrate 拒绝覆盖"
+    // 这类陈旧墓碑把真实新值挡在外面（即用户报的"跨设备不同步"根因）。
+    purgeLegacyLastPushedAt();
     let cancelled = false;
     const unsubs = [];
 
@@ -657,6 +663,9 @@ export function SiteContentProvider({ children }) {
           return;
         }
         siteSyncRefs.current[key] = updatedAt;
+        // 一次性抑制：紧随其后的 filterOptions useEffect → pushToCloud 将消费并跳过，
+        // 避免本机"收到云端值 → 回推云端 → 对方再收到 → 再回推"的乒乓循环。
+        suppressNextPushRef.current[key] = true;
         setter((prev) => {
           if (kind === 'object') {
             // 对象合并默认值，保证新增字段存在默认
@@ -680,6 +689,8 @@ export function SiteContentProvider({ children }) {
         const lastPushed = lastPushedUpdatedAtRef.current[key];
         if (lastPushed && updatedAt && lastPushed >= updatedAt) return;
         siteSyncRefs.current[key] = updatedAt;
+        // 同 hydrate：抑制紧随其后的 useEffect 回推
+        suppressNextPushRef.current[key] = true;
         setter((prev) => {
           if (kind === 'object') {
             return { ...fallback(), ...value };
@@ -724,6 +735,12 @@ export function SiteContentProvider({ children }) {
     }
     // 必须等该 key 从云端 hydrate 完成后才允许回写，否则初始化阶段的本地 mock 会覆盖云端真实数据
     if (!hydratedKeysRef.current[key]) return;
+    // 如果本次 state 变化是"hydrate / 订阅 刚把云端值塞进来"触发的，就不要再回推云端。
+    // 消费一次性抑制标志即可继续处理用户后续的真实编辑。
+    if (suppressNextPushRef.current[key]) {
+      suppressNextPushRef.current[key] = false;
+      return;
+    }
     // 只要 push 被真正排队，就把 dirty 标记置为 true，让可能晚到的 fetch 回包不要覆盖本地
     localDirtyRef.current[key] = true;
     // 记录 pending 值，便于 beforeunload/visibilitychange 时同步 flush
@@ -734,11 +751,11 @@ export function SiteContentProvider({ children }) {
       const res = await saveSetting(key, value);
       if (res.success) {
         siteSyncRefs.current[key] = res.updatedAt;
-        // 记录本次推云的 updatedAt，用于防止 hydrate/subscribe 用更旧的值回覆
-        if (res.updatedAt) {
-          lastPushedUpdatedAtRef.current[key] = res.updatedAt;
-          writeLastPushedAt(key, res.updatedAt);
-        }
+        // 记录本次推云的 updatedAt（仅本会话内存语义）：
+        // 用于让"同一条 updatedAt 的 realtime 自回流"被识别后跳过；
+        // 以及让 fetch/订阅晚到的旧版本值被拒绝覆盖。绝不持久化到 localStorage，
+        // 避免成为另一台设备上的"时间戳墓碑"导致跨设备不同步。
+        if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
         // pending 已成功写入，清掉快照
         delete pendingPushValueRef.current[key];
         setCloudSyncStatus((prev) => ({
@@ -783,10 +800,10 @@ export function SiteContentProvider({ children }) {
     const res = await saveSetting(key, value);
     if (res.success) {
       siteSyncRefs.current[key] = res.updatedAt;
-      if (res.updatedAt) {
-        lastPushedUpdatedAtRef.current[key] = res.updatedAt;
-        writeLastPushedAt(key, res.updatedAt);
-      }
+      // 仅更新会话内存，不再写 localStorage —— 跨会话持久化会把
+      // "本设备某次推云时间戳"带给下次挂载，造成另一台设备拿到云端
+      // 最新值反被判定为"旧事件"拒绝覆盖，即跨设备不同步的根因。
+      if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
       setCloudSyncStatus((prev) => ({
         ...prev,
         [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
@@ -816,8 +833,11 @@ export function SiteContentProvider({ children }) {
   //   - beforeunload 覆盖"刷新 / 导航到别的站"。
   //   三个事件在不同浏览器/平台上互有缺失，叠加监听保证至少触发一次。
   // saveSetting 本身是异步的，浏览器在 unload 阶段通常会允许 pending fetch
-  // 跑完（Chrome/Edge 会尝试，Safari 最保守）。即便 flush 真的没跑完，下面还
-  // 有 localStorage updatedAt 兜底，也不会把新值冲掉。
+  // 跑完（Chrome/Edge 会尝试，Safari 最保守）。即便 flush 真的没跑完，下次
+  // 挂载时 fetchSetting 拿回的云端 updated_at 是服务端权威时间，hydrate
+  // 逻辑会如实覆盖本地，不会因为本地"陈旧时间戳兜底"而阻塞新值（此前那个
+  // localStorage updatedAt 兜底已移除，因为它在跨设备场景下反而会把另一台
+  // 设备的真实最新值误判为"旧事件"拒绝覆盖）。
   useEffect(() => {
     if (!isSupabaseConfigured) return;
     const flushAll = () => {
@@ -837,7 +857,10 @@ export function SiteContentProvider({ children }) {
             if (res && res.success && res.updatedAt) {
               lastPushedUpdatedAtRef.current[key] = res.updatedAt;
               siteSyncRefs.current[key] = res.updatedAt;
-              writeLastPushedAt(key, res.updatedAt);
+              // 不再 writeLastPushedAt：下次挂载若从 localStorage 读回旧时间戳，
+              // 会错误拒绝云端真实最新值（跨设备不同步根因）。unload 阶段能跑完
+              // saveSetting 的情况下，云端本身就是权威，下次挂载走 fetchSetting
+              // 拿到的 updated_at 自然是最新的，无需本地兜底时间戳。
             }
           }).catch(() => { /* 卸载阶段错误无意义 */ });
         } catch { /* 同上 */ }
