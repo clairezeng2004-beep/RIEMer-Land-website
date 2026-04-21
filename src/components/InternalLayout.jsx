@@ -53,13 +53,33 @@ function MobileInternalNav() {
     ] : []),
   ];
 
-  // 路由变化时将当前激活项滚动到可见区域
+  // 路由变化时把当前激活项滚到可见区域。
+  // 注意：刷新后第一次进入也会执行这个 effect。
+  // 若直接用 behavior:'smooth'，浏览器会从 scrollLeft=0 平滑滚到目标位置 ——
+  // 用户感知就是"导航栏左右抖一下"。
+  // 同时 sc.labelXxx 来自异步加载的 internalConfig，刷新瞬间 label 可能
+  // 还是空字符串/默认值，等云端拉回来后每个 chip 宽度会跳变，
+  // 此时若已经平滑滚动过一次，会再被推一次 → 二次抖动。
+  // 修复：
+  //   1) 首次挂载（initialPositionDoneRef 还是 false）用 'auto' 瞬时居中，不动画；
+  //   2) 用 requestAnimationFrame 等首次 layout 完成（label 文字已稳定）再定位，
+  //      避免在 label 还在跳变时定位、之后又被异步 label 推一次；
+  //   3) 后续路由切换才允许 smooth。
+  const initialPositionDoneRef = useRef(false);
   useEffect(() => {
     if (!scrollRef.current) return;
-    const active = scrollRef.current.querySelector('.internal-mobile-nav__item--active');
-    if (active) {
-      active.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
-    }
+    const raf = requestAnimationFrame(() => {
+      if (!scrollRef.current) return;
+      const active = scrollRef.current.querySelector('.internal-mobile-nav__item--active');
+      if (!active) return;
+      active.scrollIntoView({
+        behavior: initialPositionDoneRef.current ? 'smooth' : 'auto',
+        inline: 'center',
+        block: 'nearest',
+      });
+      initialPositionDoneRef.current = true;
+    });
+    return () => cancelAnimationFrame(raf);
   }, [location.pathname]);
 
   return (
