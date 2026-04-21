@@ -128,11 +128,13 @@
 
 .footer-guestbook__input {
   width: 100%;
-  padding: 10px 12px 10px 34px;
+  padding: 8px 12px 8px 34px;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg, 12px);
   background: var(--color-bg, #fafafa);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs, 0.8125rem);
+  line-height: 1.4;
+  font-family: inherit;
   color: var(--color-text);
   outline: none;
   transition: border-color var(--transition-fast);
