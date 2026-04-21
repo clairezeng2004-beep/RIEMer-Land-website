@@ -676,6 +676,22 @@
     display: none;
   }
 
+  /* 手机端「添加注释（选填）」输入框：字号与高度向整体 UI 对齐。
+     根因：src/index.css 在 (pointer: coarse) 下把所有 input 强制提到 16px
+           （为防 iOS Safari 输入聚焦自动放大页面），但本组件桌面端
+           显式设的是 --text-xs (12px) + 较小 padding，二者叠加后在手机端
+           表现为「字大但框矮」，与同区其它控件（--text-sm 14px 体系）不一致。
+     方案：在手机端显式覆盖到 --text-sm + 更大 padding，使输入框高度与
+           上方图片缩略图边距、下方按钮节奏匹配；focus 时 iOS 仍可能短暂
+           放大整页，失焦后会复原，可接受。
+     注：登录验证码等特殊场景的 16px 防缩放规则在各自组件内独立维护，
+         本覆盖只作用于 .gallery-upload__caption-input，不影响其它输入框。 */
+  .gallery-upload__caption-input {
+    font-size: var(--text-sm);
+    padding: 0.5rem 0.625rem;
+    line-height: 1.45;
+  }
+
   .gallery-page__header {
     flex-direction: column;
     gap: var(--space-md);
