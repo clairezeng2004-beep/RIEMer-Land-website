@@ -243,7 +243,7 @@ const taskToRow = (t) => ({
 
 export default function Tasks() {
   const { isAuthenticated, user, getAllUsers, supabaseOk } = useAuth();
-  const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig } = useSiteContent();
+  const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig, flushSettingToCloud, SITE_KEYS } = useSiteContent();
   const { editing } = useWysiwyg();
   // useNotifications 保留引用以确保 NotificationProvider 已就绪；
   // 实际通知派发已统一走规则引擎 emitNotificationEvent。
@@ -627,9 +627,20 @@ export default function Tasks() {
       setShowAddCategory(false);
       return;
     }
-    updateFilterOptions({
+    // 构造下一份完整 filterOptions，用它同时 setState + 立即推云
+    // （原实现只调 updateFilterOptions，依赖 400ms 去抖 push；用户点完立刻
+    //   关 tab / 刷新时去抖 setTimeout 被丢弃、beforeunload 阶段的 supabase
+    //   fetch 又常被浏览器 cancel，导致云端从没写入，跨设备看不到新分类。）
+    const nextFilterOptions = {
       ...filterOptions,
       taskCategories: [...taskCategories, trimmed],
+    };
+    updateFilterOptions(nextFilterOptions);
+    // 立即推送到云端并 await；失败时回显给用户
+    flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions).then((res) => {
+      if (!res?.success) {
+        alert(`新分类已保存到本地，但同步到云端失败：${res?.error || '未知错误'}\n其它设备可能暂时看不到该分类。`);
+      }
     });
     setNewCategoryName('');
     setShowAddCategory(false);

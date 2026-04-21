@@ -194,12 +194,16 @@ export default function ContentManagement() {
     setSaved(true);
 
     // 2) 再显式 await 关键 key 的云端写入，这样我们能**真实**知道成没成
-    //    重点是筛选项 / 公开内容 / 建议 / 活动 / 时间轴这类"所有成员都会看到"的配置；
-    //    internalConfig 走的是原本的 flushInternalConfig，在编辑器退出时触发，不在这里管。
+    //    这里包含筛选项 / 公开内容 / 内部空间配置（侧边栏 Tab 名称、流程模板/
+    //    内部文档的 extraTypeKeys/hiddenBuiltinKeys 等）三大类"所有成员都会看到"
+    //    的配置。internalConfig 过去是靠 flushInternalConfig 单独落盘，
+    //    但点击"保存"后没有立即 flush，用户一旦立刻刷新/切 tab，400ms 去抖窗口
+    //    内云端还没写；现在统一走 flushSettingToCloud 立即推送并 await 返回。
     setCloudSaveState({ phase: 'syncing', failures: [] });
     const targets = [
-      { key: SITE_KEYS.PUBLIC_CONTENT, value: form,        label: '首页内容' },
-      { key: SITE_KEYS.FILTER_OPTIONS, value: filtersForm, label: '筛选项' },
+      { key: SITE_KEYS.PUBLIC_CONTENT,   value: form,         label: '首页内容' },
+      { key: SITE_KEYS.FILTER_OPTIONS,   value: filtersForm,  label: '筛选项' },
+      { key: SITE_KEYS.INTERNAL_CONFIG,  value: internalForm, label: '内部空间配置' },
     ];
     const failures = [];
     for (const t of targets) {

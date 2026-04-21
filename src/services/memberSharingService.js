@@ -263,10 +263,12 @@ export async function fetchCategories() {
   }
 }
 
-/** 新增分类 */
+/** 新增分类。返回 { success, error } 方便调用方感知云端失败后回滚。 */
 export async function addCategory(cat) {
   saveLocalCategories([...getLocalCategories(), cat]);
-  if (!isSupabaseConfigured || !supabase) return;
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'supabase-not-configured' };
+  }
   try {
     const { error } = await supabase
       .from('member_sharing_categories')
@@ -276,17 +278,24 @@ export async function addCategory(cat) {
         color: cat.color,
         sort_order: Date.now() % 2147483647, // 简单的递增 sort_order
       });
-    if (error) console.warn('[MemberSharingDB] 新增分类失败:', error.message);
+    if (error) {
+      console.warn('[MemberSharingDB] 新增分类失败:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true, error: null };
   } catch (err) {
     console.warn('[MemberSharingDB] 新增分类异常:', err.message);
+    return { success: false, error: err.message };
   }
 }
 
-/** 更新分类 */
+/** 更新分类。返回 { success, error }。 */
 export async function updateCategory(key, updates) {
   const list = getLocalCategories().map((c) => (c.key === key ? { ...c, ...updates } : c));
   saveLocalCategories(list);
-  if (!isSupabaseConfigured || !supabase) return;
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'supabase-not-configured' };
+  }
   try {
     const u = {};
     if (updates.label !== undefined) u.label = updates.label;
@@ -296,24 +305,36 @@ export async function updateCategory(key, updates) {
       .from('member_sharing_categories')
       .update(u)
       .eq('key', key);
-    if (error) console.warn('[MemberSharingDB] 更新分类失败:', error.message);
+    if (error) {
+      console.warn('[MemberSharingDB] 更新分类失败:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true, error: null };
   } catch (err) {
     console.warn('[MemberSharingDB] 更新分类异常:', err.message);
+    return { success: false, error: err.message };
   }
 }
 
-/** 删除分类 */
+/** 删除分类。返回 { success, error }。 */
 export async function deleteCategory(key) {
   saveLocalCategories(getLocalCategories().filter((c) => c.key !== key));
-  if (!isSupabaseConfigured || !supabase) return;
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'supabase-not-configured' };
+  }
   try {
     const { error } = await supabase
       .from('member_sharing_categories')
       .delete()
       .eq('key', key);
-    if (error) console.warn('[MemberSharingDB] 删除分类失败:', error.message);
+    if (error) {
+      console.warn('[MemberSharingDB] 删除分类失败:', error.message);
+      return { success: false, error: error.message };
+    }
+    return { success: true, error: null };
   } catch (err) {
     console.warn('[MemberSharingDB] 删除分类异常:', err.message);
+    return { success: false, error: err.message };
   }
 }
 

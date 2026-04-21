@@ -504,8 +504,22 @@ export function SiteContentProvider({ children }) {
 
   // ---- 启动时从云端拉取 internalConfig，并订阅实时变更 ----
   // 作用：管理员在 A 设备保存的 Tab 名称等站点配置，其它设备也能看到
+  //
+  // 与下面 pushToCloud 路径的对接（重要）：
+  // internalConfig 的云端读/订阅走本独立 effect，但"写回云端"统一通过
+  // pushToCloud(SITE_KEYS.INTERNAL_CONFIG, internalConfig) 走去抖+pagehide 兜底路径。
+  // 由于 pushToCloud 里有 hydratedKeysRef 守卫（未 hydrate 前禁止写云，防止初始化
+  // 阶段本地 mock 覆盖云端真实数据），我们必须在 hydrate 完成后（无论成功/失败/
+  // 云端暂无数据）都把 INTERNAL_CONFIG 标记为 hydrated，否则后续用户的真实编辑会
+  // 被 pushToCloud 静默丢弃 —— 表现为"流程模板/内部分享就地改分类，本设备刷新
+  // 就消失"的典型症状。
   useEffect(() => {
-    if (!isSupabaseConfigured) return;
+    if (!isSupabaseConfigured) {
+      // 未配置 Supabase：同样要标 hydrated，否则 pushToCloud 永远跳过，
+      // 虽然没有 Supabase 写不进云端，但至少不会把 cloudSyncStatus 卡在 syncing。
+      hydratedKeysRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
+      return;
+    }
     let cancelled = false;
 
     // 1) 初始化拉取云端配置，覆盖本地（编辑模式下不覆盖）
@@ -513,12 +527,31 @@ export function SiteContentProvider({ children }) {
       const { value, updatedAt, error } = await fetchInternalConfig();
       if (cancelled) return;
       if (error) {
-        // 表不存在或权限拒绝：安静降级，只用本地
+        // 表不存在或权限拒绝：安静降级，只用本地；但仍要开闸允许后续 push
         console.warn('[SiteContent] 云端 internalConfig 不可用，使用本地:', error);
+        hydratedKeysRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
         return;
       }
-      if (!value) return; // 云端还没保存过
+      if (!value) {
+        // 云端暂无数据：首次本地变更就要允许推上去
+        hydratedKeysRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
+        return;
+      }
+      // 竞态防御：hydrate 返回前，用户可能已经点过保存 / 就地改过分类
+      // （走 pushToCloud 或 flushSettingToCloud），此时 lastPushedUpdatedAtRef
+      // 可能已经比云端返回的 updatedAt 新，不应被覆盖。
+      const lastPushed = lastPushedUpdatedAtRef.current[SITE_KEYS.INTERNAL_CONFIG];
+      if (lastPushed && updatedAt && lastPushed >= updatedAt) {
+        hydratedKeysRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
+        return;
+      }
+      if (localDirtyRef.current[SITE_KEYS.INTERNAL_CONFIG]) {
+        // 本地已被用户改过但还没推云成功：保留本地值
+        hydratedKeysRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
+        return;
+      }
       lastSyncedAtRef.current = updatedAt;
+      siteSyncRefs.current[SITE_KEYS.INTERNAL_CONFIG] = updatedAt;
       // 深度合并默认值，保证新增字段存在默认
       const defaults = getDefaultInternalConfig();
       const merged = {};
@@ -527,11 +560,15 @@ export function SiteContentProvider({ children }) {
       }
       // 侧边栏旧标签一次性迁移
       merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
+      // 一次性抑制：下面 internalConfig state 的 push-effect 消费后跳过，
+      // 防止"hydrate 回包 setState → effect push → 订阅回流 → 覆盖本地"的乒乓。
+      suppressNextPushRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
       setInternalConfig((prev) => {
         // 编辑模式下不要打断用户的修改
         if (persistPausedRef.current) return prev;
         return merged;
       });
+      hydratedKeysRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
     };
     hydrate();
 
@@ -540,7 +577,11 @@ export function SiteContentProvider({ children }) {
       if (cancelled) return;
       // 若本地刚刚是写入源，则跳过回流，避免闪烁
       if (updatedAt && lastSyncedAtRef.current === updatedAt) return;
+      // 防竞态：只接受比本地最新推云更新的事件；否则可能是之前的旧版本晚到
+      const lastPushed = lastPushedUpdatedAtRef.current[SITE_KEYS.INTERNAL_CONFIG];
+      if (lastPushed && updatedAt && lastPushed >= updatedAt) return;
       lastSyncedAtRef.current = updatedAt;
+      siteSyncRefs.current[SITE_KEYS.INTERNAL_CONFIG] = updatedAt;
       const defaults = getDefaultInternalConfig();
       const merged = {};
       for (const key of Object.keys(defaults)) {
@@ -548,6 +589,8 @@ export function SiteContentProvider({ children }) {
       }
       // 侧边栏旧标签一次性迁移
       merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
+      // 一次性抑制：订阅 setState 后紧跟的 push-effect 跳过回推，避免乒乓
+      suppressNextPushRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
       setInternalConfig((prev) => {
         // 正在编辑时不覆盖，等用户保存/取消后再同步
         if (persistPausedRef.current) return prev;
@@ -886,6 +929,15 @@ export function SiteContentProvider({ children }) {
   useEffect(() => { pushToCloud(SITE_KEYS.SUGGESTIONS, suggestions);      }, [suggestions, pushToCloud]);
   useEffect(() => { pushToCloud(SITE_KEYS.EVENTS, events);                }, [events, pushToCloud]);
   useEffect(() => { pushToCloud(SITE_KEYS.TIMELINE, timeline);            }, [timeline, pushToCloud]);
+  // internalConfig 也自动推云：Documents/ProcessTemplates/Tasks 的就地改分类会
+  // 经由 updateInternalConfig 改 state；没有这个 effect，它们的改动仅停留在内存+
+  // localStorage，被 realtime 回流覆盖后"同设备刷新就消失"。
+  // 编辑模式下（internalConfigPersistPaused）不推云：让 ContentManagement 的
+  // "取消编辑"能回滚，避免中间态被写入云端。
+  useEffect(() => {
+    if (internalConfigPersistPaused) return;
+    pushToCloud(SITE_KEYS.INTERNAL_CONFIG, internalConfig);
+  }, [internalConfig, internalConfigPersistPaused, pushToCloud]);
 
   const updateContent = (updates) => {
     setContent((prev) => ({ ...prev, ...updates }));

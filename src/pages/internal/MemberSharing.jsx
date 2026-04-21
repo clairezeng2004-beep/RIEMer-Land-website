@@ -199,8 +199,18 @@ export default function MemberSharing() {
     }
     const key = 'cat_' + Date.now();
     const cat = { key, label, color: newCatColor };
+    // 乐观更新本地 UI
     setCategoryList((prev) => [...prev, cat]);
-    addCategoryRemote(cat).catch(() => { /* ignore */ });
+    // 立即写云端；失败时回滚本地并弹窗，避免"本地看得见 → 刷新就消失"的假象
+    addCategoryRemote(cat).then((res) => {
+      if (!res?.success) {
+        setCategoryList((prev) => prev.filter((c) => c.key !== cat.key));
+        alert(
+          `新增分类失败，已回滚。原因：${res?.error || '未知错误'}\n` +
+          `若提示"relation does not exist"，请在 Supabase 里执行 supabase-member-sharing.sql。`
+        );
+      }
+    });
     setNewCatLabel('');
     setNewCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
   };
@@ -217,10 +227,21 @@ export default function MemberSharing() {
     if (!editCatLabel.trim()) return;
     const label = editCatLabel.trim();
     const color = editCatColor;
+    // 记录旧值用于回滚
+    const prevCat = categoryList.find((c) => c.key === editingCatKey);
     setCategoryList((prev) =>
       prev.map((c) => (c.key === editingCatKey ? { ...c, label, color } : c)),
     );
-    updateCategoryRemote(editingCatKey, { label, color }).catch(() => { /* ignore */ });
+    updateCategoryRemote(editingCatKey, { label, color }).then((res) => {
+      if (!res?.success) {
+        if (prevCat) {
+          setCategoryList((prev) =>
+            prev.map((c) => (c.key === editingCatKey ? { ...c, label: prevCat.label, color: prevCat.color } : c)),
+          );
+        }
+        alert(`更新分类失败，已回滚。原因：${res?.error || '未知错误'}`);
+      }
+    });
     setEditingCatKey(null);
   };
 
@@ -229,8 +250,15 @@ export default function MemberSharing() {
     const cat = categoryList.find((c) => c.key === key);
     if (!cat) return;
     if (!window.confirm(`确定要删除分类「${cat.label}」吗？该分类下的分享不会被删除。`)) return;
+    // 保留快照用于回滚
+    const snapshot = categoryList;
     setCategoryList((prev) => prev.filter((c) => c.key !== key));
-    deleteCategoryRemote(key).catch(() => { /* ignore */ });
+    deleteCategoryRemote(key).then((res) => {
+      if (!res?.success) {
+        setCategoryList(snapshot);
+        alert(`删除分类失败，已回滚。原因：${res?.error || '未知错误'}`);
+      }
+    });
     if (selectedCategory === key) setSelectedCategory('全部');
   };
 

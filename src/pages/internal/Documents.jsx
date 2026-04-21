@@ -153,7 +153,29 @@ function loadDocViews() {
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
   const { addNotification } = useNotifications();
-  const { internalConfig, updateInternalConfig, filterOptions, updateFilterOptions } = useSiteContent();
+  const { internalConfig, updateInternalConfig, filterOptions, updateFilterOptions, flushSettingToCloud, SITE_KEYS } = useSiteContent();
+
+  // 立即把最新的 filterOptions / internalConfig 推云端。
+  // 就地编辑筛选项时必须用它替代 context 自带的 400ms 去抖 push：
+  // 用户常常点完"+ 添加分类"就立即关 tab / 刷新，去抖 setTimeout 被卸载丢弃，
+  // pagehide 的兜底又因浏览器在 unload 阶段 cancel 非 sendBeacon fetch 而不可靠，
+  // 云端从未写入 → 跨设备看不到，本设备刷新还会被 realtime 回流覆盖掉本地 localStorage。
+  // 这里统一立即推送并等待返回，失败时给用户弹窗提示真实原因。
+  const flushFilterOptionsNow = useCallback((nextFilterOptions) => {
+    flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions).then((res) => {
+      if (!res?.success) {
+        alert(`筛选分类已保存到本地，但同步到云端失败：${res?.error || '未知错误'}\n其它设备可能暂时看不到最新分类。`);
+      }
+    });
+  }, [flushSettingToCloud, SITE_KEYS]);
+
+  const flushInternalConfigNow = useCallback((nextInternalConfig) => {
+    flushSettingToCloud(SITE_KEYS.INTERNAL_CONFIG, nextInternalConfig).then((res) => {
+      if (!res?.success) {
+        alert(`页面筛选设置已保存到本地，但同步到云端失败：${res?.error || '未知错误'}\n其它设备可能暂时看不到最新设置。`);
+      }
+    });
+  }, [flushSettingToCloud, SITE_KEYS]);
 
   /* ==========
      贡献者真名映射：通过 uploadedById 动态解析真名，
@@ -260,9 +282,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const palette = ['#5EAD8C', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899', '#F59E0B', '#3B82F6', '#EF4444', '#10B981', '#6366F1'];
     const color = palette[docTypes.length % palette.length];
     // ① 先在全局文档类型池里注册（保证其它通过 filterOptions 读取的地方拿到 label/color）
-    updateFilterOptions({
+    const nextFilterOptions = {
+      ...filterOptions,
       documentTypes: [...docTypes, { key, label: trimmed, color }],
-    });
+    };
+    updateFilterOptions(nextFilterOptions);
+    flushFilterOptionsNow(nextFilterOptions);
     // ② 对 filterTypes 模式（例如"流程模板文件"页）：filterTypes 是写死的白名单
     //   (['process', 'regulation'])，新 key 不在白名单里就不会被 types 数组采纳。
     //   这里用页面级 extraTypeKeys 把新 key 补进来，避免污染其它不受 filterTypes 约束
@@ -270,6 +295,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (filterTypes) {
       const nextExtra = [...extraTypeKeys, key];
       updateDocs('extraTypeKeys', nextExtra);
+      // 立即把整份 internalConfig 推云，和 filterOptions 保持一致的即时性
+      const nextInternalConfig = {
+        ...internalConfig,
+        [sectionKey]: { ...(internalConfig[sectionKey] || {}), extraTypeKeys: nextExtra },
+      };
+      flushInternalConfigNow(nextInternalConfig);
     }
     setNewTypeLabel('');
     setShowAddType(false);
@@ -278,11 +309,14 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleRenameType = (typeKey) => {
     const trimmed = renameValue.trim();
     if (!trimmed) return;
-    updateFilterOptions({
+    const nextFilterOptions = {
+      ...filterOptions,
       documentTypes: docTypes.map((t) =>
         t.key === typeKey ? { ...t, label: trimmed } : t
       ),
-    });
+    };
+    updateFilterOptions(nextFilterOptions);
+    flushFilterOptionsNow(nextFilterOptions);
     setRenamingType(null);
     setRenameValue('');
   };
@@ -300,20 +334,34 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           ? hiddenBuiltinKeys
           : [...hiddenBuiltinKeys, typeKey];
         updateDocs('hiddenBuiltinKeys', nextHidden);
+        const nextInternalConfig = {
+          ...internalConfig,
+          [sectionKey]: { ...(internalConfig[sectionKey] || {}), hiddenBuiltinKeys: nextHidden },
+        };
+        flushInternalConfigNow(nextInternalConfig);
       } else {
-        updateDocs(
-          'extraTypeKeys',
-          extraTypeKeys.filter((k) => k !== typeKey)
-        );
-        updateFilterOptions({
+        const nextExtra = extraTypeKeys.filter((k) => k !== typeKey);
+        updateDocs('extraTypeKeys', nextExtra);
+        const nextInternalConfig = {
+          ...internalConfig,
+          [sectionKey]: { ...(internalConfig[sectionKey] || {}), extraTypeKeys: nextExtra },
+        };
+        flushInternalConfigNow(nextInternalConfig);
+        const nextFilterOptions = {
+          ...filterOptions,
           documentTypes: docTypes.filter((t) => t.key !== typeKey),
-        });
+        };
+        updateFilterOptions(nextFilterOptions);
+        flushFilterOptionsNow(nextFilterOptions);
       }
     } else {
       // 无 filterTypes 约束的总入口：沿用原行为——直接从全局池删除。
-      updateFilterOptions({
+      const nextFilterOptions = {
+        ...filterOptions,
         documentTypes: docTypes.filter((t) => t.key !== typeKey),
-      });
+      };
+      updateFilterOptions(nextFilterOptions);
+      flushFilterOptionsNow(nextFilterOptions);
     }
     if (selectedType === typeKey) setSelectedType('全部');
   };
