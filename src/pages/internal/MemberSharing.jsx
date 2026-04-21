@@ -187,13 +187,25 @@ export default function MemberSharing() {
   const [editCatColor, setEditCatColor] = useState('');
   // 就地新增分类（对齐流程模板文件页，所有成员可用；管理员还可在分类标签上就地编辑/删除）
   const [showInlineAddCat, setShowInlineAddCat] = useState(false);
+  // 分类操作提交中：防止用户在 await 期间重复点击（双推、双删、双改）
+  const [catOpBusy, setCatOpBusy] = useState(false);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const categories = ['全部', ...categoryList.map((c) => c.key)];
 
   // 新建分类（所有成员可用）
-  const handleAddCategory = () => {
+  //
+  // 跨设备同步关键点（与 EventPublish / Tasks 同款对齐修复）：
+  //   ① 提交中禁用：await 返回前再次点击会发起重复 insert，第二次还会用
+  //      同一毫秒生成的 key → 主键冲突失败。用 catOpBusy 守住这个窗口。
+  //   ② key 加随机后缀：两个设备（或同一设备快速连点）在同一毫秒新增时，
+  //      单靠 Date.now() 会撞 key，其中一边 INSERT 因 PK 冲突失败，用户
+  //      看到的现象就是"新增了但另一台没同步过来"。加 6 位随机后缀即可。
+  //   ③ await 后再清空输入框：失败时保留用户刚输入的 label 和颜色，方便
+  //      他直接改名重试，不用再输一遍。
+  const handleAddCategory = async () => {
+    if (catOpBusy) return;
     const label = newCatLabel.trim();
     if (!label) return;
     // 检查重名
@@ -201,22 +213,31 @@ export default function MemberSharing() {
       alert('该分类名称已存在');
       return;
     }
-    const key = 'cat_' + Date.now();
+    // key 必须全局唯一：毫秒时间戳 + 随机后缀，防止并发碰撞
+    const key = 'cat_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     const cat = { key, label, color: newCatColor };
+
+    setCatOpBusy(true);
     // 乐观更新本地 UI
     setCategoryList((prev) => [...prev, cat]);
-    // 立即写云端；失败时回滚本地并弹窗，避免"本地看得见 → 刷新就消失"的假象
-    addCategoryRemote(cat).then((res) => {
+
+    try {
+      const res = await addCategoryRemote(cat);
       if (!res?.success) {
+        // 回滚：只移除刚插入的这条，不整体覆盖，避免冲掉 realtime 中到的并发变更
         setCategoryList((prev) => prev.filter((c) => c.key !== cat.key));
         alert(
           `新增分类失败，已回滚。原因：${res?.error || '未知错误'}\n` +
-          `若提示"relation does not exist"，请在 Supabase 里执行 supabase-member-sharing.sql。`
+          `若提示"relation does not exist"，请在 Supabase 里执行 supabase-member-sharing.sql。`,
         );
+        return;
       }
-    });
-    setNewCatLabel('');
-    setNewCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
+      // 成功后再清空输入，失败时保留给用户重试
+      setNewCatLabel('');
+      setNewCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
+    } finally {
+      setCatOpBusy(false);
+    }
   };
 
   // 开始编辑分类（仅管理员）
@@ -227,43 +248,61 @@ export default function MemberSharing() {
   };
 
   // 保存编辑（仅管理员）
-  const saveEditCategory = () => {
+  const saveEditCategory = async () => {
+    if (catOpBusy) return;
     if (!editCatLabel.trim()) return;
     const label = editCatLabel.trim();
     const color = editCatColor;
+    const targetKey = editingCatKey;
     // 记录旧值用于回滚
-    const prevCat = categoryList.find((c) => c.key === editingCatKey);
+    const prevCat = categoryList.find((c) => c.key === targetKey);
+    if (!prevCat) return;
+
+    setCatOpBusy(true);
+    // 乐观更新
     setCategoryList((prev) =>
-      prev.map((c) => (c.key === editingCatKey ? { ...c, label, color } : c)),
+      prev.map((c) => (c.key === targetKey ? { ...c, label, color } : c)),
     );
-    updateCategoryRemote(editingCatKey, { label, color }).then((res) => {
+    // 立即退出编辑态，UI 流畅；失败时再次打开不现实，只做 alert + 回滚
+    setEditingCatKey(null);
+
+    try {
+      const res = await updateCategoryRemote(targetKey, { label, color });
       if (!res?.success) {
-        if (prevCat) {
-          setCategoryList((prev) =>
-            prev.map((c) => (c.key === editingCatKey ? { ...c, label: prevCat.label, color: prevCat.color } : c)),
-          );
-        }
+        setCategoryList((prev) =>
+          prev.map((c) =>
+            c.key === targetKey ? { ...c, label: prevCat.label, color: prevCat.color } : c,
+          ),
+        );
         alert(`更新分类失败，已回滚。原因：${res?.error || '未知错误'}`);
       }
-    });
-    setEditingCatKey(null);
+    } finally {
+      setCatOpBusy(false);
+    }
   };
 
   // 删除分类（仅管理员）
-  const handleDeleteCategory = (key) => {
+  const handleDeleteCategory = async (key) => {
+    if (catOpBusy) return;
     const cat = categoryList.find((c) => c.key === key);
     if (!cat) return;
     if (!window.confirm(`确定要删除分类「${cat.label}」吗？该分类下的分享不会被删除。`)) return;
     // 保留快照用于回滚
     const snapshot = categoryList;
+
+    setCatOpBusy(true);
     setCategoryList((prev) => prev.filter((c) => c.key !== key));
-    deleteCategoryRemote(key).then((res) => {
+    if (selectedCategory === key) setSelectedCategory('全部');
+
+    try {
+      const res = await deleteCategoryRemote(key);
       if (!res?.success) {
         setCategoryList(snapshot);
         alert(`删除分类失败，已回滚。原因：${res?.error || '未知错误'}`);
       }
-    });
-    if (selectedCategory === key) setSelectedCategory('全部');
+    } finally {
+      setCatOpBusy(false);
+    }
   };
 
   const filtered = sharings.filter((s) => {
@@ -427,8 +466,8 @@ export default function MemberSharing() {
                       <button
                         className="ms-filters__cat-rename-confirm"
                         onClick={saveEditCategory}
-                        disabled={!editCatLabel.trim()}
-                        title="确认"
+                        disabled={!editCatLabel.trim() || catOpBusy}
+                        title={catOpBusy ? '正在同步…' : '确认'}
                       >
                         <Check size={14} />
                       </button>
@@ -510,8 +549,8 @@ export default function MemberSharing() {
                       handleAddCategory();
                       setShowInlineAddCat(false);
                     }}
-                    disabled={!newCatLabel.trim()}
-                    title="确认添加"
+                    disabled={!newCatLabel.trim() || catOpBusy}
+                    title={catOpBusy ? '正在同步…' : '确认添加'}
                   >
                     <Check size={14} />
                   </button>
@@ -635,7 +674,7 @@ export default function MemberSharing() {
                   <button
                     className="ms-cat-manager__add-btn"
                     onClick={handleAddCategory}
-                    disabled={!newCatLabel.trim()}
+                    disabled={!newCatLabel.trim() || catOpBusy}
                   >
                     <Plus size={14} /> 添加
                   </button>

@@ -618,8 +618,23 @@ export default function Tasks() {
     }
   };
 
+  // 提交中标记：防止用户在 await 期间重复点"确认"按钮触发双推
+  const [addingCategory, setAddingCategory] = useState(false);
+
   // 添加新分类标签
-  const handleAddCategory = () => {
+  //
+  // 关键设计（与 EventPublish 同款三连坑的对齐修复）：
+  //   ① 乐观更新在前：立即 updateFilterOptions，让用户看到新分类马上出现，
+  //      体验流畅；失败时再回滚并提示，用户可以决定重试还是放弃。
+  //   ② 立即推云 + await：用 flushSettingToCloud 绕开 400ms 去抖，关 tab / 刷新
+  //      的场景下也能保证写入云端。await 返回后再根据结果决定回滚/成功。
+  //   ③ 提交中禁用按钮：await 返回前再次点击会产生重复 insert，且第二次调用
+  //      flushSettingToCloud 传的 value 是"已包含自己的本地乐观态"，会把第一次
+  //      还没确认的值重复推一遍。用 addingCategory 守住这个窗口。
+  //   ④ 失败时精确回滚该条分类：不能直接 setFilterOptions(prev)，因为用户可能
+  //      在 await 期间编辑了 filterOptions 的其它字段，整体覆盖会丢掉这些修改。
+  const handleAddCategory = async () => {
+    if (addingCategory) return;
     const trimmed = newCategoryName.trim();
     if (!trimmed) return;
     // 重名检测：忽略大小写与前后空白，命中则弹窗提示并保留输入框内容，
@@ -629,23 +644,35 @@ export default function Tasks() {
       alert(`分类「${trimmed}」已存在，请换一个名字。`);
       return;
     }
-    // 构造下一份完整 filterOptions，用它同时 setState + 立即推云
-    // （原实现只调 updateFilterOptions，依赖 400ms 去抖 push；用户点完立刻
-    //   关 tab / 刷新时去抖 setTimeout 被丢弃、beforeunload 阶段的 supabase
-    //   fetch 又常被浏览器 cancel，导致云端从没写入，跨设备看不到新分类。）
+
+    setAddingCategory(true);
+    // 先乐观更新本地 UI（用户立即看到新分类）
     const nextFilterOptions = {
       ...filterOptions,
       taskCategories: [...taskCategories, trimmed],
     };
     updateFilterOptions(nextFilterOptions);
-    // 立即推送到云端并 await；失败时回显给用户
-    flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions).then((res) => {
-      if (!res?.success) {
-        alert(`新分类已保存到本地，但同步到云端失败：${res?.error || '未知错误'}\n其它设备可能暂时看不到该分类。`);
-      }
-    });
+    // 清空输入框、关闭弹层，避免用户反复点确认按钮
     setNewCategoryName('');
     setShowAddCategory(false);
+
+    // 立即推送到云端并 await；失败时精确回滚这条新分类并提示
+    try {
+      const res = await flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions);
+      if (!res?.success) {
+        // 精确回滚：只移除本次新增的 trimmed，不整体覆盖，避免丢掉用户在 await
+        // 期间对 filterOptions 其它字段（teamMembers / taskStatuses）的并发编辑
+        updateFilterOptions({
+          taskCategories: taskCategories.filter((c) => c !== trimmed),
+        });
+        alert(
+          `新增分类「${trimmed}」失败，已回滚。原因：${res?.error || '未知错误'}\n` +
+          `请检查网络后重试；如问题持续，请联系管理员。`,
+        );
+      }
+    } finally {
+      setAddingCategory(false);
+    }
   };
 
   // Stats
@@ -826,8 +853,8 @@ export default function Tasks() {
                 <button
                   className="tasks-filters__add-confirm"
                   onClick={handleAddCategory}
-                  disabled={!newCategoryName.trim()}
-                  title="确认添加"
+                  disabled={!newCategoryName.trim() || addingCategory}
+                  title={addingCategory ? '正在同步到云端…' : '确认添加'}
                 >
                   <CheckCircle2 size={14} />
                 </button>
