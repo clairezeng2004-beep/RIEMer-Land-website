@@ -67,15 +67,29 @@ function saveEventCategoriesLocal(data) {
 }
 
 // 双写：本地 + 云端（site_settings.event_categories），便于跨设备同步
+//
+// ⚠️ 失败必须显式提示（而非只打 console）：
+//   历史版本是 fire-and-forget 且仅 console.warn，用户在管理面板删 / 改 / 加分类
+//   后 saveSetting 失败（网络抖动、RLS 拒绝、表不存在…）时，本机 UI 已经按"操作
+//   成功"的样子把 UI 刷新了，其它设备却从未收到任何变更 → 报过来的"活动发布筛选
+//   项无法跨设备同步"通常就是这里静默失败。改为 alert 让用户第一时间知道需要重试。
+//
+// 函数本身仍是 async，但上层调用处大多未 await —— 只要失败分支弹了 alert，用户就
+// 能知情；改全链路串 await 会传染大量 handler 签名，性价比不高，故保留此形态。
 async function persistEventCategories(data, lastSyncRef) {
   saveEventCategoriesLocal(data);
-  if (!isSupabaseConfigured) return;
+  if (!isSupabaseConfigured) return { success: true, offline: true };
   const res = await saveSetting(SITE_KEYS.EVENT_CATEGORIES, data);
   if (res.success && lastSyncRef) {
     lastSyncRef.current = res.updatedAt;
   } else if (!res.success) {
     console.warn('[EventPublish] 分类云端同步失败:', res.error);
+    // 用户可见提示：避免本机假装成功、其它设备看不到改动
+    try {
+      alert(`活动分类保存到云端失败：${res.error || '未知错误'}\n改动已保存到本设备本地，但其它设备暂时看不到，请检查网络后重试。`);
+    } catch { /* SSR 或无 window 环境下忽略 */ }
   }
+  return res;
 }
 
 // 计算倒计时天数（活动日期晚于今天则返回天数，否则 null）
@@ -102,7 +116,17 @@ const EMPTY_EVENT = {
 
 export default function EventPublish() {
   const { isAuthenticated, isAdmin } = useAuth();
-  const { events, addEvent, updateEvent, internalConfig, updateInternalConfig } = useSiteContent();
+  // flushSettingToCloud / SITE_KEYS：当我们做"分类改名 / 删除分类"这种需要级联
+  // 修改 events[].category 的操作时，events 默认走 context 的 400ms 去抖写云。
+  // 如果用户删完立即关 tab，events 的去抖尚未触发就被取消 → B 设备看到分类列表
+  // 已同步更新，但某些老活动的 category 字段仍指向旧名 → categories useMemo 又
+  // 把它补回成派生分类 → "筛选项删了又冒出来"。所以需要在级联完立即 await
+  // flushSettingToCloud(EVENTS) 把 events 强制推上云端。
+  const {
+    events, addEvent, updateEvent, internalConfig, updateInternalConfig,
+    flushSettingToCloud,
+    SITE_KEYS: CTX_SITE_KEYS,
+  } = useSiteContent();
   const { editing } = useWysiwyg();
   const ep = internalConfig.eventPublish || {};
   const updateEP = useCallback(
@@ -125,7 +149,11 @@ export default function EventPublish() {
 
     fetchSetting(SITE_KEYS.EVENT_CATEGORIES).then(({ value, updatedAt, error }) => {
       if (cancelled || error) return;
-      if (Array.isArray(value) && value.length > 0 && value.every((x) => typeof x === 'string')) {
+      // ⚠️ 允许空数组（[]）原样覆盖本地：表示用户在其它设备已把分类清空，
+      // 如果这里加 `value.length > 0` 守卫，B 设备永远看不到 A 设备的"清空"动作，
+      // 本地默认三类会一直保留 —— 这就是"跨设备删除不生效"的根因之一。
+      // 只要云端返回的是数组（非 null 的合法结构），就以云端为准。
+      if (Array.isArray(value) && value.every((x) => typeof x === 'string')) {
         lastCatSyncRef.current = updatedAt;
         setCategoryList(value);
         saveEventCategoriesLocal(value);
@@ -134,7 +162,8 @@ export default function EventPublish() {
 
     const unsub = subscribeSetting(SITE_KEYS.EVENT_CATEGORIES, (value, updatedAt) => {
       if (updatedAt && lastCatSyncRef.current === updatedAt) return; // 自己的回流
-      if (!Array.isArray(value)) return;
+      // 同上：realtime 推来的空数组也要原样应用，不能被丢弃。
+      if (!Array.isArray(value) || !value.every((x) => typeof x === 'string')) return;
       lastCatSyncRef.current = updatedAt;
       setCategoryList(value);
       saveEventCategoriesLocal(value);
@@ -254,7 +283,7 @@ export default function EventPublish() {
     setEditingCatLabel(label);
     setEditCatDraft(label);
   };
-  const saveEditCategory = () => {
+  const saveEditCategory = async () => {
     const next = editCatDraft.trim();
     if (!next) return;
     const prev = editingCatLabel;
@@ -282,17 +311,30 @@ export default function EventPublish() {
     persistEventCategories(updated, lastCatSyncRef);
 
     // 2) 同步把所有引用旧 label 的活动 category 改成新 label
-    //    （托管/派生都要做；跨设备持久化由 SiteContentContext 的 pushToCloud(events) 自动完成）
-    events
-      .filter((e) => e.category === prev)
-      .forEach((e) => updateEvent(e.id, { category: next }));
+    //    （托管/派生都要做）
+    const affected = events.filter((e) => e.category === prev);
+    affected.forEach((e) => updateEvent(e.id, { category: next }));
+
+    // 3) 立即把 events 推上云端 —— 不能依赖 context 的 400ms 去抖：
+    //    用户改完名立刻关 tab，去抖 setTimeout 会被 cancel，云端 events 里的
+    //    category 字段还停留在旧名，B 设备的 categories useMemo 会把旧名作为
+    //    "历史派生分类"自动补回筛选项，造成改名看起来没生效。
+    if (affected.length > 0 && flushSettingToCloud && CTX_SITE_KEYS?.EVENTS) {
+      // 用最新的 events 计算 nextEvents（此刻 setEvents 还未提交到 state，
+      // 这里直接根据快照构造同样的结果）
+      const nextEvents = events.map((e) => (e.category === prev ? { ...e, category: next } : e));
+      const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+      if (!res?.success) {
+        alert(`分类改名已在本设备生效，但活动列表同步失败：${res?.error || '未知错误'}\n其它设备可能仍显示旧分类名，请检查网络后重试。`);
+      }
+    }
 
     // 如果当前选中的正是被改名的分类，同步选中到新名
     if (selectedCategory === prev) setSelectedCategory(next);
     setEditingCatLabel(null);
     setEditCatDraft('');
   };
-  const handleDeleteCategory = (label) => {
+  const handleDeleteCategory = async (label) => {
     const affected = events.filter((e) => e.category === label);
     const msg = affected.length > 0
       ? `确定要删除分类「${label}」吗？\n该分类下有 ${affected.length} 个活动，删除后这些活动的分类会被清空（活动本身保留）。`
@@ -307,6 +349,15 @@ export default function EventPublish() {
     }
     // 2) 级联清空受影响活动的 category → 派生分类随之消失
     affected.forEach((e) => updateEvent(e.id, { category: '' }));
+
+    // 3) 立即把 events 推上云端（同 saveEditCategory 的理由，避免派生分类"复活"）
+    if (affected.length > 0 && flushSettingToCloud && CTX_SITE_KEYS?.EVENTS) {
+      const nextEvents = events.map((e) => (e.category === label ? { ...e, category: '' } : e));
+      const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+      if (!res?.success) {
+        alert(`分类已在本设备删除，但活动列表同步失败：${res?.error || '未知错误'}\n其它设备可能仍把该分类显示在筛选中，请检查网络后重试。`);
+      }
+    }
 
     if (selectedCategory === label) setSelectedCategory('全部');
   };
