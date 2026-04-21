@@ -49,8 +49,12 @@
   bottom: 0;
   left: 50%;
   transform: translateX(-50%);
-  width: 100%;
-  max-width: 560px;
+  /* 宽度不再受父列约束：
+     - 最小 360px：保证窄父列下也不会被挤成小窗
+     - 首选 min(92vw, 640px)：桌面宽屏下按视口拉开
+     - 最大 720px：避免在超宽屏上显得过于空旷 */
+  width: max(360px, min(92vw, 640px));
+  max-width: 720px;
   background: var(--color-bg-card, #fff);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-xl, 16px);
@@ -128,11 +132,11 @@
 
 .footer-guestbook__input {
   width: 100%;
-  padding: 8px 12px 8px 34px;
+  padding: 10px 12px 10px 34px;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg, 12px);
   background: var(--color-bg, #fafafa);
-  font-size: var(--text-xs, 0.8125rem);
+  font-size: var(--text-sm);
   line-height: 1.4;
   font-family: inherit;
   color: var(--color-text);
@@ -151,10 +155,11 @@
   border-radius: var(--radius-lg, 12px);
   background: var(--color-bg, #fafafa);
   font-size: var(--text-sm);
+  line-height: 1.6;
   color: var(--color-text);
   outline: none;
   resize: vertical;
-  min-height: 72px;
+  min-height: 96px;
   font-family: inherit;
   transition: border-color var(--transition-fast);
 }
