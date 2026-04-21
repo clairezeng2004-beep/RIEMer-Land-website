@@ -188,6 +188,13 @@
   border-collapse: separate;
   border-spacing: 0;
   min-width: 1600px;
+  /* 防止某些手机浏览器（国内套壳 WebView、部分 Android Chrome 版本）
+     忽略 html 上的 text-size-adjust: 100%，对某些"看起来像正文"的较宽
+     td（例如"我愿意分享什么""爱好""其他"等列）做 text inflation，
+     把字号抬高一档。这里在表格级别再显式关一次，双重保险。
+     CSS 规范允许在任意元素上声明 text-size-adjust，并会沿继承链生效。 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 .member-profiles-table thead th {

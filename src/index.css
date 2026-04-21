@@ -108,6 +108,19 @@
 html {
   scroll-behavior: smooth;
   font-size: 16px;
+  /* 关闭移动端浏览器对"长段落文字"的自动放大（Text Autosizing / text inflation）。
+     背景：Android Chrome 与 iOS Safari 都内置一套启发式算法，会主动把
+     它认为"像正文段落"的文字放大字号——判定条件大致是"列宽较宽 + 字符较多
+     + 多行"。结果就是在手机端成员通讯录里，同一张 .member-profiles-table
+     的所有 td 明明都是 var(--text-sm)，但"一句话概括自己""我愿意分享什么"
+     "我想和大家请教什么""爱好""喜欢的…""其他"等较宽的长文本列会被浏览器
+     自动顶大一档，而"姓名""入学年份""加入时间""家乡"这些短列保持原样 ——
+     于是用户看到"有几列字体特别大"。
+     两个前缀各浏览器都需要（-webkit 覆盖 Safari/老 Chromium，text-size-adjust
+     是标准名）。100% 表示"按作者指定字号渲染，不要自动放大"，不会影响用户
+     的浏览器缩放（pinch zoom），只关掉浏览器的自动启发式。 */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
   /* 关键：只锁横向溢出，纵向完全交给 window 默认滚动。
      必须使用 overflow-x: clip 而不是 hidden —— hidden 会把 html 变成"滚动容器"
      并把 overflow-y 隐式提升为 auto，从而让文档详情页里 .ptd-toc / .msd-toc
