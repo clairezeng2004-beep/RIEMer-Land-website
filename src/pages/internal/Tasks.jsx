@@ -622,9 +622,11 @@ export default function Tasks() {
   const handleAddCategory = () => {
     const trimmed = newCategoryName.trim();
     if (!trimmed) return;
-    if (taskCategories.includes(trimmed)) {
-      setNewCategoryName('');
-      setShowAddCategory(false);
+    // 重名检测：忽略大小写与前后空白，命中则弹窗提示并保留输入框内容，
+    // 让用户知道原因、可以直接改名（原实现是静默清空关闭，用户会误以为添加成功）
+    const normalized = trimmed.toLowerCase();
+    if (taskCategories.some((c) => String(c).trim().toLowerCase() === normalized)) {
+      alert(`分类「${trimmed}」已存在，请换一个名字。`);
       return;
     }
     // 构造下一份完整 filterOptions，用它同时 setState + 立即推云

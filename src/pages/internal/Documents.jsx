@@ -276,6 +276,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleAddType = () => {
     const trimmed = newTypeLabel.trim();
     if (!trimmed) return;
+    // 重名检测：与本页当前可见的所有文档类型对比（docTypes 已经是 filterTypes
+    // + extraTypeKeys - hiddenBuiltinKeys 过滤后的结果，即用户实际在本页能看到
+    // 的分类池）。忽略大小写与前后空白。命中则弹提示并保留输入，避免用户产生
+    // "点了没反应 / 不知为什么加不进去"的困惑。
+    const normalized = trimmed.toLowerCase();
+    if (docTypes.some((t) => String(t.label).trim().toLowerCase() === normalized)) {
+      alert(`分类「${trimmed}」已存在，请换一个名字。`);
+      return;
+    }
     // 生成唯一 key
     const key = 'custom_' + Date.now();
     // 随机颜色
@@ -309,6 +318,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleRenameType = (typeKey) => {
     const trimmed = renameValue.trim();
     if (!trimmed) return;
+    // 重名检测：改名后不能与本页其它现存分类重名（允许改回自己，或只改大小写/空白）
+    const normalized = trimmed.toLowerCase();
+    if (docTypes.some((t) => t.key !== typeKey && String(t.label).trim().toLowerCase() === normalized)) {
+      alert(`分类「${trimmed}」已存在，请换一个名字。`);
+      return;
+    }
     const nextFilterOptions = {
       ...filterOptions,
       documentTypes: docTypes.map((t) =>

@@ -312,8 +312,15 @@ export default function EventPublish() {
   };
   const handleAddCategoryInManager = () => {
     const label = newCatLabel.trim();
-    if (!label || categoryList.includes(label)) {
+    if (!label) {
       setNewCatLabel('');
+      return;
+    }
+    // 重名检测：忽略大小写与前后空白，命中则弹窗提示并保留输入，方便用户改名
+    // （原实现是静默清空，用户会误以为添加成功但下方列表没变化）
+    const normalized = label.toLowerCase();
+    if (categoryList.some((c) => String(c).trim().toLowerCase() === normalized)) {
+      alert(`分类「${label}」已存在，请换一个名字。`);
       return;
     }
     const updated = [...categoryList, label];
