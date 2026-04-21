@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Link, Navigate, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -175,6 +175,11 @@ export default function InternalArticles() {
   const { addNotification } = useNotifications();
   const { editing } = useWysiwyg();
   const navigate = useNavigate();
+  const location = useLocation();
+  // 跨模块预填（来自 Tasks 页的 navigate state）的缓存——
+  // 会在 showModal 声明之后的 useEffect 里消费。
+  const [pendingWorkItemId, setPendingWorkItemId] = useState(null);
+  const [pendingSuggestedTitle, setPendingSuggestedTitle] = useState('');
   const ia = internalConfig.internalArticles || {};
   const updateIA = useCallback((key, val) => updateInternalConfig({ internalArticles: { [key]: val } }), [updateInternalConfig]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -236,6 +241,21 @@ export default function InternalArticles() {
   const [urlInput, setUrlInput] = useState('');
   const [fetchError, setFetchError] = useState('');
   const [fetching, setFetching] = useState(false);
+
+  // 跨模块预填：Tasks 页弹窗 / 未闭环清单带 workItemId + suggestedTitle 跳过来时，
+  // 在这里消费一次 navigate state：自动打开新建弹窗，并缓存 workItemId / 建议标题
+  // 等用户抓取完成后写入。读完立即把 state 清空，避免刷新或再次进入时重复触发。
+  useEffect(() => {
+    const s = location.state;
+    if (!s || typeof s !== 'object') return;
+    if (!s.workItemId && !s.suggestedTitle) return;
+    if (s.workItemId) setPendingWorkItemId(s.workItemId);
+    if (s.suggestedTitle) setPendingSuggestedTitle(s.suggestedTitle);
+    setShowModal(true);
+    setStep('input');
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // AI 摘要生成状态（仅在确认页使用）
   const [aiLoading, setAiLoading] = useState(false);
@@ -543,7 +563,9 @@ export default function InternalArticles() {
     try {
       const parsed = await fetchAndParseArticle(url);
       setDraft(parsed);
-      setEditTitle(parsed.title);
+      // 如果是从 Tasks 页带着 suggestedTitle 跳过来的，优先用抓取到的标题；
+      // 抓取标题为空时用 suggestedTitle 兜底，避免用户要手动再输一次。
+      setEditTitle(parsed.title || pendingSuggestedTitle || '');
       setEditCategory(parsed.category);
       setEditTags([...parsed.tags]);
       setEditExcerpt(parsed.excerpt || '');
@@ -610,6 +632,10 @@ export default function InternalArticles() {
       content: draft.content,
       archivedBy: user?.name || user?.nickname || '未知',
       archivedAt: new Date().toISOString(),
+      // 跨模块关联（见 src/utils/workItem.js）：
+      // 从 Tasks 页跳转带过来的 workItemId 写入新归档，完成"姿势 C"的回填闭环。
+      // 不带时为 null，不影响独立新建流程。
+      workItemId: pendingWorkItemId || null,
     };
 
     const articleTitle = newArticle.title;
@@ -628,6 +654,9 @@ export default function InternalArticles() {
     }
 
     closeModal();
+    // 归档成功后，清空从 Tasks 页带过来的预填缓存，避免下次新建时意外沿用
+    setPendingWorkItemId(null);
+    setPendingSuggestedTitle('');
     // 归档成功后提示用户是否去事项追踪标记对应事项为"已完成"
     setTaskPrompt({ articleTitle });
   };
@@ -1128,6 +1157,25 @@ export default function InternalArticles() {
             </div>
 
             <div className="ia-modal__body">
+              {/* 跨模块来源提示：从 Tasks 页"未闭环清单"或完成提示跳过来时，
+                  顶部显示一条横幅让用户知道"这次归档会关联到事项 X"。 */}
+              {(pendingWorkItemId || pendingSuggestedTitle) && (
+                <div
+                  className="ia-modal__error"
+                  style={{
+                    background: '#E6F4EA',
+                    color: '#1B5E20',
+                    border: '1px solid #A5D6A7',
+                    marginBottom: 'var(--space-md)',
+                  }}
+                >
+                  <Check size={14} />
+                  <span>
+                    正在为事项「{pendingSuggestedTitle || '未命名事项'}」归档对应文章，
+                    保存后会自动标记为闭环。
+                  </span>
+                </div>
+              )}
               {/* Step 1: 输入链接 */}
               {step === 'input' && (
                 <div className="ia-modal__step-input">

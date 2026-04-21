@@ -23,6 +23,9 @@ import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 // 把"其他"沉到筛选列表最末，符合产品"所有筛选中'其他'永远最后一位"的约定
 import { sortWithOtherLast } from '../../utils/sortWithOtherLast';
+// 工作项关联（WorkItem）：让事项追踪 ↔ 公众号归档 ↔ 活动发布三者可以通过
+// 共享的 workItemId 串成"同一件工作"。详见 src/utils/workItem.js。
+import { genWorkItemId, collectOpenWorkItems } from '../../utils/workItem';
 import '../../components/CrossLinkToast.css';
 import './Tasks.css';
 
@@ -225,6 +228,10 @@ const rowToTask = (r) => ({
   statusHistory: Array.isArray(r.status_history) ? r.status_history : [],
   highlights: r.highlights || '',
   reflections: r.reflections || '',
+  // 工作项关联（WorkItem）：与文章归档 / 活动发布共享同一个 workItemId 时代表同一件工作。
+  // 详见 src/utils/workItem.js。老数据没有这些列 → 统一归一成 null。
+  workItemId: r.work_item_id || null,
+  workItemKind: r.work_item_kind || null,
   createdAt: r.created_at ? String(r.created_at).slice(0, 10) : '',
 });
 
@@ -239,11 +246,21 @@ const taskToRow = (t) => ({
   status_history: Array.isArray(t.statusHistory) ? t.statusHistory : [],
   highlights: t.highlights || '',
   reflections: t.reflections || '',
+  // 工作项关联：允许把 null 显式写回数据库以解除关联。
+  work_item_id: t.workItemId || null,
+  work_item_kind: t.workItemKind || null,
 });
 
 export default function Tasks() {
-  const { isAuthenticated, user, getAllUsers, supabaseOk } = useAuth();
-  const { filterOptions, updateFilterOptions, internalConfig, updateInternalConfig, flushSettingToCloud, SITE_KEYS } = useSiteContent();
+  const { isAuthenticated, isAdmin, user, getAllUsers, supabaseOk } = useAuth();
+  const {
+    filterOptions, updateFilterOptions, internalConfig, updateInternalConfig,
+    flushSettingToCloud, SITE_KEYS,
+    // 读取 userArticles / events 用于：
+    //   1) 判断 task 完成时对应侧是否已经归档/发布，决定 CrossLinkToast 的走向；
+    //   2) 计算 Tasks 页面顶部"未闭环清单"卡片的内容。
+    userArticles, events,
+  } = useSiteContent();
   const { editing } = useWysiwyg();
   // useNotifications 保留引用以确保 NotificationProvider 已就绪；
   // 实际通知派发已统一走规则引擎 emitNotificationEvent。
@@ -423,6 +440,12 @@ export default function Tasks() {
     status: '待启动',
     assignee: [],
     helpers: [],
+    // 关联目标（见 src/utils/workItem.js）：
+    //   'none'    → 不关联（纯内部事项）
+    //   'article' → 这件事最终会产出一篇公众号文章（期望稍后归档）
+    //   'event'   → 这件事最终会落地一场活动（期望稍后发布）
+    // 默认 'none'——保持旧行为，用户如果不选就不会强行生成 workItemId。
+    workItemKind: 'none',
   });
   // 亮点总结 / 经验复盘 的 Supabase 写入防抖计时器
   // 结构：{ [taskId]: { [field]: number(timerId) } }
@@ -471,6 +494,11 @@ export default function Tasks() {
         ? crypto.randomUUID()
         : Date.now().toString() + Math.random().toString(36).slice(2, 8)
     );
+    // 关联目标：用户选了 article/event 就立刻生成 workItemId；选了 none 不生成。
+    // 这样即便用户"先立项、稍后再去归档/发活动"，也有一把钥匙等着另一侧来对齐。
+    const kind = newTask.workItemKind === 'none' ? null : (newTask.workItemKind || null);
+    const workItemId = kind ? genWorkItemId() : null;
+
     const task = {
       ...newTask,
       id: genId(),
@@ -478,6 +506,9 @@ export default function Tasks() {
       // 避免受控 input 的 value 在首次输入时从 undefined 变成 '' 触发 React 警告。
       highlights: '',
       reflections: '',
+      // 覆盖 newTask.workItemKind，把 UI 侧的 'none' 归一成真实落库值（null）
+      workItemId,
+      workItemKind: kind,
       createdAt: new Date().toISOString().split('T')[0],
     };
     // 乐观更新 UI + 本地缓存
@@ -489,6 +520,7 @@ export default function Tasks() {
       status: '待启动',
       assignee: [],
       helpers: [],
+      workItemKind: 'none',
     });
     setShowForm(false);
 
@@ -539,13 +571,42 @@ export default function Tasks() {
       ? { ...t, status: newStatus, statusHistory: nextHistory }
       : t
     )));
-    // 公众号文章分类的事项标记为"已完成"时，提示用户是否去归档页面
+    // 跨模块联动提示（基于 workItemId 的新逻辑，见 src/utils/workItem.js）：
+    //   - task 标记完成 且 声明了 workItemKind='article'/'event'
+    //   - 并且对应侧（article/event）还没落地 → 弹提示引导去补登
+    //
+    // 兼容旧口径：如果 task 没有 workItemId 但分类是"公众号文章"，仍走原有
+    // 的"去归档"提示，避免历史数据失去提醒。
     if (
-      targetTask.category === '公众号文章' &&
       newStatus === '已完成' &&
       targetTask.status !== '已完成'
     ) {
-      setArchivePrompt({ taskTitle: targetTask.title });
+      const wid = targetTask.workItemId;
+      const kind = targetTask.workItemKind;
+      if (wid && kind === 'article') {
+        const hasArticle = (userArticles || []).some((a) => a.workItemId === wid);
+        if (!hasArticle) {
+          setArchivePrompt({
+            taskTitle: targetTask.title,
+            target: 'article',
+            workItemId: wid,
+            missingPayload: { title: targetTask.title },
+          });
+        }
+      } else if (wid && kind === 'event') {
+        const hasEvent = (events || []).some((e) => e.workItemId === wid);
+        if (!hasEvent) {
+          setArchivePrompt({
+            taskTitle: targetTask.title,
+            target: 'event',
+            workItemId: wid,
+            missingPayload: { title: targetTask.title },
+          });
+        }
+      } else if (!wid && targetTask.category === '公众号文章') {
+        // 旧口径兜底：没关联但分类匹配时，仍弹去归档页
+        setArchivePrompt({ taskTitle: targetTask.title, target: 'article' });
+      }
     }
     // 发送"事项状态变更"通知（由规则引擎按用户自定义规则触发）
     if (targetTask.status !== newStatus) {
@@ -683,6 +744,45 @@ export default function Tasks() {
     completed: tasks.filter((t) => t.status === '已完成').length,
   };
 
+  // 未闭环工作项清单：
+  //   - 管理员：全量（不限 assignee/helpers）
+  //   - 普通成员：只看自己为 assignee/helpers 的 task
+  // 判定由 collectOpenWorkItems 统一完成，这里只负责按角色切分数据。
+  const openWorkItems = useMemo(
+    () => collectOpenWorkItems({
+      tasks,
+      articles: userArticles || [],
+      events: events || [],
+      isAdmin: !!isAdmin,
+      currentUserId: user?.id || null,
+    }),
+    [tasks, userArticles, events, isAdmin, user?.id],
+  );
+  // 默认折叠以免顶部太重；有未闭环项时右上角显示角标引导展开
+  const [showOpenList, setShowOpenList] = useState(false);
+
+  // 点击未闭环项的 CTA：
+  //   - 缺 article → 跳公众号历史文章归档，带 workItemId + 建议标题
+  //   - 缺 event   → 跳活动发布，带 workItemId + 建议标题
+  //   - 缺 task    → 只滚动到对应 task 行，没有 task 是不会出现在 openWorkItems 里的
+  const handleOpenWorkItemCTA = (wi) => {
+    if (wi.missingKind === 'article') {
+      navigate('/internal/articles', {
+        state: {
+          workItemId: wi.workItemId,
+          suggestedTitle: wi.title || '',
+        },
+      });
+    } else if (wi.missingKind === 'event') {
+      navigate('/internal/event-publish', {
+        state: {
+          workItemId: wi.workItemId,
+          suggestedTitle: wi.title || '',
+        },
+      });
+    }
+  };
+
   return (
     <div className="tasks-page">
       <div className="container">
@@ -716,6 +816,64 @@ export default function Tasks() {
             />}
           </button>
         </div>
+
+        {/* 未闭环工作项清单：task 声明了 workItemKind 但对应侧（article/event）
+            还没落地。管理员全量，普通成员仅含自己 assignee/helpers 的事项。 */}
+        {openWorkItems.length > 0 && (
+          <div className="tasks-open-workitems">
+            <div className="tasks-open-workitems__header">
+              <span className="tasks-open-workitems__title">
+                <ArrowRight size={14} />
+                未闭环的工作项
+                <span className="tasks-open-workitems__count">{openWorkItems.length}</span>
+              </span>
+              <button
+                type="button"
+                className="tasks-open-workitems__toggle"
+                onClick={() => setShowOpenList((v) => !v)}
+                title={showOpenList ? '收起' : '展开'}
+              >
+                {showOpenList ? '收起' : '展开'}
+              </button>
+            </div>
+            {showOpenList && (
+              <ul className="tasks-open-workitems__list">
+                {openWorkItems.map((wi) => {
+                  const tagLabel =
+                    wi.missingKind === 'article' ? '缺公众号归档' :
+                    wi.missingKind === 'event' ? '缺活动发布' :
+                    '待标记完成';
+                  const tagClass =
+                    wi.missingKind === 'article' ? 'tasks-open-workitems__tag--missing-article' :
+                    wi.missingKind === 'event' ? 'tasks-open-workitems__tag--missing-event' :
+                    'tasks-open-workitems__tag--missing-task';
+                  return (
+                    <li key={wi.workItemId} className="tasks-open-workitems__item">
+                      <div className="tasks-open-workitems__item-main">
+                        <span className={`tasks-open-workitems__tag ${tagClass}`}>
+                          {tagLabel}
+                        </span>
+                        <span className="tasks-open-workitems__item-title" title={wi.title}>
+                          {wi.title}
+                        </span>
+                      </div>
+                      {(wi.missingKind === 'article' || wi.missingKind === 'event') && (
+                        <button
+                          type="button"
+                          className="tasks-open-workitems__cta"
+                          onClick={() => handleOpenWorkItemCTA(wi)}
+                        >
+                          {wi.missingKind === 'article' ? '去归档' : '去发布'}
+                          <ArrowRight size={12} />
+                        </button>
+                      )}
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+        )}
 
         {/* Stats */}
         <div className="tasks-stats">
@@ -783,6 +941,21 @@ export default function Tasks() {
                   value={newTask.category}
                   onChange={(val) => setNewTask({ ...newTask, category: val })}
                   options={orderedTaskCategories}
+                />
+              </div>
+              {/* 关联目标（workItemKind）——弱提示：默认"不关联"，选了 article/event 会
+                  在创建时自动生成 workItemId，串联到归档/活动发布两侧。
+                  产品决策：只做"提示 + 可选强绑"，不强制。 */}
+              <div className="tasks-form__field">
+                <label>关联目标</label>
+                <CustomSelect
+                  value={newTask.workItemKind || 'none'}
+                  onChange={(val) => setNewTask({ ...newTask, workItemKind: val })}
+                  options={[
+                    { value: 'none', label: '不关联（纯内部事项）' },
+                    { value: 'article', label: '将产出公众号文章 → 稍后归档' },
+                    { value: 'event', label: '将落地一场活动 → 稍后发布' },
+                  ]}
                 />
               </div>
               <button type="submit" className="btn btn-primary">
@@ -1078,7 +1251,7 @@ export default function Tasks() {
         )}
       </div>
 
-      {/* 跨模块联动提示：公众号文章事项完成 → 引导归档 */}
+      {/* 跨模块联动提示：事项完成 → 根据 workItemKind 引导去归档 / 发布活动 */}
       {archivePrompt && (
         <div className="cross-link-overlay" onClick={() => setArchivePrompt(null)}>
           <div className="cross-link-toast" onClick={(e) => e.stopPropagation()}>
@@ -1089,19 +1262,40 @@ export default function Tasks() {
               <p className="cross-link-toast__title">事项已标记为完成 🎉</p>
               <p className="cross-link-toast__desc">
                 「{archivePrompt.taskTitle}」已完成，是否前往
-                <strong>公众号历史文章归档</strong>页面归档对应的文章？
+                <strong>
+                  {archivePrompt.target === 'event'
+                    ? '活动发布'
+                    : '公众号历史文章归档'}
+                </strong>
+                页面补登{archivePrompt.target === 'event' ? '对应的活动' : '对应的文章'}？
               </p>
             </div>
             <div className="cross-link-toast__actions">
               <button
                 className="cross-link-toast__btn cross-link-toast__btn--primary"
                 onClick={() => {
+                  // 跳转时把 workItemId + 期望的标题通过 state 传过去，
+                  // 目标页可据此预填表单并在保存时回写同一个 workItemId。
+                  // 路由路径来自 src/App.jsx：
+                  //   /internal/articles       → InternalArticles
+                  //   /internal/event-publish  → EventPublish
+                  const path = archivePrompt.target === 'event'
+                    ? '/internal/event-publish'
+                    : '/internal/articles';
                   setArchivePrompt(null);
-                  navigate('/internal/articles');
+                  navigate(path, {
+                    state: {
+                      workItemId: archivePrompt.workItemId || null,
+                      suggestedTitle: archivePrompt.taskTitle || '',
+                    },
+                  });
                 }}
               >
-                <FileText size={15} /> 去归档
-                <ArrowRight size={14} />
+                {archivePrompt.target === 'event' ? (
+                  <>去发布活动<ArrowRight size={14} /></>
+                ) : (
+                  <><FileText size={15} /> 去归档<ArrowRight size={14} /></>
+                )}
               </button>
               <button
                 className="cross-link-toast__btn cross-link-toast__btn--ghost"

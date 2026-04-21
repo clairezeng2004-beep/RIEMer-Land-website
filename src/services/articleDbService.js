@@ -89,6 +89,9 @@ export async function updateArticleInDb(id, updates) {
     if (updates.author !== undefined) dbUpdates.author = updates.author;
     if (updates.coverImage !== undefined) dbUpdates.cover_image = updates.coverImage;
     if (updates.readNum !== undefined) dbUpdates.read_num = Number(updates.readNum) || 0;
+    // 工作项关联（见 supabase-work-item-link.sql / src/utils/workItem.js）：
+    // 允许把 null 写回数据库以解除关联；undefined 则表示调用方没打算改这个字段。
+    if (updates.workItemId !== undefined) dbUpdates.work_item_id = updates.workItemId || null;
     dbUpdates.updated_at = new Date().toISOString();
 
     const { error } = await supabase
@@ -239,6 +242,9 @@ function dbToFrontend(row) {
     readNum: typeof row.read_num === 'number' ? row.read_num : Number(row.read_num) || 0,
     archivedBy: row.archived_by || '未知',
     archivedAt: row.created_at || new Date().toISOString(),
+    // 工作项关联（WorkItem）：用于和 tasks / events 之间串"同一件工作"
+    // 的闭环。老数据无此列 → 读出来是 undefined → 统一归一成 null。
+    workItemId: row.work_item_id || null,
     _fromDb: true, // 标记来自数据库
   };
 }
@@ -260,6 +266,8 @@ function frontendToDb(article, userId) {
     read_num: Number(article.readNum ?? article.read_num ?? 0) || 0,
     archived_by: article.archivedBy || article.archived_by || '未知',
     archived_by_id: userId || null,
+    // 工作项关联：若前端传了 workItemId，写入数据库新增的 work_item_id 列。
+    work_item_id: article.workItemId || null,
   };
 }
 

@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -24,6 +24,7 @@ import {
   Settings2,
   Pencil,
   Trash2,
+  CheckSquare,
 } from 'lucide-react';
 import {
   SITE_KEYS,
@@ -32,6 +33,7 @@ import {
   subscribeSetting,
 } from '../../services/siteSettingsService';
 import { isSupabaseConfigured } from '../../lib/supabase';
+import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
 import './EventPublish.css';
 
@@ -195,11 +197,39 @@ export default function EventPublish() {
   // 新建活动弹窗内"其他"自定义分类临时值
   const [customCategoryInput, setCustomCategoryInput] = useState('');
 
+  // 跨模块预填：Tasks 页"未闭环清单 / 完成弹窗"带 workItemId + suggestedTitle
+  // 跳过来时，自动打开新建弹窗并把标题预填上，确认发布时把 workItemId 写入 event。
+  // 读一次就 replace 掉 state，避免重复触发。
+  const [pendingWorkItemId, setPendingWorkItemId] = useState(null);
+  const location = useLocation();
+  const navigate = useNavigate();
+  useEffect(() => {
+    const s = location.state;
+    if (!s || typeof s !== 'object') return;
+    if (!s.workItemId && !s.suggestedTitle) return;
+    if (s.workItemId) setPendingWorkItemId(s.workItemId);
+    const defaultCat = categoryList[0] || '其他';
+    setDraft({
+      ...EMPTY_EVENT,
+      category: defaultCat,
+      title: s.suggestedTitle || '',
+    });
+    setCustomCategoryInput('');
+    setFormError('');
+    setShowModal(true);
+    navigate(location.pathname, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // ---- 回放密码弹窗（点击有回放的卡片）----
   const [replayModal, setReplayModal] = useState(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
+
+  // 跨模块联动提示：发布一个带 workItemId 的活动之后，引导用户去 Tasks 页
+  // 把对应事项标为"已完成"形成闭环。与 InternalArticles 的 taskPrompt 等价。
+  const [taskPrompt, setTaskPrompt] = useState(null);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -436,8 +466,21 @@ export default function EventPublish() {
       officialUrl: draft.officialUrl.trim(),
       replayUrl: draft.replayUrl.trim(),
       replayPassword: draft.replayPassword.trim(),
+      // 跨模块关联（见 src/utils/workItem.js）：
+      // 从 Tasks 页带过来的 workItemId 写入新 event，让事项/活动两侧形成闭环。
+      // events 存在 site_settings.value 的 JSON 数组里，workItemId 作为普通
+      // 字段即可，无需 Supabase schema 迁移。
+      workItemId: pendingWorkItemId || null,
     });
+    const savedTitle = draft.title.trim();
+    const hadWorkItem = !!pendingWorkItemId;
+    setPendingWorkItemId(null);
     closeModal();
+    // 发布成功后：如果是带工作项关联进来的 → 弹"去标记事项完成"提示；
+    // 否则保持静默（独立发布活动的常规路径不打扰）。
+    if (hadWorkItem) {
+      setTaskPrompt({ eventTitle: savedTitle });
+    }
   };
 
   // ---- 卡片点击：
@@ -860,6 +903,24 @@ export default function EventPublish() {
 
             <div className="ia-modal__body">
               <div className="ia-modal__step-confirm">
+                {/* 跨模块来源提示：从 Tasks 页跳过来时顶部横幅说明 */}
+                {pendingWorkItemId && (
+                  <div
+                    className="ia-modal__error"
+                    style={{
+                      background: '#E3F2FD',
+                      color: '#0D47A1',
+                      border: '1px solid #90CAF9',
+                      marginBottom: 'var(--space-md)',
+                    }}
+                  >
+                    <Check size={14} />
+                    <span>
+                      正在为事项「{draft.title || '未命名事项'}」发布对应活动，
+                      保存后会自动标记为闭环。
+                    </span>
+                  </div>
+                )}
                 {/* 标题 */}
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">活动标题 *</label>
@@ -1132,6 +1193,42 @@ export default function EventPublish() {
                 disabled={!quickCatLabel.trim()}
               >
                 <Plus size={16} /> 新增
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 跨模块联动提示：发布带 workItemId 的活动后 → 引导去 Tasks 标记完成 */}
+      {taskPrompt && (
+        <div className="cross-link-overlay" onClick={() => setTaskPrompt(null)}>
+          <div className="cross-link-toast" onClick={(e) => e.stopPropagation()}>
+            <div className="cross-link-toast__icon">
+              <CalendarRange size={22} />
+            </div>
+            <div className="cross-link-toast__body">
+              <p className="cross-link-toast__title">活动发布成功 🎉</p>
+              <p className="cross-link-toast__desc">
+                「{taskPrompt.eventTitle}」已发布，是否前往
+                <strong>事项追踪</strong>页面将对应的事项标记为"已完成"？
+              </p>
+            </div>
+            <div className="cross-link-toast__actions">
+              <button
+                className="cross-link-toast__btn cross-link-toast__btn--primary"
+                onClick={() => {
+                  setTaskPrompt(null);
+                  navigate('/internal/tasks');
+                }}
+              >
+                <CheckSquare size={15} /> 去标记完成
+                <ArrowRight size={14} />
+              </button>
+              <button
+                className="cross-link-toast__btn cross-link-toast__btn--ghost"
+                onClick={() => setTaskPrompt(null)}
+              >
+                暂不需要
               </button>
             </div>
           </div>
