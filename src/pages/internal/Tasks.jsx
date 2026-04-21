@@ -462,6 +462,27 @@ export default function Tasks() {
   // 跨模块联动提示
   const [archivePrompt, setArchivePrompt] = useState(null);
 
+  // ⚠️ 下面这些 hooks 必须放在 early return 之前，否则未登录用户命中 Navigate 后
+  // 下次渲染 hook 数量会与已登录时不一致，触发 React "Rendered fewer hooks than
+  // expected" 错误（Rules of Hooks）。
+  //
+  // 未闭环工作项清单：
+  //   - 管理员：全量（不限 assignee/helpers）
+  //   - 普通成员：只看自己为 assignee/helpers 的 task
+  // 判定由 collectOpenWorkItems 统一完成，这里只负责按角色切分数据。
+  const openWorkItems = useMemo(
+    () => collectOpenWorkItems({
+      tasks,
+      articles: userArticles || [],
+      events: events || [],
+      isAdmin: !!isAdmin,
+      currentUserId: user?.id || null,
+    }),
+    [tasks, userArticles, events, isAdmin, user?.id],
+  );
+  // 默认折叠以免顶部太重；有未闭环项时右上角显示角标引导展开
+  const [showOpenList, setShowOpenList] = useState(false);
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -743,23 +764,6 @@ export default function Tasks() {
     inProgress: tasks.filter((t) => t.status === '进行中').length,
     completed: tasks.filter((t) => t.status === '已完成').length,
   };
-
-  // 未闭环工作项清单：
-  //   - 管理员：全量（不限 assignee/helpers）
-  //   - 普通成员：只看自己为 assignee/helpers 的 task
-  // 判定由 collectOpenWorkItems 统一完成，这里只负责按角色切分数据。
-  const openWorkItems = useMemo(
-    () => collectOpenWorkItems({
-      tasks,
-      articles: userArticles || [],
-      events: events || [],
-      isAdmin: !!isAdmin,
-      currentUserId: user?.id || null,
-    }),
-    [tasks, userArticles, events, isAdmin, user?.id],
-  );
-  // 默认折叠以免顶部太重；有未闭环项时右上角显示角标引导展开
-  const [showOpenList, setShowOpenList] = useState(false);
 
   // 点击未闭环项的 CTA：
   //   - 缺 article → 跳公众号历史文章归档，带 workItemId + 建议标题
