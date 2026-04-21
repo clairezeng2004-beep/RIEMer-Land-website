@@ -299,14 +299,28 @@
   padding: 14px;
   border-bottom: 1px solid var(--color-border-light);
   vertical-align: middle;
+  /* hover 切换柔化（与成员通讯录一致的反馈节奏）：
+     transition 必须写在 td 上而不是 tr 上 —— <tr> 的背景实际由 <td> 渲染，
+     在 tr 上加 transition 大多数浏览器不生效，会出现"瞬切"的灵敏感。
+     这里 0.18s 既不会拖泥带水，也消除了原来鼠标一掠就闪一下的突兀感。 */
+  transition: background-color 0.18s ease;
 }
 
 .mc-table tbody tr:last-child td {
   border-bottom: none;
 }
 
+/* 行 hover 配色与"成员通讯录"对齐：
+   用户反馈：'保证悬浮时的底色，跟成员通讯录悬浮时的青绿色是一致的。
+              现在底色切换太灵敏，而且颜色太深了。'
+   原值 var(--color-bg-hover, #E4ECE0) 在白底上是相当饱和的灰绿，
+   而成员通讯录用的是 rgba(91,140,62,0.02) ≈ #fbfdf9（极淡主色绿），
+   两表并排能明显看出本表 hover 偏深、偏灰。
+   现统一改成同一套数值：
+     - 普通 td：rgba(91,140,62,0.02) 透明绿
+     - sticky 列：#f8faf6 不透明等价色（避免横滚时下方文字穿透） */
 .mc-table__row:hover {
-  background: var(--color-bg-hover, #E4ECE0);
+  background: rgba(91, 140, 62, 0.02);
 }
 
 /* 前三名行的视觉方案（第四版）：
@@ -372,7 +386,8 @@
    和 sticky 层叠无冲突，也不需要 member td 额外处理。 */
 .mc-table__row:hover .mc-table__td--rank,
 .mc-table__row:hover .mc-table__td--member {
-  background: var(--color-bg-hover, #E4ECE0);
+  /* 与成员通讯录 sticky 列 hover 同色（rgba(91,140,62,0.02) 在白底上的不透明等价色） */
+  background: #f8faf6;
 }
 
 /* 排名 */
