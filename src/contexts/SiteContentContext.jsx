@@ -243,6 +243,25 @@ const getDefaultInternalConfig = () => ({
     pageDesc: '发布与维护团队活动，数据与首页「最新活动」实时同步',
     btnNew: '新建活动',
   },
+  // 流程模板文件页（Documents 组件以 configSection="processTemplates" 复用）
+  // 这里的 pageTitle/pageDesc 由 ProcessTemplates.jsx 用 customTitle/customDesc
+  // 写死，不走 EditableText，所以默认文案留空即可；关键是下面两个数组：
+  // - extraTypeKeys：本页新增的自定义 documentType 的 key 列表（custom_*）
+  // - hiddenBuiltinKeys：本页"隐藏"的白名单内置 key（如隐藏 'process'）
+  // 必须把 processTemplates 登记进 defaults，否则 hydrate / subscribe /
+  // flushInternalConfig 的合并逻辑（只遍历 Object.keys(defaults)）会把云端
+  // 回包里真实存在的 processTemplates 字段整段扔掉，导致"刷新后就地新增
+  // 的筛选分类消失、跨设备同步不上"。
+  processTemplates: {
+    extraTypeKeys: [],
+    hiddenBuiltinKeys: [],
+  },
+  // 成员内部分享页（MemberSharing.jsx 使用 internalConfig.memberSharing.pageTitle/pageDesc）
+  // 同样必须登记进 defaults，否则云端的 pageTitle/pageDesc 会被合并逻辑丢弃。
+  memberSharing: {
+    pageTitle: '成员内部分享',
+    pageDesc: '浏览课程资料、历史会议记录及成员经验分享，支持 Word 与 Markdown 格式',
+  },
 });
 
 // 默认文档类型定义
@@ -280,6 +299,47 @@ function migrateSidebarLegacyLabels(sidebar) {
     if (from.includes(next[key])) next[key] = to;
   }
   return next;
+}
+
+/**
+ * 合并云端/本地持久化的 internalConfig 与 defaults。
+ *
+ * ⚠️ 历史坑（已修复）：原先的实现是 `for (const key of Object.keys(defaults))`，
+ *   即"只合并 defaults 中显式声明的 section"。结果任何新增 section（如
+ *   processTemplates / memberSharing）如果忘了登记到 getDefaultInternalConfig，
+ *   云端 site_settings.internal_config 里真实存在的这些字段每次 hydrate /
+ *   realtime 回包时都会被静默丢掉。用户的典型报错就是：
+ *     "流程模板文件新增筛选分类后刷新就没了 / 跨设备同步不上"
+ *   因为 Documents.jsx 把 extraTypeKeys / hiddenBuiltinKeys 存在
+ *   internalConfig.processTemplates 下，而 processTemplates 没出现在 defaults，
+ *   整段被丢 → 本地 state 不含新 key → push-effect 把"不含 processTemplates 的
+ *   值"反推云端 → 云端也被擦。
+ *
+ * 现在改为遍历 defaults ∪ value 的并集：
+ *   - 即便后续新增 section 忘了登记 defaults，也能正确保留云端的真实值；
+ *   - 同时对每个 section 依然合并 defaults 的基础字段，保证 UI 有默认文案。
+ */
+function mergeInternalConfig(value) {
+  const defaults = getDefaultInternalConfig();
+  const safeValue = value && typeof value === 'object' ? value : {};
+  const allKeys = new Set([...Object.keys(defaults), ...Object.keys(safeValue)]);
+  const merged = {};
+  for (const key of allKeys) {
+    const d = defaults[key];
+    const v = safeValue[key];
+    if (d && typeof d === 'object' && !Array.isArray(d)) {
+      // defaults 有定义且是对象：走字段级浅合并
+      merged[key] = { ...d, ...(v && typeof v === 'object' && !Array.isArray(v) ? v : {}) };
+    } else if (v !== undefined) {
+      // defaults 没定义（新增 section）：原样保留云端/本地值
+      merged[key] = v;
+    } else if (d !== undefined) {
+      merged[key] = d;
+    }
+  }
+  // 侧边栏旧标签一次性迁移
+  if (merged.sidebar) merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
+  return merged;
 }
 
 export function SiteContentProvider({ children }) {
@@ -343,15 +403,8 @@ export function SiteContentProvider({ children }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // 深度合并，确保新增的字段有默认值
-        const defaults = getDefaultInternalConfig();
-        const merged = {};
-        for (const key of Object.keys(defaults)) {
-          merged[key] = { ...defaults[key], ...(parsed[key] || {}) };
-        }
-        // 侧边栏旧标签一次性迁移（'成员' → '成员信息'、'管理' → '网站管理'）
-        merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
-        return merged;
+        // 深度合并（并集，保留云端/本地新增 section 的值，侧边栏旧标签自动迁移）
+        return mergeInternalConfig(parsed);
       } catch {
         return getDefaultInternalConfig();
       }
@@ -552,14 +605,9 @@ export function SiteContentProvider({ children }) {
       }
       lastSyncedAtRef.current = updatedAt;
       siteSyncRefs.current[SITE_KEYS.INTERNAL_CONFIG] = updatedAt;
-      // 深度合并默认值，保证新增字段存在默认
-      const defaults = getDefaultInternalConfig();
-      const merged = {};
-      for (const key of Object.keys(defaults)) {
-        merged[key] = { ...defaults[key], ...(value[key] || {}) };
-      }
-      // 侧边栏旧标签一次性迁移
-      merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
+      // 深度合并：遍历 defaults ∪ value 的并集，保证云端新增 section
+      // (processTemplates / memberSharing 等) 不会被 defaults 白名单过滤丢弃。
+      const merged = mergeInternalConfig(value);
       // 一次性抑制：下面 internalConfig state 的 push-effect 消费后跳过，
       // 防止"hydrate 回包 setState → effect push → 订阅回流 → 覆盖本地"的乒乓。
       suppressNextPushRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
@@ -582,13 +630,8 @@ export function SiteContentProvider({ children }) {
       if (lastPushed && updatedAt && lastPushed >= updatedAt) return;
       lastSyncedAtRef.current = updatedAt;
       siteSyncRefs.current[SITE_KEYS.INTERNAL_CONFIG] = updatedAt;
-      const defaults = getDefaultInternalConfig();
-      const merged = {};
-      for (const key of Object.keys(defaults)) {
-        merged[key] = { ...defaults[key], ...(value[key] || {}) };
-      }
-      // 侧边栏旧标签一次性迁移
-      merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
+      // 深度合并：遍历 defaults ∪ value 的并集（理由见 mergeInternalConfig 注释）
+      const merged = mergeInternalConfig(value);
       // 一次性抑制：订阅 setState 后紧跟的 push-effect 跳过回推，避免乒乓
       suppressNextPushRef.current[SITE_KEYS.INTERNAL_CONFIG] = true;
       setInternalConfig((prev) => {
