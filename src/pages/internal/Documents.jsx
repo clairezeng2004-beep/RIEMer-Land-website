@@ -979,6 +979,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           </div>
           {configSection === 'processTemplates' ? (
             // 流程模板：新窗口打开独立发布页（支持 Markdown/Word/附件）
+            // 文案与普通文档页共享 internalConfig.documents.uploadBtn，
+            // 因为本页 internalConfig.processTemplates 分片里并没有 uploadBtn 字段，
+            // 若直接读 dc.uploadBtn 会得到 undefined，EditableText 就会渲染成空字符串
+            // ——也就是之前看到的「按钮只剩加号，文字丢失」现象。
             <a
               href="/internal/process-templates/create"
               target="_blank"
@@ -987,8 +991,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
             >
               <Plus size={18} />
               <EditableText
-                value={dc.uploadBtn}
-                onChange={(v) => updateDocs('uploadBtn', v)}
+                value={internalConfig.documents?.uploadBtn || '上传文档'}
+                onChange={(v) => updateInternalConfig({ documents: { uploadBtn: v } })}
                 configKey="documents.uploadBtn"
                 as="span"
               />
@@ -1000,7 +1004,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
             >
               {showUpload ? <X size={18} /> : <Plus size={18} />}
               {showUpload ? '取消' : <EditableText
-                value={dc.uploadBtn}
+                value={dc.uploadBtn || '上传文档'}
                 onChange={(v) => updateDocs('uploadBtn', v)}
                 configKey="documents.uploadBtn"
                 as="span"
