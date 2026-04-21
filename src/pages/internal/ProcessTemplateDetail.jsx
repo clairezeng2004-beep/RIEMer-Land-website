@@ -55,6 +55,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useTocScroll from '../../hooks/useTocScroll';
+import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
@@ -852,6 +853,11 @@ export default function ProcessTemplateDetail() {
     handlePreviewScroll: handleMdPreviewScroll,
   } = useMarkdownSyncScroll(false);
 
+  /* 编辑态文本框：高度随内容自动增长，不再限制高度。 */
+  const ptdWordEditRef = useRef(null);
+  useAutoResizeTextarea(mdSyncEditorRef, editContent, { minHeight: 480 });
+  useAutoResizeTextarea(ptdWordEditRef, editContent, { minHeight: 480 });
+
   /* ========== 编辑草稿自动保存 ========== */
   const editDraftKey = doc?.id && user?.id
     ? `process-template-edit:${doc.id}:${user.id}`
@@ -1395,6 +1401,7 @@ export default function ProcessTemplateDetail() {
                     </div>
                   ) : (
                     <textarea
+                      ref={ptdWordEditRef}
                       className="ptd-edit__content-textarea"
                       value={editContent}
                       onChange={(e) => setEditContent(e.target.value)}

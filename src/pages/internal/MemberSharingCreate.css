@@ -455,10 +455,11 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--space-md, 12px);
-  /* 关键：给分屏一个"视口相对高度"，这样两个 pane 的 overflow:auto 才能各自滚动，
-     否则没有高度上限，内容会被撑开，导致只能随外层页面一起滚。 */
-  height: clamp(420px, 70vh, 760px);
-  flex: 1;
+  /* 不限制最大高度：textarea 通过 JS 随内容自动增高，预览区也自动撑开，
+     整个分屏跟随页面一起滚动。这里只给一个最小高度，避免空文档时太矮。
+     注意：grid 行默认 min-height:auto，子元素不会被压缩。 */
+  min-height: 420px;
+  align-items: stretch;
 }
 
 .msc-md-split__pane {
@@ -522,7 +523,9 @@
 }
 
 .msc-md-split__editor {
-  flex: 1;
+  /* 不使用 flex:1 + 内部滚动；由 useAutoResizeTextarea hook 把高度贴合 scrollHeight，
+     这样输入越多文本框就越高，不再受父容器限制。 */
+  width: 100%;
   padding: 1rem;
   border: none;
   border-top: 1px solid var(--color-border-light, #e5e7eb);
@@ -532,11 +535,12 @@
   color: var(--color-text, #1f2937);
   background: #fff;
   outline: none;
-  resize: none;
-  min-height: 0; /* 允许在 flex 容器中收缩，让 textarea 自己的滚动条生效 */
+  resize: none; /* 交由 JS 控制高度，避免出现内部滚动条 */
+  overflow: hidden;
+  min-height: 360px;
   line-height: 1.7;
   tab-size: 2;
-  transition: all 0.15s;
+  transition: border-color 0.15s, background 0.15s;
 }
 
 .msc-md-split__editor:focus {
@@ -545,7 +549,8 @@
 }
 
 .msc-md-split__preview {
-  flex: 1;
+  /* 预览区不设固定高，不独立滚动，随内容自然撑开，与编辑区整体跟随页面滚动。 */
+  width: 100%;
   padding: 1rem 1.25rem;
   border: none;
   border-top: 1px solid var(--color-border-light, #e5e7eb);
@@ -554,8 +559,7 @@
   font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   color: var(--color-text, #1f2937);
   background: #fff;
-  overflow-y: auto;
-  min-height: 0; /* 同上：允许 flex 中收缩，从而让 overflow-y:auto 产生独立滚动 */
+  min-height: 360px;
   line-height: 1.75;
   word-wrap: break-word;
 }
@@ -806,12 +810,13 @@
   color: var(--color-text, #1f2937);
   background: var(--color-bg, #f9fafb);
   outline: none;
+  /* 不限制高度：contentEditable 随内容自然撑高，不再出现内部滚动条。
+     用户仍可通过底部手柄 (resize: vertical) 主动拖放以拉低高度。 */
   resize: vertical;
-  overflow: auto;
+  overflow: visible;
   min-height: 400px;
   max-height: none;
   line-height: 1.7;
-  flex: 1;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 

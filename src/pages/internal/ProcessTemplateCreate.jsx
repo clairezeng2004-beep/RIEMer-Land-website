@@ -32,6 +32,7 @@ import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
+import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
@@ -91,7 +92,6 @@ export default function ProcessTemplateCreate() {
   const wordEditorRef = useRef(null);
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
-
   /* ============ Markdown 同步滚动 ============
    * 使用公共 hook 管理，默认关闭。和其他 Markdown 编辑入口
    * （MemberSharingCreate / ProcessTemplateDetail 编辑态）保持一致。
@@ -140,6 +140,9 @@ export default function ProcessTemplateCreate() {
     content: '',
     attachments: [],
   });
+
+  // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
+  useAutoResizeTextarea(mdEditorRef, newDoc.content, { minHeight: 360 });
 
   /* ============ 贡献者多选 ============
      支持"文档迁移"——发布者本人不一定是贡献者，可多选。

@@ -32,6 +32,7 @@ import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
+import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
 import {
   addSharing,
@@ -426,6 +427,9 @@ export default function MemberSharingCreate() {
   const wordEditorRef = useRef(null);
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
+
+  // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
+  useAutoResizeTextarea(mdEditorRef, newPost.content, { minHeight: 360 });
 
   /* ============ Markdown 同步滚动 ============
    * 统一由 useMarkdownSyncScroll hook 管理：

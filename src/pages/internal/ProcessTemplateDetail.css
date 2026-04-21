@@ -1099,7 +1099,9 @@
   border-radius: 0;
   background: #fff;
   outline: none;
-  resize: vertical;
+  /* 高度交由 useAutoResizeTextarea hook 控制，保持随内容增长、不出现内部滚动条 */
+  resize: none;
+  overflow: hidden;
   transition: border-color 0.15s, background 0.15s;
   font-family: 'SFMono-Regular', Menlo, Consolas, 'Liberation Mono', monospace;
   tab-size: 2;
