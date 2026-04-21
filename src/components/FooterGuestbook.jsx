@@ -96,9 +96,8 @@ export default function FooterGuestbook() {
     recognition.start();
   }, [listening]);
 
-  const handleSubmit = useCallback(async () => {
-    if (!message.trim()) return;
-    setSubmitting(true);
+  const handleSubmit = useCallback(() => {
+    if (!message.trim() || submitting) return;
 
     const entry = {
       id: `gb-${Date.now()}`,
@@ -109,38 +108,60 @@ export default function FooterGuestbook() {
       created_at: new Date().toISOString(),
     };
 
-    try {
-      if (isSupabaseConfigured && supabase) {
-        const { error } = await supabase.from('guestbook_entries').insert({
-          nickname: entry.nickname,
-          message: entry.message,
-          contact: entry.contact,
-          show_contact: entry.show_contact,
-        });
-        if (error) throw error;
-      } else {
-        // localStorage fallback
-        const stored = JSON.parse(localStorage.getItem(GUESTBOOK_LS_KEY) || '[]');
-        stored.unshift(entry);
-        localStorage.setItem(GUESTBOOK_LS_KEY, JSON.stringify(stored));
-      }
+    // —— 乐观更新：点击提交后立刻给用户「成功」反馈并清空输入
+    //   旧实现里 UI 要等 Supabase INSERT 的完整网络往返（海外节点下
+    //   常常 1-3s）才切换到成功态，用户会感觉按钮按下去后「卡住了」。
+    //   这里改成：
+    //     1. 先 setSubmitted(true)，立刻显示「留言成功」提示
+    //     2. 立刻清空表单、准备关闭弹窗
+    //     3. 后台异步把数据写入 Supabase，同时无条件写一份
+    //        localStorage 兜底——即便网络失败，留言也不丢
+    //     4. 只有当后台写入真的失败才通过 console 记录；不再弹 alert
+    //        打断用户（因为本地已经留了一份，下次能补同步；同时
+    //        避免「看起来成功了但突然跳 alert」的割裂感）
+    setSubmitting(true);
+    setSubmitted(true);
+    setMessage('');
+    setNickname('');
+    setContact('');
+    setShowContact(false);
 
-      setSubmitted(true);
-      setMessage('');
-      setNickname('');
-      setContact('');
-      setShowContact(false);
-      setTimeout(() => {
-        setSubmitted(false);
-        setOpen(false);
-      }, 2000);
-    } catch (err) {
-      console.error('[Guestbook] 提交留言失败:', err);
-      alert('留言提交失败，请稍后再试');
-    } finally {
+    // 关闭窗口：从 2s 缩短到 1.2s，成功提示一闪而过，不让用户干等
+    setTimeout(() => {
+      setSubmitted(false);
+      setOpen(false);
       setSubmitting(false);
+    }, 1200);
+
+    // 无论是否走 Supabase，都在 localStorage 留一份本地备份
+    try {
+      const stored = JSON.parse(localStorage.getItem(GUESTBOOK_LS_KEY) || '[]');
+      stored.unshift(entry);
+      localStorage.setItem(GUESTBOOK_LS_KEY, JSON.stringify(stored.slice(0, 500)));
+    } catch (lsErr) {
+      console.warn('[Guestbook] 本地缓存写入失败:', lsErr);
     }
-  }, [nickname, message, contact, showContact]);
+
+    // 后台写 Supabase，不阻塞 UI；带 8s 超时，防止网络挂起拖住后续点击
+    if (isSupabaseConfigured && supabase) {
+      const insertPromise = supabase.from('guestbook_entries').insert({
+        nickname: entry.nickname,
+        message: entry.message,
+        contact: entry.contact,
+        show_contact: entry.show_contact,
+      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('submit_timeout_8s')), 8000)
+      );
+      Promise.race([insertPromise, timeoutPromise])
+        .then((res) => {
+          if (res && res.error) throw res.error;
+        })
+        .catch((err) => {
+          console.error('[Guestbook] 后台同步留言失败（本地已保存）:', err);
+        });
+    }
+  }, [nickname, message, contact, showContact, submitting]);
 
   return (
     <div className="footer-guestbook">
@@ -259,6 +280,7 @@ export default function FooterGuestbook() {
               )}
 
               <button
+                type="button"
                 className="footer-guestbook__submit"
                 disabled={!message.trim() || submitting}
                 onClick={handleSubmit}
