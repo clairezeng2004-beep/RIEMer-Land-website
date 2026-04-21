@@ -14,6 +14,25 @@ const SUGGESTIONS_KEY = 'riemer_site_suggestions';
 const EVENTS_KEY = 'riemer_site_events';
 const TIMELINE_KEY = 'riemer_site_timeline';
 
+// site_settings 每个 key 最近一次成功写云的 updated_at 兜底存 localStorage。
+// 用途：页面卸载后再打开时，内存里的 lastPushedUpdatedAtRef 归零，若云端 fetch
+// 回来一条比本地最新编辑还旧的值（例如本地 push 因卸载没来得及写，或云端延迟），
+// 仍然可以据此判定"这条是旧版本，别覆盖本地 state"，避免刷新即丢新值。
+const LAST_PUSHED_AT_KEY = 'riemer_site_settings_last_pushed_at';
+const readLastPushedAtMap = () => {
+  try {
+    const raw = localStorage.getItem(LAST_PUSHED_AT_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch { return {}; }
+};
+const writeLastPushedAt = (key, updatedAt) => {
+  try {
+    const map = readLastPushedAtMap();
+    map[key] = updatedAt;
+    localStorage.setItem(LAST_PUSHED_AT_KEY, JSON.stringify(map));
+  } catch { /* 存储失败不是致命错误 */ }
+};
+
 // 建设建议初始模拟数据（包含网站改进与组织建设两类）
 const getDefaultSuggestions = () => [
   {
@@ -588,6 +607,15 @@ export function SiteContentProvider({ children }) {
       syncDefs.forEach(({ key }) => { hydratedKeysRef.current[key] = true; });
       return;
     }
+    // 从 localStorage 恢复"本会话之前最后一次成功推云"的 updatedAt，
+    // 作为本次挂载的 lastPushedUpdatedAtRef 起点。配合下面 hydrate 的
+    // 迟到过滤，可以避免"刚在上一会话 push 成功 → 立刻刷新 → 云端 replica
+    // 延迟一点点 → 新挂载 fetch 到的是 push 前的旧 updated_at → 覆盖本地
+    // 新值"这种极端时序。
+    const persistedLastPushed = readLastPushedAtMap();
+    Object.entries(persistedLastPushed).forEach(([k, v]) => {
+      if (v) lastPushedUpdatedAtRef.current[k] = v;
+    });
     let cancelled = false;
     const unsubs = [];
 
@@ -681,6 +709,10 @@ export function SiteContentProvider({ children }) {
 
   // 去抖写云端：state 变化后 400ms 再 upsert，避免连续编辑刷爆 DB
   const pushDebouncedRef = useRef({});
+  // 保存每个 key 最近一次 pending 的"值快照"，用于页面卸载前同步 flush。
+  // 否则用户编辑筛选项后 400ms 内刷新页面，去抖的 setTimeout 随页面卸载丢失，
+  // 云端从来没写入新值；刷新后 hydrate 拉回旧值覆盖本地，表现为"刷新就丢"。
+  const pendingPushValueRef = useRef({});
   const pushToCloud = useCallback((key, value) => {
     if (!isSupabaseConfigured) {
       // 未配置 Supabase：明确标记，上层可据此提示用户"当前无云端，仅本设备生效"
@@ -694,6 +726,8 @@ export function SiteContentProvider({ children }) {
     if (!hydratedKeysRef.current[key]) return;
     // 只要 push 被真正排队，就把 dirty 标记置为 true，让可能晚到的 fetch 回包不要覆盖本地
     localDirtyRef.current[key] = true;
+    // 记录 pending 值，便于 beforeunload/visibilitychange 时同步 flush
+    pendingPushValueRef.current[key] = value;
     if (pushDebouncedRef.current[key]) clearTimeout(pushDebouncedRef.current[key]);
     setCloudSyncStatus((prev) => ({ ...prev, [key]: { status: 'syncing', at: Date.now() } }));
     pushDebouncedRef.current[key] = setTimeout(async () => {
@@ -701,7 +735,12 @@ export function SiteContentProvider({ children }) {
       if (res.success) {
         siteSyncRefs.current[key] = res.updatedAt;
         // 记录本次推云的 updatedAt，用于防止 hydrate/subscribe 用更旧的值回覆
-        if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
+        if (res.updatedAt) {
+          lastPushedUpdatedAtRef.current[key] = res.updatedAt;
+          writeLastPushedAt(key, res.updatedAt);
+        }
+        // pending 已成功写入，清掉快照
+        delete pendingPushValueRef.current[key];
         setCloudSyncStatus((prev) => ({
           ...prev,
           [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
@@ -738,11 +777,16 @@ export function SiteContentProvider({ children }) {
       clearTimeout(pushDebouncedRef.current[key]);
       pushDebouncedRef.current[key] = null;
     }
+    // flush 已经立即推送，清掉对应的 pending 值，避免卸载 hook 重复再写一次
+    delete pendingPushValueRef.current[key];
     setCloudSyncStatus((prev) => ({ ...prev, [key]: { status: 'syncing', at: Date.now() } }));
     const res = await saveSetting(key, value);
     if (res.success) {
       siteSyncRefs.current[key] = res.updatedAt;
-      if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
+      if (res.updatedAt) {
+        lastPushedUpdatedAtRef.current[key] = res.updatedAt;
+        writeLastPushedAt(key, res.updatedAt);
+      }
       setCloudSyncStatus((prev) => ({
         ...prev,
         [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
@@ -754,6 +798,63 @@ export function SiteContentProvider({ children }) {
       }));
     }
     return res;
+  }, []);
+
+  // ============================================
+  // 页面卸载前立即 flush 所有 pending 去抖 push
+  // ============================================
+  // 问题场景：用户在"流程模板 / 内部文档"页点"+ 添加分类"、删分类、改分类名
+  // 这三个入口背后走的都是 updateFilterOptions → pushToCloud 的 400ms 去抖路径。
+  // 如果用户编辑完立刻刷新页面（或切换路由/关闭 tab），400ms 还没到，去抖的
+  // setTimeout 会随页面卸载被抛弃，云端从未写入新值。下次挂载时 hydrate 拉回
+  // 的还是旧值，表现为"刷新后筛选项就丢了，跨设备更看不到"。
+  //
+  // 这里监听 visibilitychange(hidden) + pagehide + beforeunload 三个时机，
+  // 把所有 pending 的值同步调用一次 saveSetting。注意：
+  //   - 用 document.visibilitychange hidden 能覆盖"切 tab / 手机熄屏"等场景；
+  //   - pagehide 覆盖"关闭 tab / 返回上一页"；
+  //   - beforeunload 覆盖"刷新 / 导航到别的站"。
+  //   三个事件在不同浏览器/平台上互有缺失，叠加监听保证至少触发一次。
+  // saveSetting 本身是异步的，浏览器在 unload 阶段通常会允许 pending fetch
+  // 跑完（Chrome/Edge 会尝试，Safari 最保守）。即便 flush 真的没跑完，下面还
+  // 有 localStorage updatedAt 兜底，也不会把新值冲掉。
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    const flushAll = () => {
+      const pending = pendingPushValueRef.current;
+      const keys = Object.keys(pending);
+      if (keys.length === 0) return;
+      keys.forEach((key) => {
+        const value = pending[key];
+        // 先取消对应的去抖定时器，避免 setTimeout 稍后在一个已经不存在的上下文里再打一次
+        if (pushDebouncedRef.current[key]) {
+          clearTimeout(pushDebouncedRef.current[key]);
+          pushDebouncedRef.current[key] = null;
+        }
+        // 直接调用 saveSetting，不 await——unload 阶段 await 也没意义
+        try {
+          saveSetting(key, value).then((res) => {
+            if (res && res.success && res.updatedAt) {
+              lastPushedUpdatedAtRef.current[key] = res.updatedAt;
+              siteSyncRefs.current[key] = res.updatedAt;
+              writeLastPushedAt(key, res.updatedAt);
+            }
+          }).catch(() => { /* 卸载阶段错误无意义 */ });
+        } catch { /* 同上 */ }
+        delete pending[key];
+      });
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') flushAll();
+    };
+    window.addEventListener('pagehide', flushAll);
+    window.addEventListener('beforeunload', flushAll);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('pagehide', flushAll);
+      window.removeEventListener('beforeunload', flushAll);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
   }, []);
 
   // state 变化 → 去抖 push 云端
