@@ -55,15 +55,32 @@ function saveArticleCategories(data) {
 
 // 双写：本地 + 云端（site_settings.article_categories），便于跨设备同步
 // lastSyncRef 用于记录最近一次自己 push 的 updated_at，订阅回流时可据此跳过
+//
+// ⚠️ 失败必须显式提示（与 EventPublish 的 persistEventCategories 对齐）：
+//   历史版本是 fire-and-forget 且只 console.warn —— 用户在 A 设备新增/删除/
+//   改名分类，saveSetting 因网络抖动 / RLS 拒绝 / 表不存在等原因失败时，
+//   本机 UI 已经按"操作成功"把 Tab 更新完了，云端却什么都没写；B 设备
+//   刷新或实时订阅都收不到变化，用户反馈就是"公众号文章归档 Tab 跨设备
+//   不同步"。改为 alert 显式提示，让用户第一时间知道需要重试。
+//
+// 函数本身仍是 async，但上层调用处大多没有 await —— 只要失败分支弹了 alert，
+// 用户就能知情；改成全链路 await 会传染大量 handler 签名，性价比不高。
 async function persistCategories(data, lastSyncRef) {
   saveArticleCategories(data);
-  if (!isSupabaseConfigured) return;
+  if (!isSupabaseConfigured) return { success: true, offline: true };
   const res = await saveSetting(SITE_KEYS.ARTICLE_CATEGORIES, data);
   if (res.success && lastSyncRef) {
     lastSyncRef.current = res.updatedAt;
   } else if (!res.success) {
     console.warn('[InternalArticles] 分类云端同步失败:', res.error);
+    try {
+      alert(
+        `文章分类保存到云端失败：${res.error || '未知错误'}\n` +
+        `改动已保存到本设备本地，但其它设备暂时看不到，请检查网络后重试。`,
+      );
+    } catch { /* SSR 或无 window 环境下忽略 */ }
   }
+  return res;
 }
 
 function buildCategoryMaps(cats) {
@@ -212,7 +229,12 @@ export default function InternalArticles() {
 
     fetchSetting(SITE_KEYS.ARTICLE_CATEGORIES).then(({ value, updatedAt, error }) => {
       if (cancelled || error) return;
-      if (Array.isArray(value) && value.length > 0) {
+      // ⚠️ 允许空数组（[]）原样覆盖本地：代表用户在其它设备把分类全部删了。
+      // 以前这里写的是 `value.length > 0` —— 只要云端是 []（全删状态），B 设备
+      // 就会以为"云端没数据"而保留本地默认的 4 个预置分类；然后 B 设备任何一次
+      // 对分类的修改都会把"本地默认 + 这次新增"整体回推云端，等于把 A 设备的
+      // 删除动作撤销了，跨设备完全失配。这里只要是合法数组就以云端为准。
+      if (Array.isArray(value)) {
         lastCatSyncRef.current = updatedAt;
         setCategoryList(value);
         saveArticleCategories(value);
@@ -221,6 +243,7 @@ export default function InternalArticles() {
 
     const unsub = subscribeSetting(SITE_KEYS.ARTICLE_CATEGORIES, (value, updatedAt) => {
       if (updatedAt && lastCatSyncRef.current === updatedAt) return; // 自己的回流，跳过
+      // 同上：realtime 推来的空数组也要原样应用，不能被丢弃。
       if (!Array.isArray(value)) return;
       lastCatSyncRef.current = updatedAt;
       setCategoryList(value);
