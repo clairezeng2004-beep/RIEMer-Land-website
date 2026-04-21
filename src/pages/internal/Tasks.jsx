@@ -326,6 +326,9 @@ export default function Tasks() {
   // 添加新标签状态
   const [showAddCategory, setShowAddCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState('');
+  // 添加新状态
+  const [showAddStatus, setShowAddStatus] = useState(false);
+  const [newStatusName, setNewStatusName] = useState('');
 
   // memberMap 合并硬编码和动态用户
   const memberMap = useMemo(() => {
@@ -702,6 +705,10 @@ export default function Tasks() {
 
   // 提交中标记：防止用户在 await 期间重复点"确认"按钮触发双推
   const [addingCategory, setAddingCategory] = useState(false);
+  // 同上，状态栏自己的增/删也要有一把锁，避免并发双推
+  const [addingStatus, setAddingStatus] = useState(false);
+  const [deletingStatusName, setDeletingStatusName] = useState(null);
+  const [deletingCategoryName, setDeletingCategoryName] = useState(null);
 
   // 添加新分类标签
   //
@@ -754,6 +761,119 @@ export default function Tasks() {
       }
     } finally {
       setAddingCategory(false);
+    }
+  };
+
+  // 添加新状态（与 handleAddCategory 完全同构，见其注释里的"三连坑"说明）
+  const handleAddStatus = async () => {
+    if (addingStatus) return;
+    const trimmed = newStatusName.trim();
+    if (!trimmed) return;
+    if (trimmed === '全部') {
+      alert('「全部」是系统保留项，不能作为自定义状态名。');
+      return;
+    }
+    const normalized = trimmed.toLowerCase();
+    if (taskStatuses.some((s) => String(s).trim().toLowerCase() === normalized)) {
+      alert(`状态「${trimmed}」已存在，请换一个名字。`);
+      return;
+    }
+
+    setAddingStatus(true);
+    const nextFilterOptions = {
+      ...filterOptions,
+      taskStatuses: [...taskStatuses, trimmed],
+    };
+    updateFilterOptions(nextFilterOptions);
+    setNewStatusName('');
+    setShowAddStatus(false);
+
+    try {
+      const res = await flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions);
+      if (!res?.success) {
+        updateFilterOptions({
+          taskStatuses: taskStatuses.filter((s) => s !== trimmed),
+        });
+        alert(
+          `新增状态「${trimmed}」失败，已回滚。原因：${res?.error || '未知错误'}\n` +
+          `请检查网络后重试；如问题持续，请联系管理员。`,
+        );
+      }
+    } finally {
+      setAddingStatus(false);
+    }
+  };
+
+  // 删除状态
+  //
+  // 数据契约：taskStatuses 只决定"快捷筛选条 / 下拉选项 / 新建弹窗"里能选到哪些状态；
+  // 事项本身的 status 字段仍然是**字符串字面值**存储。删除一个状态后：
+  //   - 已有事项的 status 字段不动（保留字面值，不丢数据）；
+  //   - 这些事项在"状态"筛选栏里不再出现对应按钮；但表头列筛选器仍能看到它们
+  //     （因为列筛选器是从当前 tasks 的实际 status 值里去重生成的）；
+  //   - 若当前正选中被删除的状态为 filterStatus，自动切回"全部"，避免筛出空结果。
+  const handleDeleteStatus = async (name) => {
+    if (deletingStatusName) return;
+    const inUseCount = tasks.filter((t) => t.status === name).length;
+    const confirmMsg =
+      inUseCount > 0
+        ? `确认删除状态「${name}」？\n\n当前有 ${inUseCount} 条事项正在使用这个状态。\n删除后，这些事项的状态字段不会被清除，但不会再出现在快捷筛选条里。\n\n此操作可撤销：随时可以在状态栏点「+ 添加状态」重新添加同名项。`
+        : `确认删除状态「${name}」？\n\n当前没有事项使用此状态，可以安全删除。`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeletingStatusName(name);
+    const nextStatuses = taskStatuses.filter((s) => s !== name);
+    const nextFilterOptions = { ...filterOptions, taskStatuses: nextStatuses };
+    updateFilterOptions(nextFilterOptions);
+    // 如果正选中被删的状态，回退到"全部"避免空白结果
+    if (filterStatus === name) setFilterStatus('全部');
+
+    try {
+      const res = await flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions);
+      if (!res?.success) {
+        // 精确回滚：把被删除的状态加回去，位置追加到末尾（原顺序无法恢复，但数据不丢）
+        updateFilterOptions({
+          taskStatuses: [...nextStatuses, name],
+        });
+        alert(
+          `删除状态「${name}」失败，已回滚。原因：${res?.error || '未知错误'}\n` +
+          `请检查网络后重试。`,
+        );
+      }
+    } finally {
+      setDeletingStatusName(null);
+    }
+  };
+
+  // 删除分类（逻辑与 handleDeleteStatus 同构，只是落到 taskCategories）
+  const handleDeleteCategory = async (name) => {
+    if (deletingCategoryName) return;
+    const inUseCount = tasks.filter((t) => t.category === name).length;
+    const confirmMsg =
+      inUseCount > 0
+        ? `确认删除分类「${name}」？\n\n当前有 ${inUseCount} 条事项属于这个分类。\n删除后，这些事项的分类字段不会被清除，但不会再出现在快捷筛选条里。\n\n此操作可撤销：随时可以在分类栏点「+ 添加标签」重新添加同名项。`
+        : `确认删除分类「${name}」？\n\n当前没有事项使用此分类，可以安全删除。`;
+    if (!window.confirm(confirmMsg)) return;
+
+    setDeletingCategoryName(name);
+    const nextCategories = taskCategories.filter((c) => c !== name);
+    const nextFilterOptions = { ...filterOptions, taskCategories: nextCategories };
+    updateFilterOptions(nextFilterOptions);
+    if (filterCategory === name) setFilterCategory('全部');
+
+    try {
+      const res = await flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFilterOptions);
+      if (!res?.success) {
+        updateFilterOptions({
+          taskCategories: [...nextCategories, name],
+        });
+        alert(
+          `删除分类「${name}」失败，已回滚。原因：${res?.error || '未知错误'}\n` +
+          `请检查网络后重试。`,
+        );
+      }
+    } finally {
+      setDeletingCategoryName(null);
     }
   };
 
@@ -992,26 +1112,115 @@ export default function Tasks() {
           </div>
           <div className="tasks-filters__group">
             <span className="tasks-filters__label">状态：</span>
-            {['全部', ...taskStatuses.filter((s) => tasks.some((t) => t.status === s))].map((s) => (
-              <button
-                key={s}
-                className={`tasks-filters__btn ${filterStatus === s ? 'tasks-filters__btn--active' : ''}`}
-                onClick={() => setFilterStatus(s)}
-              >
-                {s}
-              </button>
+            {/* "全部"是系统伪项，不允许删除 */}
+            <button
+              key="__all__"
+              className={`tasks-filters__btn ${filterStatus === '全部' ? 'tasks-filters__btn--active' : ''}`}
+              onClick={() => setFilterStatus('全部')}
+            >
+              全部
+            </button>
+            {/*
+              状态按钮：鼠标悬停（.tasks-filters__chip:hover）时显示右上角小"×"；
+              点击"×"时 stopPropagation 阻止触发按钮本身的选中动作。
+              注意：这里不再像旧实现那样只渲染"tasks 里实际存在的状态"，而是
+              渲染完整的 taskStatuses 列表——否则刚建出来还没被任何事项使用的状态
+              不会显现，用户也就没法点"×"删除它。
+            */}
+            {taskStatuses.map((s) => (
+              <span key={s} className="tasks-filters__chip">
+                <button
+                  className={`tasks-filters__btn ${filterStatus === s ? 'tasks-filters__btn--active' : ''}`}
+                  onClick={() => setFilterStatus(s)}
+                >
+                  {s}
+                </button>
+                <button
+                  type="button"
+                  className="tasks-filters__chip-remove"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteStatus(s);
+                  }}
+                  disabled={deletingStatusName === s}
+                  title={deletingStatusName === s ? '删除中…' : `删除状态「${s}」`}
+                  aria-label={`删除状态「${s}」`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
             ))}
+            {showAddStatus ? (
+              <div className="tasks-filters__add-category">
+                <input
+                  type="text"
+                  className="tasks-filters__add-input"
+                  placeholder="新状态名称"
+                  value={newStatusName}
+                  onChange={(e) => setNewStatusName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleAddStatus();
+                    if (e.key === 'Escape') { setShowAddStatus(false); setNewStatusName(''); }
+                  }}
+                  autoFocus
+                />
+                <button
+                  className="tasks-filters__add-confirm"
+                  onClick={handleAddStatus}
+                  disabled={!newStatusName.trim() || addingStatus}
+                  title={addingStatus ? '正在同步到云端…' : '确认添加'}
+                >
+                  <CheckCircle2 size={14} />
+                </button>
+                <button
+                  className="tasks-filters__add-cancel"
+                  onClick={() => { setShowAddStatus(false); setNewStatusName(''); }}
+                  title="取消"
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                className="tasks-filters__btn tasks-filters__btn--add"
+                onClick={() => setShowAddStatus(true)}
+                title="添加新状态"
+              >
+                <Plus size={14} /> 添加状态
+              </button>
+            )}
           </div>
           <div className="tasks-filters__group">
             <span className="tasks-filters__label">分类：</span>
-            {['全部', ...orderedTaskCategories].map((c) => (
-              <button
-                key={c}
-                className={`tasks-filters__btn ${filterCategory === c ? 'tasks-filters__btn--active' : ''}`}
-                onClick={() => setFilterCategory(c)}
-              >
-                {c}
-              </button>
+            <button
+              key="__all__"
+              className={`tasks-filters__btn ${filterCategory === '全部' ? 'tasks-filters__btn--active' : ''}`}
+              onClick={() => setFilterCategory('全部')}
+            >
+              全部
+            </button>
+            {orderedTaskCategories.map((c) => (
+              <span key={c} className="tasks-filters__chip">
+                <button
+                  className={`tasks-filters__btn ${filterCategory === c ? 'tasks-filters__btn--active' : ''}`}
+                  onClick={() => setFilterCategory(c)}
+                >
+                  {c}
+                </button>
+                <button
+                  type="button"
+                  className="tasks-filters__chip-remove"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDeleteCategory(c);
+                  }}
+                  disabled={deletingCategoryName === c}
+                  title={deletingCategoryName === c ? '删除中…' : `删除分类「${c}」`}
+                  aria-label={`删除分类「${c}」`}
+                >
+                  <X size={12} />
+                </button>
+              </span>
             ))}
             {showAddCategory ? (
               <div className="tasks-filters__add-category">

@@ -309,6 +309,65 @@
   color: var(--color-primary);
 }
 
+/*
+  状态/分类按钮的"可删除"胶囊外壳
+  - 容器 position:relative 锚定右上角的"×"按钮；
+  - 默认 "×" 隐藏（opacity:0），鼠标悬停 chip 时显现；
+  - 触屏设备（hover: none）通过 @media 直接常显，否则触控无从唤出；
+  - "×" 吸附在按钮右上角，略超出 border，视觉上像一个"可关闭的 tag"。
+*/
+.tasks-filters__chip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.tasks-filters__chip-remove {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--color-border);
+  background: var(--color-bg-card);
+  color: var(--color-text-muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  opacity: 0;
+  transform: scale(0.8);
+  transition: opacity var(--transition-fast), transform var(--transition-fast), background var(--transition-fast), color var(--transition-fast);
+  padding: 0;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+.tasks-filters__chip:hover .tasks-filters__chip-remove,
+.tasks-filters__chip-remove:focus-visible {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.tasks-filters__chip-remove:hover {
+  background: #c0392b;
+  color: #fff;
+  border-color: #c0392b;
+}
+
+.tasks-filters__chip-remove:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 触屏/无 hover 设备：常显删除按钮，避免无法唤出 */
+@media (hover: none) {
+  .tasks-filters__chip-remove {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
 .tasks-filters__add-category {
   display: inline-flex;
   align-items: center;
