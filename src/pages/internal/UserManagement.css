@@ -73,9 +73,21 @@
   animation: users-refresh-spin 0.9s linear infinite;
 }
 
-/* Stats */
+/* Stats
+   -----------------------------------------------------
+   设计对齐：与 Tasks / NotificationManagement 的「统计卡片」保持一致画风——
+     · 容器用 grid 两列等宽，避免两张卡因内容长度不同而宽度不齐；
+     · 数字 value 统一 --text-2xl / 700 / tabular-nums；
+     · 卡片本身用中性色（text），只让数字按状态着色（success/warning），
+       icon 独立上色做为视觉符号，不再让整卡 color 继承。
+   保留差异：
+     · UserManagement 这里 value + label 同行左右布局（因为「待授权」卡要
+       附带一个 chevron 表示可展开），所以不照搬 Tasks 的 text-align:center，
+       而是维持 icon + 文本堆叠 + chevron 的原交互结构；仅对齐视觉语言。
+*/
 .users-stats {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
   gap: var(--space-md);
   margin-bottom: var(--space-2xl);
 }
@@ -88,10 +100,20 @@
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-lg);
   padding: var(--space-lg) var(--space-xl);
-  color: var(--color-success);
+  /* 卡片本体回归中性色；图标 / 数字各自显式上色，避免整卡染色和「Tasks
+     数字统计卡」画风不一致。 */
+  color: var(--color-text);
+  /* grid 已经保证等宽，这里再显式 min-width:0 让内部不撑破列 */
+  min-width: 0;
 }
 
-.users-stat--pending {
+/* 左侧图标：沿用原先的语义色，让卡片一眼能区分「已授权 / 待授权」。 */
+.users-stat > svg {
+  color: var(--color-success);
+  flex-shrink: 0;
+}
+
+.users-stat--pending > svg {
   color: var(--color-warning);
 }
 
@@ -114,6 +136,7 @@
   margin-left: auto;
   color: var(--color-text-muted);
   transition: transform 0.25s ease, opacity 0.2s ease;
+  flex-shrink: 0;
 }
 
 .users-stat__chevron--open {
@@ -127,9 +150,10 @@
 }
 
 .users-stat__value {
-  font-size: var(--text-xl);
+  /* 与 Tasks / NotificationManagement 的数字统计卡保持一致 */
+  font-size: var(--text-2xl);
   font-weight: 700;
-  color: var(--color-text);
+  color: var(--color-success);
   /* 等宽数字：切换位数时字符宽度一致，避免轻微抖动 */
   font-variant-numeric: tabular-nums;
   /* 预留一个字符宽度的最小宽度，保证 "—" → 实际数字时不撑开布局 */
@@ -137,9 +161,14 @@
   line-height: 1.2;
 }
 
+.users-stat--pending .users-stat__value {
+  color: var(--color-warning);
+}
+
 .users-stat__label {
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  margin-top: 2px;
 }
 
 /* 待授权用户面板 */
@@ -462,8 +491,9 @@
     padding: var(--space-sm) var(--space-md);
     gap: var(--space-sm);
   }
+  /* 手机端数字字号与 Tasks/NotificationManagement 的统计卡保持一致 */
   .users-stat__value {
-    font-size: var(--text-lg);
+    font-size: var(--text-xl);
   }
   .users-stat__label {
     font-size: var(--text-xs);
