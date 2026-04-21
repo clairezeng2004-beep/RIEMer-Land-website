@@ -65,6 +65,29 @@ export default function ContentManagement() {
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
   const [syncingMembers, setSyncingMembers] = useState(false);
 
+  // ---- 筛选选项"删除类操作"即时落盘 ----
+  // 背景：本页原本是"草稿式"编辑——改完要点页面顶部的「保存更改」按钮才会
+  // flushSettingToCloud 推云端。对"新增/改名"这种需要连续输入的操作这个模式合适，
+  // 但对"删除"就很容易踩坑：用户点了 🗑️ 觉得"已经删了"，没意识到还需要点保存，
+  // 关 tab 后 filtersForm 里的删除就丢了；更隐蔽的是——即使点了保存，如果在 400ms
+  // 去抖窗口内又刷新/切路由，push 仍可能被取消，其它设备就看不到删除结果。
+  //
+  // 所以这里把"删除 taskCategory / taskStatus / teamMember"改成**立即落盘**：
+  //   1) setFiltersForm     —— 立即刷新本页草稿 UI
+  //   2) updateFilterOptions—— 立即写 context + localStorage，其它打开的页面同步看到
+  //   3) flushSettingToCloud—— 立即 upsert 到 Supabase 并 await，失败时弹错误提示
+  //
+  // 只对"删除"走这条即时通道；新增空项和改名依旧走草稿+保存按钮，避免边输边 push
+  // 把中间态写到云端。
+  const flushFiltersImmediate = useCallback(async (nextFiltersForm, opLabel = '删除') => {
+    setFiltersForm(nextFiltersForm);
+    updateFilterOptions(nextFiltersForm);
+    const res = await flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFiltersForm);
+    if (!res?.success) {
+      alert(`${opLabel}已保存到本地，但同步到云端失败：${res?.error || '未知错误'}\n其它设备可能暂时看不到更改，请检查网络后重试。`);
+    }
+  }, [updateFilterOptions, flushSettingToCloud, SITE_KEYS]);
+
   // 文章管理状态
   const [articleUrl, setArticleUrl] = useState('');
   const [fetchingArticle, setFetchingArticle] = useState(false);
@@ -540,10 +563,11 @@ export default function ContentManagement() {
                       <button
                         className="content-mgmt__remove-btn"
                         onClick={() => {
-                          setFiltersForm({
+                          // 即时落盘：删除事项分类立刻同步到云端，避免用户忘点"保存"
+                          flushFiltersImmediate({
                             ...filtersForm,
                             taskCategories: filtersForm.taskCategories.filter((_, idx) => idx !== i),
-                          });
+                          }, '事项分类删除');
                         }}
                         title="删除"
                       >
@@ -585,10 +609,11 @@ export default function ContentManagement() {
                       <button
                         className="content-mgmt__remove-btn"
                         onClick={() => {
-                          setFiltersForm({
+                          // 即时落盘：删除事项状态立刻同步到云端
+                          flushFiltersImmediate({
                             ...filtersForm,
                             taskStatuses: filtersForm.taskStatuses.filter((_, idx) => idx !== i),
-                          });
+                          }, '事项状态删除');
                         }}
                         title="删除"
                       >
@@ -661,10 +686,11 @@ export default function ContentManagement() {
                           <button
                             className="content-mgmt__remove-btn"
                             onClick={() => {
-                              setFiltersForm({
+                              // 即时落盘：删除团队成员立刻同步到云端
+                              flushFiltersImmediate({
                                 ...filtersForm,
                                 teamMembers: filtersForm.teamMembers.filter((_, idx) => idx !== i),
-                              });
+                              }, '团队成员删除');
                               if (editingMemberIndex === i) setEditingMemberIndex(null);
                             }}
                             title="删除"
@@ -714,7 +740,7 @@ export default function ContentManagement() {
 
                 <div className="content-mgmt__hint">
                   <AlertCircle size={16} />
-                  <span>修改后请点击顶部「保存更改」按钮，筛选选项将同步更新到事项追踪页面。</span>
+                  <span>删除项会立即同步到云端及其它设备；新增项和改名需点击顶部「保存更改」按钮生效。</span>
                 </div>
               </div>
             )}
