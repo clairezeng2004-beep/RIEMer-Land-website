@@ -12,15 +12,20 @@
 --
 -- 使用方式：
 --   打开 Supabase Dashboard → SQL Editor → 粘贴本脚本整体 Run。
---   也可在 DBeaver / TablePlus / DataGrip 等桌面客户端整体执行，
---   本版本不使用 DO $$ ... $$ 匿名块，纯 DDL + SELECT，
---   任何 PostgreSQL 客户端都能逐句执行或整体执行。
+--   也可在 DBeaver / TablePlus / DataGrip 等桌面客户端整体执行。
+--   诊断输出部分仍是纯 DDL + SELECT；仅 STEP 3 用到一个不含 DECLARE
+--   的极简 DO 块做"表是否已在 publication 里"的条件判断（详见 STEP 3）。
 --
 -- 历史：
 --   v1 用 DO $$ ... DECLARE v_count INT ... $$ 做诊断输出，
 --   在 Supabase SQL Editor 里 OK，但在第三方客户端会把 DECLARE 块
 --   里的 v_count 当成"表名"解析，报 42P01 relation "v_count" does not exist。
---   v2（当前）改为纯 SQL 输出：每一步返回一行/多行结果，直观可见。
+--   v2 改为纯 SQL 输出：每一步返回一行/多行结果，直观可见。
+--   v3（当前）修复 STEP 3：直接 ALTER PUBLICATION ADD TABLE 在表已加入
+--   时会抛 42710 "relation ... is already member of publication"，
+--   Supabase SQL Editor 把这个错误当硬错误中断整个脚本。改成：先查
+--   pg_publication_rel，未加入才 ADD。仍是极简 DO 块（无 DECLARE），
+--   不触碰 v1 的坑。
 -- ============================================================
 
 
@@ -81,13 +86,32 @@ ORDER BY policyname;
 -- ============================================================
 -- STEP 3. 确保 realtime publication 包含 site_settings
 -- ============================================================
--- 直接 ALTER PUBLICATION，如果已加入会抛 duplicate_object 错。
--- 为避免报错打断脚本，这里改用 "如果未加入就加入" 的条件判断。
--- （仍然是纯 SQL，无 DO 块）
-ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
--- ^ 如果上一句报 "relation is already member of publication" 或
---   "publication supabase_realtime does not exist"，请忽略，
---   继续往下跑。前者说明本来就在，后者说明当前库不是 Supabase 云（非问题）。
+-- 直接 ALTER PUBLICATION ADD TABLE 在表已加入时会抛
+--   ERROR 42710: relation "site_settings" is already member of publication
+-- Supabase SQL Editor 会把这个错误当硬错误中断整个脚本（后续 STEP 不执行）。
+-- 为了幂等，这里先查 pg_publication_rel，仅在未加入时才 ADD。
+--
+-- 注意：这个 DO 块不声明任何变量（没有 DECLARE），所以不会触发 v1 版本
+-- 在第三方客户端上"把 DECLARE 的变量名当成表名解析"的坑。
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_publication p
+    JOIN pg_publication_rel pr ON pr.prpubid = p.oid
+    JOIN pg_class c            ON c.oid      = pr.prrelid
+    JOIN pg_namespace n        ON n.oid      = c.relnamespace
+    WHERE p.pubname = 'supabase_realtime'
+      AND n.nspname = 'public'
+      AND c.relname = 'site_settings'
+  ) THEN
+    -- 只有当 publication 存在时才 ADD；不存在则忽略（非 Supabase 云环境）
+    IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+      ALTER PUBLICATION supabase_realtime ADD TABLE public.site_settings;
+    END IF;
+  END IF;
+END
+$$;
 
 -- 验证：应当输出一行，说明 site_settings 在 supabase_realtime 里
 SELECT
