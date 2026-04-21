@@ -465,6 +465,118 @@ export default function MemberProfiles() {
     loadProfiles();
   }, [loadProfiles]);
 
+  // ============================================
+  // Supabase realtime 订阅：跨设备自动同步
+  // ============================================
+  // 场景：A 在桌面改了自己的行、或管理员在 B 改了某成员的行。其它在线设备
+  // （其他成员的手机 / 管理员的另一台电脑）应当在 ~1s 内看到最新值，而不
+  // 需要手动刷新页面。之前整个文件没有任何订阅，只在挂载时 loadProfiles()
+  // 拉一次，所以现象就是"跨设备不同步"。
+  //
+  // 设计：
+  //   - 监听 public.member_profiles 表的 INSERT / UPDATE / DELETE；
+  //   - 收到事件后**增量合并**到本地 profiles，不做全表重拉（全表重拉
+  //     在大表 + 慢网下依然会退化成"保存后等很久"）；
+  //   - INSERT / UPDATE 来的是 Postgres 行（不含 JOIN 过来的 name），
+  //     所以要用 extraProfiles / fallbackNameById 兜底取姓名——本地缓
+  //     存 + 现有 profiles state + getAllUsers 都可能有，优先复用已有
+  //     的 name（因为该成员在当前页面几乎一定是已知用户）；只有极端
+  //     情况（新用户刚被授权、但本地 allUsers 还没刷新）才会出现"未
+  //     知用户"，这时下次 loadProfiles 会修正；
+  //   - DELETE 直接把对应行剔除；
+  //   - 只要 isSupabaseConfigured + isAuthenticated 成立就订阅，跟
+  //     loadProfiles 的前置条件一致。
+  //
+  // 前置条件已满足：member_profiles 表已通过
+  // `ALTER PUBLICATION supabase_realtime ADD TABLE public.member_profiles;`
+  // 加入了 Realtime publication（见 supabase-members-and-albums.sql）。
+  useEffect(() => {
+    if (!isSupabaseConfigured || !supabase || !isAuthenticated) return;
+
+    const channel = supabase
+      .channel('member_profiles-sync')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'member_profiles' },
+        (payload) => {
+          const evt = payload.eventType;
+          // DELETE：payload.old 只含主键（REPLICA IDENTITY DEFAULT），这里
+          // 用 user_id 剔除即可。
+          if (evt === 'DELETE') {
+            const uid = payload.old?.user_id;
+            if (!uid) return;
+            setProfiles((prev) => {
+              const next = prev.filter((p) => p.user_id !== uid);
+              try {
+                saveLocalProfiles(
+                  next.map(({ id: _id, joined_at_display: _d, ...rest }) => rest)
+                );
+              } catch { /* ignore */ }
+              return next;
+            });
+            return;
+          }
+
+          // INSERT / UPDATE：payload.new 是完整行，但没有 JOIN 过来的 name
+          const row = payload.new;
+          if (!row || !row.user_id) return;
+
+          setProfiles((prev) => {
+            // 优先保留前端已解析出来的 name（loadProfiles 做过 JOIN +
+            // 显式补查 + 兜底），避免 realtime 事件把它覆盖成 '未知用户'。
+            const existing = prev.find((p) => p.user_id === row.user_id);
+            const formatted = formatProfilesFromSupabase([row], {
+              fallbackNameById: existing?.name
+                ? { [row.user_id]: existing.name }
+                : {},
+            })[0];
+
+            let next;
+            if (existing) {
+              next = prev.map((p) => (p.user_id === row.user_id ? formatted : p));
+            } else {
+              // INSERT：按 joined_at 升序插入新行
+              next = [...prev, formatted].sort((a, b) => {
+                const da = safeParseDate(a.joined_at);
+                const db = safeParseDate(b.joined_at);
+                return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
+              });
+              // 新成员 JOIN 姓名可能为空，异步补一下（不阻塞 UI）
+              if (!formatted.name || formatted.name === '未知用户') {
+                (async () => {
+                  try {
+                    const { data: profRow } = await supabase
+                      .from('profiles')
+                      .select('name')
+                      .eq('id', row.user_id)
+                      .maybeSingle();
+                    if (profRow?.name) {
+                      setProfiles((cur) =>
+                        cur.map((p) =>
+                          p.user_id === row.user_id ? { ...p, name: profRow.name } : p
+                        )
+                      );
+                    }
+                  } catch { /* ignore */ }
+                })();
+              }
+            }
+            try {
+              saveLocalProfiles(
+                next.map(({ id: _id, joined_at_display: _d, ...rest }) => rest)
+              );
+            } catch { /* ignore */ }
+            return next;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      try { supabase.removeChannel(channel); } catch { /* ignore */ }
+    };
+  }, [isAuthenticated]);
+
   // 开始编辑
   const startEdit = (profile) => {
     setEditingId(profile.user_id);
@@ -643,7 +755,43 @@ export default function MemberProfiles() {
       }
 
       // --- 成功（云端或本地模式）---
-      await loadProfiles();
+      //
+      // 关键性能修复（解决"点保存后要加载很久"）：
+      //   之前这里 `await loadProfiles()` 会重新发一遍带 JOIN 的 member_profiles
+      //   全表查询 + 潜在的 refreshSession + 显式补查 profiles + getAllUsers 兜底，
+      //   整条链路在 Supabase 免费层 / 冷启动 / 含大段长文本字段时常常要 2-10s
+      //   才能回来。用户的直观感受就是"保存按钮转圈转很久，输入框一直锁在那儿"。
+      //
+      //   实际上保存成功后我们已经拥有全部必要信息：
+      //     - 云端模式：update 已在服务端落库，本行其它列本地缓存里就是最新的
+      //       （除了 updateData 里刚改的字段，其它值本来就没动过）；
+      //     - 本地模式：同样只是改了 updateData，其它字段不变。
+      //   所以直接把本地 profiles 里这一行就地替换掉即可，没必要重新拉整张表。
+      //
+      //   跨设备同步由下面新加的 realtime 订阅负责：其他设备会在 ~1s 内收到
+      //   UPDATE 事件并增量合并，不再依赖"保存后重查 + 用户手动刷新"。
+      const patchedRow = (() => {
+        const base = profiles.find((p) => p.user_id === editingId) || {};
+        const merged = { ...base, ...updateData };
+        // joined_at 变了要同步刷新 joined_at_display
+        if (updateData.joined_at) {
+          const d = safeParseDate(updateData.joined_at);
+          merged.joined_at_display = d
+            ? `${d.getFullYear()}年${d.getMonth() + 1}月`
+            : '';
+        }
+        return merged;
+      })();
+      setProfiles((prev) => {
+        const next = prev.map((p) => (p.user_id === editingId ? patchedRow : p));
+        // 同步写本地缓存，保证离线/下次冷启动能看到最新值
+        try {
+          saveLocalProfiles(
+            next.map(({ id: _id, joined_at_display: _d, ...rest }) => rest)
+          );
+        } catch { /* ignore */ }
+        return next;
+      });
       setEditingId(null);
       setEditData({});
       setSaveMsg({
