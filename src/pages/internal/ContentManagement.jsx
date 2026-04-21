@@ -65,6 +65,37 @@ export default function ContentManagement() {
   const [editingMemberIndex, setEditingMemberIndex] = useState(null);
   const [syncingMembers, setSyncingMembers] = useState(false);
 
+  // ---- 让 filtersForm 跟随 context.filterOptions 的最新值 ----
+  // 背景：filtersForm 在 useState 里只用了挂载时的 filterOptions 作初始值。
+  // 但 filterOptions 在挂载后仍可能被以下两条路径更新：
+  //   1) SiteContentContext 首次 hydrate 云端设置（挂载 → fetch → setState，通常
+  //      在进入页面后的几十到几百毫秒内完成，把 localStorage 里的旧快照替换为云端最新）
+  //   2) 其它设备 / 其它页面修改了 filterOptions（例如另一个管理员在线编辑），
+  //      经由 context 的轮询 / 订阅回流到本页。
+  //
+  // 如果不让 filtersForm 跟随，就会出现严重的"丢更新"bug：
+  //   本机打开内容管理 → filtersForm = localStorage 旧值 → context 随后 hydrate
+  //   到了云端最新（例如同事刚加了一个新分类"X"）→ filterOptions 有 X 但
+  //   filtersForm 没有 → 用户在本页删除另一项 Y → flushFiltersImmediate 把
+  //   "filtersForm 去掉 Y"推云端 → 云端的 X 被整份覆盖丢失。
+  //
+  // 策略：用 filtersDirtyRef 标记"用户已在本页手动改过 filtersForm"。
+  //   - dirty = false 时，context 推来的新 filterOptions 原样同步到 filtersForm；
+  //   - dirty = true 时（用户正在编辑输入 / 加过空行），暂不覆盖，避免打断输入；
+  //   - 用户点击"保存更改"或任何"立即落盘"按钮（handleSave / flushFiltersImmediate）
+  //     都会把最新 filtersForm 推上云端并把 dirty 清回 false，此后可继续跟随远端。
+  const filtersDirtyRef = useRef(false);
+  useEffect(() => {
+    if (filtersDirtyRef.current) return;
+    setFiltersForm((prev) => (prev === filterOptions ? prev : { ...filterOptions }));
+  }, [filterOptions]);
+
+  // 包装一个 setter：任何用户主动编辑 filtersForm 的入口都应走它，自动标记 dirty。
+  const markFiltersDirty = useCallback((updater) => {
+    filtersDirtyRef.current = true;
+    setFiltersForm(updater);
+  }, []);
+
   // ---- 筛选选项"删除类操作"即时落盘 ----
   // 背景：本页原本是"草稿式"编辑——改完要点页面顶部的「保存更改」按钮才会
   // flushSettingToCloud 推云端。对"新增/改名"这种需要连续输入的操作这个模式合适，
@@ -85,7 +116,10 @@ export default function ContentManagement() {
     const res = await flushSettingToCloud(SITE_KEYS.FILTER_OPTIONS, nextFiltersForm);
     if (!res?.success) {
       alert(`${opLabel}已保存到本地，但同步到云端失败：${res?.error || '未知错误'}\n其它设备可能暂时看不到更改，请检查网络后重试。`);
+      return;
     }
+    // 已落盘到云端，清除 dirty，让 context 后续推来的最新值能继续同步进 filtersForm
+    filtersDirtyRef.current = false;
   }, [updateFilterOptions, flushSettingToCloud, SITE_KEYS]);
 
   // 文章管理状态
@@ -244,6 +278,8 @@ export default function ContentManagement() {
     });
     // 绿条 / 错误条分别决定消失时间：成功 2.5s 收起，失败留着让用户看清
     if (failures.length === 0) {
+      // 已落盘，清除 dirty 标记；此后 context 云端推来的新 filterOptions 可继续同步到 filtersForm
+      filtersDirtyRef.current = false;
       setTimeout(() => {
         setSaved(false);
         setCloudSaveState({ phase: null, failures: [] });
@@ -554,7 +590,7 @@ export default function ContentManagement() {
                           onChange={(e) => {
                             const arr = [...filtersForm.taskCategories];
                             arr[i] = e.target.value;
-                            setFiltersForm({ ...filtersForm, taskCategories: arr });
+                            markFiltersDirty({ ...filtersForm, taskCategories: arr });
                           }}
                           className="content-mgmt__input"
                           placeholder="分类名称"
@@ -578,7 +614,7 @@ export default function ContentManagement() {
                   <button
                     className="content-mgmt__add-btn"
                     onClick={() =>
-                      setFiltersForm({
+                      markFiltersDirty({
                         ...filtersForm,
                         taskCategories: [...filtersForm.taskCategories, ''],
                       })
@@ -600,7 +636,7 @@ export default function ContentManagement() {
                           onChange={(e) => {
                             const arr = [...filtersForm.taskStatuses];
                             arr[i] = e.target.value;
-                            setFiltersForm({ ...filtersForm, taskStatuses: arr });
+                            markFiltersDirty({ ...filtersForm, taskStatuses: arr });
                           }}
                           className="content-mgmt__input"
                           placeholder="状态名称"
@@ -624,7 +660,7 @@ export default function ContentManagement() {
                   <button
                     className="content-mgmt__add-btn"
                     onClick={() =>
-                      setFiltersForm({
+                      markFiltersDirty({
                         ...filtersForm,
                         taskStatuses: [...filtersForm.taskStatuses, ''],
                       })
@@ -709,7 +745,7 @@ export default function ContentManagement() {
                               onChange={(e) => {
                                 const arr = [...filtersForm.teamMembers];
                                 arr[i] = { ...arr[i], name: e.target.value };
-                                setFiltersForm({ ...filtersForm, teamMembers: arr });
+                                markFiltersDirty({ ...filtersForm, teamMembers: arr });
                               }}
                               className="content-mgmt__input"
                               placeholder="成员姓名"
@@ -727,7 +763,7 @@ export default function ContentManagement() {
                     className="content-mgmt__add-btn"
                     onClick={() => {
                       const newId = `member-${Date.now()}`;
-                      setFiltersForm({
+                      markFiltersDirty({
                         ...filtersForm,
                         teamMembers: [...filtersForm.teamMembers, { id: newId, name: '', role: '' }],
                       });

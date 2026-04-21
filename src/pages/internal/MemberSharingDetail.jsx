@@ -140,7 +140,8 @@ export default function MemberSharingDetail() {
         const [list, cats] = await Promise.all([fetchSharings(), fetchCategories()]);
         if (cancelled) return;
         setSharings(list);
-        if (cats && cats.length > 0) setCategoryList(cats);
+        // 兼容云端返回空数组（他人已在另一设备把分类全部删除的场景）
+        if (Array.isArray(cats)) setCategoryList(cats);
       } catch (err) {
         console.warn('[MemberSharingDetail] 加载失败:', err);
       } finally {

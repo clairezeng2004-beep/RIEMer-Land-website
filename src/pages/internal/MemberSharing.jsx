@@ -136,7 +136,10 @@ export default function MemberSharing() {
         const [list, cats] = await Promise.all([fetchSharings(), fetchCategories()]);
         if (cancelled) return;
         setSharings(list);
-        if (cats && cats.length > 0) setCategoryList(cats);
+        // ⚠️ 必须兼容"空数组"—— 若只有云端可用且用户已在另一设备把分类全删光，
+        // fetchCategories 会返回 []，直接同步给 UI；若 cats 为 null/undefined
+        // （服务层意外分支）才保留默认列表不动。
+        if (Array.isArray(cats)) setCategoryList(cats);
       } catch (err) {
         console.warn('[MemberSharing] 初次加载失败:', err);
       }
@@ -167,7 +170,8 @@ export default function MemberSharing() {
   useEffect(() => {
     const unsubscribe = subscribeCategories(() => {
       fetchCategories().then((cats) => {
-        if (cats && cats.length > 0) setCategoryList(cats);
+        // 同上：cats 可能是空数组（别的设备把所有分类都删了），原样应用
+        if (Array.isArray(cats)) setCategoryList(cats);
       }).catch(() => { /* ignore */ });
     });
     return () => unsubscribe();

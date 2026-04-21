@@ -241,7 +241,16 @@ export async function migrateLocalSharingsToDb() {
 // Categories（分类）
 // ================================================================
 
-/** 获取所有分类（按 sort_order 升序） */
+/** 获取所有分类（按 sort_order 升序）
+ *
+ * ⚠️ 空数组语义很重要：
+ *   - 云端成功返回 0 行 → 表示"用户把所有分类都删掉了"，必须原样返回 []，
+ *     不能兜底成 DEFAULT_CATEGORIES，否则会出现"A 设备把默认分类全删了、
+ *     B 设备收到 realtime 重 fetch → 被默认分类填回去"的诡异体验，删除就
+ *     等于没做。
+ *   - 只有在 supabase 未配置 / 请求出错（无法得知云端真实状态）时，才回退
+ *     localStorage 的本地兜底，避免断网 / RLS 拒绝等异常场景下丢数据。
+ */
 export async function fetchCategories() {
   if (!isSupabaseConfigured || !supabase) {
     return getLocalCategories();
@@ -255,8 +264,8 @@ export async function fetchCategories() {
       console.warn('[MemberSharingDB] 获取分类失败，回退本地:', error.message);
       return getLocalCategories();
     }
-    const list = (data || []).map((r) => ({ key: r.key, label: r.label, color: r.color }));
-    return list.length > 0 ? list : DEFAULT_CATEGORIES;
+    // 云端真实结果（可能为空数组，空 = 用户清空了所有分类，必须原样返回）
+    return (data || []).map((r) => ({ key: r.key, label: r.label, color: r.color }));
   } catch (err) {
     console.warn('[MemberSharingDB] 获取分类异常，回退本地:', err.message);
     return getLocalCategories();

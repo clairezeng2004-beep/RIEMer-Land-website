@@ -457,7 +457,9 @@ export default function MemberSharingCreate() {
     fetchCategories()
       .then((list) => {
         if (cancelled) return;
-        if (list && list.length > 0) setCats(list);
+        // 允许云端空数组（用户可能已在其它设备把所有分类都删了），
+        // 直接应用；若服务层意外返回 null/undefined 则保留当前 cats。
+        if (Array.isArray(list)) setCats(list);
       })
       .catch(() => { /* ignore */ });
     return () => { cancelled = true; };
