@@ -297,12 +297,32 @@
   .notifications-page__header {
     flex-direction: column;
     gap: var(--space-md);
+    /* 手机端：把 header 与下方筛选行的间距收紧到和 header 内部 gap 一致，
+       让「全部/未读/已读」这一行的垂直位置 ≈ 其他 TAB（Documents/Gallery/
+       Tasks 等）顶部「上传文档 / 新建相册」按钮的位置。
+       其他 TAB 手机端节奏为：
+         padding-top(--space-3xl) + h1 + p + header.gap(--space-md) + btn(margin-top:4px)
+       Notifications 这里把 __header margin-bottom 从 --space-xl 改成 --space-md 后，
+       当「全部已读」按钮不存在时，filters 就紧跟 h1/p，占位与其他 TAB 的按钮一致；
+       当「全部已读」按钮存在时，filters 位于按钮下一行，仍保持规整节奏。 */
+    margin-bottom: var(--space-md);
   }
   .notifications-page__header .btn {
     align-self: flex-start;
     padding: 0.3rem 0.8rem;
     font-size: var(--text-sm);
   }
+
+  /* 邮件提醒横幅：手机端下方间距同步收紧，整体内容往上移一点。 */
+  .notifications-email-banner {
+    margin-bottom: var(--space-md);
+  }
+
+  /* 筛选行：手机端底部间距适度收紧，让列表整体往上提。 */
+  .notifications-filters {
+    margin-bottom: var(--space-lg);
+  }
+
   .notification-item {
     flex-direction: column;
     gap: var(--space-sm);
