@@ -564,6 +564,14 @@ export function SiteContentProvider({ children }) {
   // 标记该 key 是否已完成首次云端拉取（hydrated）。只有 hydrated 后的本地变更才允许 push 回云端，
   // 否则初始化阶段的本地 mock 会把云端真实数据覆盖掉。
   const hydratedKeysRef = useRef({});
+  // 本地是否在 hydrate 完成前就被用户改过（含保存按钮触发 flushSettingToCloud）。
+  // 若 true，则 hydrate 返回来的云端值即使非空也不能再覆盖本地 state——否则会出现：
+  //   保存 → flush 成功 → 稍后的 fetchSetting 回包带着 flush 之前的旧值 → 覆盖本地 →
+  //   触发 effect push → 把旧值写回云端（刷新后就看不到刚才的编辑）。
+  const localDirtyRef = useRef({});
+  // 最近一次我们成功推到云端的 updatedAt（包含去抖 push 和 flush 两种路径）。
+  // hydrate 和订阅回来的数据，只有 updatedAt 比这个值新，才允许覆盖本地。
+  const lastPushedUpdatedAtRef = useRef({});
   // 每条 state 的 setter + 默认值生成器 + 是否为合并型（对象）或替换型（数组）
   const syncDefs = [
     { key: SITE_KEYS.PUBLIC_CONTENT, setter: setContent,        fallback: getDefaultContent,  kind: 'object' },
@@ -599,6 +607,27 @@ export function SiteContentProvider({ children }) {
           hydratedKeysRef.current[key] = true;
           return;
         }
+        // 竞态防御：如果在 fetch 发出后、回包之前，用户已经触发过保存/flush，
+        // 那么 lastPushedUpdatedAtRef 会比 fetch 回包的 updatedAt 新（或相等）。
+        // 此时必须放弃覆盖本地 state，否则会把刚保存的新值冲掉，随后 push-effect
+        // 再把旧值写回云端，造成"保存后刷新就没了，跨设备也看不到"。
+        const lastPushed = lastPushedUpdatedAtRef.current[key];
+        if (lastPushed && updatedAt && lastPushed >= updatedAt) {
+          hydratedKeysRef.current[key] = true;
+          console.log(
+            `[SiteContent] ${key} hydrate 跳过覆盖：本地最近推云 updatedAt=${lastPushed} ≥ 云端返回 ${updatedAt}`
+          );
+          return;
+        }
+        // 本地已被用户改过但还没推云成功：同样不能被云端旧值覆盖。
+        // 标 hydrated 为 true，让下次 effect push 真正把本地变更写上去。
+        if (localDirtyRef.current[key]) {
+          hydratedKeysRef.current[key] = true;
+          console.log(
+            `[SiteContent] ${key} hydrate 跳过覆盖：本地已 dirty，保留用户正在编辑的值`
+          );
+          return;
+        }
         siteSyncRefs.current[key] = updatedAt;
         setter((prev) => {
           if (kind === 'object') {
@@ -618,6 +647,10 @@ export function SiteContentProvider({ children }) {
       const unsub = subscribeSetting(key, (value, updatedAt) => {
         // 本地刚写入的回流，跳过
         if (updatedAt && siteSyncRefs.current[key] === updatedAt) return;
+        // 同样防竞态：如果订阅回来的 updatedAt 不比我们本地推过的新，就不接受。
+        // 避免用户保存后收到一条"之前的旧版本"订阅事件，把刚保存的值冲掉。
+        const lastPushed = lastPushedUpdatedAtRef.current[key];
+        if (lastPushed && updatedAt && lastPushed >= updatedAt) return;
         siteSyncRefs.current[key] = updatedAt;
         setter((prev) => {
           if (kind === 'object') {
@@ -659,12 +692,16 @@ export function SiteContentProvider({ children }) {
     }
     // 必须等该 key 从云端 hydrate 完成后才允许回写，否则初始化阶段的本地 mock 会覆盖云端真实数据
     if (!hydratedKeysRef.current[key]) return;
+    // 只要 push 被真正排队，就把 dirty 标记置为 true，让可能晚到的 fetch 回包不要覆盖本地
+    localDirtyRef.current[key] = true;
     if (pushDebouncedRef.current[key]) clearTimeout(pushDebouncedRef.current[key]);
     setCloudSyncStatus((prev) => ({ ...prev, [key]: { status: 'syncing', at: Date.now() } }));
     pushDebouncedRef.current[key] = setTimeout(async () => {
       const res = await saveSetting(key, value);
       if (res.success) {
         siteSyncRefs.current[key] = res.updatedAt;
+        // 记录本次推云的 updatedAt，用于防止 hydrate/subscribe 用更旧的值回覆
+        if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
         setCloudSyncStatus((prev) => ({
           ...prev,
           [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
@@ -692,6 +729,10 @@ export function SiteContentProvider({ children }) {
       }));
       return { success: false, error: 'supabase-not-configured' };
     }
+    // 用户点了保存 = 本地权威，必须把 dirty 标起来；同时把 hydrated 强制置 true，
+    // 保证即使 fetchSetting 回包还没到（hydrate 尚未完成），也不会被吞掉后续 push。
+    localDirtyRef.current[key] = true;
+    hydratedKeysRef.current[key] = true;
     // 取消掉可能正在排队的去抖 push，避免它覆盖我们立即推的结果
     if (pushDebouncedRef.current[key]) {
       clearTimeout(pushDebouncedRef.current[key]);
@@ -701,6 +742,7 @@ export function SiteContentProvider({ children }) {
     const res = await saveSetting(key, value);
     if (res.success) {
       siteSyncRefs.current[key] = res.updatedAt;
+      if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
       setCloudSyncStatus((prev) => ({
         ...prev,
         [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
