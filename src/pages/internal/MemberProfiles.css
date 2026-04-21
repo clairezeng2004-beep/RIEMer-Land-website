@@ -625,6 +625,24 @@
   .member-profiles-table__input {
     font-size: var(--text-sm);
   }
+
+  /* 手机端：序号列、姓名列适当收窄，腾出更多横向空间给后面的内容列。
+     - 序号列由 44px → 36px：两位数（如 10、20）配合 nowrap 仍能一行；
+     - 姓名列 minWidth 由 90px → 76px：中文姓名 2~3 字 + 6px gap + 可能的
+       "我"角标在 14px 字号下仍能在一行内放下（实测 3 字 ≈ 42px，
+       加左右 padding 0.625rem×2 ≈ 20px，总占用 ≈ 62px，76px 充裕）。
+     - 同步把 name-col 的 sticky left 从 44px 改为 36px，紧贴新的 # 列宽。 */
+  .member-profiles-table__sticky-col {
+    min-width: 36px;
+    width: 36px;
+  }
+  .member-profiles-table__name-col {
+    left: 36px;
+  }
+  .member-profiles-table th.member-profiles-table__name-col,
+  .member-profiles-table td.member-profiles-table__name-col {
+    min-width: 76px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -641,6 +659,23 @@
      确保两个页面的表头列高始终一致。 */
   .member-profiles-table td {
     padding: 0.4rem 0.55rem;
+  }
+
+  /* 更窄屏下序号列 / 姓名列再适度收紧，
+     但仍保证两位数序号、2~3 字中文姓名一行内放下。
+     - # 列：36px → 32px（两位数 + 12px 左右 padding ≈ 28px，刚好）；
+     - name-col sticky left 同步：32px；
+     - 姓名列 minWidth：76px → 68px（3 字中文 ≈ 42px + padding 0.55rem×2≈18px，仍可一行）。 */
+  .member-profiles-table__sticky-col {
+    min-width: 32px;
+    width: 32px;
+  }
+  .member-profiles-table__name-col {
+    left: 32px;
+  }
+  .member-profiles-table th.member-profiles-table__name-col,
+  .member-profiles-table td.member-profiles-table__name-col {
+    min-width: 68px;
   }
 
   /* 窄屏 wrapper 高度再压一点（顶部 hint 在窄屏更紧凑，
