@@ -276,12 +276,19 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleAddType = () => {
     const trimmed = newTypeLabel.trim();
     if (!trimmed) return;
-    // 重名检测：与本页当前可见的所有文档类型对比（docTypes 已经是 filterTypes
-    // + extraTypeKeys - hiddenBuiltinKeys 过滤后的结果，即用户实际在本页能看到
-    // 的分类池）。忽略大小写与前后空白。命中则弹提示并保留输入，避免用户产生
-    // "点了没反应 / 不知为什么加不进去"的困惑。
+    // 重名检测：仅与"本页当前真正可见的分类"比较（即 types 数组里渲染出来的那几个）。
+    // ⚠️ 不能用全局 docTypes 当基准 —— docTypes 是 filterOptions.documentTypes，
+    // 包含所有 Documents 页面（总入口 / 流程模板 / 规章制度）共用的分类池。本页可能
+    // 通过 filterTypes 白名单 + hiddenBuiltinKeys 把其中一部分隐藏掉了，那些"看不见
+    // 的分类"不应阻止用户在当前 tab 新建同名项，否则会出现"UI 上明明没有该分类，
+    // 却弹框说已存在"的矛盾提示。
     const normalized = trimmed.toLowerCase();
-    if (docTypes.some((t) => String(t.label).trim().toLowerCase() === normalized)) {
+    // types 里 '全部' 是 UI 虚拟项，过滤掉；其余每个 key 通过 typeLabels 解析成 label
+    const visibleLabels = types
+      .filter((k) => k !== '全部')
+      .map((k) => String(typeLabels[k] || '').trim().toLowerCase())
+      .filter(Boolean);
+    if (visibleLabels.includes(normalized)) {
       alert(`分类「${trimmed}」已存在，请换一个名字。`);
       return;
     }
@@ -318,9 +325,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleRenameType = (typeKey) => {
     const trimmed = renameValue.trim();
     if (!trimmed) return;
-    // 重名检测：改名后不能与本页其它现存分类重名（允许改回自己，或只改大小写/空白）
+    // 重名检测：改名后不能与"本页其它可见分类"重名（同样只看当前 tab 用户眼见的那几个，
+    // 不把其它 Documents 页独有的分类也纳入对比，理由见 handleAddType 的注释）。
+    // 允许改回自己（typeKey === 当前项），也允许只改大小写/空白。
     const normalized = trimmed.toLowerCase();
-    if (docTypes.some((t) => t.key !== typeKey && String(t.label).trim().toLowerCase() === normalized)) {
+    const visibleLabels = types
+      .filter((k) => k !== '全部' && k !== typeKey)
+      .map((k) => String(typeLabels[k] || '').trim().toLowerCase())
+      .filter(Boolean);
+    if (visibleLabels.includes(normalized)) {
       alert(`分类「${trimmed}」已存在，请换一个名字。`);
       return;
     }
