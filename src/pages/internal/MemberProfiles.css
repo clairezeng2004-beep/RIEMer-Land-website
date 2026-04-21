@@ -328,10 +328,18 @@
   background: rgba(91, 140, 62, 0.07) !important;
 }
 
+/* 本人行 hover 时 sticky 列（含姓名列）要"比同行普通 td 更深一档"。
+   用户反馈："其他行 hover 时姓名列更深，但登录者所在行 hover 时姓名列反而更浅。"
+   根因：普通 td 在本人行下相当于 rgba(91,140,62,0.07) 叠在 self 底色 0.04 上，
+         等效 ≈ 0.107 绿（≈#ecf3e6）；
+         而原先这里把 sticky 列直接写成 #f1f6ed（=0.07 实色），等效更浅，
+         导致姓名列视觉反过来比正文列更亮。
+   现在统一抬升到 #e9f1e3（约等于 0.12 绿，略高于普通 td 的 0.107），
+   保证"姓名列始终更深"的层级在普通行 / 本人行两种状态下都成立。 */
 .member-profiles-table__row--self:hover .member-profiles-table__sticky-col,
 .member-profiles-table__row--self:hover .member-profiles-table__name-col,
 .member-profiles-table__row--self:hover .member-profiles-table__action-col {
-  background: #f1f6ed;  /* 不透明：等价于 rgba(91,140,62,0.07) on #FFFFFF */
+  background: #e9f1e3;
 }
 
 .member-profiles-table__row--editing {
