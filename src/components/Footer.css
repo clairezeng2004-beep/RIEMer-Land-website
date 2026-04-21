@@ -64,10 +64,9 @@
     "nav about contact qrcode";
   column-gap: var(--space-xl);
   row-gap: var(--space-2xl);
-  /* 关键：让所有列高度一致（= 最高列），这样每列的"最后一行文字"
-     可以通过 margin-top:auto 推到同一基准线，实现底部对齐。
-     只在桌面/中等宽度并排时需要，手机端单列堆叠会在 media query 覆盖。 */
-  align-items: stretch;
+  /* 各列从顶部开始排；不再强制等高（旧版靠 stretch + flex-end 做底对齐，
+     会把左侧三列标题和列表之间拉开大空白）。 */
+  align-items: start;
 }
 
 /* 公开页面中等宽度（769–960px）：4 列会挤压文字，降级为 2 列 */
@@ -99,17 +98,11 @@
   gap: 8px;
 }
 
-/* 桌面端：让每列的"内容列表容器"吸收剩余空间并把内容贴底排列，
-   这样无论哪列最高（通常是带二维码的那列），其它列的最后一行
-   文字都会与之底部对齐。手机端堆叠时由 media query 重置。 */
-@media (min-width: 769px) {
-  .footer__grid > .footer__nav > .footer__nav-links-row,
-  .footer__grid > .footer__nav > .footer__about-texts,
-  .footer__grid > .footer__nav--contact > .footer__contact-list {
-    flex: 1;
-    justify-content: flex-end;
-  }
-}
+/* 桌面端：左侧三列（导航 / 关于我们 / 联系方式）从标题开始自顶向下自然排列。
+   此前版本曾把内容容器设为 flex:1 + justify-content:flex-end，试图让每列
+   的最后一行文字与二维码列底对齐；但二维码列较高（100px 图 + 说明文字），
+   会把左侧三列的标题"吸"到顶部、内容"吸"到底部，中间留出大片空白，视觉上
+   标题与列表被硬生生拉远，与其他页面的信息密度不一致。现在改回顺排。 */
 
 /* 联系方式内容容器：与左侧两栏 (.footer__nav-links-row / .footer__about-texts) 结构对称 */
 .footer__contact-list {
@@ -149,17 +142,8 @@
   transition: opacity var(--transition-fast);
 }
 
-/* 桌面端：把二维码图垂直居中、文字贴底，
-   使"微信扫码关注"与联系方式列的"给我们留言"底对齐。
-   手机端单列堆叠无需此分布，由 media query 覆盖 margin-top。 */
-@media (min-width: 769px) {
-  .footer__grid > .footer__qrcode > .footer__qrcode-img {
-    margin-top: auto;
-  }
-  .footer__grid > .footer__qrcode > .footer__qrcode-text {
-    margin-top: auto;
-  }
-}
+/* 二维码列：桌面端自然顺排（标题 → 图 → 说明文字），与左侧三列节奏一致。
+   不再用 margin-top:auto 把图/文字推到列底，避免与标题之间出现大片空白。 */
 
 .footer__qrcode-img:hover {
   opacity: 0.85;
