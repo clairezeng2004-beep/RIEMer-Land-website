@@ -1099,6 +1099,35 @@ export function SiteContentProvider({ children }) {
   };
 
   // ---- 从数据库同步团队成员到 filterOptions.teamMembers ----
+  //
+  // 跨设备同步关键坑（事项追踪新增分类"推不上去"的真正根因）：
+  //
+  //   这个函数本质上是把 profiles 表的"权威成员列表"注入到 filterOptions.teamMembers
+  //   （一个对象字段），它会触发 filterOptions 的 push-effect → pushToCloud →
+  //   把整对象（含 taskCategories/taskStatuses/teamMembers）重新 upsert 回 site_settings。
+  //
+  //   危险时序：
+  //     1. A 设备新增了 taskCategory="新分类" → 立即 flush 到云端 site_settings.filterOptions
+  //     2. B 设备打开 MemberContributions / ContentManagement 页（两页都在 mount 时
+  //        调 syncTeamMembersFromDB）
+  //     3. B 的 fetchSetting(FILTER_OPTIONS) 和 profiles 查询是并行的；如果 profiles
+  //        先回，且 fetchSetting 回包稍晚或还没触发 suppressNextPushRef 消费周期，
+  //        setFilterOptions((prev) => ...) 里的 prev 可能是"仅从 localStorage 恢复的
+  //        旧 filterOptions"（不含 A 的新分类）
+  //     4. push-effect 触发 → pushToCloud(FILTER_OPTIONS, 旧值+新 teamMembers)
+  //        → 400ms 后 upsert 覆盖云端 → **A 的新分类被 B 用自己的派生值整体擦掉**
+  //     5. A 的订阅收到 B 的覆盖事件 → A 本地 filterOptions 也被冲掉新分类
+  //
+  //   现象就是用户说的"新增分类跨设备同步不了" —— 不是推不出去，而是被 B 设备
+  //   挂载页面时"顺手拿旧值 + 新 teamMembers 回推"给硬覆盖了，两边最终都看不到。
+  //
+  //   修复策略：
+  //     a) 等待 FILTER_OPTIONS 完成 hydrate 再 setState，保证 prev 一定是云端最新值，
+  //        永远不会把 localStorage 旧快照回推；
+  //     b) 同时置位 suppressNextPushRef[FILTER_OPTIONS] = true，让这次"派生自 profiles
+  //        表的注入"本身不再触发 pushToCloud。teamMembers 本来就是 profiles 表的投影，
+  //        把它和用户真实编辑的 taskCategories 合在一起回推是浪费一次冲突机会；
+  //     c) dbMembers 和现有 teamMembers 一致时直接跳过，避免无谓的 setState。
   const syncTeamMembersFromDB = useCallback(async (getAllUsers, supabaseOk) => {
     try {
       let dbMembers = [];
@@ -1112,7 +1141,7 @@ export function SiteContentProvider({ children }) {
           .order('created_at', { ascending: true });
 
         if (!error && profiles && profiles.length > 0) {
-          dbMembers = profiles.map((p, idx) => ({
+          dbMembers = profiles.map((p) => ({
             id: p.id,
             name: p.name || '未知用户',
             role: '',
@@ -1137,15 +1166,47 @@ export function SiteContentProvider({ children }) {
         }
       }
 
-      if (dbMembers.length > 0) {
-        setFilterOptions((prev) => ({
-          ...prev,
-          teamMembers: dbMembers,
-        }));
-        return { success: true, count: dbMembers.length };
+      if (dbMembers.length === 0) {
+        return { success: false, message: '未找到已授权的成员数据' };
       }
 
-      return { success: false, message: '未找到已授权的成员数据' };
+      // --- 跨设备同步修复：等 FILTER_OPTIONS 完成 hydrate 再注入 ---
+      // 若云端 hydrate 还没完成，这里直接 setState 会基于 localStorage 旧快照
+      // 生成新值，紧随其后的 push-effect 会把旧 taskCategories 整体推回云端，
+      // 覆盖其它设备刚写入的新分类。这里轮询等 hydrated，最多等 5s，超时则退让
+      // （超时只会让这次 teamMembers 同步延后生效，不会造成跨设备数据丢失）。
+      if (isSupabaseConfigured && !hydratedKeysRef.current[SITE_KEYS.FILTER_OPTIONS]) {
+        const start = Date.now();
+        while (!hydratedKeysRef.current[SITE_KEYS.FILTER_OPTIONS]) {
+          if (Date.now() - start > 5000) {
+            console.warn(
+              '[SiteContent] syncTeamMembersFromDB: 等待 FILTER_OPTIONS hydrate 超时，放弃本次注入'
+            );
+            return { success: false, message: 'filter-options-hydrate-timeout' };
+          }
+          // eslint-disable-next-line no-await-in-loop
+          await new Promise((r) => setTimeout(r, 50));
+        }
+      }
+
+      setFilterOptions((prev) => {
+        const prevMembers = Array.isArray(prev.teamMembers) ? prev.teamMembers : [];
+        // 如果和现有完全一致，直接返回原引用避免 push-effect 触发
+        const sameLength = prevMembers.length === dbMembers.length;
+        const sameContent =
+          sameLength &&
+          prevMembers.every((m, i) => {
+            const n = dbMembers[i];
+            return m && n && m.id === n.id && m.name === n.name && m.avatar === n.avatar;
+          });
+        if (sameContent) return prev;
+        // 标记此次 setState 是"派生自 profiles 的权威注入"，不应再触发 pushToCloud 回推；
+        // 否则会把"云端当前 filterOptions + 新 teamMembers"原样写回云端，增加并发覆盖
+        // 其它设备刚写入字段（如 taskCategories）的风险。
+        suppressNextPushRef.current[SITE_KEYS.FILTER_OPTIONS] = true;
+        return { ...prev, teamMembers: dbMembers };
+      });
+      return { success: true, count: dbMembers.length };
     } catch (err) {
       console.error('[SiteContent] syncTeamMembersFromDB 失败:', err);
       return { success: false, message: err.message };
