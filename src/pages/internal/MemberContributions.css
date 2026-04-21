@@ -330,60 +330,26 @@
    v3 左侧 3px inset 金/银/铜色条 + 🥇🥈🥉 emoji：
       用户反馈 —— emoji 奖牌跨系统渲染差异大、风格太像游戏；
       那条左竖线也被觉得突兀。
-   v4（当前）去 emoji、去左竖线，改"整行底色三档强调"：
-      - 排名用纯数字（1/2/3），由 .mc-rank--top{1,2,3} 给颜色+加粗；
-      - 整行 td 染同色系三档底色：比 hover 色 (#E4ECE0) 更深一档的金绿，
-        由第一名最深、第三名最浅，形成能一眼分辨的层级；
-      - sticky 的"排名/成员"两列有独立 background（用于挡横滚穿透），
-        这里必须单独覆盖，否则 sticky 列不染色会露白；
-      - hover 仍然生效（优先级更高），不抢夺 top 行的底色。
-   用 CSS 变量便于后续调色：
-      --mc-top1-bg：第一名底色（最醒目）
-      --mc-top2-bg：第二名底色
-      --mc-top3-bg：第三名底色
+   v4 去 emoji、去左竖线，改"整行底色三档强调"（同色系淡金/银/铜）。
+   v5（当前）去掉整行底色：
+      - 用户反馈整行染色太抢眼、跟站内其他表格画风不一致；
+      - 前三名的视觉强调只保留在排名列的数字圆章上
+        （.mc-rank--top{1,2,3}：深金/银/铜文字 + 14px/700）；
+      - 行本身回归普通行样式，受 hover 规则控制；
+      - 对应删掉 --mc-topN-bg 变量与 .mc-table__row--topN 的整片染色规则，
+        以及 sticky 列为挡住染色而做的显式覆盖。
+   只保留 --mc-topN-fg（数字圆章文字色）作为可调色入口。
 */
 .mc-table {
-  --mc-top1-bg: #F2E9C6;  /* 金：暖米黄，比 hover 绿色深且温暖 */
-  --mc-top2-bg: #E4E7EC;  /* 银：冷灰，中性 */
-  --mc-top3-bg: #EADFCF;  /* 铜：淡驼色，比金浅、比银暖 */
   --mc-top1-fg: #8A6A0A;  /* 金数字：深金棕 */
   --mc-top2-fg: #4A5260;  /* 银数字：深冷灰 */
   --mc-top3-fg: #8A5A2A;  /* 铜数字：深棕 */
 }
 
-.mc-table__row--top1 > td {
-  background: var(--mc-top1-bg);
-}
-.mc-table__row--top2 > td {
-  background: var(--mc-top2-bg);
-}
-.mc-table__row--top3 > td {
-  background: var(--mc-top3-bg);
-}
-
-/* sticky 的"排名/成员"两列：自身有 background: var(--color-bg-card)
-   会盖住上面的行背景，所以必须对前三名显式覆盖。 */
-.mc-table__row--top1 .mc-table__td--rank,
-.mc-table__row--top1 .mc-table__td--member {
-  background: var(--mc-top1-bg);
-}
-.mc-table__row--top2 .mc-table__td--rank,
-.mc-table__row--top2 .mc-table__td--member {
-  background: var(--mc-top2-bg);
-}
-.mc-table__row--top3 .mc-table__td--rank,
-.mc-table__row--top3 .mc-table__td--member {
-  background: var(--mc-top3-bg);
-}
-
-/* ---- sticky 列在特殊行背景下的补齐 ----
+/* ---- sticky 列 hover 态补齐 ----
    冻结的"排名/成员"列自身有不透明 background（卡片底色）用于
-   遮挡横向滚时中间列文字。
-   v3 行背景已回归透明，不再需要为 top1/2/3 复刻整片染色；
-   这里只保留 hover 态的同步——hover 时 sticky 列如果不染色会
-   露出下方卡片底色，造成"中间列变深、sticky 列还是白"的脏视觉。
-   前三名的金/银/铜色条画在 rank td 内部（inset box-shadow），
-   和 sticky 层叠无冲突，也不需要 member td 额外处理。 */
+   遮挡横向滚时中间列文字。hover 时中间列会变色，sticky 列如果不同步
+   就会露出卡片底色，造成"中间列变深、sticky 列还是白"的脏视觉。 */
 .mc-table__row:hover .mc-table__td--rank,
 .mc-table__row:hover .mc-table__td--member {
   /* 与成员通讯录 sticky 列 hover 同色（rgba(91,140,62,0.02) 在白底上的不透明等价色） */
@@ -430,9 +396,11 @@
   background: var(--color-bg-hover);
 }
 
-/* 前三名数字的强调样式（v4）：
-   用更深的金/银/铜色做文字色，字号从 xs 提到 14px 并加粗到 700，
-   圆底也用对应的深色，和整行底色（浅金/银/铜）形成层级呼应。 */
+/* 前三名数字的强调样式（v5）：
+   v4 时整行有浅金/银/铜底色，此处圆章是"深色呼应"。
+   v5 已去掉整行底色，前三名的视觉强调只剩这枚数字圆章——
+   用更深的金/银/铜文字色 + 14px/700 + 14% 透明度的同色圆底，
+   在普通行背景上独立成立，不再依赖行底色。 */
 .mc-rank--top1,
 .mc-rank--top2,
 .mc-rank--top3 {
