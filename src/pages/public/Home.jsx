@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -13,7 +13,6 @@ import {
   ExternalLink,
   AlertCircle,
   CalendarDays,
-  Tag,
 } from 'lucide-react';
 import CoverImage from '../../components/CoverImage';
 import { articlesData } from '../../data/siteData';
@@ -30,34 +29,11 @@ export default function Home() {
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // 首页文章标签筛选
-  const [selectedTag, setSelectedTag] = useState('全部');
-
   // 合并硬编码文章和用户添加的文章，按日期降序排列
   const allArticles = [...userArticles, ...articlesData]
     .sort((a, b) => b.date.localeCompare(a.date));
 
-  // 从所有文章中动态提取标签（按出现频次降序，最多展示 8 个，避免首页过于拥挤）
-  const allTags = useMemo(() => {
-    const tagCount = {};
-    allArticles.forEach((a) => {
-      (a.tags || []).forEach((t) => {
-        tagCount[t] = (tagCount[t] || 0) + 1;
-      });
-    });
-    return Object.entries(tagCount)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag)
-      .slice(0, 8);
-  }, [allArticles]);
-
-  // 按标签筛选后的最近文章
-  const filteredArticles = useMemo(() => {
-    if (selectedTag === '全部') return allArticles;
-    return allArticles.filter((a) => (a.tags || []).includes(selectedTag));
-  }, [allArticles, selectedTag]);
-
-  const recentArticles = filteredArticles.slice(0, 6);
+  const recentArticles = allArticles.slice(0, 6);
   // 最新活动：按日期从新到旧排序后完整展示
   //（此前曾用 .slice(0, 4) 只展示 4 条，但首页统计区的"活动讲座"数字来自 events.length，
   //  会出现"统计显示 10 条，首页实际只看到 4 条"的不一致观感。
@@ -248,25 +224,6 @@ export default function Home() {
         <div className="container">
           <div className="featured__header">
             <h2 className="section-title">{content.articlesSectionTitle}</h2>
-            {allTags.length > 0 && (
-              <div className="featured__tags-filter">
-                <button
-                  className={`featured__tag-btn ${selectedTag === '全部' ? 'featured__tag-btn--active' : ''}`}
-                  onClick={() => setSelectedTag('全部')}
-                >
-                  全部
-                </button>
-                {allTags.map((tag) => (
-                  <button
-                    key={tag}
-                    className={`featured__tag-btn ${selectedTag === tag ? 'featured__tag-btn--active' : ''}`}
-                    onClick={() => setSelectedTag(tag)}
-                  >
-                    <Tag size={12} /> {tag}
-                  </button>
-                ))}
-              </div>
-            )}
           </div>
           <div className="featured__grid">
             {recentArticles.map((article) => {
