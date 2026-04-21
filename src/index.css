@@ -290,11 +290,25 @@ input[type='number'] {
 .btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: var(--space-sm);
   padding: 0.75rem 1.75rem;
   border-radius: var(--radius-md);
   font-weight: 500;
   font-size: var(--text-sm);
+  /* 关键：显式锁定 line-height / font-family / box-sizing，
+     避免同一个 .btn 在 <a> 和 <button> 上表现不一致。
+     - <a class="btn"> 会继承 body 的 line-height: 1.8，盒高被撑大；
+     - <button class="btn"> 受 UA 样式影响用 line-height: normal(~1.2)
+       且 font-family 默认不是继承 → 字号/基线也会不同。
+     这会直接导致"流程模板文件 → 上传文档"按钮（用 <a>）比其他 Tab
+     下同样 .btn 的 <button> 明显偏大。这里统一锁住即可。 */
+  line-height: 1.2;
+  font-family: inherit;
+  box-sizing: border-box;
+  vertical-align: middle;
+  white-space: nowrap;
+  cursor: pointer;
   border: none;
   transition: all var(--transition-normal);
   text-decoration: none;
