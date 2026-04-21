@@ -763,6 +763,12 @@
 }
 
 @media (max-width: 768px) {
+  /* 手机端附件 dropzone：隐藏"拖拽文件到此处，或"片段，
+     仅保留"点击浏览"，避免在无法拖拽的触屏环境下误导用户。 */
+  .msc-attach__dropzone-drag {
+    display: none;
+  }
+
   /* 手机端 navbar 高 64px，另外 .internal-mobile-nav 本身也是 sticky top:64px 的
      水平导航条（高度约 44px）。工具栏要停在它们之下，约 64 + 44 = 108px。
      如果导航条高度变化，这里需要同步。 */

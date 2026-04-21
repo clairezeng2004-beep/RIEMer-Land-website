@@ -380,7 +380,8 @@ function AttachmentUploader({ attachments, onChange }) {
         <Upload size={28} className="msc-attach__dropzone-icon" />
         <div className="msc-attach__dropzone-text">
           <span className="msc-attach__dropzone-main">
-            拖拽文件到此处，或 <span className="msc-attach__dropzone-link">点击浏览</span>
+            <span className="msc-attach__dropzone-drag">拖拽文件到此处，或 </span>
+            <span className="msc-attach__dropzone-link">点击浏览</span>
           </span>
           <span className="msc-attach__dropzone-hint">
             支持任意文件格式，单文件最大 5MB，最多 {MAX_FILES} 个附件

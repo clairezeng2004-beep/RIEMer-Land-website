@@ -646,7 +646,9 @@ export default function Gallery() {
                       style={{ display: 'none' }}
                     />
                     <Upload size={28} />
-                    <p>点击或拖拽照片到这里上传</p>
+                    <p>
+                      点击<span className="gallery-upload__drag-hint">或拖拽</span>照片到这里上传
+                    </p>
                     <span>支持多张同时选择，创建后还能继续添加</span>
                   </div>
                   {createAlbumFiles.length > 0 && (
@@ -841,7 +843,9 @@ export default function Gallery() {
                 style={{ display: 'none' }}
               />
               <Upload size={32} />
-              <p>点击或拖拽照片到这里上传</p>
+              <p>
+                点击<span className="gallery-upload__drag-hint">或拖拽</span>照片到这里上传
+              </p>
               <span>支持多张同时选择，JPG / PNG / WebP 等图片格式</span>
             </div>
 

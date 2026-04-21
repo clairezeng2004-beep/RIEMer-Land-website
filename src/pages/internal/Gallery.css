@@ -670,6 +670,12 @@
     padding-top: var(--space-3xl);
   }
 
+  /* 手机端无法用鼠标拖拽，直接隐藏 dropzone 文案中的"或拖拽"片段，
+     只保留"点击照片到这里上传"，避免给用户造成误导。 */
+  .gallery-upload__drag-hint {
+    display: none;
+  }
+
   .gallery-page__header {
     flex-direction: column;
     gap: var(--space-md);
