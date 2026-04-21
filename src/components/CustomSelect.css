@@ -270,3 +270,20 @@
 .custom-select--sm .custom-select__search-input {
   font-size: var(--text-sm);
 }
+
+/* ============ Mobile ============ */
+@media (max-width: 768px) {
+  /* 手机端下拉内嵌的搜索框（如"贡献者 → 搜索成员"）字号对齐到整体 UI。
+     根因：src/index.css 在 (pointer: coarse) 下把所有 input 强制 16px
+           （防 iOS Safari 聚焦时整页放大），但本组件桌面端设计为
+           --text-sm (14px)，叠加后在手机端表现为字号明显偏大，与同表单内
+           其它控件（--text-sm 体系）不一致。
+     修复：显式把 .custom-select__search-input 覆盖回 --text-sm，保持下拉
+           内部视觉节奏统一；focus 时 iOS 可能短暂放大整页，失焦后复原，
+           对这种"嵌入在下拉面板里的临时输入框"影响很小，可接受。
+     注：--sm 变体桌面端已是 --text-sm，这里不另外覆盖；登录验证码等
+         特殊场景的防缩放规则在各自组件内独立维护，不受此处影响。 */
+  .custom-select__search-input {
+    font-size: var(--text-sm);
+  }
+}
