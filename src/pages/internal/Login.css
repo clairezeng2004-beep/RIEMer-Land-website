@@ -167,7 +167,7 @@
 }
 
 .login-card__input::placeholder {
-  font-family: inherit;
+  font-family: 'Lora', 'Lora Fallback', 'LXGW WenKai', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', serif;
   font-weight: 400;
 }
 
