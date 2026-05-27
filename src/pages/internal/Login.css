@@ -166,6 +166,11 @@
   }
 }
 
+.login-card__input::placeholder {
+  font-family: inherit;
+  font-weight: 400;
+}
+
 .login-card__input:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
