@@ -22,10 +22,8 @@
    手机端 (<= 768px) 见文件末尾的媒体查询单独覆盖为 left:0，配合
    InternalLayout 的 .internal-mobile-nav 错开垂直位置。 */
 .ptd-topbar {
-  position: fixed;
+  position: sticky;
   top: 72px;
-  left: 220px; /* 桌面侧边栏宽度，避免盖住导航 */
-  right: 0;
   z-index: 90; /* 低于全站 navbar(1000) 高于内容层 */
   display: flex;
   align-items: center;
@@ -69,10 +67,7 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  /* 顶部多留一条 topbar 高度（约 60px = 按钮高 + 上下 0.75rem padding）。
-     .ptd-topbar 改为 fixed 后不再占据文档流，这里手动让位，
-     防止文章标题被顶栏盖住。 */
-  padding: calc(1.5rem + 60px) 2rem 1.5rem;
+  padding: 1.5rem 2rem;
 }
 
 .ptd-content__inner {
@@ -788,17 +783,14 @@
 }
 
 @media (max-width: 768px) {
-  /* 手机端：侧边栏收起（margin-left: 0），topbar 占满屏宽；
-     位置挪到 navbar(64) + internal-mobile-nav(~44) 下方，避免被遮挡。 */
+  /* 手机端：fullscreen 页，无 navbar / mobile-nav，topbar 贴顶 sticky */
   .ptd-topbar {
-    top: 108px;
-    left: 0;
+    top: 0;
     padding: 0.75rem 1rem;
   }
 
   .ptd-content {
-    /* topbar 高 ~60，加原本 0.75rem 间距 */
-    padding: calc(0.75rem + 60px) 0.75rem 0.75rem;
+    padding: 0.75rem;
   }
 
   .ptd-article {
