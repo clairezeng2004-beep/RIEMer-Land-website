@@ -145,8 +145,8 @@ export default function Notifications() {
                       <Clock size={12} /> {notif.date}
                     </span>
                     {notif.read && (
-                      <span className={`notification-item__read${notif.autoRead ? ' notification-item__read--auto' : ''}`}>
-                        <CheckCircle size={12} /> {notif.autoRead ? '自动已读' : '已读'}
+                      <span className={`notification-item__read${(notif.autoRead || notif.title?.startsWith('文档已删除')) ? ' notification-item__read--auto' : ''}`}>
+                        <CheckCircle size={12} /> {(notif.autoRead || notif.title?.startsWith('文档已删除')) ? '自动已读' : '已读'}
                       </span>
                     )}
                     <div className="notification-item__actions">
