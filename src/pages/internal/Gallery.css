@@ -647,6 +647,42 @@
   border-radius: var(--radius-full);
 }
 
+/* ============ Loading State ============ */
+.gallery-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-2xl) var(--space-xl);
+  color: var(--color-text-muted);
+}
+
+.gallery-loading__spinner {
+  animation: gallery-spin 1s linear infinite;
+  flex-shrink: 0;
+  opacity: 0.5;
+}
+
+@keyframes gallery-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.gallery-loading__text {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.gallery-loading__hint {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  opacity: 0.65;
+}
+
+.gallery-loading__hint::before {
+  content: '·';
+  margin-right: 6px;
+}
+
 /* ============ Empty State ============ */
 .gallery-empty {
   text-align: center;

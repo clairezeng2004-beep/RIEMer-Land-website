@@ -709,9 +709,10 @@ export default function Gallery() {
 
           {/* 相册列表 */}
           {loading ? (
-            <div className="gallery-empty">
-              <Images size={48} />
-              <h3>加载中...</h3>
+            <div className="gallery-loading">
+              <Loader2 size={20} className="gallery-loading__spinner" />
+              <span className="gallery-loading__text">加载中</span>
+              <span className="gallery-loading__hint">通常需要 1–2 秒</span>
             </div>
           ) : albums.length > 0 ? (
             <div className="gallery-grid">
@@ -904,9 +905,10 @@ export default function Gallery() {
 
         {/* 照片网格 */}
         {albumDetailLoading ? (
-          <div className="gallery-empty">
-            <Images size={48} />
-            <h3>加载中...</h3>
+          <div className="gallery-loading">
+            <Loader2 size={20} className="gallery-loading__spinner" />
+            <span className="gallery-loading__text">加载中</span>
+            <span className="gallery-loading__hint">通常需要 1–2 秒</span>
           </div>
         ) : selectedAlbum.photos.length > 0 ? (
           <div className="photo-grid">

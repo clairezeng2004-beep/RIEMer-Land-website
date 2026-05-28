@@ -158,7 +158,32 @@ export function AuthProvider({ children }) {
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        // 优先从 riemer_users 查找（本地注册的用户）
+
+        if (isSupabaseConfigured) {
+          // ── Supabase 模式 ──
+          // 优先使用 profile cache：它来自 Supabase profiles 表，角色 / 授权状态最准确。
+          // 不能先查 riemer_users：该表在纯本地模式下注册时写入，role 可能是过期的 'member'，
+          // 用它覆盖 profile cache 会导致管理员身份丢失。
+          const cached = getCachedProfile(parsed.id);
+          if (cached && cached.authorized) {
+            setUser(cached);
+            return true;
+          }
+          // profile cache 里没有该用户 → 最低限度降级：用 riemer_users，但不覆盖 cache
+          // （覆盖 cache 会把旧 role 持久化，下次 Supabase 可用时才能纠正）
+          const users = getLocalUsers();
+          const found = users.find((u) => u.id === parsed.id);
+          if (found && found.authorized) {
+            setUser(found);
+            // intentionally NOT calling cacheProfile(found)
+            return true;
+          }
+          localStorage.removeItem(AUTH_KEY);
+          setUser(null);
+          return false;
+        }
+
+        // ── 纯本地模式（Supabase 未配置）：保留原有逻辑 ──
         const users = getLocalUsers();
         const found = users.find((u) => u.id === parsed.id);
         if (found && found.authorized) {
@@ -166,13 +191,11 @@ export function AuthProvider({ children }) {
           cacheProfile(found);
           return true;
         }
-        // riemer_users 找不到（Supabase 用户）→ 尝试 profile 缓存
         const cached = getCachedProfile(parsed.id);
         if (cached && cached.authorized) {
           setUser(cached);
           return true;
         }
-        // 都找不到 → 清除登录态
         localStorage.removeItem(AUTH_KEY);
         setUser(null);
         return false;
@@ -392,8 +415,10 @@ export function AuthProvider({ children }) {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         console.log('[Auth] onAuthStateChange:', event);
-        // 如果 Supabase 已标记不可达，跳过
-        if (getReachable() === false) return;
+        // 健康检查失败时仍处理 SIGNED_IN：HEAD 探活可能被 CDN 拦截导致误判，
+        // 但 auth 接口（POST）实际仍可用；跳过 SIGNED_IN 会导致登录后 profile 无法更新。
+        // 只跳过 SIGNED_OUT，避免离线时把本地用户强制登出。
+        if (getReachable() === false && event !== 'SIGNED_IN') return;
         if (session?.user) {
           // SIGNED_IN: login() 可能已经 setUser（真 profile 或 _fallback 降级 profile）
           // 但有些邮箱/网络场景下 login() 提前返回或 setUser 未执行 → 这里兜底补一次
@@ -548,8 +573,11 @@ export function AuthProvider({ children }) {
 
   // ---- 登录 ----
   const login = useCallback(async (email, password) => {
-    // 如果 Supabase 未配置，或已确认不可达，走本地模式
-    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    // Supabase 未配置时才走本地模式。
+    // supabaseOk === false 不再作为判断条件：健康检查（HEAD 请求）可能被 CDN/防火墙误拦，
+    // 但 auth API（POST signInWithPassword）实际仍可用。若 Supabase 真的不可达，
+    // signInWithPassword 会抛异常或超时，catch 块里再降级到本地模式。
+    const useLocal = !isSupabaseConfigured;
 
     if (useLocal) {
       // 本地模式
@@ -980,7 +1008,8 @@ export function AuthProvider({ children }) {
 
   // ---- 注册 ----
   const register = useCallback(async (email, password, name) => {
-    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    // 同 login：只在 Supabase 完全未配置时才走本地模式
+    const useLocal = !isSupabaseConfigured;
     if (useLocal) {
       return registerLocal(email, password, name);
     }
