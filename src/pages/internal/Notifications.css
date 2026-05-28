@@ -66,6 +66,12 @@
   align-items: center;
   gap: var(--space-xs);
   padding: 0.4rem 1rem;
+  /* 显式锁定 line-height，确保各 tab 下"搜索框 / 周期 / 共 X 条留言"等
+     使用同样数值后，盒高在 Chrome / Safari / Firefox 间表现一致。
+     <button> UA 默认是 line-height: normal（约 1.15–1.25，随字体浮动），
+     这里钉死为 1.2 作为整个内部空间的"行高基准"。 */
+  line-height: 1.2;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   background: transparent;

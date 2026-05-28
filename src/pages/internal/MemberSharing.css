@@ -269,7 +269,12 @@
 
 .ms-filters__input {
   width: 100%;
-  padding: 0.65rem 1rem 0.65rem 2.4rem;
+  /* 高度对齐：与「消息通知」筛选项 .notifications-filter
+     （padding: 0.4rem 1rem）保持一致的盒高；line-height 显式锁定为 1.2，
+     避免 <input> 受继承的 body line-height: 1.8 影响把盒高撑大。 */
+  padding: 0.4rem 1rem 0.4rem 2.4rem;
+  line-height: 1.2;
+  box-sizing: border-box;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);

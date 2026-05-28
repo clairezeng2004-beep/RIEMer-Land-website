@@ -74,9 +74,18 @@
 }
 
 .guestbook-page__stats-item {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  /* 高度对齐：与「消息通知」筛选项 .notifications-filter
+     （padding: 0.4rem 1rem + 1px border + line-height 1.2）保持一致的盒高。
+     这里没有可见边框/底色，所以用 1px transparent border 补齐 2px，
+     再用相同 padding + line-height 撑出和筛选按钮完全一致的总高度，
+     避免「共 X 条留言」这一行的文字比筛选按钮看上去偏低。 */
+  padding: 0.4rem 0;
+  line-height: 1.2;
+  border: 1px solid transparent;
+  box-sizing: border-box;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
 }

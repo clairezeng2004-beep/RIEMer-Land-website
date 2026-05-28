@@ -56,7 +56,12 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 8px 14px;
+  /* 高度对齐：与「消息通知」筛选项 .notifications-filter
+     （padding: 0.4rem 1rem）保持一致的盒高；显式锁 line-height: 1.2，
+     避免 <button> UA / 继承 line-height 在不同浏览器表现不一致。 */
+  padding: 0.4rem 1rem;
+  line-height: 1.2;
+  box-sizing: border-box;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
   border-radius: 8px;
