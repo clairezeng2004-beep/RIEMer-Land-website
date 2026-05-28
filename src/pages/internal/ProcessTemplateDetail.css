@@ -23,7 +23,7 @@
    InternalLayout 的 .internal-mobile-nav 错开垂直位置。 */
 .ptd-topbar {
   position: sticky;
-  top: 72px;
+  top: 0; /* 全屏页无 Navbar，直接贴视口顶端 */
   z-index: 90; /* 低于全站 navbar(1000) 高于内容层 */
   display: flex;
   align-items: center;
@@ -123,8 +123,8 @@
 /* 右侧：划线评论栏（inline TextAnnotation 面板的外壳） */
 .ptd-comments {
   position: sticky;
-  /* 与 .ptd-toc 对齐：navbar 72 + fixed topbar ~60 + 间距 8 */
-  top: 140px;
+  /* 与 .ptd-toc 对齐：topbar ~60 + 间距 8 = 68px */
+  top: 68px;
   max-height: calc(100vh - 160px);
   display: flex;
   flex-direction: column;
@@ -138,8 +138,8 @@
 /* ============ 目录（TOC）侧栏 ============ */
 .ptd-toc {
   position: sticky;
-  /* navbar 72 + 详情页 fixed topbar ~60 + 视觉间距 8 */
-  top: 140px;
+  /* 全屏页：topbar ~60 + 视觉间距 8 = 68px */
+  top: 68px;
   max-height: calc(100vh - 160px);
   overflow-y: auto;
   padding: var(--space-md, 16px);

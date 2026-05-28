@@ -34,7 +34,7 @@
       不会成为滚动容器；真正的滚动容器是 window，sticky 以 viewport 为参照。*/
 .msc-topbar {
   position: sticky;
-  top: 72px; /* 紧贴全站 Navbar 下沿 */
+  top: 0; /* 全屏页无 Navbar，直接贴视口顶端 */
   z-index: 95; /* 低于全站 Navbar(1000)，高于页内 Select dropdown(~200) 等 */
   display: flex;
   align-items: center;
@@ -746,7 +746,7 @@
      - z-index 10：高于编辑器及图片，但低于 FloatingTextToolbar(z-index: 1200)
        和 Navbar(z-index: 1000)，保证浮层仍在它之上。 */
   position: sticky;
-  top: 72px; /* navbar 高度 */
+  top: 60px; /* msc-topbar 高度（贴在其下方） */
   z-index: 10;
   background: var(--color-bg, #f9fafb);
   padding: 6px 0;
@@ -774,11 +774,9 @@
     display: none;
   }
 
-  /* 手机端 navbar 高 64px，另外 .internal-mobile-nav 本身也是 sticky top:64px 的
-     水平导航条（高度约 44px）。工具栏要停在它们之下，约 64 + 44 = 108px。
-     如果导航条高度变化，这里需要同步。 */
+  /* 全屏页无 Navbar / mobile-nav，工具栏停在 msc-topbar 下方（~60px） */
   .msc-form__editor-toolbar {
-    top: 108px;
+    top: 60px;
   }
 }
 
@@ -1093,9 +1091,8 @@
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .msc-topbar {
-    /* 手机端 sticky 吸附位置要避开全站 Navbar(64) + 内部空间手机端导航条(~44)，
-       取 108px，与 .ptd-topbar 的 mobile 偏移保持一致。 */
-    top: 108px;
+    /* 全屏页无 Navbar / mobile-nav，贴视口顶端 */
+    top: 0;
     padding: 0.75rem 1rem;
   }
 

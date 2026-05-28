@@ -688,7 +688,7 @@ export default function Login() {
                   <button
                     type="button"
                     className="btn btn-lg login-card__submit"
-                    style={{ flex: 'none', width: 'auto', padding: '0 16px', background: 'var(--color-bg-hover)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border-light)' }}
+                    style={{ flex: 'none', width: 'auto', background: 'var(--color-bg-hover)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border-light)' }}
                     disabled={countdown > 0 || submitting}
                     onClick={handleSendCode}
                   >

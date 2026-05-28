@@ -179,12 +179,13 @@
 /* ===== 6 位验证码输入框 ===== */
 /* 有内容时：大字 + 宽字距 + 居中，凸显验证码 */
 .login-card__input--code {
-  font-family: 'SF Mono', Menlo, Consolas, monospace;
-  font-size: 20px;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
   font-weight: 600;
-  letter-spacing: 8px;
+  letter-spacing: 10px;
   text-align: center;
-  padding-left: calc(1rem + 8px); /* 补偿 letter-spacing 造成的整体右偏 */
+  padding-left: calc(1rem + 10px); /* 补偿 letter-spacing 造成的整体右偏 */
 }
 
 /* 显示 placeholder 时：恢复正常文字样式，和其他输入框保持一致 */

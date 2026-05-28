@@ -33,6 +33,12 @@
   margin-top: 4px;
 }
 
+.ia-list__header-actions {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-sm);
+}
+
 /* 筛选区 */
 .ia-list__filters {
   display: flex;

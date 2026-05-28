@@ -7,14 +7,12 @@
 }
 
 /* ============ Top Bar ============ */
-/* 顶部操作栏：position: fixed，钉死在视口顶部（navbar 下沿），
-   不随页面滚动或目录锚点跳转发生任何位移。详细说明见
-   ProcessTemplateDetail.css 对应注释。 */
+/* 顶部操作栏：position: sticky，随内容在文档流中占位，无需补偿 padding。
+   全屏路径（/view/:id）无 Navbar → top: 0；
+   InternalLayout 路径（/member-sharing/:id）有 72px Navbar → 见下方覆盖规则。 */
 .msd-topbar {
-  position: fixed;
-  top: 72px;
-  left: 220px;
-  right: 0;
+  position: sticky;
+  top: 0; /* 全屏：直接贴视口顶端 */
   z-index: 90;
   display: flex;
   align-items: center;
@@ -23,6 +21,11 @@
   background: var(--color-bg, #f9fafb);
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
   box-shadow: none;
+}
+
+/* InternalLayout 内部（有 72px 固定 Navbar）：吸附在 Navbar 下沿 */
+.internal-layout__content .msd-topbar {
+  top: 72px;
 }
 
 .msd-topbar__back {
@@ -49,8 +52,8 @@
   flex: 1;
   display: flex;
   justify-content: center;
-  /* 顶部让出 fixed topbar 的高度，避免内容被盖住 */
-  padding: calc(1.5rem + 60px) 2rem 1.5rem;
+  /* sticky topbar 在文档流中占位，内容区无需额外补偿 */
+  padding: 1.5rem 2rem 1.5rem;
 }
 
 .msd-content__inner {
@@ -82,23 +85,32 @@
 /* 右侧：划线评论栏（inline TextAnnotation 面板的外壳） */
 .msd-comments {
   position: sticky;
-  top: 80px;
-  max-height: calc(100vh - 100px);
+  top: 68px; /* 全屏：topbar ~60 + 间距 8 */
+  max-height: calc(100vh - 80px);
   display: flex;
   flex-direction: column;
   min-height: 0;
 }
 
+/* InternalLayout（有 72px Navbar）：评论栏吸附在 navbar + topbar 下 */
+.internal-layout__content .msd-comments {
+  top: 140px;
+  max-height: calc(100vh - 160px);
+}
+
 .msd-comments .ta-panel.ta-panel--inline {
-  max-height: calc(100vh - 100px);
+  max-height: calc(100vh - 80px);
+}
+
+.internal-layout__content .msd-comments .ta-panel.ta-panel--inline {
+  max-height: calc(100vh - 160px);
 }
 
 /* ============ 目录（TOC）侧栏 ============ */
 .msd-toc {
   position: sticky;
-  /* navbar 72 + fixed topbar ~60 + 间距 8 */
-  top: 140px;
-  max-height: calc(100vh - 160px);
+  top: 68px; /* 全屏：topbar ~60 + 间距 8 */
+  max-height: calc(100vh - 88px);
   overflow-y: auto;
   padding: var(--space-md, 16px);
   background: var(--color-bg-card, #fff);
@@ -106,6 +118,12 @@
   border-radius: var(--radius-lg, 12px);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
+}
+
+/* InternalLayout（有 72px Navbar）：目录吸附在 navbar + topbar 下 */
+.internal-layout__content .msd-toc {
+  top: 140px;
+  max-height: calc(100vh - 160px);
 }
 
 .msd-toc__header {
@@ -686,13 +704,13 @@
 
 @media (max-width: 768px) {
   .msd-topbar {
-    top: 108px;
+    top: 0; /* 全屏移动端无 Navbar，直接贴顶 */
     left: 0;
     padding: 0.75rem 1rem;
   }
 
   .msd-content {
-    padding: calc(0.75rem + 60px) 0.75rem 0.75rem;
+    padding: 0.75rem;
   }
 
   .msd-article {
@@ -736,7 +754,7 @@
 
 @media (max-width: 480px) {
   .msd-content {
-    padding: calc(0.5rem + 60px) 0.5rem 0.5rem;
+    padding: 0.5rem;
   }
 
   .msd-article__content {
