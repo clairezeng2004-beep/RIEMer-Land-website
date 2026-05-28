@@ -62,11 +62,11 @@
 
 .ia-list__search input {
   width: 100%;
-  /* 高度对齐：与「消息通知」筛选项 .notifications-filter
-     （padding: 0.4rem 1rem）保持一致的盒高；line-height 显式锁定为 1.2，
-     避免 <input> 受继承的 body line-height: 1.8 影响把盒高撑大。
+  /* 盒高调到 ~38px：vertical padding 0.6rem + 1px border + 14px×1.2 line-height。
+     比「消息通知」筛选按钮稍高一点，更接近常见输入框观感。
+     line-height 显式锁定为 1.2，避免 <input> 继承 body 的 1.8 把盒高再撑大。
      这一条规则同时被 EventPublish 复用（它 import 了本文件）。 */
-  padding: 0.4rem 1rem 0.4rem 2.4rem;
+  padding: 0.6rem 1rem 0.6rem 2.4rem;
   line-height: 1.2;
   box-sizing: border-box;
   border: 1px solid var(--color-border);

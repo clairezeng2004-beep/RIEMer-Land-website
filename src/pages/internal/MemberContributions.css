@@ -56,10 +56,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
-  /* 高度对齐：与「消息通知」筛选项 .notifications-filter
-     （padding: 0.4rem 1rem）保持一致的盒高；显式锁 line-height: 1.2，
-     避免 <button> UA / 继承 line-height 在不同浏览器表现不一致。 */
-  padding: 0.4rem 1rem;
+  /* 盒高调到 ~38px：vertical padding 0.6rem + 1px border + 14px×1.2 line-height。
+     和上方搜索框统一观感；显式锁 line-height: 1.2，避免 <button> UA / 继承
+     line-height 在不同浏览器表现不一致。 */
+  padding: 0.6rem 1rem;
   line-height: 1.2;
   box-sizing: border-box;
   background: var(--color-bg-card);
@@ -120,22 +120,30 @@
   font-weight: 600;
 }
 
-/* 团队总览 */
+/* 团队总览
+   ——————————————————————————————————————————————
+   v5 改动：和「事项追踪」.tasks-stats / .tasks-stat 完全对齐。
+   - 5 列网格（事项追踪是 4 列，这里业务上有 5 个指标）
+   - 卡片极简：大数字 + 小 label，居中
+   - margin-bottom 提到 --space-2xl，和 .tasks-stats 一致
+   - padding 用 --space-lg、radius 用 --radius-lg，外观完全同一 token
+
+   原本的 .mc-summary__icon / __icon--*（彩色图标块）与 .mc-summary__info
+   横向排版样式已不再被 JSX 使用，下方将这些规则一并删除，避免迷惑。
+   保留的卡片 hover 抬升效果（事项追踪没有，但用户原来就喜欢），保留。 */
 .mc-summary {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: var(--space-md);
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-2xl);
 }
 
 .mc-summary__card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-md);
-  padding: var(--space-md);
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
-  border-radius: 12px;
+  border-radius: var(--radius-lg);
+  padding: var(--space-lg);
+  text-align: center;
   transition: transform 0.15s, box-shadow 0.15s;
 }
 
@@ -144,62 +152,16 @@
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
-.mc-summary__icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 12px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.mc-summary__icon--share {
-  background: #e8f5e9;
-  color: #388e3c;
-}
-
-.mc-summary__icon--article {
-  background: #e3f2fd;
-  color: #1976d2;
-}
-
-.mc-summary__icon--help {
-  background: #fff3e0;
-  color: #f57c00;
-}
-
-.mc-summary__icon--upload {
-  background: #f3e5f5;
-  color: #7b1fa2;
-}
-
-.mc-summary__icon--total {
-  background: #fce4ec;
-  color: #c62828;
-}
-
-.mc-summary__info {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: 10px;
-  flex-wrap: nowrap;
-  min-width: 0;
-  overflow: hidden;
-}
-
 .mc-summary__value {
-  font-size: var(--text-xl);
+  font-size: var(--text-2xl);
   font-weight: 700;
   color: var(--color-text);
-  line-height: 1;
 }
 
 .mc-summary__label {
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--color-text-muted);
-  white-space: nowrap;
+  margin-top: 2px;
 }
 
 /* 表格 */
@@ -729,40 +691,27 @@
 }
 
 @media (max-width: 640px) {
+  /* 卡片改为极简「事项追踪」风格后，不再需要 __icon / __info 相关规则。
+     这里只保留：网格列数、卡片 padding、value/label 字号。 */
   .mc-summary {
     grid-template-columns: repeat(2, 1fr);
     gap: 8px;
   }
 
   .mc-summary__card {
-    gap: 8px;
     padding: 10px;
     border-radius: 10px;
   }
 
-  .mc-summary__icon {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-  }
-
-  .mc-summary__icon svg {
-    width: 18px;
-    height: 18px;
-  }
-
-  .mc-summary__info {
-    gap: 6px;
-  }
-
   .mc-summary__value {
-    font-size: 1.1rem;
+    font-size: var(--text-xl);
   }
 
   .mc-summary__label {
-    font-size: 0.7rem;
+    font-size: var(--text-xs);
   }
 
+  /* 5 个卡片在 2 列网格下，第 5 个独占一行 → 让它横跨两列居中 */
   .mc-summary__card:last-child {
     grid-column: span 2;
   }
@@ -864,7 +813,10 @@
   }
 }
 
-/* iPhone 适配（≤430px） */
+/* iPhone 适配（≤430px）
+   ——————————————————————————————————————————————
+   卡片极简化后，去掉所有 __icon / __info 残留规则；
+   只保留：周期选择器降字号 + 卡片更紧凑 + value/label 再缩一档。 */
 @media (max-width: 430px) {
   .mc-period-dropdown__trigger {
     font-size: 0.75rem;
@@ -876,32 +828,15 @@
   }
 
   .mc-summary__card {
-    gap: 6px;
     padding: 8px;
     border-radius: 8px;
   }
 
-  .mc-summary__icon {
-    width: 30px;
-    height: 30px;
-    border-radius: 7px;
-  }
-
-  .mc-summary__icon svg {
-    width: 15px;
-    height: 15px;
-  }
-
-  .mc-summary__info {
-    gap: 4px;
-    min-width: 0;
-  }
-
   .mc-summary__value {
-    font-size: 0.95rem;
+    font-size: var(--text-lg);
   }
 
   .mc-summary__label {
-    font-size: 0.65rem;
+    font-size: 0.7rem;
   }
 }

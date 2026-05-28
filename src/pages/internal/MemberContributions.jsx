@@ -7,7 +7,6 @@ import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import {
   BarChart3,
-  Users,
   Mic,
   FileText,
   Handshake,
@@ -16,7 +15,6 @@ import {
   X,
   Calendar,
   Trophy,
-  TrendingUp,
   ChevronDown,
   RefreshCw,
 } from 'lucide-react';
@@ -391,72 +389,62 @@ export default function MemberContributions() {
           </div>
         </div>
 
-        {/* 团队总览卡片 */}
+        {/* 团队总览卡片
+            ——————————————————————————————————————————————
+            v5 改动：删除原本左侧的彩色图标块和 .mc-summary__info 横向排版，
+            改为与「事项追踪」.tasks-stat 一致的极简卡片：
+              大数字（text-2xl）在上，label（text-sm）在下，居中。
+            原 .mc-summary__icon / __info 等 CSS 规则保留但不再被使用。 */}
         <div className="mc-summary">
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--share"><Mic size={28} /></div>
-            <div className="mc-summary__info">
-              <span className="mc-summary__value">{teamTotal.shareEvents}</span>
-              <EditableText
-                value={cc.labelShareEvents || '线上分享会'}
-                onChange={(v) => updateContribs('labelShareEvents', v)}
-                configKey="contributions.labelShareEvents"
-                as="span"
-                className="mc-summary__label"
-              />
-            </div>
+            <div className="mc-summary__value">{teamTotal.shareEvents}</div>
+            <EditableText
+              value={cc.labelShareEvents || '线上分享会'}
+              onChange={(v) => updateContribs('labelShareEvents', v)}
+              configKey="contributions.labelShareEvents"
+              as="div"
+              className="mc-summary__label"
+            />
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--article"><FileText size={28} /></div>
-            <div className="mc-summary__info">
-              <span className="mc-summary__value">{teamTotal.articleCount}</span>
-              <EditableText
-                value={cc.labelArticleCount || '公众号文章'}
-                onChange={(v) => updateContribs('labelArticleCount', v)}
-                configKey="contributions.labelArticleCount"
-                as="span"
-                className="mc-summary__label"
-              />
-            </div>
+            <div className="mc-summary__value">{teamTotal.articleCount}</div>
+            <EditableText
+              value={cc.labelArticleCount || '公众号文章'}
+              onChange={(v) => updateContribs('labelArticleCount', v)}
+              configKey="contributions.labelArticleCount"
+              as="div"
+              className="mc-summary__label"
+            />
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--help"><Handshake size={28} /></div>
-            <div className="mc-summary__info">
-              <span className="mc-summary__value">{teamTotal.helpCount}</span>
-              <EditableText
-                value={cc.labelHelpCount || '协作帮助'}
-                onChange={(v) => updateContribs('labelHelpCount', v)}
-                configKey="contributions.labelHelpCount"
-                as="span"
-                className="mc-summary__label"
-              />
-            </div>
+            <div className="mc-summary__value">{teamTotal.helpCount}</div>
+            <EditableText
+              value={cc.labelHelpCount || '协作帮助'}
+              onChange={(v) => updateContribs('labelHelpCount', v)}
+              configKey="contributions.labelHelpCount"
+              as="div"
+              className="mc-summary__label"
+            />
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--upload"><Upload size={28} /></div>
-            <div className="mc-summary__info">
-              <span className="mc-summary__value">{teamTotal.uploadCount}</span>
-              <EditableText
-                value={cc.labelUploadCount || '资料上传'}
-                onChange={(v) => updateContribs('labelUploadCount', v)}
-                configKey="contributions.labelUploadCount"
-                as="span"
-                className="mc-summary__label"
-              />
-            </div>
+            <div className="mc-summary__value">{teamTotal.uploadCount}</div>
+            <EditableText
+              value={cc.labelUploadCount || '资料上传'}
+              onChange={(v) => updateContribs('labelUploadCount', v)}
+              configKey="contributions.labelUploadCount"
+              as="div"
+              className="mc-summary__label"
+            />
           </div>
           <div className="mc-summary__card">
-            <div className="mc-summary__icon mc-summary__icon--total"><TrendingUp size={28} /></div>
-            <div className="mc-summary__info">
-              <span className="mc-summary__value">{teamTotal.total}</span>
-              <EditableText
-                value={cc.labelTotal || '贡献总计'}
-                onChange={(v) => updateContribs('labelTotal', v)}
-                configKey="contributions.labelTotal"
-                as="span"
-                className="mc-summary__label"
-              />
-            </div>
+            <div className="mc-summary__value">{teamTotal.total}</div>
+            <EditableText
+              value={cc.labelTotal || '贡献总计'}
+              onChange={(v) => updateContribs('labelTotal', v)}
+              configKey="contributions.labelTotal"
+              as="div"
+              className="mc-summary__label"
+            />
           </div>
         </div>
 
