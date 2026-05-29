@@ -169,21 +169,11 @@ export async function fetchAllFromCloud() {
 }
 
 /**
- * 新增一条文档。云端成功后同步更新本地缓存。
- * 云端失败会 throw，由调用方决定是否退回本地存储（比如：非登录 / 表未建）。
+ * 新增一条文档。正式发布必须写入云端成功；本地只作为成功后的缓存。
  */
 export async function createDoc(doc) {
-  // 始终先把本地缓存也加一份，失败了至少当前设备不会丢
-  try {
-    const existing = loadLocalDocs();
-    saveLocalDocs([doc, ...existing]);
-  } catch {
-    // saveLocalDocs 内部抛了（localStorage 空间不足），继续上抛
-    throw new Error('本地存储空间不足');
-  }
-
   if (!canUseSupabase() || !supabase) {
-    return { doc, remote: false };
+    throw new Error('云端暂时不可用，请检查网络后重新发布。');
   }
 
   try {
@@ -191,13 +181,21 @@ export async function createDoc(doc) {
     const { error } = await supabase.from('documents').insert(row);
     if (error) {
       console.warn('[documentsService] 云端插入失败:', error.message, error.code);
-      return { doc, remote: false, error };
+      throw new Error(error.message || '云端上传失败，请重新发布。');
     }
+
+    try {
+      const existing = loadLocalDocs();
+      saveLocalDocs([doc, ...existing]);
+    } catch (cacheErr) {
+      console.warn('[documentsService] 云端已发布，本地缓存写入失败:', cacheErr);
+    }
+
     console.log('[documentsService] 云端插入成功, id:', doc.id);
     return { doc, remote: true };
   } catch (err) {
     console.warn('[documentsService] createDoc 异常:', err.message);
-    return { doc, remote: false, error: err };
+    throw err;
   }
 }
 

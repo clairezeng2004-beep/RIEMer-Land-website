@@ -22,7 +22,7 @@ import {
 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import { useSiteContent } from '../../contexts/SiteContentContext';
-import { createDoc, canUseSupabase } from '../../lib/documentsService';
+import { createDoc } from '../../lib/documentsService';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -191,7 +191,7 @@ export default function ProcessTemplateCreate() {
     key: draftKey,
     values: newDoc,
     enabled: isAuthenticated,
-    delay: 1500,
+    delay: 500,
     isEmpty: (v) =>
       !v ||
       ((v.title || '').trim() === '' &&
@@ -530,17 +530,11 @@ export default function ProcessTemplateCreate() {
     };
 
     try {
-      // 通过 documentsService 同时写本地 + 云端（Supabase 可用时）
-      const result = await createDoc(doc);
-      if (canUseSupabase() && !result.remote) {
-        // Supabase 配置但写云端失败 —— 给用户一个可感知的警告，
-        // 但仍然允许发布（本地已保存），避免阻塞工作流。
-        console.warn('[ProcessTemplateCreate] 云端同步失败，其他设备将看不到此文档，请联系管理员检查 Supabase 配置。', result.error);
-        alert('已本地保存，但云端同步失败 —— 其他设备可能看不到此文档。请联系管理员检查后台配置。');
-      }
+      draft.flush();
+      await createDoc(doc);
     } catch (err) {
       console.error('[ProcessTemplateCreate] 发布失败:', err);
-      alert('发布失败：' + (err.message || '未知错误'));
+      alert('云端上传失败，请检查网络后重新发布。草稿已保留。\n\n' + (err.message || '未知错误'));
       return;
     }
 
