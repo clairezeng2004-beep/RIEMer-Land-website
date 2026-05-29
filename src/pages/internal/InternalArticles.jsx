@@ -806,7 +806,7 @@ export default function InternalArticles() {
                 onClick={openReadNumModal}
                 title="批量录入/更新公众号阅读量"
               >
-                <Eye size={16} /> 管理阅读量
+                <Eye size={16} /> 更新阅读量
               </button>
             )}
             <button className="btn btn-primary" onClick={openModal}>
