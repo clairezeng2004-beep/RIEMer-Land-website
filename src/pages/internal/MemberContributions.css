@@ -714,11 +714,7 @@
     font-size: var(--text-xs);
   }
 
-  /* mc 有 5 张卡（vs Tasks 的 4 张）；2 列网格下最后一张
-     独占一行，跨 2 列居中。 */
-  .mc-summary__card:last-child {
-    grid-column: span 2;
-  }
+  /* 5 张卡都保持单格宽度，避免最后一张比「事项追踪」卡片更宽。 */
 }
 
 @media (max-width: 640px) {
