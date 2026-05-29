@@ -126,6 +126,18 @@ export default function MemberSharingDetail() {
     [userNameMap, user],
   );
 
+  const resolveLikeUserName = useCallback(
+    (like) => {
+      const uid = like?.userId;
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return like?.userName || '访客';
+    },
+    [userNameMap, user],
+  );
+
   // 动态分类
   const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
@@ -289,7 +301,7 @@ export default function MemberSharingDetail() {
         const already = likes.some((l) => l.userId === user.id);
         newLikes = already
           ? likes.filter((l) => l.userId !== user.id)
-          : [...likes, { userId: user.id, userName: user.nickname || user.name || user.email }];
+          : [...likes, { userId: user.id, userName: user.name || user.nickname || user.email }];
         return { ...s, likes: newLikes };
       }),
     );
@@ -431,7 +443,7 @@ export default function MemberSharingDetail() {
                   <div className="msd-like-names">
                     {post.likes.map((l, idx) => (
                       <span key={l.userId}>
-                        {l.userName}{idx < post.likes.length - 1 ? '、' : ''}
+                        {resolveLikeUserName(l)}{idx < post.likes.length - 1 ? '、' : ''}
                       </span>
                     ))}
                   </div>

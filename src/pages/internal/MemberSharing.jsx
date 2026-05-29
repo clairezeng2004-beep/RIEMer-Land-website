@@ -108,6 +108,18 @@ export default function MemberSharing() {
     [userNameMap, user],
   );
 
+  const resolveLikeUserName = useCallback(
+    (like) => {
+      const uid = like?.userId;
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return like?.userName || '访客';
+    },
+    [userNameMap, user],
+  );
+
   const sc = internalConfig.memberSharing || {};
   const updateSC = useCallback(
     (key, val) => updateInternalConfig({ memberSharing: { [key]: val } }),
@@ -331,7 +343,7 @@ export default function MemberSharing() {
         const already = likes.some((l) => l.userId === user.id);
         newLikes = already
           ? likes.filter((l) => l.userId !== user.id)
-          : [...likes, { userId: user.id, userName: user.nickname || user.name || user.email }];
+          : [...likes, { userId: user.id, userName: user.name || user.nickname || user.email }];
         return { ...s, likes: newLikes };
       }),
     );
@@ -768,7 +780,7 @@ export default function MemberSharing() {
                     <div className="ms-card__like-names">
                       {post.likes.map((l, idx) => (
                         <span key={l.userId}>
-                          {l.userName}{idx < post.likes.length - 1 ? '、' : ''}
+                          {resolveLikeUserName(l)}{idx < post.likes.length - 1 ? '、' : ''}
                         </span>
                       ))}
                     </div>

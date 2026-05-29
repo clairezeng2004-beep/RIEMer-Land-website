@@ -35,6 +35,8 @@ import {
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
 import TextAnnotation from '../../components/TextAnnotation';
+import FloatingTextToolbar from '../../components/FloatingTextToolbar';
+import WordEditorToolbar from '../../components/WordEditorToolbar';
 import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
@@ -59,6 +61,12 @@ import useTocScroll from '../../hooks/useTocScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
+import { attachWordImageEditor } from '../../utils/wordImageEditor';
+import {
+  attachTableControls,
+  attachColumnPlaceholderHandler,
+  attachWordEditingNormalizer,
+} from '../../utils/wordDocBlocks';
 import { DraftStatusIndicator, DraftRestoreBanner } from './ProcessTemplateCreate';
 import './ProcessTemplateDetail.css';
 // 复用"成员内部分享"发布页的 Markdown 左编辑右预览样式（.msc-md-split 相关）
@@ -112,6 +120,46 @@ function downloadFile({ dataUrl, url, name }) {
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
+}
+
+function cleanWordHtml(html) {
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
+  parsed.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
+  parsed.querySelectorAll('*').forEach((el) => {
+    const attrs = [...el.attributes];
+    const tag = el.tagName.toLowerCase();
+    const keepAttrs = tag === 'img'
+      ? new Set(['src', 'alt', 'width', 'height', 'style', 'class'])
+      : new Set(['href', 'class', 'data-msc-table', 'data-cols', 'contenteditable', 'style']);
+    attrs.forEach((attr) => {
+      if (!keepAttrs.has(attr.name)) el.removeAttribute(attr.name);
+    });
+  });
+  parsed.querySelectorAll('img').forEach((img) => {
+    if (!img.src || img.src.startsWith('file:')) {
+      img.remove();
+      return;
+    }
+    if (!img.classList.contains('msc-img')) img.classList.add('msc-img');
+    img.setAttribute('draggable', 'false');
+    const parent = img.parentElement;
+    if (!parent || !parent.classList.contains('msc-img-wrap')) {
+      const wrap = parsed.createElement('p');
+      wrap.className = 'msc-img-wrap';
+      wrap.setAttribute('style', 'text-align:center');
+      img.replaceWith(wrap);
+      wrap.appendChild(img);
+    }
+  });
+
+  return stripUnderline(
+    parsed.body.innerHTML
+      .replace(/<span[^>]*>/gi, '')
+      .replace(/<\/span>/gi, '')
+      .replace(/<p>\s*<\/p>/gi, '')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim()
+  );
 }
 
 /* ========== 编辑日志工具 ========== */
@@ -412,6 +460,18 @@ export default function ProcessTemplateDetail() {
         return user.name || user.nickname;
       }
       return fallback || 'Unknown';
+    },
+    [userNameMap, user],
+  );
+
+  const resolveLikeUserName = useCallback(
+    (like) => {
+      const uid = like?.userId;
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return like?.userName || 'Unknown';
     },
     [userNameMap, user],
   );
@@ -800,7 +860,7 @@ export default function ProcessTemplateDetail() {
     if (!doc || !user) return;
     const likeInfo = {
       userId: user.id,
-      userName: user.nickname || user.name || user.email,
+      userName: user.name || user.nickname || user.email,
       userAvatar: user.avatar || null,
     };
     let nextLikes;
@@ -856,9 +916,42 @@ export default function ProcessTemplateDetail() {
   } = useMarkdownSyncScroll(false);
 
   /* 编辑态文本框：高度随内容自动增长，不再限制高度。 */
-  const ptdWordEditRef = useRef(null);
+  const ptdWordEditorRef = useRef(null);
+  const ptdWordImageApiRef = useRef(null);
   useAutoResizeTextarea(mdSyncEditorRef, editContent, { minHeight: 480 });
-  useAutoResizeTextarea(ptdWordEditRef, editContent, { minHeight: 480 });
+
+  useEffect(() => {
+    if (!isEditing || doc?.format !== 'word' || !ptdWordEditorRef.current) return;
+    const editor = ptdWordEditorRef.current;
+    if (editor.innerHTML !== editContent) {
+      editor.innerHTML = editContent || '';
+    }
+  }, [isEditing, doc?.id, doc?.format]);
+
+  useEffect(() => {
+    if (!isEditing || doc?.format !== 'word') {
+      ptdWordImageApiRef.current?.destroy?.();
+      ptdWordImageApiRef.current = null;
+      return undefined;
+    }
+    if (!ptdWordEditorRef.current) return undefined;
+
+    const editor = ptdWordEditorRef.current;
+    const syncHtml = () => setEditContent(stripUnderline(editor.innerHTML));
+    const api = attachWordImageEditor(editor, { onChange: syncHtml });
+    ptdWordImageApiRef.current = api;
+    const detachTable = attachTableControls(editor, syncHtml);
+    const detachCols = attachColumnPlaceholderHandler(editor, syncHtml);
+    const detachNormalize = attachWordEditingNormalizer(editor, syncHtml);
+
+    return () => {
+      detachNormalize();
+      detachCols();
+      detachTable();
+      api.destroy();
+      ptdWordImageApiRef.current = null;
+    };
+  }, [isEditing, doc?.format]);
 
   /* ========== 编辑草稿自动保存 ========== */
   const editDraftKey = doc?.id && user?.id
@@ -921,11 +1014,81 @@ export default function ProcessTemplateDetail() {
       const v = pendingDraft.values;
       if (typeof v.editTitle === 'string') setEditTitle(v.editTitle);
       if (typeof v.editDescription === 'string') setEditDescription(v.editDescription);
-      if (typeof v.editContent === 'string') setEditContent(v.editContent);
+      if (typeof v.editContent === 'string') {
+        setEditContent(v.editContent);
+        if (ptdWordEditorRef.current && doc?.format === 'word') {
+          ptdWordEditorRef.current.innerHTML = v.editContent;
+        }
+      }
     }
     setShowEditDraftPrompt(false);
     setPendingDraft(null);
-  }, [pendingDraft]);
+  }, [pendingDraft, doc?.format]);
+
+  const handleWordPaste = useCallback((e) => {
+    const items = e.clipboardData?.items;
+    if (items && Array.from(items).some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
+      return;
+    }
+    e.preventDefault();
+    const html = e.clipboardData.getData('text/html');
+    const text = e.clipboardData.getData('text/plain');
+
+    if (html) {
+      document.execCommand('insertHTML', false, cleanWordHtml(html));
+    } else if (text) {
+      const paragraphs = stripUnderline(
+        text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+      );
+      document.execCommand('insertHTML', false, paragraphs || text);
+    }
+
+    if (ptdWordEditorRef.current) {
+      setEditContent(stripUnderline(ptdWordEditorRef.current.innerHTML));
+    }
+  }, []);
+
+  const handleOneClickPaste = useCallback(async () => {
+    try {
+      const items = await navigator.clipboard.read();
+      for (const item of items) {
+        if (item.types.includes('text/html')) {
+          const blob = await item.getType('text/html');
+          const cleaned = cleanWordHtml(await blob.text());
+          if (ptdWordEditorRef.current) {
+            ptdWordEditorRef.current.innerHTML = cleaned;
+            setEditContent(cleaned);
+          }
+          return;
+        }
+        if (item.types.includes('text/plain')) {
+          const blob = await item.getType('text/plain');
+          const text = await blob.text();
+          const paragraphs = stripUnderline(
+            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+          );
+          if (ptdWordEditorRef.current) {
+            ptdWordEditorRef.current.innerHTML = paragraphs;
+            setEditContent(paragraphs);
+          }
+          return;
+        }
+      }
+    } catch {
+      try {
+        const text = await navigator.clipboard.readText();
+        const paragraphs = stripUnderline(
+          text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
+        );
+        if (ptdWordEditorRef.current) {
+          ptdWordEditorRef.current.innerHTML = paragraphs;
+          setEditContent(paragraphs);
+        }
+      } catch {
+        /* 剪贴板权限被拒绝 */
+      }
+    }
+  }, []);
 
   const handleDiscardEditDraft = useCallback(() => {
     editDraft.clearDraft();
@@ -1420,14 +1583,31 @@ export default function ProcessTemplateDetail() {
                       </div>
                     </div>
                   ) : (
-                    <textarea
-                      ref={ptdWordEditRef}
-                      className="ptd-edit__content-textarea"
-                      value={editContent}
-                      onChange={(e) => setEditContent(e.target.value)}
-                      placeholder={'正文内容…'}
-                      spellCheck={false}
-                    />
+                    <div className="msc-form__word-editor-wrapper ptd-edit__word-editor-wrapper">
+                      <WordEditorToolbar
+                        editorRef={ptdWordEditorRef}
+                        imageApiRef={ptdWordImageApiRef}
+                        onOneClickPaste={handleOneClickPaste}
+                        onChange={(html) => setEditContent(stripUnderline(html))}
+                      />
+                      <div
+                        ref={ptdWordEditorRef}
+                        className="msc-form__word-editor ptd-edit__word-editor"
+                        contentEditable
+                        onPaste={handleWordPaste}
+                        onInput={() => {
+                          if (ptdWordEditorRef.current) {
+                            setEditContent(stripUnderline(ptdWordEditorRef.current.innerHTML));
+                          }
+                        }}
+                        data-placeholder="正文内容…"
+                        suppressContentEditableWarning
+                      />
+                      <FloatingTextToolbar
+                        editorRef={ptdWordEditorRef}
+                        onChange={(html) => setEditContent(stripUnderline(html))}
+                      />
+                    </div>
                   )}
                 </div>
               ) : (
@@ -1529,7 +1709,7 @@ export default function ProcessTemplateDetail() {
                     <div className="ptd-like-names">
                       {likes.map((l, idx) => (
                         <span key={l.userId}>
-                          {l.userName}{idx < likes.length - 1 ? '、' : ''}
+                          {resolveLikeUserName(l)}{idx < likes.length - 1 ? '、' : ''}
                         </span>
                       ))}
                     </div>

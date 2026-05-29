@@ -218,6 +218,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     [userNameMap, user],
   );
 
+  const resolveLikeUserName = useCallback(
+    (like) => {
+      const uid = like?.userId;
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return like?.userName || 'Unknown';
+    },
+    [userNameMap, user],
+  );
+
   /* 展示贡献者：优先读 doc.contributorIds（多贡献者），
      缺省则回退到旧的 uploadedById / uploadedBy 单贡献者逻辑。 */
   const resolveContributors = useCallback(
@@ -810,7 +822,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (!user) return;
     const likeData = {
       userId: user.id,
-      userName: user.nickname || user.name || user.email,
+      userName: user.name || user.nickname || user.email,
       userAvatar: user.avatar || null,
     };
 
@@ -1355,7 +1367,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                     <div className="doc-card__like-names">
                       {(doc.likes || []).map((like, idx) => (
                         <span key={like.userId} className="doc-card__like-name">
-                          {like.userName}{idx < (doc.likes || []).length - 1 ? '、' : ''}
+                          {resolveLikeUserName(like)}{idx < (doc.likes || []).length - 1 ? '、' : ''}
                         </span>
                       ))}
                     </div>
@@ -1586,7 +1598,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   <div className="doc-preview__like-names">
                     {(previewDoc.likes || []).map((like, idx) => (
                       <span key={like.userId} className="doc-preview__like-name">
-                        {like.userName}{idx < (previewDoc.likes || []).length - 1 ? '、' : ''}
+                        {resolveLikeUserName(like)}{idx < (previewDoc.likes || []).length - 1 ? '、' : ''}
                       </span>
                     ))}
                   </div>
