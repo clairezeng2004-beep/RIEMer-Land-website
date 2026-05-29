@@ -9,7 +9,9 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  /* 与下方筛选行的间距加大，跟标题字号同步上调，避免上半部分挤在一起。 */
+  /* 与其他 tab（Documents / Suggestions / MemberSharing 等）一致：
+     header 与下方第一行内容的距离统一用 var(--space-2xl)，这样不论是
+     搜索框还是「全部/未读/已读」筛选行，垂直起点都在同一条水平线。 */
   margin-bottom: var(--space-2xl);
 }
 
@@ -17,11 +19,14 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  /* 字号从 var(--text-2xl)（32px）上调到 var(--text-3xl)（40px）——
-     index.css 里 --text-3xl 的注释就是「页面标题」。原本 32px 显得太瘦。 */
-  font-size: var(--text-3xl);
-  /* h1 与下方副标题段的距离也跟着加大。 */
-  margin-bottom: var(--space-sm);
+  /* 字号回退到 var(--text-2xl)，与 Documents / MemberProfiles /
+     MemberSharing / Profile 等所有内部 tab 的 h1 完全一致。
+     之前用 var(--text-3xl) 是把通知页 h1 当成独立"页面标题"放大，
+     但用户反馈：跨 tab 切换时这个 tab 的标题明显比别的大，且整页
+     被推下去；改回 text-2xl 之后筛选栏的 Y 坐标也会上移到和别的
+     tab 顶部搜索框同一行。 */
+  font-size: var(--text-2xl);
+  margin-bottom: var(--space-xs);
 }
 
 .notifications-page__header p {

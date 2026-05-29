@@ -688,19 +688,22 @@
     flex-direction: column;
     gap: var(--space-md);
   }
-}
 
-@media (max-width: 640px) {
-  /* 卡片改为极简「事项追踪」风格后，不再需要 __icon / __info 相关规则。
-     这里只保留：网格列数、卡片 padding、value/label 字号。 */
+  /* 卡片宽高跟「事项追踪」.tasks-stats / .tasks-stat 在 ≤768px 同断点
+     同 token 完全对齐——
+       - 2 列网格 + gap: var(--space-sm)
+       - 卡片 padding: var(--space-sm) var(--space-md)（即 8px 16px）
+       - value: var(--text-xl)，label: var(--text-xs)
+     之前 mc-summary 用的是 ≤640px 才切到 2 列、padding 10px，结果
+     640-768 区间内 5 列被挤成 3 列，每张卡反而比同断点 Tasks 卡更高。
+     现在直接和 Tasks 同步触发，卡片大小完全一致。 */
   .mc-summary {
     grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
+    gap: var(--space-sm);
   }
 
   .mc-summary__card {
-    padding: 10px;
-    border-radius: 10px;
+    padding: var(--space-sm) var(--space-md);
   }
 
   .mc-summary__value {
@@ -711,10 +714,15 @@
     font-size: var(--text-xs);
   }
 
-  /* 5 个卡片在 2 列网格下，第 5 个独占一行 → 让它横跨两列居中 */
+  /* mc 有 5 张卡（vs Tasks 的 4 张）；2 列网格下最后一张
+     独占一行，跨 2 列居中。 */
   .mc-summary__card:last-child {
     grid-column: span 2;
   }
+}
+
+@media (max-width: 640px) {
+  /* 这一档保留给表格相关的滚动 / sticky 调整，与卡片尺寸无关。 */
 
   .mc-table-wrapper {
     /* 字号继承 .mc-table 的 --text-sm，与事项追踪 (.tasks-table) 对齐；
@@ -811,32 +819,31 @@
   .mc-table thead th {
     top: 100px;
   }
-}
 
-/* iPhone 适配（≤430px）
-   ——————————————————————————————————————————————
-   卡片极简化后，去掉所有 __icon / __info 残留规则；
-   只保留：周期选择器降字号 + 卡片更紧凑 + value/label 再缩一档。 */
-@media (max-width: 430px) {
-  .mc-period-dropdown__trigger {
-    font-size: 0.75rem;
-    padding: 6px 10px;
-  }
-
+  /* 卡片继续和 Tasks 在 ≤480px 同 token 对齐：
+       - gap: var(--space-xs)
+       - padding: var(--space-xs) var(--space-sm)
+       - border-radius: var(--radius-md)
+       - value: var(--text-lg) */
   .mc-summary {
-    gap: 6px;
+    gap: var(--space-xs);
   }
 
   .mc-summary__card {
-    padding: 8px;
-    border-radius: 8px;
+    padding: var(--space-xs) var(--space-sm);
+    border-radius: var(--radius-md);
   }
 
   .mc-summary__value {
     font-size: var(--text-lg);
   }
+}
 
-  .mc-summary__label {
-    font-size: 0.7rem;
+/* iPhone 极窄屏（≤430px）：只剩周期选择器降字号，
+   卡片样式已经由 ≤480px 规则统一覆盖，这里不重复。 */
+@media (max-width: 430px) {
+  .mc-period-dropdown__trigger {
+    font-size: 0.75rem;
+    padding: 6px 10px;
   }
 }
