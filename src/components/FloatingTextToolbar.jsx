@@ -286,7 +286,18 @@ export default function FloatingTextToolbar({
   }, [editorRef, onChange]);
 
   const applyInlineRich = useCallback((cmd, val) => {
+    const sel = window.getSelection();
+    const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
     document.execCommand(cmd, false, val);
+    if (cmd === 'bold' && savedRange && !savedRange.collapsed) {
+      const after = savedRange.cloneRange();
+      after.collapse(false);
+      sel?.removeAllRanges();
+      sel?.addRange(after);
+      if (document.queryCommandState('bold')) {
+        document.execCommand('bold', false, null);
+      }
+    }
     detectActiveRich();
     fireChangeRich();
   }, [detectActiveRich, fireChangeRich]);

@@ -256,3 +256,10 @@
   outline-offset: -2px;
   background: rgba(91, 140, 62, 0.04);
 }
+
+/* 全选表格：放在左上角，和行列增删按钮分开 */
+.msc-table-ctl__btn--select {
+  top: -12px;
+  left: -12px;
+  font-size: 13px;
+}

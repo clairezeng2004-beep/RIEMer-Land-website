@@ -12,11 +12,8 @@
  *             <img class="msc-img" src="..." />
  *           </div>
  *           <div class="msc-col">
- *             <!-- 未填充的空栏：提供"插图"和"写文字"两个占位按钮 -->
- *             <div class="msc-col__empty" contenteditable="false">
- *               <button class="msc-col__act msc-col__act--img">点此添加图片</button>
- *               <button class="msc-col__act msc-col__act--text">输入文字</button>
- *             </div>
+ *             <p><br /></p>
+ *             <p><br /></p>
  *           </div>
  *           <div class="msc-col">
  *             <!-- 填了文字的栏：一个可编辑 <p>（和正文一样的富文本行为） -->
@@ -79,6 +76,28 @@ function insertBlockAtCaret(editor, node) {
   } catch { /* ignore */ }
 }
 
+function placeCaretAtStart(node) {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    node.focus?.();
+  } catch { /* ignore */ }
+}
+
+function buildEmptyColumnContent() {
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < 2; i++) {
+    const p = document.createElement('p');
+    p.innerHTML = '<br />';
+    frag.appendChild(p);
+  }
+  return frag;
+}
+
 /** 文件 → dataURL */
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -129,28 +148,7 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
       img.alt = '';
       col.appendChild(img);
     } else {
-      // 空栏：给两个占位按钮（均 contenteditable=false，
-      // 不会被当做可编辑内容，避免光标进入按钮本身）。
-      //   - "点此添加图片" → 弹文件选择器，选完后替换为 <img>
-      //   - "输入文字"     → 把占位替换成一个可编辑的 <p>，光标自动进入
-      // 两个交互都由 attachColumnPlaceholderHandler 统一拦截。
-      const empty = document.createElement('div');
-      empty.className = 'msc-col__empty';
-      empty.setAttribute('contenteditable', 'false');
-
-      const btnImg = document.createElement('button');
-      btnImg.type = 'button';
-      btnImg.className = 'msc-col__act msc-col__act--img';
-      btnImg.textContent = '点此添加图片';
-
-      const btnText = document.createElement('button');
-      btnText.type = 'button';
-      btnText.className = 'msc-col__act msc-col__act--text';
-      btnText.textContent = '输入文字';
-
-      empty.appendChild(btnImg);
-      empty.appendChild(btnText);
-      col.appendChild(empty);
+      col.appendChild(buildEmptyColumnContent());
     }
     container.appendChild(col);
   }
@@ -213,7 +211,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
 
-    // 1) 新版「输入文字」按钮
+    // 1) 历史文档里的「输入文字」按钮
     const textBtn = t.closest('.msc-col__act--text');
     if (textBtn && editor.contains(textBtn)) {
       const col = textBtn.closest('.msc-col');
@@ -224,7 +222,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       return;
     }
 
-    // 2) 新版「点此添加图片」按钮
+    // 2) 历史文档里的「点此添加图片」按钮
     const imgBtn = t.closest('.msc-col__act--img');
     if (imgBtn && editor.contains(imgBtn)) {
       const col = imgBtn.closest('.msc-col');
@@ -320,6 +318,7 @@ export function attachTableControls(editor, onChange) {
   overlay.className = 'msc-table-ctl';
   overlay.style.display = 'none';
   overlay.innerHTML = `
+    <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--select" data-act="select-table" title="全选表格">✣</button>
     <button type="button" class="msc-table-ctl__btn" data-act="add-col" title="在右侧添加列">
       <span class="msc-table-ctl__v">+</span>
     </button>
@@ -406,13 +405,26 @@ export function attachTableControls(editor, onChange) {
     onChange?.();
   }
 
+  function selectTable() {
+    if (!currentWrap) return;
+    const table = currentWrap.querySelector('table');
+    if (!table) return;
+    const range = document.createRange();
+    range.selectNode(table);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    editor.focus();
+  }
+
   function onOverlayClick(e) {
     const btn = e.target instanceof HTMLElement ? e.target.closest('[data-act]') : null;
     if (!btn) return;
     e.preventDefault();
     e.stopPropagation();
     const act = btn.getAttribute('data-act');
-    if (act === 'add-col') addCol();
+    if (act === 'select-table') selectTable();
+    else if (act === 'add-col') addCol();
     else if (act === 'add-row') addRow();
     else if (act === 'del-col') delCol();
     else if (act === 'del-row') delRow();
@@ -438,4 +450,29 @@ export function attachTableControls(editor, onChange) {
     editor.parentElement?.removeEventListener('scroll', onScrollOrResize);
     overlay.remove();
   };
+}
+
+
+export function attachWordEditingNormalizer(editor, onChange) {
+  if (!editor) return () => {};
+
+  const onKeyDown = (e) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+    const anchor =
+      sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+    const quote = anchor?.closest?.('blockquote');
+    if (!quote || !editor.contains(quote)) return;
+
+    e.preventDefault();
+    const p = document.createElement('p');
+    p.innerHTML = '<br />';
+    quote.parentNode?.insertBefore(p, quote.nextSibling);
+    placeCaretAtStart(p);
+    onChange?.();
+  };
+
+  editor.addEventListener('keydown', onKeyDown);
+  return () => editor.removeEventListener('keydown', onKeyDown);
 }

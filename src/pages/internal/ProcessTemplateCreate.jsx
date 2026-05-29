@@ -27,6 +27,7 @@ import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
   attachColumnPlaceholderHandler,
+  attachWordEditingNormalizer,
 } from '../../utils/wordDocBlocks';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
@@ -451,8 +452,10 @@ export default function ProcessTemplateCreate() {
     };
     const detachTable = attachTableControls(editor, syncHtml);
     const detachCols = attachColumnPlaceholderHandler(editor, syncHtml);
+    const detachNormalize = attachWordEditingNormalizer(editor, syncHtml);
 
     return () => {
+      detachNormalize();
       detachCols();
       detachTable();
       api.destroy();
