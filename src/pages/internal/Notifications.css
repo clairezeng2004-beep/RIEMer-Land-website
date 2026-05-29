@@ -9,15 +9,19 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: var(--space-xl);
+  /* 与下方筛选行的间距加大，跟标题字号同步上调，避免上半部分挤在一起。 */
+  margin-bottom: var(--space-2xl);
 }
 
 .notifications-page__header h1 {
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  font-size: var(--text-2xl);
-  margin-bottom: var(--space-xs);
+  /* 字号从 var(--text-2xl)（32px）上调到 var(--text-3xl)（40px）——
+     index.css 里 --text-3xl 的注释就是「页面标题」。原本 32px 显得太瘦。 */
+  font-size: var(--text-3xl);
+  /* h1 与下方副标题段的距离也跟着加大。 */
+  margin-bottom: var(--space-sm);
 }
 
 .notifications-page__header p {
@@ -191,11 +195,20 @@
 }
 
 .notification-item__type {
+  display: inline-flex;
+  align-items: center;
   font-size: var(--text-xs);
   font-weight: 600;
   padding: 2px 8px;
   border-radius: var(--radius-full);
   flex-shrink: 0;
+  /* 之前没写 line-height，导致 span 继承 body 的 1.8，
+     badge 行框比标题 h4（line-height: 1.4）整整高一截。
+     align-items: center 看上去就把 badge 顶到标题文字上方。
+     这里钉到 1.4 与 h4 对齐，再用 align-self: center 由父容器
+     的 flex 居中规则把它和标题完全对齐到同一基线。 */
+  line-height: 1.4;
+  align-self: center;
 }
 
 .notification-item__message {
