@@ -268,8 +268,15 @@
   gap: 4px;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  /* nowrap 防止文字跨行；flex-shrink: 0 + min-width: max-content
+     一起锁住盒宽——之前用 min-width: 0 会让 flex 容器里这只胶囊
+     在 justify-content: space-between 下被强行压窄，结果 Chinese 文字
+     仍然按单字逐个换行（"需密 / 码"、"2025-03- / 06"）。
+     现在让每只胶囊以自然内容宽度为下限，父级 .featured__meta 有
+     flex-wrap: wrap，整只胶囊会换到下一行而不是被切成单字。 */
   white-space: nowrap;
-  min-width: 0;
+  flex-shrink: 0;
+  min-width: max-content;
 }
 
 .featured__meta-item svg {

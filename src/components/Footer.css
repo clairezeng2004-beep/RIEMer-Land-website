@@ -323,12 +323,19 @@
   }
 
   /* 手机端：四个模块（导航 / 关于我们 / 联系方式 / 关注公众号）
-     各自独占一行，垂直堆叠，互相之间留出明确间距。 */
+     各自独占一行，垂直堆叠。
+     v3 改动：手机端整体行距全面收紧——
+       - 模块之间 row-gap 从 --space-xl(32px) 降到 --space-lg(24px)；
+       - 模块内"标题 ↔ 内容"间距从 --space-sm(8px) 降到 --space-xs(4px)；
+       - 三行链接 / 三行文字 / 三行联系方式之间 gap 从 --space-xs(4px) 降到 0；
+       - 单行链接 / 单行文字的 line-height 从 1.4 降到 1.3，去掉额外 padding，
+         让"首页 / 分享回顾 / 关于我们"以及"邮箱 / 地址 / 留言"三行字
+         视觉上更紧凑、更居中。 */
   .footer__grid {
     grid-template-columns: 1fr;
     grid-template-rows: none;
     grid-template-areas: none;
-    row-gap: var(--space-xl);
+    row-gap: var(--space-lg);
     column-gap: 0;
     text-align: center;
   }
@@ -344,7 +351,7 @@
     padding: 0;
     border-bottom: none;
     justify-content: flex-start;
-    gap: var(--space-sm);
+    gap: var(--space-xs);
     width: 100%;
   }
 
@@ -355,12 +362,12 @@
     padding-bottom: 0;
   }
 
-  /* 导航链接列表：每个链接一行，居中 */
+  /* 导航链接列表：每个链接一行，居中。gap 收到 0，三行紧贴在一起。 */
   .footer__nav-links-row {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-xs);
+    gap: 0;
     width: 100%;
   }
 
@@ -368,14 +375,19 @@
     display: block;
     width: 100%;
     text-align: center;
+    /* 手机端单独收紧：line-height 1.3 + padding 0，让三行链接的行间距
+       仅由各自行高决定，去掉桌面端 1px padding + 1.4 line-height 累计起来
+       的 5-6px 视觉空隙。 */
+    line-height: 1.3;
+    padding: 0;
   }
 
-  /* "关于我们"三行文字：居中堆叠 */
+  /* "关于我们"三行文字：居中堆叠。gap 收到 0，同上。 */
   .footer__about-texts {
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-xs);
+    gap: 0;
     width: 100%;
     border-top: none;
     padding-top: 0;
@@ -383,6 +395,8 @@
 
   .footer__about-texts .footer__nav-text {
     display: block;
+    line-height: 1.3;
+    padding: 0;
   }
 
   /* 联系方式内容 */
@@ -390,8 +404,14 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: var(--space-xs);
+    gap: 0;
     width: 100%;
+  }
+
+  /* 邮箱 / 地址 / 留言 三行：与上面两栏同步收紧。 */
+  .footer__contact-item {
+    line-height: 1.3;
+    padding: 0;
   }
 
   .footer__contact-item {
