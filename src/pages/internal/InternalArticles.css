@@ -784,11 +784,22 @@
   padding: 0.65rem 1rem 0.65rem 2.4rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  font-family: var(--font-body);
   font-size: var(--text-sm);
+  letter-spacing: 0;
   color: var(--color-text);
   background: var(--color-bg);
   outline: none;
   transition: all var(--transition-fast);
+}
+
+.ia-modal__url-input::placeholder,
+.ia-modal__text-input::placeholder,
+.ia-modal__textarea::placeholder,
+.ia-modal__tag-input::placeholder,
+.ia-modal__outline-input::placeholder {
+  font-family: var(--font-body);
+  letter-spacing: 0;
 }
 
 .ia-modal__url-input:focus {
@@ -902,6 +913,7 @@
   padding: 0.55rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
+  font-family: var(--font-body);
   font-size: var(--text-sm);
   color: var(--color-text);
   background: var(--color-bg);
@@ -1064,6 +1076,7 @@
   padding: 0.35rem 0.65rem;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-sm);
+  font-family: var(--font-body);
   font-size: var(--text-sm);
   color: var(--color-text);
   background: var(--color-bg-card, #fff);
@@ -1526,4 +1539,3 @@
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
 }
-

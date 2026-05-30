@@ -232,6 +232,11 @@ input, textarea, select {
   font-family: var(--font-body);
 }
 
+input::placeholder,
+textarea::placeholder {
+  font-family: var(--font-body);
+}
+
 /* 标识符型输入框使用系统无衬线 / 等宽字体。
  *
  * 为什么单独处理：
@@ -265,6 +270,15 @@ input[type='number'] {
   font-size: 0.95em;
   /* 字母间略加一点字距，避免 _ 与相邻字符视觉粘连的另一个极端。 */
   letter-spacing: 0.01em;
+}
+
+input[type='email']::placeholder,
+input[type='url']::placeholder,
+input[type='tel']::placeholder,
+input[type='password']::placeholder,
+input[type='number']::placeholder {
+  font-family: var(--font-body);
+  letter-spacing: 0;
 }
 
 /* Utility Classes */
