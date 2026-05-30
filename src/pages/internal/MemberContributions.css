@@ -129,8 +129,7 @@
    - padding 用 --space-lg、radius 用 --radius-lg，外观完全同一 token
 
    原本的 .mc-summary__icon / __icon--*（彩色图标块）与 .mc-summary__info
-   横向排版样式已不再被 JSX 使用，下方将这些规则一并删除，避免迷惑。
-   保留的卡片 hover 抬升效果（事项追踪没有，但用户原来就喜欢），保留。 */
+   横向排版样式已不再被 JSX 使用。 */
 .mc-summary {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
@@ -144,12 +143,6 @@
   border-radius: var(--radius-lg);
   padding: var(--space-lg);
   text-align: center;
-  transition: transform 0.15s, box-shadow 0.15s;
-}
-
-.mc-summary__card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.06);
 }
 
 .mc-summary__value {
@@ -510,8 +503,11 @@
 }
 
 .mc-table__td--custom {
+  width: 180px;
   min-width: 180px;
+  max-width: 180px;
   text-align: left;
+  overflow: hidden;
 }
 
 .mc-custom {
@@ -524,6 +520,9 @@
   display: flex;
   align-items: center;
   gap: 6px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 4px 8px;
   background: var(--color-bg-hover);
   border-radius: 6px;
@@ -542,6 +541,8 @@
 }
 
 .mc-custom__text {
+  min-width: 0;
+  max-width: 100%;
   color: var(--color-text);
   word-break: break-word;
 }
@@ -550,10 +551,12 @@
 .mc-custom__recorder {
   color: var(--color-text-muted);
   font-size: 11px;
-  white-space: nowrap;
+  white-space: normal;
+  word-break: keep-all;
 }
 
 .mc-custom__remove {
+  flex-shrink: 0;
   border: none;
   background: none;
   color: var(--color-text-muted);
@@ -622,6 +625,8 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  max-width: 100%;
+  box-sizing: border-box;
   padding: 4px 10px;
   border: 1px dashed var(--color-border-light);
   border-radius: 6px;
@@ -673,12 +678,6 @@
 }
 
 /* 响应式 */
-@media (max-width: 900px) {
-  .mc-summary {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
-
 @media (max-width: 768px) {
   .mc-page {
     padding-top: var(--space-3xl);
