@@ -10,7 +10,7 @@
      - overscroll-behavior-x: none：即使子容器横向滚到尽头，也不把剩余的横向滑动交给浏览器
      - touch-action: pan-y：触摸设备上仅允许纵向 pan，禁止水平 pan 触发浏览器级手势（iOS Safari 两指/边缘滑动切页等） */
   overscroll-behavior-x: none;
-  touch-action: pan-y;
+  touch-action: auto;
 }
 
 .internal-layout__content {
@@ -26,7 +26,7 @@
   background: var(--color-bg);
   margin-left: 220px;
   overscroll-behavior-x: none;
-  touch-action: pan-y;
+  touch-action: auto;
 }
 
 /* 内部空间的 .container 左侧留出适当间距 */
