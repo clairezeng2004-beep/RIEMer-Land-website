@@ -63,6 +63,14 @@
   color: var(--color-primary, #5B8C3E);
 }
 
+.msc-topbar__back:disabled,
+.msc-topbar__actions .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 .msc-topbar__actions {
   display: flex;
   align-items: center;

@@ -10,6 +10,7 @@ import {
   FileText,
   Eye,
   Upload,
+  Loader2,
   Paperclip,
   X,
   File,
@@ -141,6 +142,7 @@ export default function ProcessTemplateCreate() {
     content: '',
     attachments: [],
   });
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
   useAutoResizeTextarea(mdEditorRef, newDoc.content, { minHeight: 360 });
@@ -468,6 +470,7 @@ export default function ProcessTemplateCreate() {
   /* ============ 发布 ============ */
   const handleCreate = async (e) => {
     e.preventDefault();
+    if (isPublishing) return;
     const hasContent = newDoc.content.trim().length > 0;
     const hasAttachments = newDoc.attachments.length > 0;
     if (!newDoc.title.trim()) {
@@ -530,9 +533,11 @@ export default function ProcessTemplateCreate() {
     };
 
     try {
+      setIsPublishing(true);
       draft.flush();
       await createDoc(doc);
     } catch (err) {
+      setIsPublishing(false);
       console.error('[ProcessTemplateCreate] 发布失败:', err);
       alert('云端上传失败，请检查网络后重新发布。草稿已保留。\n\n' + (err.message || '未知错误'));
       return;
@@ -557,7 +562,11 @@ export default function ProcessTemplateCreate() {
     <div className="msc-page">
       {/* 顶部导航栏 */}
       <div className="msc-topbar">
-        <button className="msc-topbar__back" onClick={() => navigate('/internal/process-templates')}>
+        <button
+          className="msc-topbar__back"
+          onClick={() => navigate('/internal/process-templates')}
+          disabled={isPublishing}
+        >
           <ChevronLeft size={20} /> 返回列表
         </button>
         <div className="msc-topbar__actions">
@@ -565,6 +574,7 @@ export default function ProcessTemplateCreate() {
           <button
             type="button"
             className="btn btn-secondary"
+            disabled={isPublishing}
             onClick={() => {
               if (window.opener && !window.opener.closed) window.close();
               else navigate('/internal/process-templates');
@@ -572,8 +582,9 @@ export default function ProcessTemplateCreate() {
           >
             取消
           </button>
-          <button type="submit" form="ptc-create-form" className="btn btn-primary">
-            <Upload size={16} /> 发布文档
+          <button type="submit" form="ptc-create-form" className="btn btn-primary" disabled={isPublishing}>
+            {isPublishing ? <Loader2 size={16} className="gallery-spin" /> : <Upload size={16} />}
+            {isPublishing ? '发布中...' : '发布文档'}
           </button>
         </div>
       </div>
