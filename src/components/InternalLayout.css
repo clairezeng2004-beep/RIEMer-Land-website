@@ -36,6 +36,65 @@
   padding-right: clamp(1rem, 3vw, 2.5rem);
 }
 
+/* 内部空间各 Tab 页头统一基线：标题、描述和右上角操作区从同一高度开始。 */
+.internal-layout__content .documents-page__header,
+.internal-layout__content .tasks-page__header,
+.internal-layout__content .gallery-page__header,
+.internal-layout__content .guestbook-page__header,
+.internal-layout__content .suggestions-page__header,
+.internal-layout__content .ms-page__header,
+.internal-layout__content .mc-page__header,
+.internal-layout__content .member-profiles-page__header,
+.internal-layout__content .notifications-page__header,
+.internal-layout__content .ia-list__header,
+.internal-layout__content .profile-page__header,
+.internal-layout__content .users-page__header,
+.internal-layout__content .notif-mgmt__header,
+.internal-layout__content .content-mgmt__header {
+  align-items: flex-start;
+}
+
+.internal-layout__content .documents-page__header h1,
+.internal-layout__content .tasks-page__header h1,
+.internal-layout__content .gallery-page__header h1,
+.internal-layout__content .guestbook-page__header h1,
+.internal-layout__content .suggestions-page__header h1,
+.internal-layout__content .ms-page__header h1,
+.internal-layout__content .mc-page__header h1,
+.internal-layout__content .member-profiles-page__header h1,
+.internal-layout__content .notifications-page__header h1,
+.internal-layout__content .ia-list__header h1,
+.internal-layout__content .profile-page__header h1,
+.internal-layout__content .users-page__header h1,
+.internal-layout__content .notif-mgmt__header h1,
+.internal-layout__content .content-mgmt__header h1 {
+  line-height: 1.3;
+  margin-bottom: var(--space-xs);
+}
+
+.internal-layout__content .documents-page__header p,
+.internal-layout__content .tasks-page__header p,
+.internal-layout__content .gallery-page__header p,
+.internal-layout__content .guestbook-page__header p,
+.internal-layout__content .suggestions-page__header p,
+.internal-layout__content .ms-page__header p,
+.internal-layout__content .mc-page__header p,
+.internal-layout__content .member-profiles-page__header p,
+.internal-layout__content .notifications-page__header p,
+.internal-layout__content .ia-list__header p,
+.internal-layout__content .profile-page__header p,
+.internal-layout__content .users-page__header p,
+.internal-layout__content .notif-mgmt__header p,
+.internal-layout__content .content-mgmt__header p {
+  line-height: 1.5;
+}
+
+.internal-layout__content .ia-list__header-actions,
+.internal-layout__content .content-mgmt__header-actions {
+  align-items: flex-start;
+  margin-top: 0;
+}
+
 /* 内部空间各 Tab 顶部主操作按钮统一尺寸。
    这些按钮有的用 <button>，有的用 <a>，各页面历史上还各自写过
    padding / margin-top；这里用公共父级提高优先级，保证右上角绿色按钮
@@ -62,6 +121,11 @@
   flex-shrink: 0;
   line-height: 1.2;
   gap: 6px;
+}
+
+.internal-layout__content .ia-list__header-actions .btn-primary,
+.internal-layout__content .content-mgmt__header-actions .btn-primary {
+  margin-top: 4px;
 }
 
 .internal-layout__content .msc-topbar__actions .btn-primary {
