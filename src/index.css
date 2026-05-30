@@ -335,10 +335,18 @@ input[type='number']::placeholder {
   box-sizing: border-box;
   vertical-align: middle;
   white-space: nowrap;
+  text-align: center;
   cursor: pointer;
   border: none;
   transition: all var(--transition-normal);
   text-decoration: none;
+}
+
+.btn > span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: inherit;
 }
 
 .btn-primary {

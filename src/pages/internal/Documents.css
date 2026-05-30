@@ -25,6 +25,15 @@
   font-size: var(--text-sm);
 }
 
+.documents-page__header .btn {
+  flex-shrink: 0;
+  align-self: flex-start;
+  padding: 0.5rem 1.2rem;
+  font-size: var(--text-sm);
+  margin-top: 4px;
+  min-height: 38px;
+}
+
 /* ============ Upload Form ============ */
 .documents-upload {
   padding: var(--space-xl);
@@ -1243,6 +1252,7 @@
     padding: 0.5rem 1.2rem;
     font-size: var(--text-sm);
     margin-top: 4px;
+    min-height: 38px;
   }
   .documents-upload__row {
     grid-template-columns: 1fr;
