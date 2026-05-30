@@ -58,7 +58,7 @@
   color: #4FBFC4;
   font-size: var(--text-sm);
   font-weight: 500;
-  margin-bottom: var(--space-xl);
+  margin-bottom: var(--space-sm);
 }
 
 /* ============ 云端加载状态横幅 ============ */
@@ -129,7 +129,7 @@
   align-items: center;
   justify-content: flex-end;
   gap: var(--space-xs);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
 .member-profiles-table-controls__btn {
@@ -829,4 +829,3 @@
     min-width: 0;
   }
 }
-

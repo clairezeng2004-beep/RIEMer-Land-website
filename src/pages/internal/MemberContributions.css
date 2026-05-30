@@ -173,7 +173,7 @@
 }
 
 .mc-table {
-  width: 960px;
+  width: 1080px;
   min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
@@ -227,8 +227,8 @@
 
 .mc-table__th--member {
   text-align: left !important;
-  width: 120px;
-  min-width: 120px;
+  width: 88px;
+  min-width: 88px;
 }
 
 /* 中间数据列（线上分享会、公众号文章、协作帮助、内部分享）适当分配 */
@@ -236,16 +236,16 @@
 .mc-table th:nth-child(4),
 .mc-table th:nth-child(5),
 .mc-table th:nth-child(6) {
-  width: 90px;
-  min-width: 90px;
+  width: 132px;
+  min-width: 132px;
 }
 
 /* 其他贡献列 —— 缩窄这一列，让出的空间给"总计"列吸收，
    从而在视觉上拉大"其他"与"总计"之间的距离；
    配合下方 translateX 调整，保持"总计"气泡的视觉位置不动。 */
 .mc-table__th--custom {
-  width: 240px;
-  min-width: 240px;
+  width: 300px;
+  min-width: 300px;
 }
 
 .mc-table__th--total {
@@ -282,8 +282,8 @@
 .mc-table td:nth-child(4),
 .mc-table td:nth-child(5),
 .mc-table td:nth-child(6) {
-  width: 90px;
-  min-width: 90px;
+  width: 132px;
+  min-width: 132px;
 }
 
 /* 行 hover 配色与"成员通讯录"对齐：
@@ -519,9 +519,9 @@
 }
 
 .mc-table__td--custom {
-  width: 240px;
-  min-width: 240px;
-  max-width: 240px;
+  width: 300px;
+  min-width: 300px;
+  max-width: 300px;
   text-align: left;
   overflow: hidden;
 }
@@ -770,8 +770,8 @@
   .mc-table {
     /* 表格保持固定总宽，宽度不够时交给 .mc-table-wrapper 横向滚动，
        不再把每列挤到只剩半个字。 */
-    width: 920px;
-    min-width: 920px;
+    width: 1060px;
+    min-width: 1060px;
     table-layout: fixed;
   }
 
@@ -779,7 +779,8 @@
   .mc-table th:nth-child(4),
   .mc-table th:nth-child(5),
   .mc-table th:nth-child(6) {
-    width: 90px;
+    width: 132px;
+    min-width: 132px;
   }
 
   /* 手机端：排名列、成员列的 sticky 锚点必须与各自实际宽度对齐。
@@ -797,15 +798,15 @@
   .mc-table__th--member,
   .mc-table__td--member {
     left: 44px;
-    width: 120px;
-    min-width: 120px;
+    width: 88px;
+    min-width: 88px;
   }
 
   .mc-table__th--custom,
   .mc-table__td--custom {
-    width: 250px;
-    min-width: 250px;
-    max-width: 250px;
+    width: 300px;
+    min-width: 300px;
+    max-width: 300px;
   }
 
   .mc-table__th--total,
@@ -816,7 +817,7 @@
 
   /* 成员名超长时在手机端截断，避免撑宽 sticky 列打破上面的对齐假设 */
   .mc-member-name {
-    max-width: 88px;
+    max-width: 64px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
