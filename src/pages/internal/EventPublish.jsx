@@ -194,6 +194,7 @@ export default function EventPublish() {
   const [showModal, setShowModal] = useState(false);
   const [draft, setDraft] = useState(EMPTY_EVENT);
   const [formError, setFormError] = useState('');
+  const [isPublishingEvent, setIsPublishingEvent] = useState(false);
   // 新建活动弹窗内"其他"自定义分类临时值
   const [customCategoryInput, setCustomCategoryInput] = useState('');
 
@@ -421,13 +422,15 @@ export default function EventPublish() {
   };
 
   const closeModal = () => {
+    if (isPublishingEvent) return;
     setShowModal(false);
     setDraft(EMPTY_EVENT);
     setCustomCategoryInput('');
     setFormError('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isPublishingEvent) return;
     if (!draft.title.trim()) {
       setFormError('请填写活动标题');
       return;
@@ -453,10 +456,10 @@ export default function EventPublish() {
       if (!categoryList.includes(custom)) {
         const updated = [...categoryList, custom];
         setCategoryList(updated);
-        persistEventCategories(updated, lastCatSyncRef);
+        await persistEventCategories(updated, lastCatSyncRef);
       }
     }
-    addEvent({
+    const newEvent = {
       ...draft,
       category: finalCategory,
       id: `evt-${Date.now()}`,
@@ -471,9 +474,24 @@ export default function EventPublish() {
       // events 存在 site_settings.value 的 JSON 数组里，workItemId 作为普通
       // 字段即可，无需 Supabase schema 迁移。
       workItemId: pendingWorkItemId || null,
-    });
+    };
     const savedTitle = draft.title.trim();
     const hadWorkItem = !!pendingWorkItemId;
+    const nextEvents = [newEvent, ...events];
+
+    setFormError('');
+    setIsPublishingEvent(true);
+    try {
+      const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+      if (!res?.success) {
+        setFormError(`活动没有写入云端：${res?.error || '未知错误'}。请稍后重试。`);
+        return;
+      }
+      addEvent(newEvent);
+    } finally {
+      setIsPublishingEvent(false);
+    }
+
     setPendingWorkItemId(null);
     closeModal();
     // 发布成功后：如果是带工作项关联进来的 → 弹"去标记事项完成"提示；
@@ -1062,11 +1080,11 @@ export default function EventPublish() {
             </div>
 
             <div className="ia-modal__footer">
-              <button className="btn btn-ghost" onClick={closeModal}>
+              <button className="btn btn-ghost" onClick={closeModal} disabled={isPublishingEvent}>
                 取消
               </button>
-              <button className="btn btn-primary" onClick={handleSave}>
-                <Check size={16} /> 确认发布
+              <button className="btn btn-primary" onClick={handleSave} disabled={isPublishingEvent}>
+                <Check size={16} /> {isPublishingEvent ? '发布中...' : '确认发布'}
               </button>
             </div>
           </div>

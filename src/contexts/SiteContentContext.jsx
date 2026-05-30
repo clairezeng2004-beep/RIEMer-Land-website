@@ -1103,7 +1103,10 @@ export function SiteContentProvider({ children }) {
 
   // 活动管理 CRUD
   const addEvent = (event) => {
-    setEvents((prev) => [event, ...prev]);
+    setEvents((prev) => {
+      if (prev.some((item) => String(item.id) === String(event.id))) return prev;
+      return [event, ...prev];
+    });
   };
 
   const updateEvent = (id, updates) => {
