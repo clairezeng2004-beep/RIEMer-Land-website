@@ -49,7 +49,27 @@ import './EventPublish.css';
 // 事件分类只有文本（无颜色），存 string[]；本地 key 与 site_settings.event_categories 双写
 const EVENT_CATEGORIES_KEY = 'riemer_event_categories';
 
-const DEFAULT_EVENT_CATEGORIES = ['腾讯会议分享', '团队招新', '其他'];
+const DEFAULT_EVENT_LOCATION = '线上腾讯会议';
+const EVENT_CATEGORY_RENAMES = {
+  腾讯会议分享: '腾讯会议分享会',
+};
+const DEFAULT_EVENT_CATEGORIES = ['腾讯会议分享会', '团队招新', '其他'];
+
+function normalizeEventCategory(category) {
+  return EVENT_CATEGORY_RENAMES[category] || category;
+}
+
+function normalizeEventCategories(categories) {
+  const result = [];
+  const seen = new Set();
+  categories.forEach((category) => {
+    const normalized = normalizeEventCategory(category);
+    if (!normalized || seen.has(normalized)) return;
+    result.push(normalized);
+    seen.add(normalized);
+  });
+  return result;
+}
 
 function loadEventCategories() {
   try {
@@ -57,7 +77,7 @@ function loadEventCategories() {
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed) && parsed.every((x) => typeof x === 'string')) {
-        return parsed;
+        return normalizeEventCategories(parsed);
       }
     }
   } catch { /* ignore */ }
@@ -107,8 +127,8 @@ function getCountdownDays(eventDate) {
 const EMPTY_EVENT = {
   title: '',
   date: '',
-  category: '腾讯会议分享',
-  location: '',
+  category: '腾讯会议分享会',
+  location: DEFAULT_EVENT_LOCATION,
   excerpt: '',
   officialUrl: '',
   hasReplay: false,
@@ -156,9 +176,10 @@ export default function EventPublish() {
       // 本地默认三类会一直保留 —— 这就是"跨设备删除不生效"的根因之一。
       // 只要云端返回的是数组（非 null 的合法结构），就以云端为准。
       if (Array.isArray(value) && value.every((x) => typeof x === 'string')) {
+        const nextCategories = normalizeEventCategories(value);
         lastCatSyncRef.current = updatedAt;
-        setCategoryList(value);
-        saveEventCategoriesLocal(value);
+        setCategoryList(nextCategories);
+        saveEventCategoriesLocal(nextCategories);
       }
     });
 
@@ -166,9 +187,10 @@ export default function EventPublish() {
       if (updatedAt && lastCatSyncRef.current === updatedAt) return; // 自己的回流
       // 同上：realtime 推来的空数组也要原样应用，不能被丢弃。
       if (!Array.isArray(value) || !value.every((x) => typeof x === 'string')) return;
+      const nextCategories = normalizeEventCategories(value);
       lastCatSyncRef.current = updatedAt;
-      setCategoryList(value);
-      saveEventCategoriesLocal(value);
+      setCategoryList(nextCategories);
+      saveEventCategoriesLocal(nextCategories);
     });
 
     return () => {
@@ -244,9 +266,10 @@ export default function EventPublish() {
     const result = ['全部', ...categoryList];
     const set = new Set(result);
     events.forEach((e) => {
-      if (e.category && !set.has(e.category)) {
-        result.push(e.category);
-        set.add(e.category);
+      const category = normalizeEventCategory(e.category);
+      if (category && !set.has(category)) {
+        result.push(category);
+        set.add(category);
       }
     });
     return sortWithOtherLast(result);
@@ -444,17 +467,17 @@ export default function EventPublish() {
       return;
     }
     // 如果选了"__custom__"（自定义），用输入的文本作为分类
-    let finalCategory = draft.category;
+    let finalCategory = normalizeEventCategory(draft.category);
     if (draft.category === '__custom__') {
       const custom = customCategoryInput.trim();
       if (!custom) {
         setFormError('请输入自定义分类名称');
         return;
       }
-      finalCategory = custom;
+      finalCategory = normalizeEventCategory(custom);
       // 若新分类不在分类列表，顺带添加进去（让它成为可筛选项）
-      if (!categoryList.includes(custom)) {
-        const updated = [...categoryList, custom];
+      if (!categoryList.includes(finalCategory)) {
+        const updated = [...categoryList, finalCategory];
         setCategoryList(updated);
         await persistEventCategories(updated, lastCatSyncRef);
       }
@@ -855,7 +878,7 @@ export default function EventPublish() {
               >
                 <div className="ia-card__body">
                   <div className="ep-card__top">
-                    <span className="ia-card__category">{event.category}</span>
+                    <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
                     {countdownDays && (
                       <span className="ep-card__badge ep-card__badge--upcoming">
                         <Calendar size={12} /> {countdownDays} 天后
