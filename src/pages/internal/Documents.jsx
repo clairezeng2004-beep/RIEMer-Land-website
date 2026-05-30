@@ -425,6 +425,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       return 0;
     });
   });
+  const pendingDeletedIdsRef = useRef(new Set());
+  const [pendingDeletedIds, setPendingDeletedIds] = useState([]);
+  const hidePendingDeletedDocs = useCallback(
+    (items) => items.filter((doc) => !pendingDeletedIdsRef.current.has(String(doc.id))),
+    [],
+  );
 
   // 刷新函数：重新合并 localStorage 里的数据（被新窗口发布时调用）
   const refreshDocs = useCallback(() => {
@@ -488,7 +494,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         if (!aIsUser && bIsUser) return 1;
         return 0;
       });
-      setDocuments(sorted);
+      setDocuments(hidePendingDeletedDocs(sorted));
       console.log('[Documents] 从云端同步', cloudDocs.length, '条文档(含覆盖层)，', cloudDeletedIds.length, '条默认删除记录');
 
       // 同步浏览计数
@@ -499,7 +505,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     })();
 
     return () => { cancelled = true; };
-  }, [isProcessTemplateMode, filterTypes]);
+  }, [isProcessTemplateMode, filterTypes, hidePendingDeletedDocs]);
 
   // ---- 订阅 documents / documents_deleted_defaults 表的 realtime 变更 ----
   // 其它设备新增/编辑/删除文档、或删除默认模拟数据时，本设备自动刷新
@@ -532,7 +538,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           if (!aIsUser && bIsUser) return 1;
           return 0;
         });
-        setDocuments(sorted);
+        setDocuments(hidePendingDeletedDocs(sorted));
         // 同时更新本地缓存，供其它组件及下次打开时的首屏使用
         try {
           // 本地 userDocs 缓存仅存放有实际持久化意义的记录（含覆盖层）
@@ -550,7 +556,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       unsubDocs();
       unsubDeleted();
     };
-  }, [isProcessTemplateMode, filterTypes]);
+  }, [isProcessTemplateMode, filterTypes, hidePendingDeletedDocs]);
 
   // 监听独立发布页（新窗口）发来的刷新消息 + 监听浏览计数变化
   useEffect(() => {
@@ -652,6 +658,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   };
 
   const filtered = documents.filter((doc) => {
+    if (pendingDeletedIds.includes(String(doc.id))) return false;
     const desc = decodePlainText(doc.description);
     const matchesSearch =
       !searchTerm ||
@@ -758,8 +765,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const typeLabel = typeLabels[target.type] || '文档';
     const confirmMsg = `确定要删除文档「${target.title}」吗？`;
     if (window.confirm(confirmMsg)) {
-      setDocuments((prev) => prev.filter((d) => d.id !== id));
       const sid = String(id);
+      pendingDeletedIdsRef.current.add(sid);
+      setPendingDeletedIds(Array.from(pendingDeletedIdsRef.current));
+      setDocuments((prev) => prev.filter((d) => String(d.id) !== sid));
+      setPreviewDoc((prev) => (prev && String(prev.id) === sid ? null : prev));
+      setViewLogDoc((prev) => (prev && String(prev.id) === sid ? null : prev));
       const isUser = sid.startsWith('doc-');
       // userDocs 中可能存在同 id 的覆盖层（即便 id 不以 doc- 开头），
       // 一并从本地/云端删除，避免删除后因覆盖层残留仍然显示。

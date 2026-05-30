@@ -30,13 +30,15 @@
   align-items: center;
   gap: var(--space-md);
   flex-shrink: 0;
+  margin-top: 4px;
 }
 
 .member-profiles-page__stat {
   display: inline-flex;
   align-items: center;
   gap: var(--space-xs);
-  padding: 6px 14px;
+  min-height: 38px;
+  padding: 0 14px;
   background: rgba(91, 140, 62, 0.08);
   border: 1px solid rgba(91, 140, 62, 0.15);
   border-radius: var(--radius-full);
