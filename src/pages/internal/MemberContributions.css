@@ -173,7 +173,8 @@
 }
 
 .mc-table {
-  width: 100%;
+  width: 960px;
+  min-width: 100%;
   border-collapse: collapse;
   table-layout: fixed;
   font-size: var(--text-sm);
@@ -221,11 +222,13 @@
 
 .mc-table__th--rank {
   width: 50px;
+  min-width: 50px;
 }
 
 .mc-table__th--member {
   text-align: left !important;
-  width: 90px;
+  width: 120px;
+  min-width: 120px;
 }
 
 /* 中间数据列（线上分享会、公众号文章、协作帮助、内部分享）适当分配 */
@@ -233,7 +236,8 @@
 .mc-table th:nth-child(4),
 .mc-table th:nth-child(5),
 .mc-table th:nth-child(6) {
-  width: 11%;
+  width: 90px;
+  min-width: 90px;
 }
 
 /* 其他贡献列 —— 缩窄这一列，让出的空间给"总计"列吸收，
@@ -241,12 +245,14 @@
    配合下方 translateX 调整，保持"总计"气泡的视觉位置不动。 */
 .mc-table__th--custom {
   width: 240px;
+  min-width: 240px;
 }
 
 .mc-table__th--total {
   /* 原 120px；吸收"其他"列让出的 120px，变 240px，
      将总计列中心向右推，以便 translateX 归零后气泡仍停留在原视觉位置。 */
   width: 96px;
+  min-width: 96px;
   text-align: center;
 }
 
@@ -270,6 +276,14 @@
 
 .mc-table tbody tr:last-child td {
   border-bottom: none;
+}
+
+.mc-table td:nth-child(3),
+.mc-table td:nth-child(4),
+.mc-table td:nth-child(5),
+.mc-table td:nth-child(6) {
+  width: 90px;
+  min-width: 90px;
 }
 
 /* 行 hover 配色与"成员通讯录"对齐：
@@ -754,18 +768,11 @@
   }
 
   .mc-table {
-    /* 关键：继续保留 table-layout: fixed。
-       之前写的是 auto，浏览器会按内容自动分配列宽 ——
-       但 .mc-table__td--member 是 sticky 且 left: 50px（硬编码，
-       假设"排名列"实际 50px 宽）。一旦排名列被自动缩成 ~36px，
-       成员列的 sticky 起点还停在 50px，就会出现：
-         • 姓名文字被排名列右边缘遮挡，视觉上"重叠"；
-         • 横滑时排名列盖不住成员列左沿，中间列内容透上来。
-       这就是手机端左滑\"字样重叠\"的真正原因。
-       改回 fixed + 在下方给排名 / 成员列显式 width，让实际渲染宽度
-       与 sticky left 对齐即可。 */
+    /* 表格保持固定总宽，宽度不够时交给 .mc-table-wrapper 横向滚动，
+       不再把每列挤到只剩半个字。 */
+    width: 920px;
+    min-width: 920px;
     table-layout: fixed;
-    min-width: 900px;
   }
 
   .mc-table th:nth-child(3),
