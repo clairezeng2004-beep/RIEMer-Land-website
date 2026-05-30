@@ -36,6 +36,53 @@
   padding-right: clamp(1rem, 3vw, 2.5rem);
 }
 
+/* 内部空间各 Tab 顶部主操作按钮统一尺寸。
+   这些按钮有的用 <button>，有的用 <a>，各页面历史上还各自写过
+   padding / margin-top；这里用公共父级提高优先级，保证右上角绿色按钮
+   在大小、位置、文字居中和图标尺寸上完全一致。 */
+.internal-layout__content .documents-page__header .btn-primary,
+.internal-layout__content .tasks-page__header .btn-primary,
+.internal-layout__content .gallery-page__header .btn-primary,
+.internal-layout__content .guestbook-page__header .btn-primary,
+.internal-layout__content .suggestions-page__header .btn-primary,
+.internal-layout__content .ms-page__header .btn-primary,
+.internal-layout__content .mc-page__header .btn-primary,
+.internal-layout__content .member-profiles-page__header .btn-primary,
+.internal-layout__content .notifications-page__header .btn-primary,
+.internal-layout__content .ia-list__header .btn-primary,
+.internal-layout__content .profile-page__header .btn-primary,
+.internal-layout__content .users-page__header .btn-primary,
+.internal-layout__content .notif-mgmt__header .btn-primary,
+.internal-layout__content .content-mgmt__header .btn-primary {
+  inline-size: 118px;
+  block-size: 38px;
+  padding: 0 1.1rem;
+  margin-top: 4px;
+  align-self: flex-start;
+  flex-shrink: 0;
+  line-height: 1.2;
+  gap: 6px;
+}
+
+.internal-layout__content .documents-page__header .btn-primary svg,
+.internal-layout__content .tasks-page__header .btn-primary svg,
+.internal-layout__content .gallery-page__header .btn-primary svg,
+.internal-layout__content .guestbook-page__header .btn-primary svg,
+.internal-layout__content .suggestions-page__header .btn-primary svg,
+.internal-layout__content .ms-page__header .btn-primary svg,
+.internal-layout__content .mc-page__header .btn-primary svg,
+.internal-layout__content .member-profiles-page__header .btn-primary svg,
+.internal-layout__content .notifications-page__header .btn-primary svg,
+.internal-layout__content .ia-list__header .btn-primary svg,
+.internal-layout__content .profile-page__header .btn-primary svg,
+.internal-layout__content .users-page__header .btn-primary svg,
+.internal-layout__content .notif-mgmt__header .btn-primary svg,
+.internal-layout__content .content-mgmt__header .btn-primary svg {
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+}
+
 /* ---- 手机端水平导航条（桌面端隐藏） ---- */
 .internal-mobile-nav {
   display: none;
