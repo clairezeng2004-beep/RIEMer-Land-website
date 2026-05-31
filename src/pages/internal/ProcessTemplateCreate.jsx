@@ -600,7 +600,7 @@ export default function ProcessTemplateCreate() {
             />
           )}
           <h2 className="msc-content__title"><FolderOpen size={22} /> 发布流程/模版文件</h2>
-          <p className="msc-content__desc">支持 Markdown、Word 正文与附件上传，三者可组合使用</p>
+          <p className="msc-content__desc">正文格式请选择 Markdown 或 Word 富文本其中一种；附件可另行上传</p>
 
           <form id="ptc-create-form" onSubmit={handleCreate} className="msc-form">
             {/* 第一行：标题 + 类型 */}
