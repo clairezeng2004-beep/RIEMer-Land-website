@@ -1587,7 +1587,6 @@ export default function ProcessTemplateDetail() {
                       <WordEditorToolbar
                         editorRef={ptdWordEditorRef}
                         imageApiRef={ptdWordImageApiRef}
-                        onOneClickPaste={handleOneClickPaste}
                         onChange={(html) => setEditContent(stripUnderline(html))}
                       />
                       <div

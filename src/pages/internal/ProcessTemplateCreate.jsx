@@ -785,7 +785,7 @@ export default function ProcessTemplateCreate() {
                 <span className="msc-form__hint">
                   {newDoc.format === 'markdown'
                     ? '支持 Markdown 语法：# 标题、**加粗**、- 列表、```代码块```'
-                    : '支持从 Word/网页一键粘贴，自动保留段落和标题层级'}
+                    : '支持从 Word/网页直接粘贴，自动保留段落和标题层级'}
                 </span>
               </label>
               {newDoc.format === 'markdown' ? (
@@ -839,7 +839,6 @@ export default function ProcessTemplateCreate() {
                   <WordEditorToolbar
                     editorRef={wordEditorRef}
                     imageApiRef={imageApiRef}
-                    onOneClickPaste={handleOneClickPaste}
                     onChange={(html) => setNewDoc((prev) => ({ ...prev, content: html }))}
                   />
                   <div
@@ -852,7 +851,7 @@ export default function ProcessTemplateCreate() {
                         setNewDoc((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
                       }
                     }}
-                    data-placeholder="从 Word / 网页复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
+                    data-placeholder="从 Word / 网页复制内容后，直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
                     suppressContentEditableWarning
                   />
                   <FloatingTextToolbar

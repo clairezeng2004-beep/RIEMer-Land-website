@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  Clipboard,
   Image as ImageIcon,
   Columns,
   Table as TableIcon,
@@ -18,19 +17,16 @@ import './WordEditorToolbar.css';
  * Props:
  *   editorRef          —— 目标 contentEditable 容器 ref
  *   imageApiRef        —— attachWordImageEditor 返回的 api ref（用于 pickImage）
- *   onOneClickPaste    —— 一键粘贴按钮的回调
  *   onChange           —— (html) => void，当分栏/表格变化后把最新 innerHTML 回写到 state
  *
- * 包含四个功能：
- *   1. 一键粘贴（复用外部实现）
- *   2. 插入图片（复用 imageApi.pickImage()）
- *   3. 分栏（类似飞书图片分栏）：下拉选择 2/3/4 栏 + 可选一次批量选图
- *   4. 表格：飞书式网格选择器（悬停决定行列数）+ 点击插入
+ * 包含三个功能：
+ *   1. 插入图片（复用 imageApi.pickImage()）
+ *   2. 分栏（类似飞书图片分栏）：下拉选择 2/3/4 栏 + 可选一次批量选图
+ *   3. 表格：飞书式网格选择器（悬停决定行列数）+ 点击插入
  */
 export default function WordEditorToolbar({
   editorRef,
   imageApiRef,
-  onOneClickPaste,
   onChange,
 }) {
   const fireChange = () => {
@@ -118,15 +114,6 @@ export default function WordEditorToolbar({
 
   return (
     <div className="msc-form__editor-toolbar">
-      {/* 一键粘贴 */}
-      <button
-        type="button"
-        className="msc-form__paste-btn"
-        onClick={onOneClickPaste}
-      >
-        <Clipboard size={14} /> 一键粘贴
-      </button>
-
       {/* 插入图片 */}
       <button
         type="button"
