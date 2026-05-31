@@ -571,7 +571,7 @@ export default function InternalArticles() {
   // ---- 抓取文章 ----
   // 改动要点：
   // 1. 不再切到独立的 'loading' step，按钮自身 loading 即可
-  // 2. 抓取不再在后端拉 AI 摘要（articleService 中已移除）
+  // 2. 抓取不再在后端拉 AI 摘要
   // 3. 抓取成功 → 直接进入 confirm 弹窗；摘要留空由用户手动点「AI 生成」
   const handleFetch = async () => {
     const url = urlInput.trim();

@@ -429,9 +429,6 @@ export default function MemberSharingCreate() {
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
 
-  // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
-  useAutoResizeTextarea(mdEditorRef, newPost.content, { minHeight: 360 });
-
   /* ============ Markdown 同步滚动 ============
    * 统一由 useMarkdownSyncScroll hook 管理：
    *   - 默认关闭，两侧各自独立滚动
@@ -474,6 +471,9 @@ export default function MemberSharingCreate() {
     period: { startYear: null, startMonth: null, endYear: null, endMonth: null },
     attachments: [],
   });
+
+  // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
+  useAutoResizeTextarea(mdEditorRef, newPost.content, { minHeight: 360 });
 
   // 新增分类（同步到云端）
   const handleAddCategory = (cat) => {
@@ -884,7 +884,7 @@ export default function MemberSharingCreate() {
                 <span className="msc-form__hint">
                   {newPost.format === 'markdown'
                     ? '支持 Markdown 语法：标题用 #，加粗用 **，列表用 -'
-                    : '支持一键粘贴 Word 文字，自动保留格式'}
+                    : '支持从 Word 直接粘贴，自动保留格式'}
                 </span>
               </label>
               {newPost.format === 'markdown' ? (
@@ -938,7 +938,6 @@ export default function MemberSharingCreate() {
                   <WordEditorToolbar
                     editorRef={wordEditorRef}
                     imageApiRef={imageApiRef}
-                    onOneClickPaste={handleOneClickPaste}
                     onChange={(html) => setNewPost((prev) => ({ ...prev, content: html }))}
                   />
                   <div
@@ -951,7 +950,7 @@ export default function MemberSharingCreate() {
                         setNewPost((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
                       }
                     }}
-                    data-placeholder="从 Word 复制内容后，点击上方「一键粘贴」按钮，或直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
+                    data-placeholder="从 Word 复制内容后，直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
                     suppressContentEditableWarning
                   />
                   <FloatingTextToolbar
