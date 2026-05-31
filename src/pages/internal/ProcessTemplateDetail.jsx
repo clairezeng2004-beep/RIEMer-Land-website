@@ -24,7 +24,6 @@ import {
   HardDrive,
   Pencil,
   Save,
-  Clipboard,
   Check,
   AlertTriangle,
   History,
@@ -1532,16 +1531,6 @@ export default function ProcessTemplateDetail() {
             {isEditing ? (
               hasTextContent || doc.format === 'markdown' || doc.format === 'word' ? (
                 <div className="ptd-edit__content">
-                  <div className="ptd-edit__content-hint">
-                    <Clipboard size={12} />
-                    <span>
-                      {doc.format === 'markdown'
-                        ? '当前文档为 Markdown 格式，支持 Markdown 语法'
-                        : doc.format === 'word'
-                          ? '当前文档为 Word 富文本格式，HTML 标签将被保留'
-                          : '纯文本编辑'}
-                    </span>
-                  </div>
                   {doc.format === 'markdown' ? (
                     <div className="msc-md-split ptd-edit__md-split">
                       <div className="msc-md-split__pane">
