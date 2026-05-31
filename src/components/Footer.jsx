@@ -83,6 +83,15 @@ export default function Footer({ isInternal = false }) {
                 src="/qrcode-wechat.jpg"
                 alt="RIEMer Land 微信公众号二维码"
                 className="footer__qrcode-img"
+                /* 加 width/height 让浏览器在还没下载到二维码图片时就预留好正方形
+                   位置（避免布局抖动；同时浏览器知道目标尺寸后会跳过解码出来的
+                   多余像素）。loading=lazy 让公众号二维码在「真正快滚到 footer」
+                   时再开始请求，首屏不抢带宽；decoding=async 让 JPEG 解码不阻塞
+                   主线程渲染。 */
+                width={120}
+                height={120}
+                loading="lazy"
+                decoding="async"
                 onClick={() => setQrExpanded(true)}
               />
               <span className="footer__qrcode-text">微信扫码关注</span>
