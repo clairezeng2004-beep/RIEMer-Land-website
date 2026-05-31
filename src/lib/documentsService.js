@@ -169,6 +169,35 @@ export async function fetchAllFromCloud() {
 }
 
 /**
+ * 把 Supabase 返回的 error 对象拼成一段对排错有帮助的提示。
+ *
+ * Supabase / PostgREST 的 error 通常长这样:
+ *   { message: '...', code: '23505' | 'PGRST116' | '42703' ..., details: '...', hint: '...' }
+ * 之前只透传 `error.message` 会丢掉最关键的 code / details / hint,
+ * 把它们一起串成多行字符串,UI alert 里就能直接看出是 schema 不对 / RLS 被拦
+ * / payload 太大 / 唯一键冲突。
+ */
+function describeSupabaseError(prefix, error) {
+  const code = error?.code ? `[${error.code}] ` : '';
+  const msg = error?.message || '未知错误';
+  const detail = error?.details ? `\n详细: ${error.details}` : '';
+  const hint = error?.hint ? `\n提示: ${error.hint}` : '';
+  // 常见 code → 中文友好提示。便于看到弹窗就知道下一步该做什么。
+  const knownHints = {
+    '42703': '\n（很可能是数据库缺列，比如 contributor_ids；请在 Supabase SQL Editor 跑 supabase-fix.sql）',
+    '42P01': '\n（表不存在；请先跑 supabase-setup.sql）',
+    '23505': '\n（主键/唯一键冲突，同 id 已存在；前端 id 是 doc-Date.now()，理论上不应出现）',
+    '23503': '\n（外键约束失败，uploaded_by_id 引用的 auth.users 没找到；可能登录态异常）',
+    '42501': '\n（RLS 拒绝写入。检查是否已认证登录，或 policy 是否允许 INSERT）',
+    'PGRST301': '\n（JWT 过期或失效，请重新登录）',
+    'PGRST116': '\n（Supabase 没找到符合条件的行）',
+    '413': '\n（请求体过大。附件 / 富文本里嵌的图片可能超过 PostgREST 单次请求上限，需要把附件改用 Supabase Storage 存而不是 base64 直传）',
+  };
+  const known = knownHints[error?.code] || '';
+  return `${prefix}：${code}${msg}${detail}${hint}${known}`;
+}
+
+/**
  * 新增一条文档。正式发布必须写入云端成功；本地只作为成功后的缓存。
  */
 export async function createDoc(doc) {
@@ -176,27 +205,34 @@ export async function createDoc(doc) {
     throw new Error('云端暂时不可用，请检查网络后重新发布。');
   }
 
+  let cloudResp;
   try {
     const row = docToRow(doc);
-    const { error } = await supabase.from('documents').insert(row);
-    if (error) {
-      console.warn('[documentsService] 云端插入失败:', error.message, error.code);
-      throw new Error(error.message || '云端上传失败，请重新发布。');
-    }
-
-    try {
-      const existing = loadLocalDocs();
-      saveLocalDocs([doc, ...existing]);
-    } catch (cacheErr) {
-      console.warn('[documentsService] 云端已发布，本地缓存写入失败:', cacheErr);
-    }
-
-    console.log('[documentsService] 云端插入成功, id:', doc.id);
-    return { doc, remote: true };
+    cloudResp = await supabase.from('documents').insert(row);
   } catch (err) {
-    console.warn('[documentsService] createDoc 异常:', err.message);
-    throw err;
+    // fetch 层面的异常（超时、断网、被 AbortController 切断）
+    console.error('[documentsService] 云端 insert 网络异常:', err);
+    throw new Error(
+      '云端上传失败（网络异常 / 超时）：' + (err?.message || '未知错误')
+    );
   }
+
+  if (cloudResp?.error) {
+    // Supabase 返回了显式错误（schema 不对 / RLS 拒绝 / payload 太大等）
+    console.error('[documentsService] 云端 insert 失败:', cloudResp.error);
+    throw new Error(describeSupabaseError('云端上传失败', cloudResp.error));
+  }
+
+  // 云端 OK → 写一份本地缓存。失败仅警告，不阻塞发布结果。
+  try {
+    const existing = loadLocalDocs();
+    saveLocalDocs([doc, ...existing]);
+  } catch (cacheErr) {
+    console.warn('[documentsService] 云端已发布，本地缓存写入失败:', cacheErr);
+  }
+
+  console.log('[documentsService] 云端插入成功, id:', doc.id);
+  return { doc, remote: true };
 }
 
 /**
@@ -239,7 +275,10 @@ export async function updateDoc(id, patch) {
 
     const { error } = await supabase.from('documents').update(update).eq('id', id);
     if (error) {
-      console.warn('[documentsService] 云端更新失败:', error.message, error.code);
+      // updateDoc 故意保留"return 而非 throw"——调用方（点赞、编辑保存）已经
+      // 用 result.remote / .catch 各自处理云端失败，不希望编辑中断 UI 流程。
+      // 但 error 信息透传得更完整一些，便于 console / 顶部 hint 看清原因。
+      console.warn('[documentsService] 云端更新失败:', describeSupabaseError('updateDoc 云端失败', error));
       return { remote: false, error };
     }
     return { remote: true };
