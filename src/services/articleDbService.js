@@ -41,7 +41,7 @@ export async function fetchArticles() {
 export async function addArticleToDb(article, userId) {
   if (!isSupabaseConfigured || !supabase) {
     addLocalArticle(article);
-    return article;
+    return { ...article, _localOnly: true, _saveError: 'Supabase 未配置，文章仅保存到本机缓存。' };
   }
 
   try {
@@ -55,14 +55,14 @@ export async function addArticleToDb(article, userId) {
     if (error) {
       console.warn('[ArticleDB] 添加文章失败，保存本地:', error.message);
       addLocalArticle(article);
-      return article;
+      return { ...article, _localOnly: true, _saveError: error.message };
     }
 
     return dbToFrontend(data);
   } catch (err) {
     console.warn('[ArticleDB] 添加文章异常，保存本地:', err.message);
     addLocalArticle(article);
-    return article;
+    return { ...article, _localOnly: true, _saveError: err.message };
   }
 }
 

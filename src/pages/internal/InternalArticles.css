@@ -1071,6 +1071,12 @@
   gap: var(--space-xs);
 }
 
+.ia-modal__tag-add-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+  min-width: 72px;
+}
+
 .ia-modal__tag-input {
   flex: 1;
   padding: 0.35rem 0.65rem;

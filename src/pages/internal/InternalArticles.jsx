@@ -636,7 +636,7 @@ export default function InternalArticles() {
   };
 
   // ---- 确认保存 ----
-  const handleConfirmSave = () => {
+  const handleConfirmSave = async () => {
     if (!draft) return;
 
     const newArticle = {
@@ -662,7 +662,14 @@ export default function InternalArticles() {
     };
 
     const articleTitle = newArticle.title;
-    addArticle(newArticle, user?.id);
+    const savedArticle = await addArticle(newArticle, user?.id);
+    if (savedArticle?._localOnly) {
+      alert(
+        `文章没有写入云端 articles 表：${savedArticle._saveError || '未知错误'}\n` +
+        '这条归档暂时只在本机缓存里，刷新或跨设备可能看不到。请检查 Supabase 表结构 / RLS 权限后重试。'
+      );
+      return;
+    }
 
     // 发送"公众号文章归档"通知（由规则引擎按用户自定义规则触发）
     try {
@@ -1356,14 +1363,14 @@ export default function InternalArticles() {
                             }}
                           />
                           <button
-                            className="btn btn-ghost btn-sm"
+                            className="btn btn-ghost btn-sm ia-modal__tag-add-btn"
                             onClick={() => {
                               addTag();
                               setShowTagSuggestions(false);
                             }}
                             disabled={!newTagInput.trim()}
                           >
-                            <Plus size={14} />
+                            新增标签
                           </button>
                           {/* 标签建议下拉 */}
                           {showTagSuggestions && filteredTagSuggestions.length > 0 && (

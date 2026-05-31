@@ -1060,12 +1060,17 @@ export function SiteContentProvider({ children }) {
     setUserArticles((prev) => [article, ...prev]);
     // 异步写入数据库
     const saved = await addArticleToDb(article, userId);
+    if (saved?._localOnly) {
+      setUserArticles((prev) => prev.filter((a) => a.id !== article.id));
+      return saved;
+    }
     if (saved && saved.id !== article.id) {
       // 如果数据库返回了新 ID，更新列表
       setUserArticles((prev) =>
         prev.map((a) => (a.id === article.id ? saved : a))
       );
     }
+    return saved;
   };
 
   const updateArticle = async (id, updates) => {
