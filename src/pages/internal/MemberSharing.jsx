@@ -365,7 +365,7 @@ export default function MemberSharing() {
 
   // 获取文本的纯文摘要（前 120 字）
   const getExcerpt = (post) => {
-    let text = post.content || '';
+    let text = String(post.content || '');
     if (post.format === 'word') {
       // 用 DOMParser 同时完成"剥标签 + 解码 HTML 实体（&amp; &nbsp; 等）"
       try {
@@ -726,7 +726,7 @@ export default function MemberSharing() {
                     <span className="ms-card__format-tag">
                       {post.format === 'markdown' ? <><Code2 size={11} /> Markdown</> : <><FileText size={11} /> Word</>}
                     </span>
-                    {post.attachments && post.attachments.length > 0 && (
+                    {Array.isArray(post.attachments) && post.attachments.length > 0 && (
                       <span className="ms-card__attach-tag">
                         <Paperclip size={11} /> {post.attachments.length} 个附件
                       </span>
@@ -776,7 +776,7 @@ export default function MemberSharing() {
                     <ThumbsUp size={14} />
                     <span>{(post.likes || []).length}</span>
                   </button>
-                  {(post.likes || []).length > 0 && (
+                  {Array.isArray(post.likes) && post.likes.length > 0 && (
                     <div className="ms-card__like-names">
                       {post.likes.map((l, idx) => (
                         <span key={l.userId}>

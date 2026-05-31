@@ -25,6 +25,7 @@ export const DEFAULT_CATEGORIES = [
 
 /** DB 行 → 前端对象 */
 function dbToFrontend(row) {
+  const attachments = Array.isArray(row.attachments) ? row.attachments : [];
   return {
     id: row.id,
     title: row.title || '',
@@ -32,7 +33,7 @@ function dbToFrontend(row) {
     format: row.format || 'word',
     content: row.content || '',
     period: row.period || null,
-    attachments: Array.isArray(row.attachments) ? row.attachments : (row.attachments || null),
+    attachments,
     author: row.author || 'Unknown',
     authorId: row.author_id || null,
     createdAt: row.created_at || new Date().toISOString().split('T')[0],

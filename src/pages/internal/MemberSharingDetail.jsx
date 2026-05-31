@@ -50,7 +50,7 @@ function buildCategoryMaps(cats) {
 
 /* 附件辅助函数 */
 function getFileIcon(name) {
-  const ext = name.split('.').pop().toLowerCase();
+  const ext = String(name || '').split('.').pop().toLowerCase();
   if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) return Image;
   if (['pdf'].includes(ext)) return FileText;
   if (['xls', 'xlsx', 'csv'].includes(ext)) return FileSpreadsheet;
@@ -60,15 +60,17 @@ function getFileIcon(name) {
 }
 
 function formatFileSize(bytes) {
+  if (!Number.isFinite(Number(bytes))) return '—';
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
 function downloadFile(attachment) {
+  if (!attachment?.dataUrl) return;
   const a = document.createElement('a');
   a.href = attachment.dataUrl;
-  a.download = attachment.name;
+  a.download = attachment.name || 'attachment';
   document.body.appendChild(a);
   a.click();
   document.body.removeChild(a);
@@ -211,15 +213,16 @@ export default function MemberSharingDetail() {
   // 配置 marked
   const renderedContent = useMemo(() => {
     if (!post) return '';
+    const rawContent = String(post.content || '');
     if (post.format === 'markdown') {
       marked.setOptions({
         breaks: true,
         gfm: true,
       });
-      return stripUnderline(marked.parse(stripUnderline(post.content)));
+      return stripUnderline(marked.parse(stripUnderline(rawContent)));
     }
     // word (HTML) 格式直接返回（清掉下划线）
-    return stripUnderline(post.content);
+    return stripUnderline(rawContent);
   }, [post]);
 
   // 上/下一篇：sharings 已按 created_at 降序；同作者优先（authorId 可能为 null，
@@ -400,7 +403,7 @@ export default function MemberSharingDetail() {
             />
 
             {/* 附件列表 */}
-            {post.attachments && post.attachments.length > 0 && (
+            {Array.isArray(post.attachments) && post.attachments.length > 0 && (
               <div className="msd-attachments">
                 <div className="msd-attachments__header">
                   <Paperclip size={16} />
@@ -408,18 +411,18 @@ export default function MemberSharingDetail() {
                 </div>
                 <div className="msd-attachments__list">
                   {post.attachments.map((file) => {
-                    const IconComp = getFileIcon(file.name);
+                    const IconComp = getFileIcon(file?.name);
                     return (
                       <button
-                        key={file.id}
+                        key={file?.id || file?.name}
                         className="msd-attachments__item"
                         onClick={() => downloadFile(file)}
-                        title={`下载 ${file.name}`}
+                        title={`下载 ${file?.name || '附件'}`}
                       >
                         <IconComp size={20} className="msd-attachments__item-icon" />
                         <div className="msd-attachments__item-info">
-                          <span className="msd-attachments__item-name">{file.name}</span>
-                          <span className="msd-attachments__item-size">{formatFileSize(file.size)}</span>
+                          <span className="msd-attachments__item-name">{file?.name || '未命名附件'}</span>
+                          <span className="msd-attachments__item-size">{formatFileSize(file?.size)}</span>
                         </div>
                         <Download size={16} className="msd-attachments__item-dl" />
                       </button>
