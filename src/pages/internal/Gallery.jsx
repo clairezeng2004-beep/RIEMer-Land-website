@@ -37,6 +37,12 @@ import './Gallery.css';
 const getDisplayUrl = (photo) => photo?.thumbUrl || photo?.url || '';
 // 下载始终走原图。
 const getOriginalUrl = (photo) => photo?.url || '';
+// 缩略图文件缺失或访问失败时，自动切回原图，避免相册里一片空白。
+const fallbackToOriginal = (event, photo) => {
+  const original = getOriginalUrl(photo);
+  if (!original || event.currentTarget.src === original) return;
+  event.currentTarget.src = original;
+};
 
 /* ---------- 工具函数：下载时推断合适的文件名 ----------
  * 优先级：caption(若无扩展名则补 ext) → originalName → storagePath 文件名 → 'photo.jpg'
@@ -726,7 +732,13 @@ export default function Gallery() {
                   >
                     <div className="album-card__cover">
                       {cover ? (
-                        <img src={getDisplayUrl(cover)} alt={album.title} loading="lazy" decoding="async" />
+                        <img
+                          src={getDisplayUrl(cover)}
+                          alt={album.title}
+                          loading="lazy"
+                          decoding="async"
+                          onError={(e) => fallbackToOriginal(e, cover)}
+                        />
                       ) : (
                         <div className="album-card__cover-empty">
                           <Images size={40} />
@@ -918,7 +930,13 @@ export default function Gallery() {
                 className="photo-card"
                 onClick={() => openLightbox(index)}
               >
-                <img src={getDisplayUrl(photo)} alt={photo.caption} loading="lazy" decoding="async" />
+                <img
+                  src={getDisplayUrl(photo)}
+                  alt={photo.caption}
+                  loading="lazy"
+                  decoding="async"
+                  onError={(e) => fallbackToOriginal(e, photo)}
+                />
                 <div className="photo-card__overlay">
                   {photo.caption && (
                     <span className="photo-card__caption">{photo.caption}</span>
@@ -966,8 +984,9 @@ export default function Gallery() {
         <div className="lightbox" onClick={closeLightbox}>
           <div className="lightbox__content" onClick={(e) => e.stopPropagation()}>
             <img
-              src={getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
+              src={getOriginalUrl(selectedAlbum.photos[lightboxIndex]) || getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
               alt={selectedAlbum.photos[lightboxIndex].caption}
+              onError={(e) => fallbackToOriginal(e, selectedAlbum.photos[lightboxIndex])}
             />
             {selectedAlbum.photos[lightboxIndex].caption && (
               <div className="lightbox__caption">
