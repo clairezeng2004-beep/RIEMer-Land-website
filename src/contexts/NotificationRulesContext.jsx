@@ -42,6 +42,14 @@ const DEFAULT_RULES = [
     autoReadForOperator: true,
   },
   {
+    event: 'doc.delete',
+    title: '文档已删除',
+    messageTemplate: '{operator} 删除了文档「{title}」（{typeLabel}）',
+    type: 'other',
+    audience: 'operator_exclude',
+    autoReadForOperator: true,
+  },
+  {
     event: 'suggestion.new',
     title: '新建设建议',
     messageTemplate: '{operator} 提出了建议：{summary}',
@@ -108,6 +116,15 @@ function withDefaults(seed) {
     ...r,
     description: describeRule({ enabled: true, conditions: [], throttle: { maxPerDay: 0 }, ...r }),
   }));
+}
+
+function mergeMissingDefaults(existing) {
+  const rules = Array.isArray(existing) ? existing : [];
+  const existingEvents = new Set(rules.map((r) => r.event));
+  const missing = DEFAULT_RULES.filter((r) => !existingEvents.has(r.event));
+  if (missing.length === 0) return { rules, missing: [] };
+  const seededMissing = withDefaults(missing);
+  return { rules: [...rules, ...seededMissing], missing: seededMissing };
 }
 
 function readLocal() {
@@ -198,19 +215,47 @@ export function NotificationRulesProvider({ children }) {
             enabled: r.enabled !== false,
             description: r.description || '',
           }));
-          setRules(mapped);
-          writeLocal(mapped);
+          const merged = mergeMissingDefaults(mapped);
+          setRules(merged.rules);
+          writeLocal(merged.rules);
+          if (merged.missing.length > 0) {
+            try {
+              await supabase.from('notification_rules').insert(
+                merged.missing.map((r) => ({
+                  id: r.id,
+                  event: r.event,
+                  title: r.title,
+                  message_template: r.messageTemplate,
+                  type: r.type,
+                  audience: r.audience,
+                  auto_read_for_operator: r.autoReadForOperator,
+                  conditions: r.conditions,
+                  throttle: r.throttle,
+                  enabled: r.enabled,
+                  description: r.description,
+                }))
+              );
+            } catch { /* 只影响默认规则补齐，不阻塞现有规则使用 */ }
+          }
         }
       } catch (err) {
         console.warn('[NotifRules] 云端加载异常，降级本地:', err?.message || err);
         setCloudAvailable(false);
         const local = readLocal();
-        if (local && local.length > 0) setRules(local);
+        if (local && local.length > 0) {
+          const merged = mergeMissingDefaults(local);
+          setRules(merged.rules);
+          writeLocal(merged.rules);
+        }
       }
     } else {
       setCloudAvailable(false);
       const local = readLocal();
-      if (local && local.length > 0) setRules(local);
+      if (local && local.length > 0) {
+        const merged = mergeMissingDefaults(local);
+        setRules(merged.rules);
+        writeLocal(merged.rules);
+      }
       else {
         const seeded = withDefaults(DEFAULT_RULES);
         setRules(seeded);

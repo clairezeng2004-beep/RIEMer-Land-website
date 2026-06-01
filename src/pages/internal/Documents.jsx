@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { marked } from 'marked';
 import { useAuth } from '../../contexts/AuthContext';
-import { useNotifications } from '../../contexts/NotificationContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import {
   FileText,
@@ -139,6 +138,24 @@ function isUserDoc(doc) {
   return String(doc?.id || '').startsWith('doc-');
 }
 
+function mergeDocuments({ userDocs, deletedIds, filterTypes }) {
+  const deletedSet = new Set((deletedIds || []).map(String));
+  const userIds = new Set((userDocs || []).map((d) => String(d.id)));
+  const defaults = documentsData.filter(
+    (d) => !deletedSet.has(String(d.id)) && !userIds.has(String(d.id))
+  );
+  const base = filterTypes
+    ? [...defaults, ...(userDocs || [])].filter((d) => filterTypes.includes(d.type))
+    : [...(userDocs || []), ...defaults];
+  return base.sort((a, b) => {
+    const aIsUser = isUserDoc(a);
+    const bIsUser = isUserDoc(b);
+    if (aIsUser && !bIsUser) return -1;
+    if (!aIsUser && bIsUser) return 1;
+    return 0;
+  });
+}
+
 // 流程模板 / 文档详情页共享的浏览计数（与 ProcessTemplateDetail 完全一致）
 const PTD_VIEWS_KEY = 'riemer_process_template_views';
 
@@ -152,7 +169,6 @@ function loadDocViews() {
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
   const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
-  const { addNotification } = useNotifications();
   const { internalConfig, updateInternalConfig, filterOptions, updateFilterOptions, flushSettingToCloud, SITE_KEYS } = useSiteContent();
 
   // 立即把最新的 filterOptions / internalConfig 推云端。
@@ -407,22 +423,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   };
   const [documents, setDocuments] = useState(() => {
     const userDocs = loadUserDocs();
-    const deletedIds = new Set(loadDeletedDefaultIds());
-    const userIds = new Set(userDocs.map((d) => String(d.id)));
-    // 过滤掉被管理员删除过 + 被 userDocs 覆盖（同 id）的默认模拟文档
-    const defaults = documentsData.filter(
-      (d) => !deletedIds.has(String(d.id)) && !userIds.has(String(d.id))
-    );
-    const base = filterTypes
-      ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
-      : [...userDocs, ...defaults];
-    // 用户发布的在前
-    return base.sort((a, b) => {
-      const aIsUser = isUserDoc(a);
-      const bIsUser = isUserDoc(b);
-      if (aIsUser && !bIsUser) return -1;
-      if (!aIsUser && bIsUser) return 1;
-      return 0;
+    return mergeDocuments({
+      userDocs,
+      deletedIds: loadDeletedDefaultIds(),
+      filterTypes,
     });
   });
   const pendingDeletedIdsRef = useRef(new Set());
@@ -432,35 +436,52 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     [],
   );
 
-  // 刷新函数：重新合并 localStorage 里的数据（被新窗口发布时调用）
-  const refreshDocs = useCallback(() => {
-    const userDocs = loadUserDocs();
-    const deletedIds = new Set(loadDeletedDefaultIds());
-    const userIds = new Set(userDocs.map((d) => String(d.id)));
-    const defaults = documentsData.filter(
-      (d) => !deletedIds.has(String(d.id)) && !userIds.has(String(d.id))
-    );
-    const base = filterTypes
-      ? [...defaults, ...userDocs].filter((d) => filterTypes.includes(d.type))
-      : [...userDocs, ...defaults];
-    setDocuments(
-      base.sort((a, b) => {
-        const aIsUser = isUserDoc(a);
-        const bIsUser = isUserDoc(b);
-        if (aIsUser && !bIsUser) return -1;
-        if (!aIsUser && bIsUser) return 1;
-        return 0;
-      })
-    );
-    // 同步刷新浏览计数（与详情页共享同一份 localStorage）
-    setDocViews(loadDocViews());
-  }, [filterTypes]);
-
   // 与 ProcessTemplateDetail 共享的浏览计数（在列表卡片上实时展示）
   const [docViews, setDocViews] = useState(() => loadDocViews());
 
   // 是否是"流程模板"模式（跨设备同步走 Supabase）
   const isProcessTemplateMode = configSection === 'processTemplates';
+  const refreshSeqRef = useRef(0);
+
+  const applyCloudDocs = useCallback((cloudDocs, cloudDeletedIds) => {
+    const sorted = mergeDocuments({
+      userDocs: cloudDocs,
+      deletedIds: cloudDeletedIds,
+      filterTypes,
+    });
+    setDocuments(hidePendingDeletedDocs(sorted));
+    try {
+      saveUserDocs(cloudDocs);
+      localStorage.setItem(DELETED_DEFAULT_IDS_KEY, JSON.stringify(cloudDeletedIds));
+    } catch { /* ignore */ }
+  }, [filterTypes, hidePendingDeletedDocs]);
+
+  // 刷新函数：流程模板页优先拉云端；云端失败时保留当前列表，避免被本机旧缓存覆盖。
+  const refreshDocs = useCallback(async ({ allowLocalFallback = true } = {}) => {
+    const seq = refreshSeqRef.current + 1;
+    refreshSeqRef.current = seq;
+
+    if (isProcessTemplateMode && canUseSupabase()) {
+      const cloud = await fetchAllFromCloud();
+      if (refreshSeqRef.current !== seq) return;
+      if (cloud) {
+        applyCloudDocs(cloud.docs, cloud.deletedIds);
+        const mergedViews = await fetchViewsFromCloud();
+        if (refreshSeqRef.current === seq && mergedViews) setDocViews(mergedViews);
+        return;
+      }
+      if (!allowLocalFallback) return;
+    }
+
+    const userDocs = loadUserDocs();
+    const sorted = mergeDocuments({
+      userDocs,
+      deletedIds: loadDeletedDefaultIds(),
+      filterTypes,
+    });
+    setDocuments(hidePendingDeletedDocs(sorted));
+    setDocViews(loadDocViews());
+  }, [applyCloudDocs, filterTypes, hidePendingDeletedDocs, isProcessTemplateMode]);
 
   // ========== 云端同步（仅流程模板模式） ==========
   // 挂载时从 Supabase 拉取最新文档列表 + 已删除默认 id + 浏览计数；
@@ -473,29 +494,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     (async () => {
       const cloud = await fetchAllFromCloud();
       if (cancelled || !cloud) return;
-      const { docs: cloudDocs, deletedIds: cloudDeletedIds } = cloud;
-
-      // cloudDocs 可能同时包含 doc-* 用户文档 与 内置示例的"覆盖层"（id 同 siteData）
-      const deletedSet = new Set(cloudDeletedIds.map(String));
-      const cloudIds = new Set(cloudDocs.map((d) => String(d.id)));
-      // 默认示例：排除"已删除"和"已被 cloudDocs 覆盖"两类
-      const defaults = documentsData.filter(
-        (d) => !deletedSet.has(String(d.id)) && !cloudIds.has(String(d.id))
-      );
-
-      const base = filterTypes
-        ? [...defaults, ...cloudDocs].filter((d) => filterTypes.includes(d.type))
-        : [...cloudDocs, ...defaults];
-
-      const sorted = base.sort((a, b) => {
-        const aIsUser = isUserDoc(a);
-        const bIsUser = isUserDoc(b);
-        if (aIsUser && !bIsUser) return -1;
-        if (!aIsUser && bIsUser) return 1;
-        return 0;
-      });
-      setDocuments(hidePendingDeletedDocs(sorted));
-      console.log('[Documents] 从云端同步', cloudDocs.length, '条文档(含覆盖层)，', cloudDeletedIds.length, '条默认删除记录');
+      applyCloudDocs(cloud.docs, cloud.deletedIds);
+      console.log('[Documents] 从云端同步', cloud.docs.length, '条文档(含覆盖层)，', cloud.deletedIds.length, '条默认删除记录');
 
       // 同步浏览计数
       const merged = await fetchViewsFromCloud();
@@ -505,7 +505,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     })();
 
     return () => { cancelled = true; };
-  }, [isProcessTemplateMode, filterTypes, hidePendingDeletedDocs]);
+  }, [isProcessTemplateMode, applyCloudDocs]);
 
   // ---- 订阅 documents / documents_deleted_defaults 表的 realtime 变更 ----
   // 其它设备新增/编辑/删除文档、或删除默认模拟数据时，本设备自动刷新
@@ -520,31 +520,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       // 200ms 节流，避免批量写入时频繁刷
       if (timer) clearTimeout(timer);
       timer = setTimeout(async () => {
-        const cloud = await fetchAllFromCloud();
-        if (!cloud) return;
-        const { docs: cloudDocs, deletedIds: cloudDeletedIds } = cloud;
-        const deletedSet = new Set(cloudDeletedIds.map(String));
-        const cloudIds = new Set(cloudDocs.map((d) => String(d.id)));
-        const defaults = documentsData.filter(
-          (d) => !deletedSet.has(String(d.id)) && !cloudIds.has(String(d.id))
-        );
-        const base = filterTypes
-          ? [...defaults, ...cloudDocs].filter((d) => filterTypes.includes(d.type))
-          : [...cloudDocs, ...defaults];
-        const sorted = base.sort((a, b) => {
-          const aIsUser = isUserDoc(a);
-          const bIsUser = isUserDoc(b);
-          if (aIsUser && !bIsUser) return -1;
-          if (!aIsUser && bIsUser) return 1;
-          return 0;
-        });
-        setDocuments(hidePendingDeletedDocs(sorted));
-        // 同时更新本地缓存，供其它组件及下次打开时的首屏使用
-        try {
-          // 本地 userDocs 缓存仅存放有实际持久化意义的记录（含覆盖层）
-          saveUserDocs(cloudDocs);
-          localStorage.setItem(DELETED_DEFAULT_IDS_KEY, JSON.stringify(cloudDeletedIds));
-        } catch { /* ignore */ }
+        refreshDocs({ allowLocalFallback: false });
       }, 200);
     };
 
@@ -556,20 +532,20 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       unsubDocs();
       unsubDeleted();
     };
-  }, [isProcessTemplateMode, filterTypes, hidePendingDeletedDocs]);
+  }, [isProcessTemplateMode, refreshDocs]);
 
   // 监听独立发布页（新窗口）发来的刷新消息 + 监听浏览计数变化
   useEffect(() => {
     const handler = (event) => {
       if (event?.data?.type === 'process-template-created') {
-        refreshDocs();
+        refreshDocs({ allowLocalFallback: false });
       }
     };
     window.addEventListener('message', handler);
 
     // 兜底：窗口 focus 时刷新一次（用户从详情页标签切回来时看到最新浏览数）
     const onFocus = () => {
-      refreshDocs();
+      refreshDocs({ allowLocalFallback: false });
       setDocViews(loadDocViews());
     };
     window.addEventListener('focus', onFocus);
@@ -580,7 +556,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         setDocViews(loadDocViews());
       }
       if (e.key === DOCUMENTS_KEY || e.key === DELETED_DEFAULT_IDS_KEY) {
-        refreshDocs();
+        refreshDocs({ allowLocalFallback: !isProcessTemplateMode });
       }
     };
     window.addEventListener('storage', onStorage);
@@ -589,6 +565,9 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         setDocViews(loadDocViews());
+        if (isProcessTemplateMode) {
+          refreshDocs({ allowLocalFallback: false });
+        }
       }
     };
     document.addEventListener('visibilitychange', onVisibility);
@@ -599,7 +578,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refreshDocs]);
+  }, [refreshDocs, isProcessTemplateMode]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
@@ -798,21 +777,17 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           });
         }
       }
-      // 通知中显示原文档的详细信息：名称 / 类型 / 上传者 / 操作人（统一用真名）
+      // 通知由规则引擎统一触发。消息通知作为操作记录保留，但不再手写本地通知，
+      // 避免一端删除后另一端只看到本机缓存里的旧通知文案。
       const operator = user?.name || user?.nickname || '管理员';
       const uploader = resolveContributors(target) || '未知';
-      const parts = [
-        `分类：${typeLabel}`,
-        `上传者：${uploader}`,
-      ];
-      if (target.date) parts.push(`上传时间：${target.date}`);
-      parts.push(`操作人：${operator}`);
-
-      addNotification({
-        title: `文档已删除：${target.title}`,
-        message: `文档「${target.title}」已从列表中移除。${parts.join('｜')}`,
-        type: 'system',
-        read: true,
+      emitNotificationEvent('doc.delete', {
+        operator,
+        operatorUserId: user?.id,
+        title: target.title,
+        typeLabel,
+        uploader,
+        date: target.date || '',
       });
     }
   };
