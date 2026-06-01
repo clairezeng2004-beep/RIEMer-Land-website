@@ -29,6 +29,75 @@
   touch-action: auto;
 }
 
+.internal-page-fallback {
+  min-height: calc(100vh - 72px);
+  padding: 60px clamp(1.5rem, 3vw, 2.5rem) var(--space-4xl);
+  box-sizing: border-box;
+  background: var(--color-bg);
+}
+
+.internal-page-fallback__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-2xl);
+}
+
+.internal-page-fallback__title,
+.internal-page-fallback__desc,
+.internal-page-fallback__button,
+.internal-page-fallback__bar,
+.internal-page-fallback__grid > div {
+  border-radius: var(--radius-md);
+  background: linear-gradient(
+    90deg,
+    var(--color-bg-card) 0%,
+    var(--color-bg-hover) 45%,
+    var(--color-bg-card) 90%
+  );
+  background-size: 220% 100%;
+  animation: internal-fallback-pulse 1.2s ease-in-out infinite;
+}
+
+.internal-page-fallback__title {
+  width: 180px;
+  height: 32px;
+  margin-bottom: var(--space-sm);
+}
+
+.internal-page-fallback__desc {
+  width: min(320px, 62vw);
+  height: 18px;
+}
+
+.internal-page-fallback__button {
+  width: 118px;
+  height: 38px;
+  margin-top: 4px;
+}
+
+.internal-page-fallback__bar {
+  width: 100%;
+  height: 38px;
+  margin-bottom: var(--space-xl);
+}
+
+.internal-page-fallback__grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-md);
+}
+
+.internal-page-fallback__grid > div {
+  height: 180px;
+}
+
+@keyframes internal-fallback-pulse {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
 /* 内部空间的 .container 左侧留出适当间距 */
 .internal-layout__content .container {
   max-width: none;
@@ -176,6 +245,35 @@
     margin-left: 0;
   }
 
+  .internal-page-fallback {
+    min-height: calc(100vh - 64px);
+    padding-top: var(--space-3xl);
+  }
+
+  .internal-page-fallback__header {
+    flex-direction: column;
+    gap: var(--space-md);
+  }
+
+  .internal-page-fallback__title {
+    width: 150px;
+    height: 28px;
+  }
+
+  .internal-page-fallback__desc {
+    width: min(280px, 72vw);
+    height: 16px;
+  }
+
+  .internal-page-fallback__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-sm);
+  }
+
+  .internal-page-fallback__grid > div {
+    height: 120px;
+  }
+
   .internal-mobile-nav {
     display: flex;
     align-items: center;
@@ -320,8 +418,10 @@
     line-height: 1.5;
   }
 
-  /* 头部按钮（"上传文档 / 发布 / 创建 / 清空" 等）统一为紧凑尺寸，
-     与 Notifications / MemberSharing 的小按钮观感一致 */
+  /* 头部按钮（"上传文档 / 发布 / 创建 / 清空" 等）统一为流程模板
+     "上传文档"的移动端基准尺寸。各 tab 自己的移动端按钮 padding
+     规则会在页面 CSS 中出现，这里用明确的 inline/block size 把最终
+     盒子锁住，避免切换 tab 时绿色按钮忽大忽小。 */
   .internal-layout__content .documents-page__header .btn,
   .internal-layout__content .tasks-page__header .btn,
   .internal-layout__content .gallery-page__header .btn,
@@ -336,10 +436,16 @@
   .internal-layout__content .users-page__header .btn,
   .internal-layout__content .notif-mgmt__header .btn,
   .internal-layout__content .content-mgmt__header .btn {
-    padding: 0.4rem 0.95rem;
+    inline-size: 118px;
+    block-size: 38px;
+    padding: 0 1.1rem;
+    margin-top: 4px;
     font-size: var(--text-sm);
+    line-height: 1.2;
     gap: 6px;
     align-self: flex-start;
+    flex-shrink: 0;
+    justify-content: center;
   }
   /* 让按钮内的 lucide 图标也一致缩小，避免按钮本身变高 */
   .internal-layout__content .documents-page__header .btn svg,

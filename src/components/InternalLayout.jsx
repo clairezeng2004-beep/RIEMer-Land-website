@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { Suspense, useEffect, useState, useRef } from 'react';
 import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
@@ -13,6 +13,29 @@ import {
   Users, Settings, CalendarRange, Activity,
 } from 'lucide-react';
 import './InternalLayout.css';
+
+function InternalPageFallback() {
+  return (
+    <div className="internal-page-fallback" aria-label="页面加载中">
+      <div className="internal-page-fallback__header">
+        <div>
+          <div className="internal-page-fallback__title" />
+          <div className="internal-page-fallback__desc" />
+        </div>
+        <div className="internal-page-fallback__button" />
+      </div>
+      <div className="internal-page-fallback__content">
+        <div className="internal-page-fallback__bar" />
+        <div className="internal-page-fallback__grid">
+          <div />
+          <div />
+          <div />
+          <div />
+        </div>
+      </div>
+    </div>
+  );
+}
 
 /* 手机端水平导航条 */
 function MobileInternalNav() {
@@ -161,7 +184,9 @@ export default function InternalLayout() {
         <MobileInternalNav />
         <div className="internal-layout__content">
           <ErrorBoundary key={location.pathname}>
-            <Outlet />
+            <Suspense fallback={<InternalPageFallback />}>
+              <Outlet />
+            </Suspense>
           </ErrorBoundary>
         </div>
         <WysiwygToolbar />
