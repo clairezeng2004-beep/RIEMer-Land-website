@@ -503,8 +503,8 @@ CREATE POLICY "认证用户可删除事项"
 --   - src/pages/internal/ProcessTemplateDetail.jsx （详情/编辑）
 --
 -- 设计说明：
---   - attachments 以 JSONB 存储，含 dataUrl；前端限制单文件 5MB、最多 10 个，
---     所以单条 row 不会超过 ~50MB 的 Postgres TOAST 极限（实际上还会更小）。
+--   - 附件文件本体存入 Supabase Storage 的 documents bucket；
+--     documents.attachments 只存文件名、大小、公开 URL 和 storagePath 等元信息。
 --   - content 直接存 Markdown 源文或清洗过的 Word-HTML 片段。
 --   - likes 用 JSONB 数组，元素形如 { userId, userName, userAvatar }。
 --   - deleted_default_ids 也放到这里是不合适的 —— 默认模拟数据的"已删除"
@@ -516,9 +516,9 @@ CREATE TABLE IF NOT EXISTS documents (
   description TEXT NOT NULL DEFAULT '',
   format TEXT NOT NULL DEFAULT 'word',          -- word / markdown
   content TEXT NOT NULL DEFAULT '',             -- 正文（HTML 或 Markdown）
-  attachments JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ id, name, size, type, dataUrl }]
+  attachments JSONB NOT NULL DEFAULT '[]'::jsonb, -- [{ id, name, size, type, url, storagePath }]
   file_type TEXT DEFAULT NULL,                  -- pdf / docx / xlsx / pptx / image（主文件类型）
-  file_url TEXT DEFAULT NULL,                   -- 主文件 dataUrl（向后兼容）
+  file_url TEXT DEFAULT NULL,                   -- 主文件 URL（向后兼容旧 dataUrl）
   size_text TEXT DEFAULT '—',                   -- 展示用大小
   uploaded_by TEXT DEFAULT 'Unknown',
   uploaded_by_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -533,6 +533,38 @@ CREATE TABLE IF NOT EXISTS documents (
 
 CREATE INDEX IF NOT EXISTS idx_documents_created_at ON documents (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_documents_type ON documents (type);
+
+-- 流程模板附件存储桶。文件本体不再塞进 documents JSONB，避免大附件导致
+-- PostgREST 请求体过大或跨设备拉取失败。
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('documents', 'documents', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "认证用户可读取流程模板附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可上传流程模板附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可更新流程模板附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可删除流程模板附件" ON storage.objects;
+
+CREATE POLICY "认证用户可读取流程模板附件"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (bucket_id = 'documents');
+
+CREATE POLICY "认证用户可上传流程模板附件"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'documents');
+
+CREATE POLICY "认证用户可更新流程模板附件"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'documents')
+  WITH CHECK (bucket_id = 'documents');
+
+CREATE POLICY "认证用户可删除流程模板附件"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'documents');
 
 ALTER TABLE documents ENABLE ROW LEVEL SECURITY;
 

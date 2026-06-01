@@ -18,6 +18,7 @@ import { supabase, isSupabaseConfigured, getReachable } from './supabase';
 export const DOCUMENTS_KEY = 'riemer_documents';
 export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
 export const DOC_VIEWS_KEY = 'riemer_process_template_views';
+const DOCUMENTS_BUCKET = 'documents';
 
 /**
  * 判断当前是否可以使用 Supabase（已配置 + 健康检测通过）
@@ -70,7 +71,9 @@ function docToRow(doc) {
     description: doc.description || '',
     format: doc.format || 'word',
     content: doc.content || '',
-    attachments: Array.isArray(doc.attachments) ? doc.attachments : [],
+    attachments: Array.isArray(doc.attachments)
+      ? doc.attachments.map(({ dataUrl, blobUrl, file, _file, ...att }) => att)
+      : [],
     file_type: doc.fileType || null,
     file_url: doc.fileUrl || null,
     size_text: doc.size || '—',
@@ -88,6 +91,80 @@ function docToRow(doc) {
     last_edited_at: doc.lastEditedAt || null,
     last_edited_by: doc.lastEditedBy || null,
   };
+}
+
+function getFileExt(name = '') {
+  const ext = String(name).split('.').pop();
+  return ext && ext !== name ? ext.toLowerCase() : 'bin';
+}
+
+function safeStorageName(name = 'file') {
+  const cleaned = String(name)
+    .normalize('NFKD')
+    .replace(/[^\w.\-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned || `file.${getFileExt(name)}`;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, body] = String(dataUrl || '').split(',');
+  if (!meta || !body) return null;
+  const mime = meta.match(/^data:([^;]+);base64$/)?.[1] || 'application/octet-stream';
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+async function uploadAttachmentAsset({ docId, attachment, userId }) {
+  if (!attachment?.dataUrl || attachment.url) return attachment;
+  const blob = dataUrlToBlob(attachment.dataUrl);
+  if (!blob) return attachment;
+
+  const fileName = attachment.name || `attachment.${getFileExt(attachment.type)}`;
+  const path = [
+    userId || 'unknown-user',
+    docId,
+    `${attachment.id || Date.now()}-${safeStorageName(fileName)}`,
+  ].join('/');
+
+  const { error } = await supabase.storage
+    .from(DOCUMENTS_BUCKET)
+    .upload(path, blob, {
+      contentType: attachment.type || blob.type || 'application/octet-stream',
+      upsert: true,
+    });
+
+  if (error) {
+    throw new Error(`附件 "${fileName}" 上传失败：${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path);
+  const { dataUrl, ...rest } = attachment;
+  return {
+    ...rest,
+    url: data.publicUrl,
+    storagePath: path,
+  };
+}
+
+async function prepareDocForCloud(doc) {
+  const { data: auth } = await supabase.auth.getUser().catch(() => ({ data: null }));
+  const userId = doc.uploadedById || auth?.user?.id || null;
+  const attachments = Array.isArray(doc.attachments)
+    ? await Promise.all(doc.attachments.map((att) => uploadAttachmentAsset({
+      docId: doc.id,
+      attachment: att,
+      userId,
+    })))
+    : [];
+  const primary = attachments[0] || null;
+  const fileUrl =
+    doc.fileUrl && !String(doc.fileUrl).startsWith('data:')
+      ? doc.fileUrl
+      : primary?.url || doc.fileUrl || null;
+  return { ...doc, attachments, fileUrl };
 }
 
 /* ============ 本地 localStorage 读写 ============ */
@@ -206,8 +283,10 @@ export async function createDoc(doc) {
   }
 
   let cloudResp;
+  let cloudDoc;
   try {
-    const row = docToRow(doc);
+    cloudDoc = await prepareDocForCloud(doc);
+    const row = docToRow(cloudDoc);
     cloudResp = await supabase.from('documents').insert(row);
   } catch (err) {
     // fetch 层面的异常（超时、断网、被 AbortController 切断）
@@ -226,13 +305,13 @@ export async function createDoc(doc) {
   // 云端 OK → 写一份本地缓存。失败仅警告，不阻塞发布结果。
   try {
     const existing = loadLocalDocs();
-    saveLocalDocs([doc, ...existing]);
+    saveLocalDocs([cloudDoc, ...existing]);
   } catch (cacheErr) {
     console.warn('[documentsService] 云端已发布，本地缓存写入失败:', cacheErr);
   }
 
   console.log('[documentsService] 云端插入成功, id:', doc.id);
-  return { doc, remote: true };
+  return { doc: cloudDoc, remote: true };
 }
 
 /**
@@ -255,6 +334,17 @@ export async function updateDoc(id, patch) {
   }
 
   try {
+    if (
+      ('attachments' in patch && Array.isArray(patch.attachments)) ||
+      ('fileUrl' in patch && String(patch.fileUrl || '').startsWith('data:'))
+    ) {
+      const prepared = await prepareDocForCloud({ id, ...patch });
+      patch = {
+        ...patch,
+        attachments: prepared.attachments,
+        fileUrl: prepared.fileUrl,
+      };
+    }
     // 把 camelCase patch 转成 snake_case（只转已知字段，避免污染数据库列）
     const update = {};
     if ('title' in patch) update.title = patch.title;

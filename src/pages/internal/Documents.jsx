@@ -1485,10 +1485,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                                     : `${(f.size / (1024 * 1024)).toFixed(1)} MB`}
                               </span>
                             )}
-                            {f.dataUrl && (
+                            {(f.dataUrl || f.url) && (
                               <a
                                 className="doc-preview__attachments-download"
-                                href={f.dataUrl}
+                                href={f.dataUrl || f.url}
                                 download={f.name}
                               >
                                 <Download size={14} /> 下载

@@ -425,6 +425,37 @@ EXCEPTION WHEN duplicate_object THEN
 END $$;
 
 -- documents：流程模板文件（编辑/新增/删除实时同步）
+-- 附件文件本体存 Supabase Storage，documents 表只保存 URL/元信息。
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('documents', 'documents', true)
+ON CONFLICT (id) DO UPDATE SET public = true;
+
+DROP POLICY IF EXISTS "认证用户可读取流程模板附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可上传流程模板附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可更新流程模板附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可删除流程模板附件" ON storage.objects;
+
+CREATE POLICY "认证用户可读取流程模板附件"
+  ON storage.objects FOR SELECT
+  TO authenticated
+  USING (bucket_id = 'documents');
+
+CREATE POLICY "认证用户可上传流程模板附件"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'documents');
+
+CREATE POLICY "认证用户可更新流程模板附件"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'documents')
+  WITH CHECK (bucket_id = 'documents');
+
+CREATE POLICY "认证用户可删除流程模板附件"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'documents');
+
 DO $$
 BEGIN
   ALTER PUBLICATION supabase_realtime ADD TABLE public.documents;
