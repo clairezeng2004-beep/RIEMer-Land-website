@@ -1230,6 +1230,18 @@
   margin-top: 0;
 }
 
+/* InternalLayout.css 会给内部空间头部的主按钮统一加 margin-top。
+   公众号历史文章这里有两个并排按钮（更新阅读量 + 新建归档），必须以
+   操作组为基准对齐，不能让 primary 单独下移 4px。提高选择器优先级
+   覆盖该公共规则，保证两个按钮同高、同顶线、文字图标垂直居中。 */
+.internal-layout__content .ia-list__header-actions .btn,
+.internal-layout__content .ia-list__header-actions .btn-primary {
+  block-size: 38px;
+  padding-block: 0;
+  margin-top: 0;
+  align-self: center;
+}
+
 /* ============================================
    阅读量管理弹窗
    ============================================ */
