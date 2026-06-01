@@ -1,41 +1,47 @@
+import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
-import { NotificationRulesProvider } from './contexts/NotificationRulesContext';
 import ScrollToTop from './components/ScrollToTop';
 import usePageTracking from './hooks/usePageTracking';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
-import Home from './pages/public/Home';
-import Timeline from './pages/public/Timeline';
-import Articles from './pages/public/Articles';
-import ArticleDetail from './pages/public/ArticleDetail';
-import Login from './pages/internal/Login';
-import ResetPassword from './pages/internal/ResetPassword';
-import InternalLayout from './components/InternalLayout';
-import Documents from './pages/internal/Documents';
-import ProcessTemplates from './pages/internal/ProcessTemplates';
-import ProcessTemplateCreate from './pages/internal/ProcessTemplateCreate';
-import ProcessTemplateDetail from './pages/internal/ProcessTemplateDetail';
-import MemberSharing from './pages/internal/MemberSharing';
-import MemberSharingCreate from './pages/internal/MemberSharingCreate';
-import MemberSharingDetail from './pages/internal/MemberSharingDetail';
-import Tasks from './pages/internal/Tasks';
-import UserManagement from './pages/internal/UserManagement';
-import ContentManagement from './pages/internal/ContentManagement';
-import Notifications from './pages/internal/Notifications';
-import Gallery from './pages/internal/Gallery';
-import InternalArticles from './pages/internal/InternalArticles';
-import InternalArticleDetail from './pages/internal/InternalArticleDetail';
-import MemberContributions from './pages/internal/MemberContributions';
-import MemberProfiles from './pages/internal/MemberProfiles';
-import Profile from './pages/internal/Profile';
-import Suggestions from './pages/internal/Suggestions';
-import Guestbook from './pages/internal/Guestbook';
-import NotificationManagement from './pages/internal/NotificationManagement';
-import EventPublish from './pages/internal/EventPublish';
-import SyncDiagnostic from './pages/internal/SyncDiagnostic';
+
+const Home = lazy(() => import('./pages/public/Home'));
+const Timeline = lazy(() => import('./pages/public/Timeline'));
+const Articles = lazy(() => import('./pages/public/Articles'));
+const ArticleDetail = lazy(() => import('./pages/public/ArticleDetail'));
+const Login = lazy(() => import('./pages/internal/Login'));
+const ResetPassword = lazy(() => import('./pages/internal/ResetPassword'));
+const InternalLayout = lazy(() => import('./components/InternalLayout'));
+const Documents = lazy(() => import('./pages/internal/Documents'));
+const ProcessTemplates = lazy(() => import('./pages/internal/ProcessTemplates'));
+const ProcessTemplateCreate = lazy(() => import('./pages/internal/ProcessTemplateCreate'));
+const ProcessTemplateDetail = lazy(() => import('./pages/internal/ProcessTemplateDetail'));
+const MemberSharing = lazy(() => import('./pages/internal/MemberSharing'));
+const MemberSharingCreate = lazy(() => import('./pages/internal/MemberSharingCreate'));
+const MemberSharingDetail = lazy(() => import('./pages/internal/MemberSharingDetail'));
+const Tasks = lazy(() => import('./pages/internal/Tasks'));
+const UserManagement = lazy(() => import('./pages/internal/UserManagement'));
+const ContentManagement = lazy(() => import('./pages/internal/ContentManagement'));
+const Notifications = lazy(() => import('./pages/internal/Notifications'));
+const Gallery = lazy(() => import('./pages/internal/Gallery'));
+const InternalArticles = lazy(() => import('./pages/internal/InternalArticles'));
+const InternalArticleDetail = lazy(() => import('./pages/internal/InternalArticleDetail'));
+const MemberContributions = lazy(() => import('./pages/internal/MemberContributions'));
+const MemberProfiles = lazy(() => import('./pages/internal/MemberProfiles'));
+const Profile = lazy(() => import('./pages/internal/Profile'));
+const Suggestions = lazy(() => import('./pages/internal/Suggestions'));
+const Guestbook = lazy(() => import('./pages/internal/Guestbook'));
+const NotificationManagement = lazy(() => import('./pages/internal/NotificationManagement'));
+const EventPublish = lazy(() => import('./pages/internal/EventPublish'));
+const SyncDiagnostic = lazy(() => import('./pages/internal/SyncDiagnostic'));
+const NotificationRulesProvider = lazy(() =>
+  import('./contexts/NotificationRulesContext').then((module) => ({
+    default: module.NotificationRulesProvider,
+  }))
+);
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
 const FULLSCREEN_PATHS = [
@@ -51,54 +57,63 @@ function AppShell() {
   const isFullscreen = FULLSCREEN_PATHS.some((p) => pathname.startsWith(p));
   // 内部页面（/internal/**）桌面端带固定侧边栏，Footer 需相应让出左侧空间
   const isInternal = pathname.startsWith('/internal');
+  const routes = (
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/" element={<Home />} />
+      <Route path="/timeline" element={<Timeline />} />
+      <Route path="/articles" element={<Articles />} />
+      <Route path="/article/:id" element={<ArticleDetail />} />
+
+      {/* Auth */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
+
+      {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
+      <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
+      <Route path="/internal/member-sharing/view/:id" element={<MemberSharingDetail />} />
+      <Route path="/internal/process-templates/create" element={<ProcessTemplateCreate />} />
+      <Route path="/internal/process-templates/view/:id" element={<ProcessTemplateDetail />} />
+
+      {/* Internal Routes (Protected) — 带侧边栏布局 */}
+      <Route path="/internal" element={<InternalLayout />}>
+        <Route index element={<Navigate to="notifications" replace />} />
+        <Route path="process-templates" element={<ProcessTemplates />} />
+        <Route path="member-sharing" element={<MemberSharing />} />
+        <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
+        {/* 兼容旧链接 */}
+        <Route path="documents" element={<Documents />} />
+        <Route path="articles" element={<InternalArticles />} />
+        <Route path="article/:id" element={<InternalArticleDetail />} />
+        <Route path="tasks" element={<Tasks />} />
+        <Route path="gallery" element={<Gallery />} />
+        <Route path="users" element={<UserManagement />} />
+        <Route path="content" element={<ContentManagement />} />
+        <Route path="notification-management" element={<NotificationManagement />} />
+        <Route path="notifications" element={<Notifications />} />
+        <Route path="contributions" element={<MemberContributions />} />
+        <Route path="suggestions" element={<Suggestions />} />
+        <Route path="guestbook" element={<Guestbook />} />
+        <Route path="profile" element={<Profile />} />
+        <Route path="member-profiles" element={<MemberProfiles />} />
+        <Route path="event-publish" element={<EventPublish />} />
+        <Route path="sync-diagnostic" element={<SyncDiagnostic />} />
+      </Route>
+    </Routes>
+  );
 
   return (
     <>
       <ScrollToTop />
       {!isFullscreen && <Navbar />}
       <main>
-        <Routes>
-          {/* Public Routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/timeline" element={<Timeline />} />
-          <Route path="/articles" element={<Articles />} />
-          <Route path="/article/:id" element={<ArticleDetail />} />
-
-          {/* Auth */}
-          <Route path="/login" element={<Login />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-
-          {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
-          <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
-          <Route path="/internal/member-sharing/view/:id" element={<MemberSharingDetail />} />
-          <Route path="/internal/process-templates/create" element={<ProcessTemplateCreate />} />
-          <Route path="/internal/process-templates/view/:id" element={<ProcessTemplateDetail />} />
-
-          {/* Internal Routes (Protected) — 带侧边栏布局 */}
-          <Route path="/internal" element={<InternalLayout />}>
-            <Route index element={<Navigate to="notifications" replace />} />
-            <Route path="process-templates" element={<ProcessTemplates />} />
-            <Route path="member-sharing" element={<MemberSharing />} />
-            <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
-            {/* 兼容旧链接 */}
-            <Route path="documents" element={<Documents />} />
-            <Route path="articles" element={<InternalArticles />} />
-            <Route path="article/:id" element={<InternalArticleDetail />} />
-            <Route path="tasks" element={<Tasks />} />
-            <Route path="gallery" element={<Gallery />} />
-            <Route path="users" element={<UserManagement />} />
-            <Route path="content" element={<ContentManagement />} />
-            <Route path="notification-management" element={<NotificationManagement />} />
-            <Route path="notifications" element={<Notifications />} />
-            <Route path="contributions" element={<MemberContributions />} />
-            <Route path="suggestions" element={<Suggestions />} />
-            <Route path="guestbook" element={<Guestbook />} />
-            <Route path="profile" element={<Profile />} />
-            <Route path="member-profiles" element={<MemberProfiles />} />
-            <Route path="event-publish" element={<EventPublish />} />
-            <Route path="sync-diagnostic" element={<SyncDiagnostic />} />
-          </Route>
-        </Routes>
+        <Suspense fallback={null}>
+          {isInternal ? (
+            <NotificationRulesProvider>{routes}</NotificationRulesProvider>
+          ) : (
+            routes
+          )}
+        </Suspense>
       </main>
       {!isFullscreen && <Footer isInternal={isInternal} />}
     </>
@@ -111,9 +126,7 @@ function App() {
       <SiteContentProvider>
         <Router>
           <NotificationProvider>
-            <NotificationRulesProvider>
-              <AppShell />
-            </NotificationRulesProvider>
+            <AppShell />
           </NotificationProvider>
         </Router>
       </SiteContentProvider>

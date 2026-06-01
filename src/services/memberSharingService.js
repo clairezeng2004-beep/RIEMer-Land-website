@@ -11,6 +11,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 // ---- localStorage keys（保持与旧版 MemberSharing 页面一致，作为兜底缓存）----
 const LOCAL_SHARINGS_KEY = 'riemer_member_sharing';
 const LOCAL_CATEGORIES_KEY = 'riemer_sharing_categories';
+const MEMBER_SHARING_BUCKET = 'member-sharing-attachments';
 
 // 默认分类（与原页面保持一致）
 export const DEFAULT_CATEGORIES = [
@@ -51,7 +52,7 @@ function frontendToDbInsert(post) {
     format: post.format || 'word',
     content: post.content || '',
     period: post.period || null,
-    attachments: post.attachments && post.attachments.length > 0 ? post.attachments : null,
+    attachments: normaliseAttachmentsForDb(post.attachments),
     author: post.author || 'Unknown',
     author_id: post.authorId || null,
     likes: Array.isArray(post.likes) ? post.likes : [],
@@ -68,13 +69,91 @@ function frontendToDbUpdate(updates) {
   if (updates.content !== undefined) u.content = updates.content;
   if (updates.period !== undefined) u.period = updates.period;
   if (updates.attachments !== undefined) {
-    u.attachments = updates.attachments && updates.attachments.length > 0 ? updates.attachments : null;
+    u.attachments = normaliseAttachmentsForDb(updates.attachments);
   }
   if (updates.author !== undefined) u.author = updates.author;
   if (updates.authorId !== undefined) u.author_id = updates.authorId;
   if (updates.likes !== undefined) u.likes = Array.isArray(updates.likes) ? updates.likes : [];
   u.updated_at = new Date().toISOString();
   return u;
+}
+
+function getFileExt(name = '') {
+  const ext = String(name).split('.').pop();
+  return ext && ext !== name ? ext.toLowerCase() : 'bin';
+}
+
+function safeStorageName(name = 'file') {
+  const cleaned = String(name)
+    .normalize('NFKD')
+    .replace(/[^\w.\-]+/g, '-')
+    .replace(/-+/g, '-')
+    .replace(/^-|-$/g, '');
+  return cleaned || `file.${getFileExt(name)}`;
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, body] = String(dataUrl || '').split(',');
+  if (!meta || !body) return null;
+  const mime = meta.match(/^data:([^;]+);base64$/)?.[1] || 'application/octet-stream';
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+function normaliseAttachmentsForDb(attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return null;
+  return attachments.map(({ dataUrl, blobUrl, file, _file, ...att }) => att);
+}
+
+async function uploadAttachmentAsset({ postId, attachment, userId }) {
+  // 已经是云端 URL 的附件直接复用；旧数据 dataUrl 只在准备上云时上传。
+  if (!attachment?.dataUrl || attachment.url) return attachment;
+  const blob = dataUrlToBlob(attachment.dataUrl);
+  if (!blob) return attachment;
+
+  const fileName = attachment.name || `attachment.${getFileExt(attachment.type)}`;
+  const path = [
+    userId || 'unknown-user',
+    postId,
+    `${attachment.id || Date.now()}-${safeStorageName(fileName)}`,
+  ].join('/');
+
+  const { error } = await supabase.storage
+    .from(MEMBER_SHARING_BUCKET)
+    .upload(path, blob, {
+      contentType: attachment.type || blob.type || 'application/octet-stream',
+      upsert: true,
+    });
+
+  if (error) {
+    throw new Error(`附件 "${fileName}" 上传失败：${error.message}`);
+  }
+
+  const { data } = supabase.storage.from(MEMBER_SHARING_BUCKET).getPublicUrl(path);
+  const { dataUrl, ...rest } = attachment;
+  return {
+    ...rest,
+    url: data.publicUrl,
+    storagePath: path,
+  };
+}
+
+async function prepareSharingForCloud(post) {
+  const { data: auth } = await supabase.auth.getUser().catch(() => ({ data: null }));
+  const userId = post.authorId || auth?.user?.id || null;
+  const attachments = Array.isArray(post.attachments)
+    ? await Promise.all(post.attachments.map((att) => uploadAttachmentAsset({
+      postId: post.id,
+      attachment: att,
+      userId,
+    })))
+    : [];
+  return {
+    ...post,
+    attachments: attachments.length > 0 ? attachments : null,
+  };
 }
 
 // ================================================================
@@ -126,14 +205,16 @@ export async function fetchSharingById(id) {
 
 /** 新增分享 */
 export async function addSharing(post) {
-  // 本地兜底先写（即使云端失败也能即时显示）
-  addLocalSharing(post);
-
   if (!isSupabaseConfigured || !supabase) {
-    return post;
+    addLocalSharing(post);
+    return { ...post, _localOnly: true };
   }
   try {
-    const row = frontendToDbInsert(post);
+    // 附件必须先进入 Storage，DB 只保存 URL / storagePath 等元数据。
+    // 否则 base64 dataUrl 直接塞 JSONB 很容易超过 PostgREST 请求体上限，
+    // 且 localStorage 缓存也会迅速爆掉，跨设备同步不稳定。
+    const cloudPost = await prepareSharingForCloud(post);
+    const row = frontendToDbInsert(cloudPost);
     const { data, error } = await supabase
       .from('member_sharing')
       .insert(row)
@@ -141,11 +222,15 @@ export async function addSharing(post) {
       .single();
     if (error) {
       console.warn('[MemberSharingDB] 新增分享失败（仅保存本地）:', error.message);
+      addLocalSharing(post);
       return post;
     }
-    return dbToFrontend(data);
+    const saved = dbToFrontend(data);
+    addLocalSharing(saved);
+    return saved;
   } catch (err) {
     console.warn('[MemberSharingDB] 新增分享异常:', err.message);
+    addLocalSharing(post);
     return post;
   }
 }
@@ -157,7 +242,12 @@ export async function updateSharing(id, updates) {
 
   if (!isSupabaseConfigured || !supabase) return;
   try {
-    const dbUpdates = frontendToDbUpdate(updates);
+    let cloudUpdates = updates;
+    if (updates.attachments !== undefined) {
+      cloudUpdates = await prepareSharingForCloud({ id, ...updates });
+      updateLocalSharing(id, { attachments: cloudUpdates.attachments });
+    }
+    const dbUpdates = frontendToDbUpdate(cloudUpdates);
     const { error } = await supabase
       .from('member_sharing')
       .update(dbUpdates)
@@ -222,7 +312,8 @@ export async function migrateLocalSharingsToDb() {
   let migrated = 0;
   for (const post of toMigrate) {
     try {
-      const row = frontendToDbInsert(post);
+      const cloudPost = await prepareSharingForCloud(post);
+      const row = frontendToDbInsert(cloudPost);
       const { error } = await supabase
         .from('member_sharing')
         .upsert(row, { onConflict: 'id' });

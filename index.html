@@ -38,11 +38,20 @@
       - 配合下方 size-adjust 校准 "XXX Fallback"，切换几乎无字号/行高跳变
     -->
 
-    <!-- Google Fonts 英文字体（走中科大镜像，国内稳） -->
+    <!-- Google Fonts 英文字体（走中科大镜像，国内稳）
+         非阻塞加载：先用系统 fallback 首屏渲染，字体 CSS 到了再切换。 -->
     <link
-      rel="stylesheet"
+      rel="preload"
+      as="style"
       href="https://fonts.loli.net/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.loli.net/css2?family=DM+Serif+Display&family=EB+Garamond:wght@400;500;600;700&family=Lora:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
 
     <!--
       LXGW WenKai 霞鹜文楷（全局中文字体，项目原始视觉）
@@ -53,20 +62,19 @@
       **只下载用到的 2~5 个分片**（每片约 30~80KB），不是一次性 6MB。
     -->
 
-    <!-- 先 preload CSS 本身，让浏览器尽早发请求、尽早解析出 @font-face -->
+    <!-- 字体 CSS 也非阻塞加载：移动端先显示页面，再异步切换到 WenKai。 -->
     <link
       rel="preload"
       as="style"
       href="https://gcore.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkai-regular.css"
+      onload="this.onload=null;this.rel='stylesheet'"
     />
-    <!--
-      只加载"常规字重"子 CSS（不加载 light/bold/mono，减少 6 个请求 → 1 个请求）
-      全站 CSS 里 font-family 用 'LXGW WenKai'，对应的就是这个 regular 字重
-    -->
-    <link
-      rel="stylesheet"
-      href="https://gcore.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkai-regular.css"
-    />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://gcore.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/lxgwwenkai-regular.css"
+      />
+    </noscript>
 
     <!--
       Adjusted fallback @font-face：
@@ -107,13 +115,21 @@
       }
     </style>
 
-    <!-- Google Analytics (GA4) -->
-    <script async src="https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX"></script>
+    <!-- Google Analytics (GA4)
+         只有替换成真实 Measurement ID 后才加载，避免占位 ID 在移动端产生无效外链请求。 -->
     <script>
-      window.dataLayer = window.dataLayer || [];
-      function gtag(){dataLayer.push(arguments);}
-      gtag('js', new Date());
-      gtag('config', 'G-XXXXXXXXXX', { send_page_view: false });
+      (function () {
+        var GA_ID = 'G-XXXXXXXXXX';
+        if (!GA_ID || GA_ID === 'G-XXXXXXXXXX') return;
+        window.dataLayer = window.dataLayer || [];
+        window.gtag = function gtag(){dataLayer.push(arguments);}
+        var script = document.createElement('script');
+        script.async = true;
+        script.src = 'https://www.googletagmanager.com/gtag/js?id=' + encodeURIComponent(GA_ID);
+        document.head.appendChild(script);
+        window.gtag('js', new Date());
+        window.gtag('config', GA_ID, { send_page_view: false });
+      })();
     </script>
   </head>
   <body>

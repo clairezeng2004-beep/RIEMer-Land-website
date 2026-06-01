@@ -67,9 +67,10 @@ function formatFileSize(bytes) {
 }
 
 function downloadFile(attachment) {
-  if (!attachment?.dataUrl) return;
+  const href = attachment?.url || attachment?.dataUrl;
+  if (!href) return;
   const a = document.createElement('a');
-  a.href = attachment.dataUrl;
+  a.href = href;
   a.download = attachment.name || 'attachment';
   document.body.appendChild(a);
   a.click();

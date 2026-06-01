@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Mail, MapPin, Copy, Check } from 'lucide-react';
 import { clubInfo } from '../data/siteData';
 import { useSiteContent } from '../contexts/SiteContentContext';
-import FooterGuestbook from './FooterGuestbook';
 import './Footer.css';
+
+const FooterGuestbook = lazy(() => import('./FooterGuestbook'));
 
 export default function Footer({ isInternal = false }) {
   const { content } = useSiteContent();
@@ -72,7 +73,9 @@ export default function Footer({ isInternal = false }) {
                   <span>{content.footerLocation}</span>
                 </div>
                 <div className="footer__contact-guestbook">
-                  <FooterGuestbook />
+                  <Suspense fallback={null}>
+                    <FooterGuestbook />
+                  </Suspense>
                 </div>
               </div>
             </div>

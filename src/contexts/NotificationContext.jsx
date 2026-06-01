@@ -109,6 +109,16 @@ export function NotificationProvider({ children }) {
   const loadNotifications = useCallback(async (options = {}) => {
     const { force = false } = options;
 
+    // 未登录访客不需要消息通知。移动端公开页刷新时跳过这组 Supabase
+    // 查询，避免首页还没交互就被内部空间通知链路拖慢。
+    if (!userIdRef.current) {
+      setNotifications((prev) => (prev.length === 0 ? prev : []));
+      setReads(new Set());
+      setLoaded(true);
+      lastLoadAtRef.current = Date.now();
+      return;
+    }
+
     // 节流：距上次加载 < 1.5s 且非 force，直接跳过
     const now = Date.now();
     if (!force && now - lastLoadAtRef.current < MIN_RELOAD_INTERVAL_MS) {
@@ -349,7 +359,7 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     loadNotifications({ force: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [useSupabase]);
+  }, [useSupabase, user?.id]);
 
   // ---- 定时轮询 Supabase（每 30 秒刷新一次） ----
   useEffect(() => {

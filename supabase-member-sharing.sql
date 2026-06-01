@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS member_sharing (
   format TEXT NOT NULL DEFAULT 'word',          -- 'word' | 'markdown'
   content TEXT NOT NULL DEFAULT '',             -- 正文（HTML 或 Markdown）
   period TEXT,                                   -- 时间段字符串（如 "2025.06 - 2025.09"）
-  attachments JSONB,                             -- 附件元数据数组（含 dataUrl）
+  attachments JSONB,                             -- 附件元数据数组（新版只存 url/storagePath，不存 dataUrl）
   author TEXT NOT NULL DEFAULT 'Unknown',       -- 作者显示名
   author_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   likes JSONB NOT NULL DEFAULT '[]'::jsonb,     -- [{userId, userName}]
@@ -177,3 +177,44 @@ END$$;
 --
 -- 前端启用后，localStorage 中的历史数据会在首次加载时自动迁移到云端。
 -- ============================================
+
+-- ============================================
+-- 4. 附件 Storage bucket
+-- ============================================
+-- 说明：
+--   旧版前端曾把附件转成 base64 dataUrl 后直接塞进 member_sharing.attachments JSONB。
+--   这会造成：
+--     1) PostgREST 请求体过大，新增/迁移失败；
+--     2) localStorage 迅速超限；
+--     3) 跨设备同步不稳定。
+--   新版前端会把附件本体上传到 Storage，仅在 JSONB 中保存 name/size/type/url/storagePath。
+
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('member-sharing-attachments', 'member-sharing-attachments', true)
+ON CONFLICT (id) DO UPDATE SET public = EXCLUDED.public;
+
+DROP POLICY IF EXISTS "成员分享附件公开读取" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可上传成员分享附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可更新成员分享附件" ON storage.objects;
+DROP POLICY IF EXISTS "认证用户可删除成员分享附件" ON storage.objects;
+
+CREATE POLICY "成员分享附件公开读取"
+  ON storage.objects FOR SELECT
+  TO public
+  USING (bucket_id = 'member-sharing-attachments');
+
+CREATE POLICY "认证用户可上传成员分享附件"
+  ON storage.objects FOR INSERT
+  TO authenticated
+  WITH CHECK (bucket_id = 'member-sharing-attachments');
+
+CREATE POLICY "认证用户可更新成员分享附件"
+  ON storage.objects FOR UPDATE
+  TO authenticated
+  USING (bucket_id = 'member-sharing-attachments')
+  WITH CHECK (bucket_id = 'member-sharing-attachments');
+
+CREATE POLICY "认证用户可删除成员分享附件"
+  ON storage.objects FOR DELETE
+  TO authenticated
+  USING (bucket_id = 'member-sharing-attachments');
