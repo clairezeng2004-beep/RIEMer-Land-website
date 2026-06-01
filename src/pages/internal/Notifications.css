@@ -344,7 +344,17 @@
 
   /* 筛选行：手机端底部间距适度收紧，让列表整体往上提。 */
   .notifications-filters {
+    flex-wrap: wrap;
+    gap: var(--space-sm);
     margin-bottom: var(--space-lg);
+  }
+
+  .notifications-filter {
+    inline-size: 118px;
+    block-size: 38px;
+    justify-content: center;
+    padding: 0 1.1rem;
+    flex-shrink: 0;
   }
 
   .notification-item {

@@ -704,6 +704,40 @@
     gap: var(--space-md);
   }
 
+  .mc-period-selector {
+    position: relative;
+    width: 100%;
+    gap: 0;
+    margin-bottom: var(--space-lg);
+  }
+
+  .mc-period-selector > svg {
+    position: absolute;
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--color-text-muted);
+    z-index: 1;
+    pointer-events: none;
+  }
+
+  .mc-period-dropdown-wrapper,
+  .mc-period-dropdown__trigger {
+    width: 100%;
+  }
+
+  .mc-period-dropdown__trigger {
+    justify-content: space-between;
+    padding-left: 2.4rem;
+    border-color: var(--color-border);
+  }
+
+  .mc-period-dropdown {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+  }
+
   /* 卡片宽高跟「事项追踪」.tasks-stats / .tasks-stat 在 ≤768px 同断点
      同 token 完全对齐——
        - 2 列网格 + gap: var(--space-sm)
@@ -868,7 +902,7 @@
    卡片样式已经由 ≤480px 规则统一覆盖，这里不重复。 */
 @media (max-width: 430px) {
   .mc-period-dropdown__trigger {
-    font-size: 0.75rem;
-    padding: 6px 10px;
+    font-size: var(--text-sm);
+    padding: 0.6rem 1rem 0.6rem 2.4rem;
   }
 }
