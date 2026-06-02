@@ -228,6 +228,12 @@ export default function EventPublish() {
   // 新建活动弹窗内"其他"自定义分类临时值
   const [customCategoryInput, setCustomCategoryInput] = useState('');
 
+  // ---- 已发布活动编辑弹窗 ----
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [editCustomCategoryInput, setEditCustomCategoryInput] = useState('');
+  const [editFormError, setEditFormError] = useState('');
+  const [isSavingEventEdit, setIsSavingEventEdit] = useState(false);
+
   // ---- 公众号链接一键提取（复用文章归档的抓取/摘要能力）----
   // 用户先粘贴公众号推文链接，点「一键提取」后自动填入标题、日期、活动简介，
   // 仍可手动修改。和「公众号历史文章归档」的提取体验保持一致。
@@ -575,6 +581,89 @@ export default function EventPublish() {
     // 否则保持静默（独立发布活动的常规路径不打扰）。
     if (hadWorkItem) {
       setTaskPrompt({ eventTitle: savedTitle });
+    }
+  };
+
+  const openEventEditor = (event) => {
+    setEditingEvent({
+      ...EMPTY_EVENT,
+      ...event,
+      category: normalizeEventCategory(event.category) || (categoryList[0] || '其他'),
+      officialUrl: event.officialUrl || '',
+      replayUrl: event.replayUrl || '',
+      replayPassword: event.replayPassword || '',
+      hasReplay: !!event.hasReplay,
+    });
+    setEditCustomCategoryInput('');
+    setEditFormError('');
+  };
+
+  const closeEventEditor = () => {
+    if (isSavingEventEdit) return;
+    setEditingEvent(null);
+    setEditCustomCategoryInput('');
+    setEditFormError('');
+  };
+
+  const handleSaveEventEdit = async () => {
+    if (!editingEvent || isSavingEventEdit) return;
+    if (!editingEvent.title.trim()) {
+      setEditFormError('请填写活动标题');
+      return;
+    }
+    if (!editingEvent.date) {
+      setEditFormError('请选择活动日期');
+      return;
+    }
+    if (editingEvent.hasReplay && !editingEvent.replayUrl.trim()) {
+      setEditFormError('已勾选「有回放」，请填写回放链接');
+      return;
+    }
+
+    let finalCategory = normalizeEventCategory(editingEvent.category);
+    if (editingEvent.category === '__custom__') {
+      const custom = editCustomCategoryInput.trim();
+      if (!custom) {
+        setEditFormError('请输入自定义分类名称');
+        return;
+      }
+      finalCategory = normalizeEventCategory(custom);
+      if (!categoryList.includes(finalCategory)) {
+        const updated = [...categoryList, finalCategory];
+        setCategoryList(updated);
+        await persistEventCategories(updated, lastCatSyncRef);
+      }
+    }
+
+    const updates = {
+      title: editingEvent.title.trim(),
+      date: editingEvent.date,
+      category: finalCategory,
+      location: (editingEvent.location || '').trim(),
+      excerpt: (editingEvent.excerpt || '').trim(),
+      officialUrl: (editingEvent.officialUrl || '').trim(),
+      hasReplay: !!editingEvent.hasReplay,
+      replayUrl: (editingEvent.replayUrl || '').trim(),
+      replayPassword: (editingEvent.replayPassword || '').trim(),
+    };
+    const nextEvents = events.map((event) =>
+      String(event.id) === String(editingEvent.id) ? { ...event, ...updates } : event,
+    );
+
+    setEditFormError('');
+    setIsSavingEventEdit(true);
+    try {
+      const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+      if (!res?.success) {
+        setEditFormError(`活动没有写入云端：${res?.error || '未知错误'}。请稍后重试。`);
+        return;
+      }
+      updateEvent(editingEvent.id, updates);
+      setEditingEvent(null);
+      setEditCustomCategoryInput('');
+      setEditFormError('');
+    } finally {
+      setIsSavingEventEdit(false);
     }
   };
 
@@ -930,6 +1019,20 @@ export default function EventPublish() {
                 onClick={() => handleCardClick(event)}
                 style={clickable ? { cursor: 'pointer' } : undefined}
               >
+                {isAdmin && (
+                  <button
+                    type="button"
+                    className="ia-card__edit-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openEventEditor(event);
+                    }}
+                    title="编辑活动信息"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
                 <div className="ia-card__body">
                   <div className="ep-card__top">
                     <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
@@ -1205,6 +1308,167 @@ export default function EventPublish() {
               </button>
               <button className="btn btn-primary" onClick={handleSave} disabled={isPublishingEvent}>
                 <Check size={16} /> {isPublishingEvent ? '发布中...' : '确认发布'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 编辑活动弹窗 ========== */}
+      {editingEvent && (
+        <div className="ia-modal-overlay" onClick={closeEventEditor}>
+          <div className="ia-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ia-modal__header">
+              <h2>编辑活动信息</h2>
+              <button className="ia-modal__close" onClick={closeEventEditor} disabled={isSavingEventEdit}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ia-modal__body">
+              <div className="ia-modal__step-confirm">
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">活动标题 *</label>
+                  <input
+                    type="text"
+                    className="ia-modal__text-input"
+                    value={editingEvent.title}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                    autoFocus
+                  />
+                </div>
+
+                <div className="ep-modal__row">
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">活动日期 *</label>
+                    <input
+                      type="date"
+                      className="ia-modal__text-input"
+                      value={editingEvent.date || ''}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">分类</label>
+                    <select
+                      className="ia-modal__text-input"
+                      value={editingEvent.category}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                    >
+                      {categoryList.map((cat) => (
+                        <option key={cat} value={cat}>{cat}</option>
+                      ))}
+                      {editingEvent.category &&
+                        !categoryList.includes(editingEvent.category) &&
+                        editingEvent.category !== '__custom__' && (
+                          <option value={editingEvent.category}>{editingEvent.category}</option>
+                        )}
+                      <option value="__custom__">＋ 自定义…</option>
+                    </select>
+                    {editingEvent.category === '__custom__' && (
+                      <input
+                        type="text"
+                        className="ia-modal__text-input"
+                        placeholder="请输入新分类名称，保存时将自动加入筛选项"
+                        value={editCustomCategoryInput}
+                        onChange={(e) => setEditCustomCategoryInput(e.target.value)}
+                        style={{ marginTop: 8 }}
+                        maxLength={20}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">地点</label>
+                  <input
+                    type="text"
+                    className="ia-modal__text-input"
+                    value={editingEvent.location || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                    placeholder="如：线上腾讯会议 / 西南财经大学"
+                  />
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">活动简介</label>
+                  <textarea
+                    className="ia-modal__textarea"
+                    value={editingEvent.excerpt || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, excerpt: e.target.value })}
+                    rows={3}
+                    placeholder="简要介绍活动内容…"
+                  />
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <ExternalLink size={14} /> 公众号推文链接
+                  </label>
+                  <input
+                    type="url"
+                    className="ia-modal__text-input"
+                    value={editingEvent.officialUrl || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, officialUrl: e.target.value })}
+                    placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
+                  />
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <input
+                      type="checkbox"
+                      checked={!!editingEvent.hasReplay}
+                      onChange={(e) => setEditingEvent({ ...editingEvent, hasReplay: e.target.checked })}
+                      style={{ marginRight: 6 }}
+                    />
+                    <Video size={14} /> 提供活动回放（需设置链接与访问密码）
+                  </label>
+                </div>
+
+                {editingEvent.hasReplay && (
+                  <>
+                    <div className="ia-modal__field">
+                      <label className="ia-modal__label">设置回放链接 *</label>
+                      <input
+                        type="url"
+                        className="ia-modal__text-input"
+                        value={editingEvent.replayUrl || ''}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, replayUrl: e.target.value })}
+                        placeholder="https://meeting.tencent.com/…"
+                      />
+                    </div>
+                    <div className="ia-modal__field">
+                      <label className="ia-modal__label">设置访问密码</label>
+                      <input
+                        type="text"
+                        className="ia-modal__text-input"
+                        value={editingEvent.replayPassword || ''}
+                        onChange={(e) => setEditingEvent({ ...editingEvent, replayPassword: e.target.value })}
+                        placeholder="为回放设置访问密码，留空则无需密码即可访问"
+                      />
+                    </div>
+                  </>
+                )}
+
+                {editFormError && (
+                  <div className="ia-modal__error">
+                    <AlertCircle size={16} /> {editFormError}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="ia-modal__footer">
+              <button className="btn btn-ghost" onClick={closeEventEditor} disabled={isSavingEventEdit}>
+                取消
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveEventEdit}
+                disabled={isSavingEventEdit || !editingEvent.title.trim()}
+              >
+                <Check size={16} /> {isSavingEventEdit ? '保存中...' : '保存修改'}
               </button>
             </div>
           </div>
