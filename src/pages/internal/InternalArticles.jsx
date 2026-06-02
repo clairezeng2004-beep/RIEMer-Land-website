@@ -572,6 +572,7 @@ export default function InternalArticles() {
     setDraft(null);
     setEditTags([]);
     setNewTagInput('');
+    setConfirmNewCategory('');
     setFetching(false);
     setAiLoading(false);
     setAiError('');
@@ -599,6 +600,7 @@ export default function InternalArticles() {
       // 抓取标题为空时用 suggestedTitle 兜底，避免用户要手动再输一次。
       setEditTitle(parsed.title || pendingSuggestedTitle || '');
       setEditCategory(parsed.category);
+      setConfirmNewCategory('');
       setEditTags([...parsed.tags]);
       setEditExcerpt(parsed.excerpt || '');
       setAiError('');
@@ -648,6 +650,38 @@ export default function InternalArticles() {
   const handleConfirmSave = async () => {
     if (!draft) return;
 
+    const newCategoryLabel = confirmNewCategory.trim();
+    if (editCategory === '__new__' && !newCategoryLabel) {
+      alert('请输入新分类名称');
+      return;
+    }
+
+    let finalCategory = editCategory === '__new__'
+      ? newCategoryLabel
+      : (editCategory || draft.category);
+
+    if (editCategory === '__new__' && newCategoryLabel) {
+      const exists = categories.some(
+        (cat) => cat !== '全部' && cat.trim().toLowerCase() === newCategoryLabel.toLowerCase(),
+      );
+      if (exists) {
+        finalCategory = categories.find(
+          (cat) => cat !== '全部' && cat.trim().toLowerCase() === newCategoryLabel.toLowerCase(),
+        ) || newCategoryLabel;
+      } else {
+        const updated = [
+          ...categoryList,
+          {
+            key: 'acat_' + Date.now(),
+            label: newCategoryLabel,
+            color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+          },
+        ];
+        setCategoryList(updated);
+        persistCategories(updated, lastCatSyncRef);
+      }
+    }
+
     const newArticle = {
       id: `user-${Date.now()}`,
       title: editTitle.trim() || draft.title,
@@ -656,7 +690,7 @@ export default function InternalArticles() {
       avatar: null,
       coverImage: null,
       date: draft.date,
-      category: editCategory || draft.category,
+      category: finalCategory,
       tags: editTags.length > 0 ? editTags : draft.tags,
       excerpt: editExcerpt.trim() || draft.excerpt,
       outline: [],
@@ -1276,12 +1310,28 @@ export default function InternalArticles() {
                   {/* 分类 */}
                   <div className="ia-modal__field">
                     <label className="ia-modal__label">分类</label>
-                    <input
-                      type="text"
-                      className="ia-modal__text-input"
+                    <CustomSelect
+                      className="ia-modal__category-select"
                       value={editCategory}
-                      onChange={(e) => setEditCategory(e.target.value)}
+                      onChange={(value) => {
+                        setEditCategory(value);
+                        if (value !== '__new__') setConfirmNewCategory('');
+                      }}
+                      options={articleCategoryOptions}
+                      placeholder="选择分类"
+                      searchable
+                      searchPlaceholder="搜索分类…"
                     />
+                    {editCategory === '__new__' && (
+                      <input
+                        type="text"
+                        className="ia-modal__text-input"
+                        value={confirmNewCategory}
+                        onChange={(e) => setConfirmNewCategory(e.target.value)}
+                        placeholder="输入新分类名称，保存后会加入分类列表"
+                        maxLength={24}
+                      />
+                    )}
                   </div>
 
                   {/* 摘要 */}

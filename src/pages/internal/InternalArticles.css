@@ -934,6 +934,14 @@
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
 }
 
+.ia-modal__category-select {
+  width: 100%;
+}
+
+.ia-modal__category-select + .ia-modal__text-input {
+  margin-top: var(--space-sm);
+}
+
 .ia-modal__textarea {
   padding: 0.55rem 0.85rem;
   border: 1px solid var(--color-border);
