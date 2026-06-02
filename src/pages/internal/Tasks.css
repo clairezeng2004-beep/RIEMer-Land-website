@@ -834,6 +834,21 @@
   .tasks-stat__label {
     font-size: var(--text-xs);
   }
+
+  .tasks-table input.tasks-table__reason-input {
+    font-size: var(--text-sm) !important;
+    line-height: 1.4;
+  }
+
+  .tasks-table {
+    min-width: 980px;
+  }
+
+  .tasks-table th:nth-child(3),
+  .tasks-table td:nth-child(3) {
+    width: 240px;
+    min-width: 240px;
+  }
 }
 
 @media (max-width: 480px) {

@@ -168,8 +168,9 @@
   border: 1px solid var(--color-border-light);
   border-radius: 12px;
   margin-bottom: var(--space-lg);
-  overscroll-behavior-x: contain;
+  overscroll-behavior: contain;
   touch-action: pan-x pan-y;
+  scrollbar-gutter: stable;
 }
 
 .mc-table {
@@ -178,6 +179,12 @@
   border-collapse: collapse;
   table-layout: fixed;
   font-size: var(--text-sm);
+  background: var(--color-bg-card);
+}
+
+.mc-table tbody,
+.mc-table tr {
+  background: var(--color-bg-card);
 }
 
 .mc-table thead {
@@ -267,6 +274,7 @@
   padding: 14px;
   border-bottom: 1px solid var(--color-border-light);
   vertical-align: middle;
+  background: var(--color-bg-card);
   /* hover 切换柔化（与成员通讯录一致的反馈节奏）：
      transition 必须写在 td 上而不是 tr 上 —— <tr> 的背景实际由 <td> 渲染，
      在 tr 上加 transition 大多数浏览器不生效，会出现"瞬切"的灵敏感。
@@ -296,6 +304,10 @@
      - 普通 td：rgba(91,140,62,0.02) 透明绿
      - sticky 列：#f8faf6 不透明等价色（避免横滚时下方文字穿透） */
 .mc-table__row:hover {
+  background: rgba(91, 140, 62, 0.02);
+}
+
+.mc-table__row:hover td {
   background: rgba(91, 140, 62, 0.02);
 }
 
@@ -780,6 +792,9 @@
     overflow-x: auto;
     overflow-y: visible;
     max-height: none;
+    background: var(--color-bg-card);
+    overscroll-behavior-x: contain;
+    overscroll-behavior-y: auto;
   }
 
   /* 表头手机端冻结：wrapper 已改成 overflow-y: visible，
