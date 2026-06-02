@@ -481,7 +481,7 @@ export default function InternalArticles() {
     const options = categories
       .filter((cat) => cat && cat !== '全部')
       .map((cat) => ({ value: cat, label: cat }));
-    return [...options, { value: '__new__', label: '＋ 新建分类…' }];
+    return [{ value: '', label: '无分类' }, ...options, { value: '__new__', label: '＋ 新建分类…' }];
   }, [categories]);
 
   const seriesTitlePrefixes = useMemo(
@@ -767,7 +767,7 @@ export default function InternalArticles() {
 
     let finalCategory = editCategory === '__new__'
       ? newCategoryLabel
-      : (editCategory || draft.category);
+      : (editCategory || '');
 
     if (editCategory === '__new__' && newCategoryLabel) {
       const exists = categories.some(
@@ -1000,7 +1000,7 @@ export default function InternalArticles() {
 
     let finalCategory = archiveEditCategory === '__new__'
       ? newCategoryLabel
-      : (archiveEditCategory || editingArchive.category || '');
+      : (archiveEditCategory || '');
 
     if (archiveEditCategory === '__new__' && newCategoryLabel) {
       const existing = categories.find(
