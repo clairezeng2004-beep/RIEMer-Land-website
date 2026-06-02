@@ -32,7 +32,7 @@ import {
   fetchTasksForLinking,
 } from '../../services/taskLinkService';
 
-// ---- 分类管理 ----
+// ---- 系列管理 ----
 const ARTICLE_CATEGORIES_KEY = 'riemer_article_categories';
 
 const PRESET_COLORS = [
@@ -104,7 +104,7 @@ async function readCoverImage(file) {
 //
 // ⚠️ 失败必须显式提示（与 EventPublish 的 persistEventCategories 对齐）：
 //   历史版本是 fire-and-forget 且只 console.warn —— 用户在 A 设备新增/删除/
-//   改名分类，saveSetting 因网络抖动 / RLS 拒绝 / 表不存在等原因失败时，
+//   改名系列，saveSetting 因网络抖动 / RLS 拒绝 / 表不存在等原因失败时，
 //   本机 UI 已经按"操作成功"把 Tab 更新完了，云端却什么都没写；B 设备
 //   刷新或实时订阅都收不到变化，用户反馈就是"公众号文章归档 Tab 跨设备
 //   不同步"。改为 alert 显式提示，让用户第一时间知道需要重试。
@@ -118,10 +118,10 @@ async function persistCategories(data, lastSyncRef) {
   if (res.success && lastSyncRef) {
     lastSyncRef.current = res.updatedAt;
   } else if (!res.success) {
-    console.warn('[InternalArticles] 分类云端同步失败:', res.error);
+    console.warn('[InternalArticles] 系列云端同步失败:', res.error);
     try {
       alert(
-        `文章分类保存到云端失败：${res.error || '未知错误'}\n` +
+        `文章系列保存到云端失败：${res.error || '未知错误'}\n` +
         `改动已保存到本设备本地，但其它设备暂时看不到，请检查网络后重试。`,
       );
     } catch { /* SSR 或无 window 环境下忽略 */ }
@@ -251,7 +251,7 @@ export default function InternalArticles() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
 
-  // ---- 分类管理状态 ----
+  // ---- 系列管理状态 ----
   const [categoryList, setCategoryList] = useState(loadArticleCategories);
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
   const [showCatManager, setShowCatManager] = useState(false);
@@ -265,7 +265,7 @@ export default function InternalArticles() {
   const [quickCatLabel, setQuickCatLabel] = useState('');
   const [quickCatColor, setQuickCatColor] = useState(PRESET_COLORS[0]);
   const [quickCatError, setQuickCatError] = useState('');
-  // 管理员：就地新增分类（对齐流程模板文件页的"+添加分类"体验，管理员不必先打开面板）
+  // 管理员：就地新增系列（对齐流程模板文件页的"+添加系列"体验，管理员不必先打开面板）
   const [showInlineAddCat, setShowInlineAddCat] = useState(false);
 
   // 记录本设备最近一次 push 的 updated_at，避免 realtime 回流覆盖自己
@@ -278,10 +278,10 @@ export default function InternalArticles() {
 
     fetchSetting(SITE_KEYS.ARTICLE_CATEGORIES).then(({ value, updatedAt, error }) => {
       if (cancelled || error) return;
-      // ⚠️ 允许空数组（[]）原样覆盖本地：代表用户在其它设备把分类全部删了。
+      // ⚠️ 允许空数组（[]）原样覆盖本地：代表用户在其它设备把系列全部删了。
       // 以前这里写的是 `value.length > 0` —— 只要云端是 []（全删状态），B 设备
-      // 就会以为"云端没数据"而保留本地默认的 4 个预置分类；然后 B 设备任何一次
-      // 对分类的修改都会把"本地默认 + 这次新增"整体回推云端，等于把 A 设备的
+      // 就会以为"云端没数据"而保留本地默认的 4 个预置系列；然后 B 设备任何一次
+      // 对系列的修改都会把"本地默认 + 这次新增"整体回推云端，等于把 A 设备的
       // 删除动作撤销了，跨设备完全失配。这里只要是合法数组就以云端为准。
       if (Array.isArray(value)) {
         lastCatSyncRef.current = updatedAt;
@@ -459,7 +459,7 @@ export default function InternalArticles() {
     setNewLinkedTaskTitle(editTitle || draft?.title || pendingSuggestedTitle || '');
   }, [syncNewTaskTitle, editTitle, draft?.title, pendingSuggestedTitle]);
 
-  // 合并持久化分类 + 文章中动态提取的分类（去重）
+  // 合并持久化系列 + 文章中动态提取的系列（去重）
   const categories = useMemo(() => {
     const managedLabels = new Set(categoryList.map((c) => c.label));
     const dynamicCats = allArticles
@@ -473,7 +473,7 @@ export default function InternalArticles() {
     const options = categories
       .filter((cat) => cat && cat !== '全部')
       .map((cat) => ({ value: cat, label: cat }));
-    return [{ value: '', label: '无分类' }, ...options, { value: '__new__', label: '＋ 新建分类…' }];
+    return [{ value: '', label: '无系列' }, ...options, { value: '__new__', label: '＋ 新建系列…' }];
   }, [categories]);
 
   const seriesTitlePrefixes = useMemo(
@@ -481,12 +481,12 @@ export default function InternalArticles() {
     [categoryList],
   );
 
-  // ---- 分类 CRUD ----
+  // ---- 系列 CRUD ----
   const handleAddCategory = () => {
     const label = newCatLabel.trim();
     if (!label) return;
     if (categoryList.some((c) => c.label === label)) {
-      alert('该分类名称已存在');
+      alert('该系列名称已存在');
       return;
     }
     const key = 'acat_' + Date.now();
@@ -509,7 +509,7 @@ export default function InternalArticles() {
     const nextLabel = editCatLabel.trim();
     if (!nextLabel) return;
 
-    // 找到当前被编辑的分类（托管分类走 key 匹配；动态派生分类 key 以 __dyn__ 打头）
+    // 找到当前被编辑的系列（托管系列走 key 匹配；动态派生系列 key 以 __dyn__ 打头）
     const isDynamic = typeof editingCatKey === 'string' && editingCatKey.startsWith('__dyn__');
     const managed = !isDynamic ? categoryList.find((c) => c.key === editingCatKey) : null;
     // 改名前的旧 label（用于同步更新 article.category）
@@ -519,7 +519,7 @@ export default function InternalArticles() {
 
     if (!prevLabel) { setEditingCatKey(null); return; }
 
-    // 重名校验（和其他分类冲突时拒绝）
+    // 重名校验（和其他系列冲突时拒绝）
     const clash =
       (nextLabel !== prevLabel) &&
       (
@@ -527,21 +527,21 @@ export default function InternalArticles() {
         allArticles.some((a) => a.category === nextLabel && a.category !== prevLabel)
       );
     if (clash) {
-      alert('该分类名称已存在');
+      alert('该系列名称已存在');
       return;
     }
 
     // 1) 更新/补齐 categoryList
     if (managed) {
-      // 托管分类：原地改名 + 可选的 color
+      // 托管系列：原地改名 + 可选的 color
       const updated = categoryList.map((c) =>
         c.key === editingCatKey ? { ...c, label: nextLabel, color: editCatColor } : c,
       );
       setCategoryList(updated);
       persistCategories(updated, lastCatSyncRef);
     } else if (isDynamic) {
-      // 动态派生分类被改名：把这个 label 正式"领养"进 categoryList，
-      // 这样下次就能直接作为托管分类参与批量管理
+      // 动态派生系列被改名：把这个 label 正式"领养"进 categoryList，
+      // 这样下次就能直接作为托管系列参与批量管理
       const key = 'acat_' + Date.now();
       const updated = [...categoryList, { key, label: nextLabel, color: editCatColor }];
       setCategoryList(updated);
@@ -549,27 +549,27 @@ export default function InternalArticles() {
     }
 
     // 2) 同步改写所有旧 label 的文章 article.category（托管 & 派生都要做，
-    //    这样筛选项、文章明细上的分类标签才会真正改名）
+    //    这样筛选项、文章明细上的系列标签才会真正改名）
     if (nextLabel !== prevLabel) {
       const affected = allArticles.filter((a) => a.category === prevLabel);
       await Promise.all(
         affected.map((a) => updateArticle(a.id, { category: nextLabel })),
       );
-      // 如果当前选中的正是被改名的分类，把选中项同步切到新名
+      // 如果当前选中的正是被改名的系列，把选中项同步切到新名
       if (selectedCategory === prevLabel) setSelectedCategory(nextLabel);
     }
 
     setEditingCatKey(null);
   };
 
-  // 通过 label 删除分类（既适用于托管分类，也适用于动态派生分类）
+  // 通过 label 删除系列（既适用于托管系列，也适用于动态派生系列）
   const handleDeleteCategoryByLabel = async (label) => {
     if (!label) return;
     const managed = categoryList.find((c) => c.label === label);
     const affected = allArticles.filter((a) => a.category === label);
     const msg = affected.length > 0
-      ? `确定要删除分类「${label}」吗？\n该分类下有 ${affected.length} 篇文章，删除后这些文章的分类会被清空（文章本身保留）。`
-      : `确定要删除分类「${label}」吗？`;
+      ? `确定要删除系列「${label}」吗？\n该系列下有 ${affected.length} 篇文章，删除后这些文章的系列会被清空（文章本身保留）。`
+      : `确定要删除系列「${label}」吗？`;
     if (!window.confirm(msg)) return;
 
     // 1) 从 categoryList 中移除（如果是托管项）
@@ -578,7 +578,7 @@ export default function InternalArticles() {
       setCategoryList(updated);
       persistCategories(updated, lastCatSyncRef);
     }
-    // 2) 把所有引用该分类的文章 category 清空，使派生分类真正消失
+    // 2) 把所有引用该系列的文章 category 清空，使派生系列真正消失
     await Promise.all(
       affected.map((a) => updateArticle(a.id, { category: '' })),
     );
@@ -592,7 +592,7 @@ export default function InternalArticles() {
     handleDeleteCategoryByLabel(cat.label);
   };
 
-  // ---- 普通成员快速新增分类（所有登录成员可用） ----
+  // ---- 普通成员快速新增系列（所有登录成员可用） ----
   const openAddCatModal = () => {
     setQuickCatLabel('');
     setQuickCatColor(PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)]);
@@ -608,12 +608,12 @@ export default function InternalArticles() {
   const handleQuickAddCategory = () => {
     const label = quickCatLabel.trim();
     if (!label) {
-      setQuickCatError('请输入分类名称');
+      setQuickCatError('请输入系列名称');
       return;
     }
     // 同时查"已管理"和"动态派生（来自文章 category）"，避免重复
     if (categoryList.some((c) => c.label === label) || categories.includes(label)) {
-      setQuickCatError('该分类名称已存在');
+      setQuickCatError('该系列名称已存在');
       return;
     }
     const key = 'acat_' + Date.now();
@@ -739,7 +739,7 @@ export default function InternalArticles() {
 
     const newCategoryLabel = confirmNewCategory.trim();
     if (editCategory === '__new__' && !newCategoryLabel) {
-      alert('请输入新分类名称');
+      alert('请输入新系列名称');
       return;
     }
 
@@ -972,7 +972,7 @@ export default function InternalArticles() {
 
     const newCategoryLabel = archiveNewCategory.trim();
     if (archiveEditCategory === '__new__' && !newCategoryLabel) {
-      alert('请输入新分类名称');
+      alert('请输入新系列名称');
       return;
     }
 
@@ -1079,11 +1079,11 @@ export default function InternalArticles() {
                     </button>
                   );
                 }
-                // 管理员对所有非"全部"的分类都可就地编辑/删除：
-                //   - 托管分类：从 categoryList 找到，有稳定 key
-                //   - 动态派生分类：从文章 article.category 派生而来，没有 key；
+                // 管理员对所有非"全部"的系列都可就地编辑/删除：
+                //   - 托管系列：从 categoryList 找到，有稳定 key
+                //   - 动态派生系列：从文章 article.category 派生而来，没有 key；
                 //     此时构造一个 __dyn__<label> 的占位 key，重命名时会自动"领养"进 categoryList，
-                //     删除时批量把引用该分类的文章 category 清空。
+                //     删除时批量把引用该系列的文章 category 清空。
                 const managedReal = categoryList.find((c) => c.label === cat);
                 const managed = managedReal || {
                   key: '__dyn__' + cat,
@@ -1153,7 +1153,7 @@ export default function InternalArticles() {
                             e.stopPropagation();
                             handleDeleteCategoryByLabel(managed.label);
                           }}
-                          title="删除分类"
+                          title="删除系列"
                         >
                           <X size={12} />
                         </button>
@@ -1163,7 +1163,7 @@ export default function InternalArticles() {
                 );
               })}
 
-              {/* 就地新增分类：管理员走 inline 输入（与流程模板文件页一致）；
+              {/* 就地新增系列：管理员走 inline 输入（与流程模板文件页一致）；
                   非管理员继续走原 modal（所有成员可新增，但不能改/删别人建的） */}
               {isAdmin ? (
                 showInlineAddCat ? (
@@ -1171,7 +1171,7 @@ export default function InternalArticles() {
                     <input
                       type="text"
                       className="ia-list__cat-add-input"
-                      placeholder="新分类名称"
+                      placeholder="新系列名称"
                       value={newCatLabel}
                       onChange={(e) => setNewCatLabel(e.target.value)}
                       onKeyDown={(e) => {
@@ -1212,16 +1212,16 @@ export default function InternalArticles() {
                   <button
                     className="ia-list__cat ia-list__cat--add"
                     onClick={() => setShowInlineAddCat(true)}
-                    title="添加新分类"
+                    title="添加新系列"
                   >
-                    <Plus size={14} /> 添加分类
+                    <Plus size={14} /> 添加系列
                   </button>
                 )
               ) : (
                 <button
                   className="ia-list__cat ia-list__cat--add"
                   onClick={openAddCatModal}
-                  title="新增筛选分类（所有成员可用）"
+                  title="新增筛选系列（所有成员可用）"
                 >
                   <Plus size={14} /> 新增筛选
                 </button>
@@ -1231,24 +1231,24 @@ export default function InternalArticles() {
               <button
                 className={`ia-list__manage-btn ${showCatManager ? 'ia-list__manage-btn--active' : ''}`}
                 onClick={() => setShowCatManager(!showCatManager)}
-                title="管理筛选分类（含颜色/批量）"
+                title="管理筛选系列（含颜色/批量）"
               >
                 <Settings2 size={16} />
               </button>
             )}
           </div>
 
-          {/* 分类管理面板 */}
+          {/* 系列管理面板 */}
           {editing && showCatManager && (
             <div className="ia-cat-manager card">
               <div className="ia-cat-manager__header">
-                <h4><Settings2 size={16} /> 筛选分类管理</h4>
+                <h4><Settings2 size={16} /> 筛选系列管理</h4>
                 <button className="ia-cat-manager__close" onClick={() => setShowCatManager(false)}>
                   <X size={16} />
                 </button>
               </div>
 
-              {/* 现有分类列表 */}
+              {/* 现有系列列表 */}
               <div className="ia-cat-manager__list">
                 {categoryList.map((cat) => (
                   <div key={cat.key} className="ia-cat-item">
@@ -1306,7 +1306,7 @@ export default function InternalArticles() {
                 ))}
               </div>
 
-              {/* 新建分类 */}
+              {/* 新建系列 */}
               <div className="ia-cat-manager__add">
                 <div className="ia-cat-manager__add-row">
                   <span
@@ -1316,7 +1316,7 @@ export default function InternalArticles() {
                   <input
                     type="text"
                     className="ia-cat-manager__add-input"
-                    placeholder="输入新分类名称..."
+                    placeholder="输入新系列名称..."
                     value={newCatLabel}
                     onChange={(e) => setNewCatLabel(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && handleAddCategory()}
@@ -1456,7 +1456,7 @@ export default function InternalArticles() {
               {step === 'input' && (
                 <div className="ia-modal__step-input">
                   <p className="ia-modal__hint">
-                    请输入微信公众号文章链接，系统将自动提取标题、分类、日期和标签。
+                    请输入微信公众号文章链接，系统将自动提取标题、系列、日期和标签。
                     摘要需在下一步手动点击「AI 生成」。
                   </p>
                   <div className="ia-modal__url-row">
@@ -1510,11 +1510,11 @@ export default function InternalArticles() {
                     />
                   </div>
 
-                  {/* 分类 */}
+                  {/* 系列 */}
                   <div className="ia-modal__field">
-                    <label className="ia-modal__label">分类</label>
-                    {/* 进入「新建分类」输入态后，隐藏上面显示「＋ 新建分类…」的下拉框，
-                        只留输入行 + 取消，避免输入行上方再出现一行「新建分类」造成误导 */}
+                    <label className="ia-modal__label">系列</label>
+                    {/* 进入「新建系列」输入态后，隐藏上面显示「＋ 新建系列…」的下拉框，
+                        只留输入行 + 取消，避免输入行上方再出现一行「新建系列」造成误导 */}
                     {editCategory === '__new__' ? (
                       <div className="ia-modal__new-cat-row">
                         <input
@@ -1522,7 +1522,7 @@ export default function InternalArticles() {
                           className="ia-modal__text-input"
                           value={confirmNewCategory}
                           onChange={(e) => setConfirmNewCategory(e.target.value)}
-                          placeholder="输入新分类名称，保存后会加入分类列表"
+                          placeholder="输入新系列名称，保存后会加入系列列表"
                           maxLength={24}
                           autoFocus
                         />
@@ -1543,9 +1543,9 @@ export default function InternalArticles() {
                           if (value !== '__new__') setConfirmNewCategory('');
                         }}
                         options={articleCategoryOptions}
-                        placeholder="选择分类"
+                        placeholder="选择系列"
                         searchable
-                        searchPlaceholder="搜索分类…"
+                        searchPlaceholder="搜索系列…"
                       />
                     )}
                   </div>
@@ -1809,7 +1809,7 @@ export default function InternalArticles() {
                     />
                   </div>
                   <div className="ia-modal__field">
-                    <label className="ia-modal__label">分类</label>
+                    <label className="ia-modal__label">系列</label>
                     {archiveEditCategory === '__new__' ? (
                       <div className="ia-modal__new-cat-row">
                         <input
@@ -1817,7 +1817,7 @@ export default function InternalArticles() {
                           className="ia-modal__text-input"
                           value={archiveNewCategory}
                           onChange={(e) => setArchiveNewCategory(e.target.value)}
-                          placeholder="输入新分类名称，保存后会加入分类列表"
+                          placeholder="输入新系列名称，保存后会加入系列列表"
                           maxLength={24}
                           autoFocus
                         />
@@ -1838,9 +1838,9 @@ export default function InternalArticles() {
                           if (value !== '__new__') setArchiveNewCategory('');
                         }}
                         options={articleCategoryOptions}
-                        placeholder="选择分类"
+                        placeholder="选择系列"
                         searchable
-                        searchPlaceholder="搜索分类…"
+                        searchPlaceholder="搜索系列…"
                       />
                     )}
                   </div>
@@ -2140,7 +2140,7 @@ export default function InternalArticles() {
         </div>
       )}
 
-      {/* ========== 普通成员快速新增分类弹窗 ========== */}
+      {/* ========== 普通成员快速新增系列弹窗 ========== */}
       {showAddCatModal && (
         <div className="ia-modal-overlay" onClick={closeAddCatModal}>
           <div
@@ -2149,7 +2149,7 @@ export default function InternalArticles() {
           >
             <div className="ia-modal__header">
               <h2>
-                <Palette size={18} /> 新增筛选分类
+                <Palette size={18} /> 新增筛选系列
               </h2>
               <button className="ia-modal__close" onClick={closeAddCatModal}>
                 <X size={20} />
@@ -2157,10 +2157,10 @@ export default function InternalArticles() {
             </div>
             <div className="ia-modal__body">
               <p className="ia-modal__hint">
-                所有成员都可以新增筛选分类，新增后立即同步到所有设备，大家都能看到。
+                所有成员都可以新增筛选系列，新增后立即同步到所有设备，大家都能看到。
               </p>
               <div className="ia-modal__field">
-                <label className="ia-modal__label">分类名称</label>
+                <label className="ia-modal__label">系列名称</label>
                 <div className="ia-cat-manager__add-row">
                   <span
                     className="ia-cat-item__color-dot"
@@ -2182,7 +2182,7 @@ export default function InternalArticles() {
                 </div>
               </div>
               <div className="ia-modal__field">
-                <label className="ia-modal__label">分类颜色</label>
+                <label className="ia-modal__label">系列颜色</label>
                 <div className="ia-cat-item__colors">
                   {PRESET_COLORS.map((c) => (
                     <button

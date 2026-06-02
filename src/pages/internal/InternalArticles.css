@@ -90,7 +90,7 @@
   flex: 1;
 }
 
-/* 筛选栏（分类 + 齿轮按钮） */
+/* 筛选栏（系列 + 齿轮按钮） */
 .ia-list__filter-bar {
   display: flex;
   align-items: center;
@@ -406,9 +406,9 @@
 
 /* ============ 就地编辑（管理员） ===========================================
  * 视觉与 /internal/process-templates 的 Documents 页保持一致：
- *   - 分类 pill 右侧紧跟一个 22×22 圆形图标按钮组（铅笔 / ✗）
+ *   - 系列 pill 右侧紧跟一个 22×22 圆形图标按钮组（铅笔 / ✗）
  *   - 点击铅笔 → pill 原位变成输入框 + ✓/✗
- *   - 末尾"+ 添加分类"虚线按钮点一次 → 变输入框
+ *   - 末尾"+ 添加系列"虚线按钮点一次 → 变输入框
  * 命名保持 ia-list__cat-* 前缀，与现有 pill 样式同族，避免引入新的 BEM 根
  */
 .ia-list__cat-wrapper {
@@ -521,7 +521,7 @@
   color: var(--color-text);
 }
 
-/* 快速新增分类弹窗 */
+/* 快速新增系列弹窗 */
 .ia-modal--quick-cat {
   max-width: 440px;
 }
@@ -975,7 +975,7 @@
   font-size: var(--text-sm);
 }
 
-/* 新建分类输入行：输入框占满 + 右侧「取消」返回下拉选择 */
+/* 新建系列输入行：输入框占满 + 右侧「取消」返回下拉选择 */
 .ia-modal__new-cat-row {
   display: flex;
   align-items: center;
