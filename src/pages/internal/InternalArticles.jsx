@@ -6,6 +6,7 @@ import { useWysiwyg } from '../../contexts/WysiwygContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import EditableText from '../../components/EditableText';
+import CustomSelect from '../../components/CustomSelect';
 import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
 import {
@@ -290,6 +291,7 @@ export default function InternalArticles() {
   const [editTags, setEditTags] = useState([]);
   const [editTitle, setEditTitle] = useState('');
   const [editCategory, setEditCategory] = useState('');
+  const [confirmNewCategory, setConfirmNewCategory] = useState('');
   const [editExcerpt, setEditExcerpt] = useState('');
   const [newTagInput, setNewTagInput] = useState('');
   const [showTagsEditor, setShowTagsEditor] = useState(true);
@@ -389,6 +391,13 @@ export default function InternalArticles() {
     const uniqueDynamic = [...new Set(dynamicCats)];
     return ['全部', ...categoryList.map((c) => c.label), ...uniqueDynamic];
   }, [allArticles, categoryList]);
+
+  const articleCategoryOptions = useMemo(() => {
+    const options = categories
+      .filter((cat) => cat && cat !== '全部')
+      .map((cat) => ({ value: cat, label: cat }));
+    return [...options, { value: '__new__', label: '＋ 新建分类…' }];
+  }, [categories]);
 
   // ---- 分类 CRUD ----
   const handleAddCategory = () => {
@@ -1228,16 +1237,17 @@ export default function InternalArticles() {
                       />
                     </div>
                     <button
-                      className="btn btn-primary"
+                      className="btn btn-primary ia-modal__fetch-btn"
                       onClick={handleFetch}
                       disabled={!urlInput.trim() || fetching}
                     >
                       {fetching ? (
                         <>
-                          <Loader2 size={14} className="ia-modal__spinner" /> 提取中…
+                          <Loader2 size={14} className="ia-modal__spinner" />
+                          <span>提取文章</span>
                         </>
                       ) : (
-                        '提取文章'
+                        <span>提取文章</span>
                       )}
                     </button>
                   </div>

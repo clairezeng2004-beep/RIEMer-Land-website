@@ -807,6 +807,14 @@
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
 }
 
+.ia-modal__fetch-btn {
+  min-width: 112px;
+}
+
+.ia-modal__fetch-btn .ia-modal__spinner {
+  flex-shrink: 0;
+}
+
 .ia-modal__error {
   display: flex;
   align-items: center;
