@@ -39,6 +39,16 @@ export default class ErrorBoundary extends Component {
           <p style={{ fontSize: '0.9rem', maxWidth: 400 }}>
             可能是缓存数据不兼容，请尝试刷新页面或清除浏览器缓存。
           </p>
+          {import.meta.env.DEV && this.state.error?.message && (
+            <p style={{
+              fontSize: '0.8rem',
+              maxWidth: 520,
+              color: '#999',
+              wordBreak: 'break-word',
+            }}>
+              {this.state.error.message}
+            </p>
+          )}
           <div style={{ display: 'flex', gap: '0.75rem' }}>
             <button
               onClick={this.handleReset}
