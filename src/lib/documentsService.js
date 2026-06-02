@@ -13,7 +13,7 @@
 // 避免一台设备删了默认数据、另一台设备又看到。
 // 跨设备浏览计数走 document_views 表。
 
-import { supabase, isSupabaseConfigured, getReachable } from './supabase';
+import { supabase, isSupabaseConfigured } from './supabase';
 
 export const DOCUMENTS_KEY = 'riemer_documents';
 export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
@@ -24,10 +24,10 @@ const DOCUMENTS_BUCKET = 'documents';
  * 判断当前是否可以使用 Supabase（已配置 + 健康检测通过）
  */
 export function canUseSupabase() {
-  if (!isSupabaseConfigured) return false;
-  const reachable = getReachable();
-  // 健康检查未完成（null）时先尝试一次；true 时使用云端；false 时纯本地
-  return reachable !== false;
+  // 文档数据必须以云端为权威。健康检查可能被移动端网络/CDN/浏览器策略误判，
+  // 不能因此直接切到 localStorage，否则会出现跨设备只看到本地旧数据。
+  // 只要 Supabase 已配置，就让真实的 documents 查询自己决定成功或失败。
+  return Boolean(isSupabaseConfigured && supabase);
 }
 
 /* ============ Row ↔ Doc 对象互转 ============ */

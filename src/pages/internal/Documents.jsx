@@ -18,7 +18,6 @@ import {
   FileSpreadsheet,
   Presentation,
   ChevronLeft,
-  UploadCloud,
   Clock,
   User,
   HardDrive,
@@ -422,6 +421,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (selectedType === typeKey) setSelectedType('全部');
   };
   const [documents, setDocuments] = useState(() => {
+    if (canUseSupabase()) return [];
     const userDocs = loadUserDocs();
     return mergeDocuments({
       userDocs,
@@ -429,6 +429,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       filterTypes,
     });
   });
+  const [cloudLoading, setCloudLoading] = useState(() => canUseSupabase());
   const pendingDeletedIdsRef = useRef(new Set());
   const [pendingDeletedIds, setPendingDeletedIds] = useState([]);
   const hidePendingDeletedDocs = useCallback(
@@ -439,8 +440,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   // 与 ProcessTemplateDetail 共享的浏览计数（在列表卡片上实时展示）
   const [docViews, setDocViews] = useState(() => loadDocViews());
 
-  // 是否是"流程模板"模式（跨设备同步走 Supabase）
-  const isProcessTemplateMode = configSection === 'processTemplates';
+  const shouldUseCloudDocs = canUseSupabase();
   const refreshSeqRef = useRef(0);
 
   const applyCloudDocs = useCallback((cloudDocs, cloudDeletedIds) => {
@@ -456,22 +456,29 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     } catch { /* ignore */ }
   }, [filterTypes, hidePendingDeletedDocs]);
 
-  // 刷新函数：流程模板页优先拉云端；云端失败时保留当前列表，避免被本机旧缓存覆盖。
+  // 刷新函数：云端优先。Supabase 已配置时不使用本地缓存替代云端结果，
+  // 避免手机端刷新后显示和电脑端不一致的旧本地数据。
   const refreshDocs = useCallback(async ({ allowLocalFallback = true } = {}) => {
     const seq = refreshSeqRef.current + 1;
     refreshSeqRef.current = seq;
 
-    if (isProcessTemplateMode && canUseSupabase()) {
+    if (shouldUseCloudDocs) {
+      setCloudLoading(true);
       const cloud = await fetchAllFromCloud();
       if (refreshSeqRef.current !== seq) return;
       if (cloud) {
         applyCloudDocs(cloud.docs, cloud.deletedIds);
-        const mergedViews = await fetchViewsFromCloud();
-        if (refreshSeqRef.current === seq && mergedViews) setDocViews(mergedViews);
+        if (refreshSeqRef.current === seq) setCloudLoading(false);
+        fetchViewsFromCloud().then((mergedViews) => {
+          if (refreshSeqRef.current === seq && mergedViews) setDocViews(mergedViews);
+        });
         return;
       }
+      if (refreshSeqRef.current === seq) setCloudLoading(false);
       if (!allowLocalFallback) return;
     }
+
+    if (!allowLocalFallback && shouldUseCloudDocs) return;
 
     const userDocs = loadUserDocs();
     const sorted = mergeDocuments({
@@ -481,37 +488,21 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     });
     setDocuments(hidePendingDeletedDocs(sorted));
     setDocViews(loadDocViews());
-  }, [applyCloudDocs, filterTypes, hidePendingDeletedDocs, isProcessTemplateMode]);
+    setCloudLoading(false);
+  }, [applyCloudDocs, filterTypes, hidePendingDeletedDocs, shouldUseCloudDocs]);
 
-  // ========== 云端同步（仅流程模板模式） ==========
+  // ========== 云端同步 ==========
   // 挂载时从 Supabase 拉取最新文档列表 + 已删除默认 id + 浏览计数；
-  // 成功后覆盖本地 state；失败/未配置 Supabase 则保持本地数据。
+  // 成功后覆盖本地 state；失败时不回退旧缓存，避免跨设备数据不一致。
   useEffect(() => {
-    if (!isProcessTemplateMode) return;
-    if (!canUseSupabase()) return;
-
-    let cancelled = false;
-    (async () => {
-      const cloud = await fetchAllFromCloud();
-      if (cancelled || !cloud) return;
-      applyCloudDocs(cloud.docs, cloud.deletedIds);
-      console.log('[Documents] 从云端同步', cloud.docs.length, '条文档(含覆盖层)，', cloud.deletedIds.length, '条默认删除记录');
-
-      // 同步浏览计数
-      const merged = await fetchViewsFromCloud();
-      if (!cancelled && merged) {
-        setDocViews(merged);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [isProcessTemplateMode, applyCloudDocs]);
+    if (!shouldUseCloudDocs) return;
+    refreshDocs({ allowLocalFallback: false });
+  }, [shouldUseCloudDocs, refreshDocs]);
 
   // ---- 订阅 documents / documents_deleted_defaults 表的 realtime 变更 ----
   // 其它设备新增/编辑/删除文档、或删除默认模拟数据时，本设备自动刷新
   useEffect(() => {
-    if (!isProcessTemplateMode) return;
-    if (!canUseSupabase()) return;
+    if (!shouldUseCloudDocs) return;
 
     // 简单策略：收到任何变更 → 重新从云端拉一次 + 本地 state 替换
     // 这样能保证和 fetchAllFromCloud 的合并逻辑完全一致，避免重复维护
@@ -532,7 +523,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       unsubDocs();
       unsubDeleted();
     };
-  }, [isProcessTemplateMode, refreshDocs]);
+  }, [shouldUseCloudDocs, refreshDocs]);
 
   // 监听独立发布页（新窗口）发来的刷新消息 + 监听浏览计数变化
   useEffect(() => {
@@ -556,7 +547,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         setDocViews(loadDocViews());
       }
       if (e.key === DOCUMENTS_KEY || e.key === DELETED_DEFAULT_IDS_KEY) {
-        refreshDocs({ allowLocalFallback: !isProcessTemplateMode });
+        refreshDocs({ allowLocalFallback: !shouldUseCloudDocs });
       }
     };
     window.addEventListener('storage', onStorage);
@@ -565,7 +556,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const onVisibility = () => {
       if (document.visibilityState === 'visible') {
         setDocViews(loadDocViews());
-        if (isProcessTemplateMode) {
+        if (shouldUseCloudDocs) {
           refreshDocs({ allowLocalFallback: false });
         }
       }
@@ -578,7 +569,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       window.removeEventListener('storage', onStorage);
       document.removeEventListener('visibilitychange', onVisibility);
     };
-  }, [refreshDocs, isProcessTemplateMode]);
+  }, [refreshDocs, shouldUseCloudDocs]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedType, setSelectedType] = useState('全部');
   const [showUpload, setShowUpload] = useState(false);
@@ -757,7 +748,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       const hasOverrideRow = userDocs.some((d) => String(d.id) === sid);
       if (hasOverrideRow) {
         saveUserDocs(userDocs.filter((d) => String(d.id) !== sid));
-        if (isProcessTemplateMode && canUseSupabase()) {
+        if (shouldUseCloudDocs) {
           deleteUserDoc(id).catch((err) => {
             console.warn('[Documents] 云端删除文档失败:', err);
           });
@@ -771,7 +762,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           deletedIds.push(sid);
           saveDeletedDefaultIds(deletedIds);
         }
-        if (isProcessTemplateMode && canUseSupabase()) {
+        if (shouldUseCloudDocs) {
           markDefaultDeleted(id).catch((err) => {
             console.warn('[Documents] 云端标记默认文档删除失败:', err);
           });
@@ -843,8 +834,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
     // 流程模板模式：点赞同步到 Supabase（仅对用户文档 doc-* 有效）
     if (
-      isProcessTemplateMode &&
-      canUseSupabase() &&
+      shouldUseCloudDocs &&
       String(docId).startsWith('doc-') &&
       nextLikesSnapshot
     ) {
@@ -1383,7 +1373,27 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           })}
         </div>
 
-        {filtered.length === 0 && (
+        {cloudLoading && filtered.length === 0 && (
+          <div className="documents-grid documents-grid--skeleton" aria-label="正在读取云端文档">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="doc-card doc-card--skeleton card">
+                <div className="doc-card__accent" />
+                <div className="doc-card__body">
+                  <div className="doc-skeleton doc-skeleton--badge" />
+                  <div className="doc-skeleton doc-skeleton--title" />
+                  <div className="doc-skeleton doc-skeleton--line" />
+                  <div className="doc-skeleton doc-skeleton--line doc-skeleton--short" />
+                </div>
+                <div className="doc-card__bottom">
+                  <div className="doc-skeleton doc-skeleton--pill" />
+                  <div className="doc-skeleton doc-skeleton--icon" />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {filtered.length === 0 && !cloudLoading && (
           <div className="documents-list__empty">
             <File size={48} />
             <h3>暂无文档</h3>

@@ -25,6 +25,18 @@ const typeConfig = {
   info: { icon: Info, color: '#8B5CF6', label: '通知' },
 };
 
+const defaultNotificationsConfig = {
+  pageTitle: '消息通知',
+  markAllReadBtn: '全部已读',
+};
+
+const toText = (value, fallback = '') => {
+  if (value == null) return fallback;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+  return fallback;
+};
+
 export default function Notifications() {
   const { isAuthenticated } = useAuth();
   const {
@@ -38,7 +50,11 @@ export default function Notifications() {
   } = useNotifications();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
-  const nc = internalConfig.notifications || { pageTitle: '消息通知', markAllReadBtn: '全部已读' };
+  const rawConfig = internalConfig?.notifications;
+  const nc = {
+    pageTitle: toText(rawConfig?.pageTitle, defaultNotificationsConfig.pageTitle),
+    markAllReadBtn: toText(rawConfig?.markAllReadBtn, defaultNotificationsConfig.markAllReadBtn),
+  };
 
   const updateNotifs = useCallback(
     (key, val) => updateInternalConfig({ notifications: { [key]: val } }),

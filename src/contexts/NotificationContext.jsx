@@ -51,6 +51,7 @@ function notificationsEqual(a, b) {
   if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
+    if (!a[i] || !b[i]) return false;
     if (a[i].id !== b[i].id || a[i].read !== b[i].read || a[i].title !== b[i].title || a[i].message !== b[i].message || a[i].type !== b[i].type || a[i].date !== b[i].date) {
       return false;
     }
@@ -58,13 +59,39 @@ function notificationsEqual(a, b) {
   return true;
 }
 
+function normalizeNotification(raw, index = 0) {
+  if (!raw || typeof raw !== 'object') return null;
+  const toText = (value, fallback = '') => {
+    if (value == null) return fallback;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'number' || typeof value === 'boolean') return String(value);
+    return fallback;
+  };
+  const id = raw.id ?? raw.notification_id ?? `cached-${index}`;
+  return {
+    ...raw,
+    id: String(id),
+    title: toText(raw.title, '消息通知'),
+    message: toText(raw.message),
+    type: toText(raw.type, 'other'),
+    date: toText(raw.date),
+    read: Boolean(raw.read),
+    autoRead: Boolean(raw.autoRead),
+  };
+}
+
+function normalizeNotificationsList(list) {
+  if (!Array.isArray(list)) return [];
+  return list.map(normalizeNotification).filter(Boolean);
+}
+
 // 从 localStorage 读取已有通知列表用于初始化（避免刷新时列表从空闪到有数据）
 function getStoredNotifications() {
   try {
     const stored = localStorage.getItem(NOTIFICATIONS_KEY);
     if (stored) {
-      const parsed = JSON.parse(stored);
-      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      const parsed = normalizeNotificationsList(JSON.parse(stored));
+      if (parsed.length > 0) return parsed;
     }
   } catch { /* ignore */ }
   return [];
@@ -206,10 +233,8 @@ export function NotificationProvider({ children }) {
               try {
                 const cached = localStorage.getItem(NOTIFICATIONS_KEY);
                 if (cached) {
-                  const parsed = JSON.parse(cached);
-                  if (Array.isArray(parsed)) {
-                    readSet = new Set(parsed.filter((n) => n.read).map((n) => n.id));
-                  }
+                  const parsed = normalizeNotificationsList(JSON.parse(cached));
+                  readSet = new Set(parsed.filter((n) => n.read).map((n) => n.id));
                 }
               } catch { /* ignore */ }
             } else if (readData) {
@@ -249,7 +274,7 @@ export function NotificationProvider({ children }) {
           // 5 秒内自动已读的阈值（单位: 毫秒）
           // 正常用户不可能在一条通知产生后 5 秒内手动点击已读，所以超短间隔一定是系统自动标记的
           const AUTO_READ_THRESHOLD_MS = 5000;
-          const mapped = filtered.map((n) => {
+          const mapped = filtered.map((n, index) => {
             // 先按本地记录判断（老数据兜底）
             let isAuto = autoReadSet.has(String(n.id));
             // 再按云端 read_at 与 created_at 间隔判断（跨设备也可靠）
@@ -262,7 +287,7 @@ export function NotificationProvider({ children }) {
                 }
               }
             }
-            return {
+            return normalizeNotification({
               id: n.id,
               title: n.title,
               message: n.message,
@@ -270,8 +295,8 @@ export function NotificationProvider({ children }) {
               date: n.date,
               read: readSet.has(n.id),
               autoRead: isAuto,
-            };
-          });
+            }, index);
+          }).filter(Boolean);
 
           // 并发保护：如果在等待期间有更新的请求发起了，丢弃本次旧响应
           if (!isLatest()) {
@@ -317,9 +342,9 @@ export function NotificationProvider({ children }) {
     try {
       const stored = localStorage.getItem(NOTIFICATIONS_KEY);
       if (stored) {
-        const parsed = JSON.parse(stored);
+        const parsed = normalizeNotificationsList(JSON.parse(stored));
         // 只有解析后确实有数据才使用，空数组视为无数据
-        if (Array.isArray(parsed) && parsed.length > 0) {
+        if (parsed.length > 0) {
           notifs = parsed;
         }
       }
@@ -328,7 +353,7 @@ export function NotificationProvider({ children }) {
     }
     if (!notifs) {
       if (allowDefault) {
-        notifs = notificationsData;
+        notifs = normalizeNotificationsList(notificationsData);
         try {
           localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(notifs));
         } catch { /* ignore */ }
@@ -342,7 +367,7 @@ export function NotificationProvider({ children }) {
       console.log('[Notification] 本地模式加载:', notifs.length, '条通知（来自本地缓存）');
     }
     // 本地模式：过滤 target_role（非管理员看不到 admin-only 通知）
-    const filtered = notifs.filter((n) => {
+    const filtered = normalizeNotificationsList(notifs).filter((n) => {
       if (!n.target_role) return true;
       return n.target_role === 'admin' && isAdminRef.current;
     });
@@ -408,7 +433,7 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     const lastEmail = localStorage.getItem(LAST_EMAIL_KEY);
     const weekStart = getWeekStart();
-    const notificationList = Array.isArray(notifications) ? notifications : [];
+    const notificationList = normalizeNotificationsList(notifications);
     const unreadCount = notificationList.filter((n) => !n.read).length;
 
     if (unreadCount > 0) {
@@ -422,7 +447,7 @@ export function NotificationProvider({ children }) {
     }
   }, [notifications]);
 
-  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  const safeNotifications = normalizeNotificationsList(notifications);
   const unreadCount = safeNotifications.filter((n) => !n.read).length;
 
   // 未读消息数 + 当前路由 + 侧栏 Tab 名 → 同步到网页标题

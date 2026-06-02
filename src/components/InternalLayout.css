@@ -158,10 +158,12 @@
   line-height: 1.5;
 }
 
+/* 头部操作按钮组也要和单个主按钮保持同一顶线：
+   组整体下移 4px，组内按钮不再各自叠加 margin。 */
 .internal-layout__content .ia-list__header-actions,
 .internal-layout__content .content-mgmt__header-actions {
   align-items: flex-start;
-  margin-top: 0;
+  margin-top: 4px;
 }
 
 /* 内部空间各 Tab 顶部主操作按钮统一尺寸。
@@ -210,7 +212,7 @@
 
 .internal-layout__content .ia-list__header-actions .btn,
 .internal-layout__content .content-mgmt__header-actions .btn {
-  margin-top: 4px;
+  margin-top: 0;
 }
 
 .internal-layout__content .msc-topbar__actions .btn-primary {
@@ -342,7 +344,6 @@
     color: var(--color-primary-dark);
     background: #fff;
     border-color: rgba(255, 255, 255, 0.9);
-    box-shadow: 0 4px 12px rgba(31, 58, 37, 0.18);
     font-weight: 600;
   }
 
