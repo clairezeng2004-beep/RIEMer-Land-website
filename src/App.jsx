@@ -51,9 +51,9 @@ const FULLSCREEN_PATHS = [
   '/internal/process-templates/view/',
 ];
 
-function RouteSkeleton() {
+function PublicRouteSkeleton() {
   return (
-    <div className="route-skeleton" aria-label="页面加载中" aria-busy="true">
+    <div className="route-skeleton route-skeleton--public" aria-label="页面加载中" aria-busy="true">
       <section className="route-skeleton__hero">
         <div className="container">
           <div className="route-skeleton__title route-skeleton__shimmer" />
@@ -81,6 +81,45 @@ function RouteSkeleton() {
       </section>
     </div>
   );
+}
+
+function InternalRouteSkeleton() {
+  return (
+    <div className="route-skeleton route-skeleton--internal" aria-label="页面加载中" aria-busy="true">
+      <aside className="route-skeleton__sidebar" aria-hidden="true">
+        <div className="route-skeleton__brand route-skeleton__shimmer" />
+        {Array.from({ length: 10 }).map((_, index) => (
+          <div key={index} className="route-skeleton__nav-item route-skeleton__shimmer" />
+        ))}
+      </aside>
+      <section className="route-skeleton__internal-content">
+        <div className="route-skeleton__internal-header">
+          <div>
+            <div className="route-skeleton__title route-skeleton__shimmer" />
+            <div className="route-skeleton__line route-skeleton__line--wide route-skeleton__shimmer" />
+          </div>
+          <div className="route-skeleton__button route-skeleton__shimmer" />
+        </div>
+        <div className="route-skeleton__toolbar route-skeleton__shimmer" />
+        <div className="route-skeleton__grid route-skeleton__grid--internal">
+          {Array.from({ length: 8 }).map((_, index) => (
+            <div key={index} className="route-skeleton__card">
+              <div className="route-skeleton__card-body">
+                <div className="route-skeleton__line route-skeleton__line--tiny route-skeleton__shimmer" />
+                <div className="route-skeleton__line route-skeleton__shimmer" />
+                <div className="route-skeleton__line route-skeleton__line--wide route-skeleton__shimmer" />
+                <div className="route-skeleton__line route-skeleton__line--short route-skeleton__shimmer" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function RouteSkeleton({ isInternal }) {
+  return isInternal ? <InternalRouteSkeleton /> : <PublicRouteSkeleton />;
 }
 
 function AppShell() {
@@ -139,7 +178,7 @@ function AppShell() {
       <ScrollToTop />
       {!isFullscreen && <Navbar />}
       <main>
-        <Suspense fallback={<RouteSkeleton />}>
+        <Suspense fallback={<RouteSkeleton isInternal={isInternal} />}>
           {isInternal ? (
             <NotificationRulesProvider>{routes}</NotificationRulesProvider>
           ) : (
