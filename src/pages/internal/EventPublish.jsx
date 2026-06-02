@@ -284,11 +284,15 @@ export default function EventPublish() {
     events.forEach((e) => {
       const d = new Date(e.date);
       d.setHours(0, 0, 0, 0);
-      if (d >= today) upcoming.push(e);
+      // 日期缺失/非法 → Invalid Date，统一归到「过去」，避免后续 localeCompare 崩溃
+      if (!Number.isNaN(d.getTime()) && d >= today) upcoming.push(e);
       else past.push(e);
     });
-    upcoming.sort((a, b) => a.date.localeCompare(b.date));
-    past.sort((a, b) => b.date.localeCompare(a.date));
+    // 用 (x.date || '') 兜底：历史/异常数据里 date 可能为 null/undefined，
+    // 直接 a.date.localeCompare 会抛 "Cannot read properties of undefined"，
+    // 在 useMemo（渲染期）抛错会被 ErrorBoundary 捕获成「页面加载出错了」。
+    upcoming.sort((a, b) => (a.date || '').localeCompare(b.date || ''));
+    past.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
     return [...upcoming, ...past];
   }, [events]);
 
@@ -297,7 +301,7 @@ export default function EventPublish() {
     return sortedEvents.filter((e) => {
       const matchesSearch =
         !searchTerm ||
-        e.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (e.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (e.excerpt || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (e.location || '').toLowerCase().includes(searchTerm.toLowerCase());
       const matchesCat = selectedCategory === '全部' || e.category === selectedCategory;
