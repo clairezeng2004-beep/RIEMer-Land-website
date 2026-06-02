@@ -461,8 +461,8 @@ export default function InternalArticles() {
 
   const articleTagOptions = useMemo(() => {
     const filterLabels = [
-      ...existingTags.map(({ tag }) => tag),
       ...categories.filter((cat) => cat && cat !== '全部'),
+      ...existingTags.map(({ tag }) => tag),
     ];
     return [...new Set(filterLabels.filter(Boolean))]
       .map((tag) => ({ value: tag, label: tag }));

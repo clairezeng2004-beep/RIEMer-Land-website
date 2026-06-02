@@ -33,7 +33,7 @@ export default function Articles() {
     return ['全部', ...cats];
   }, [allArticles]);
 
-  // 从所有文章中动态提取标签（按出现频次降序排列）
+  // 筛选标签 = 系列 + 标签；系列放在前面，便于优先按文章系列浏览。
   const allTags = useMemo(() => {
     const tagCount = {};
     allArticles.forEach((a) => {
@@ -41,10 +41,11 @@ export default function Articles() {
         tagCount[t] = (tagCount[t] || 0) + 1;
       });
     });
-    return Object.entries(tagCount)
+    const tags = Object.entries(tagCount)
       .sort((a, b) => b[1] - a[1])
       .map(([tag]) => tag);
-  }, [allArticles]);
+    return [...new Set([...categories.filter((cat) => cat && cat !== '全部'), ...tags])];
+  }, [allArticles, categories]);
 
   const filtered = useMemo(() => {
     return allArticles.filter((article) => {
@@ -58,7 +59,9 @@ export default function Articles() {
       const matchesCategory =
         selectedCategory === '全部' || article.category === selectedCategory;
       const matchesTag =
-        selectedTag === '全部' || (article.tags || []).includes(selectedTag);
+        selectedTag === '全部' ||
+        article.category === selectedTag ||
+        (article.tags || []).includes(selectedTag);
       return matchesSearch && matchesCategory && matchesTag;
     });
   }, [searchTerm, selectedCategory, selectedTag]);

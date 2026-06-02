@@ -132,7 +132,7 @@ export default function ContentManagement() {
   const articleTagOptions = useMemo(() => {
     const tagLabels = userArticles.flatMap((article) => article.tags || []);
     const seriesLabels = userArticles.map((article) => article.category).filter(Boolean);
-    return [...new Set([...tagLabels, ...seriesLabels].filter(Boolean))]
+    return [...new Set([...seriesLabels, ...tagLabels].filter(Boolean))]
       .map((tag) => ({ value: tag, label: tag }));
   }, [userArticles]);
 
