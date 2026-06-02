@@ -281,8 +281,8 @@
     position: sticky;
     top: 64px;
     z-index: 50;
-    background: var(--color-primary);
-    border-bottom: 1px solid var(--color-primary-dark);
+    background: var(--color-bg);
+    border-bottom: 1px solid var(--color-bg);
     padding: 10px 12px 8px;
     margin-bottom: -8px;
     overflow-x: auto;
