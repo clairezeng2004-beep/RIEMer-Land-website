@@ -340,11 +340,18 @@
     background: rgba(255, 255, 255, 0.92);
   }
 
+  /* 选中态：绿色实心胶囊 + 白色文字，让用户一眼看出当前所在 tab，
+     不再是与白色背景几乎无差别的白底（之前只居中、无明显视觉反馈）。 */
   .internal-mobile-nav__item--active {
-    color: var(--color-primary-dark);
-    background: #fff;
-    border-color: rgba(255, 255, 255, 0.9);
+    color: #fff;
+    background: var(--color-primary);
+    border-color: var(--color-primary);
     font-weight: 600;
+  }
+
+  .internal-mobile-nav__item--active:hover {
+    color: #fff;
+    background: var(--color-primary);
   }
 
   .internal-mobile-nav__item svg {
@@ -377,6 +384,35 @@
   .internal-mobile-nav {
     top: 56px;
   }
+}
+
+/* ============================================
+   各 tab 头部「描述行」按自然语义断句（所有设备）
+   --------------------------------------------
+   问题：默认 CJK 折行允许在任意两个汉字之间断开，常把"心得""汇聚"这种
+   两字词从中间拆成两行，读起来很别扭。
+   方案：word-break: keep-all 让连续汉字视作不可断的整体，断行机会只落在
+   标点（，、。等）和空格处 —— 于是每个小句尽量整句放在一行，放不下时
+   整句换到下一行，符合正常阅读习惯。
+   说明：只作用于头部描述 p，不影响正文/表格；overflow-wrap 作兜底，
+   防止极端超长无标点句溢出容器。
+   ============================================ */
+.internal-layout__content .documents-page__header p,
+.internal-layout__content .tasks-page__header p,
+.internal-layout__content .gallery-page__header p,
+.internal-layout__content .guestbook-page__header p,
+.internal-layout__content .suggestions-page__header p,
+.internal-layout__content .ms-page__header p,
+.internal-layout__content .mc-page__header p,
+.internal-layout__content .member-profiles-page__header p,
+.internal-layout__content .notifications-page__header p,
+.internal-layout__content .ia-list__header p,
+.internal-layout__content .profile-page__header p,
+.internal-layout__content .users-page__header p,
+.internal-layout__content .notif-mgmt__header p,
+.internal-layout__content .content-mgmt__header p {
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* ============================================
