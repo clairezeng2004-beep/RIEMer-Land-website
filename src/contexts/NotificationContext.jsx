@@ -48,6 +48,7 @@ function getWeekStart(date = new Date()) {
 
 // 比较两个通知数组是否等价（避免无变化时触发 setState 导致闪动）
 function notificationsEqual(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b)) return false;
   if (a.length !== b.length) return false;
   for (let i = 0; i < a.length; i++) {
     if (a[i].id !== b[i].id || a[i].read !== b[i].read || a[i].title !== b[i].title || a[i].message !== b[i].message || a[i].type !== b[i].type || a[i].date !== b[i].date) {
@@ -112,7 +113,7 @@ export function NotificationProvider({ children }) {
     // 未登录访客不需要消息通知。移动端公开页刷新时跳过这组 Supabase
     // 查询，避免首页还没交互就被内部空间通知链路拖慢。
     if (!userIdRef.current) {
-      setNotifications((prev) => (prev.length === 0 ? prev : []));
+      setNotifications((prev) => (Array.isArray(prev) && prev.length === 0 ? prev : []));
       setReads(new Set());
       setLoaded(true);
       lastLoadAtRef.current = Date.now();
@@ -407,7 +408,8 @@ export function NotificationProvider({ children }) {
   useEffect(() => {
     const lastEmail = localStorage.getItem(LAST_EMAIL_KEY);
     const weekStart = getWeekStart();
-    const unreadCount = notifications.filter((n) => !n.read).length;
+    const notificationList = Array.isArray(notifications) ? notifications : [];
+    const unreadCount = notificationList.filter((n) => !n.read).length;
 
     if (unreadCount > 0) {
       if (!lastEmail || new Date(lastEmail) < weekStart) {
@@ -420,7 +422,8 @@ export function NotificationProvider({ children }) {
     }
   }, [notifications]);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const safeNotifications = Array.isArray(notifications) ? notifications : [];
+  const unreadCount = safeNotifications.filter((n) => !n.read).length;
 
   // 未读消息数 + 当前路由 + 侧栏 Tab 名 → 同步到网页标题
   // 规则详见 src/lib/pageTitle.js：
@@ -439,7 +442,7 @@ export function NotificationProvider({ children }) {
   const markAsRead = useCallback(async (id) => {
     // 立即更新本地状态
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+      (Array.isArray(prev) ? prev : []).map((n) => (n.id === id ? { ...n, read: true } : n))
     );
 
     if (useSupabase) {
@@ -481,7 +484,7 @@ export function NotificationProvider({ children }) {
 
   // ---- 全部标记已读 ----
   const markAllAsRead = useCallback(async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, read: true })));
 
     if (useSupabase) {
       try {
@@ -490,7 +493,7 @@ export function NotificationProvider({ children }) {
           console.warn('[Notification] 全部标记已读：当前未登录，云端同步跳过');
           return;
         }
-        const unread = notifications.filter((n) => !n.read);
+        const unread = safeNotifications.filter((n) => !n.read);
         if (unread.length > 0) {
           const now = new Date().toISOString();
           const rows = unread.map((n) => ({
@@ -522,7 +525,7 @@ export function NotificationProvider({ children }) {
         console.warn('[Notification] 本地全部标记已读持久化失败:', err.message);
       }
     }
-  }, [useSupabase, notifications]);
+  }, [useSupabase, safeNotifications]);
 
   // ---- 添加通知 ----
   const addNotification = useCallback(async (notification) => {
@@ -594,13 +597,13 @@ export function NotificationProvider({ children }) {
     }
     // 更新 state（已过滤）
     if (!newNotif.target_role || (newNotif.target_role === 'admin' && isAdmin)) {
-      setNotifications((prev) => [newNotif, ...prev]);
+      setNotifications((prev) => [newNotif, ...(Array.isArray(prev) ? prev : [])]);
     }
   };
 
   // ---- 删除通知 ----
   const deleteNotification = useCallback(async (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setNotifications((prev) => (Array.isArray(prev) ? prev : []).filter((n) => n.id !== id));
 
     if (useSupabase) {
       try {
@@ -624,7 +627,7 @@ export function NotificationProvider({ children }) {
   return (
     <NotificationContext.Provider
       value={{
-        notifications,
+        notifications: safeNotifications,
         unreadCount,
         loaded,
         markAsRead,

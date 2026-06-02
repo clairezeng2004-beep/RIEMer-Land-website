@@ -50,7 +50,8 @@ export default function Notifications() {
     return <Navigate to="/login" replace />;
   }
 
-  const filtered = notifications.filter((n) => {
+  const notificationList = Array.isArray(notifications) ? notifications : [];
+  const filtered = notificationList.filter(Boolean).filter((n) => {
     if (filter === '未读') return !n.read;
     if (filter === '已读') return n.read;
     return true;
@@ -112,7 +113,7 @@ export default function Notifications() {
         {/* 通知列表 */}
         <div className={`notifications-list ${loaded ? 'notifications-list--loaded' : ''}`}>
           {filtered.map((notif) => {
-            const config = typeConfig[notif.type] || typeConfig.other;
+            const config = typeConfig[notif?.type] || typeConfig.other;
             const Icon = config.icon;
             return (
               <div
@@ -130,7 +131,7 @@ export default function Notifications() {
                   <div className="notification-item__top">
                     <h4 className="notification-item__title">
                       {!notif.read && <span className="notification-item__dot" />}
-                      {notif.title}
+                      {notif.title || '消息通知'}
                     </h4>
                     <span
                       className="notification-item__type"
@@ -139,10 +140,10 @@ export default function Notifications() {
                       {config.label}
                     </span>
                   </div>
-                  <p className="notification-item__message">{notif.message}</p>
+                  <p className="notification-item__message">{notif.message || ''}</p>
                   <div className="notification-item__meta">
                     <span className="notification-item__date">
-                      <Clock size={12} /> {notif.date}
+                      <Clock size={12} /> {notif.date || ''}
                     </span>
                     {notif.read && (
                       <span className={`notification-item__read${(notif.autoRead || notif.title?.startsWith('文档已删除')) ? ' notification-item__read--auto' : ''}`}>
