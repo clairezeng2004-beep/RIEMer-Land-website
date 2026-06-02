@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -128,6 +128,13 @@ export default function ContentManagement() {
   const [fetchError, setFetchError] = useState('');
   const [editingArticle, setEditingArticle] = useState(null); // 正在编辑的文章（新建或修改）
   const [editingArticleId, setEditingArticleId] = useState(null); // 正在编辑的已有文章 ID
+
+  const articleTagOptions = useMemo(() => {
+    const tagLabels = userArticles.flatMap((article) => article.tags || []);
+    const seriesLabels = userArticles.map((article) => article.category).filter(Boolean);
+    return [...new Set([...tagLabels, ...seriesLabels].filter(Boolean))]
+      .map((tag) => ({ value: tag, label: tag }));
+  }, [userArticles]);
 
   // 活动管理状态
   const [editingEvent, setEditingEvent] = useState(null); // 新建/编辑中的活动
@@ -937,18 +944,18 @@ export default function ContentManagement() {
 
                       <div className="content-mgmt__field content-mgmt__field--ai">
                         <label>
-                          <Tag size={14} /> 标签（逗号分隔）
+                          <Tag size={14} /> 标签
                           {editingArticle.url && <span className="content-mgmt__ai-badge">✨ AI 生成 · 可修改</span>}
                         </label>
-                        <input
-                          type="text"
-                          value={editingArticle.tags.join('、')}
-                          onChange={(e) => setEditingArticle({
-                            ...editingArticle,
-                            tags: e.target.value.split(/[,，、]/).map(t => t.trim()).filter(Boolean),
-                          })}
+                        <CustomSelect
+                          value={editingArticle.tags || []}
+                          onChange={(tags) => setEditingArticle({ ...editingArticle, tags })}
+                          options={articleTagOptions}
                           className="content-mgmt__input"
-                          placeholder="如：保研、经验分享、学术"
+                          placeholder="选择标签"
+                          multiple
+                          searchable
+                          searchPlaceholder="搜索标签…"
                         />
                       </div>
 
@@ -1096,15 +1103,15 @@ export default function ContentManagement() {
                                 <Tag size={14} /> 标签
                                 <span className="content-mgmt__ai-badge">✨ AI 生成 · 可修改</span>
                               </label>
-                              <input
-                                type="text"
-                                value={editingArticle.tags.join('、')}
-                                onChange={(e) => setEditingArticle({
-                                  ...editingArticle,
-                                  tags: e.target.value.split(/[,，、]/).map(t => t.trim()).filter(Boolean),
-                                })}
+                              <CustomSelect
+                                value={editingArticle.tags || []}
+                                onChange={(tags) => setEditingArticle({ ...editingArticle, tags })}
+                                options={articleTagOptions}
                                 className="content-mgmt__input"
-                                placeholder="如：保研、经验分享、学术"
+                                placeholder="选择标签"
+                                multiple
+                                searchable
+                                searchPlaceholder="搜索标签…"
                               />
                             </div>
                             <div className="content-mgmt__field content-mgmt__field--ai">

@@ -48,12 +48,6 @@ const DEFAULT_ARTICLE_CATEGORIES = [
   { key: 'experience', label: '经验分享', color: '#F59E0B' },
 ];
 
-const DEFAULT_ARTICLE_TAGS = [
-  '保研', '考研', '留学', '求职', '实习', '课程测评',
-  '经验分享', '互联网', '金融', '经济学', '学术', '数学建模',
-  '辩论赛', '招新',
-];
-
 function loadArticleCategories() {
   try {
     const stored = localStorage.getItem(ARTICLE_CATEGORIES_KEY);
@@ -422,17 +416,6 @@ export default function InternalArticles() {
       .map(([tag, count]) => ({ tag, count }));
   }, [allArticles]);
 
-  const articleTagOptions = useMemo(() => {
-    const tags = [
-      ...DEFAULT_ARTICLE_TAGS,
-      ...existingTags.map(({ tag }) => tag),
-      ...editTags,
-      ...archiveEditTags,
-    ];
-    return [...new Set(tags.filter(Boolean))]
-      .map((tag) => ({ value: tag, label: tag }));
-  }, [archiveEditTags, editTags, existingTags]);
-
   const articleTaskOptions = useMemo(() => {
     const usedWorkItemIds = new Set(
       userArticles.map((article) => article.workItemId).filter(Boolean),
@@ -475,6 +458,15 @@ export default function InternalArticles() {
       .map((cat) => ({ value: cat, label: cat }));
     return [{ value: '', label: '无系列' }, ...options, { value: '__new__', label: '＋ 新建系列…' }];
   }, [categories]);
+
+  const articleTagOptions = useMemo(() => {
+    const filterLabels = [
+      ...existingTags.map(({ tag }) => tag),
+      ...categories.filter((cat) => cat && cat !== '全部'),
+    ];
+    return [...new Set(filterLabels.filter(Boolean))]
+      .map((tag) => ({ value: tag, label: tag }));
+  }, [categories, existingTags]);
 
   const seriesTitlePrefixes = useMemo(
     () => categoryList.map((cat) => cat.label).filter((label) => label && label.includes('系列')),
