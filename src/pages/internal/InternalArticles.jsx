@@ -14,12 +14,13 @@ import {
   generateSummaryAI,
   inferCategory,
   inferTags,
+  cleanTitle,
 } from '../../services/articleService';
 import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
   Plus, Link2, Loader2, X, Check, Tag, AlertCircle,
   ChevronDown, ChevronUp, Pencil, Settings2, Trash2, Palette,
-  CheckSquare, Sparkles, Eye, ClipboardPaste, Wand2,
+  CheckSquare, Sparkles, Eye, ClipboardPaste, Wand2, ImagePlus,
 } from 'lucide-react';
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
@@ -52,6 +53,39 @@ function loadArticleCategories() {
 
 function saveArticleCategories(data) {
   localStorage.setItem(ARTICLE_CATEGORIES_KEY, JSON.stringify(data));
+}
+
+// ---- 封面图片上传 ----
+// 封面直接存 base64 Data URL，随文章的 coverImage/cover_image 字段一起保存。
+// 限制 2MB，避免单条记录过大撑爆 localStorage / 云端字段。
+const COVER_MAX_SIZE = 2 * 1024 * 1024;
+
+function fileToDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+// 读取并校验封面图片，返回 Data URL；不合法时 alert 并返回 null
+async function readCoverImage(file) {
+  if (!file) return null;
+  if (!file.type || !file.type.startsWith('image/')) {
+    alert('请选择图片文件（jpg / png / webp 等）');
+    return null;
+  }
+  if (file.size > COVER_MAX_SIZE) {
+    alert('封面图片需小于 2MB，请压缩后再上传');
+    return null;
+  }
+  try {
+    return await fileToDataUrl(file);
+  } catch {
+    alert('图片读取失败，请重试');
+    return null;
+  }
 }
 
 // 双写：本地 + 云端（site_settings.article_categories），便于跨设备同步
@@ -410,6 +444,11 @@ export default function InternalArticles() {
     return [...options, { value: '__new__', label: '＋ 新建分类…' }];
   }, [categories]);
 
+  const seriesTitlePrefixes = useMemo(
+    () => categoryList.map((cat) => cat.label).filter((label) => label && label.includes('系列')),
+    [categoryList],
+  );
+
   // ---- 分类 CRUD ----
   const handleAddCategory = () => {
     const label = newCatLabel.trim();
@@ -606,10 +645,15 @@ export default function InternalArticles() {
 
     try {
       const parsed = await fetchAndParseArticle(url);
-      setDraft(parsed);
+      const cleanedTitle = cleanTitle(parsed.rawTitle || parsed.title, [
+        ...seriesTitlePrefixes,
+        parsed.category,
+      ]);
+      const parsedWithCleanTitle = { ...parsed, title: cleanedTitle || parsed.title };
+      setDraft(parsedWithCleanTitle);
       // 如果是从 Tasks 页带着 suggestedTitle 跳过来的，优先用抓取到的标题；
       // 抓取标题为空时用 suggestedTitle 兜底，避免用户要手动再输一次。
-      setEditTitle(parsed.title || pendingSuggestedTitle || '');
+      setEditTitle(parsedWithCleanTitle.title || pendingSuggestedTitle || '');
       setEditCategory(parsed.category);
       setConfirmNewCategory('');
       // 不再用推断标签预选：留空让用户自行从「已有标签」里挑或手动新增
@@ -700,7 +744,7 @@ export default function InternalArticles() {
       rawTitle: draft.rawTitle || '',
       author: draft.author || 'RIEMer Land',
       avatar: null,
-      coverImage: null,
+      coverImage: draft.coverImage || null,
       date: draft.date,
       category: finalCategory,
       tags: editTags,
@@ -898,6 +942,7 @@ export default function InternalArticles() {
       excerpt: editingArchive.excerpt.trim(),
       url: editingArchive.url || '',
       author: editingArchive.author || 'RIEMer Land',
+      coverImage: editingArchive.coverImage || null,
     };
 
     if (!updates.title) {
@@ -1567,6 +1612,41 @@ export default function InternalArticles() {
                     )}
                   </div>
 
+                  {/* 封面图片：首页/文章列表卡片展示用 */}
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">
+                      <ImagePlus size={16} /> 封面图片
+                    </label>
+                    {draft.coverImage ? (
+                      <div className="ia-cover-uploader__preview">
+                        <img src={draft.coverImage} alt="封面预览" />
+                        <button
+                          type="button"
+                          className="ia-cover-uploader__remove"
+                          onClick={() => setDraft((prev) => ({ ...prev, coverImage: '' }))}
+                        >
+                          <X size={14} /> 移除
+                        </button>
+                      </div>
+                    ) : (
+                      <label className="ia-cover-uploader__drop">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          hidden
+                          onChange={async (e) => {
+                            const dataUrl = await readCoverImage(e.target.files?.[0]);
+                            if (dataUrl) setDraft((prev) => ({ ...prev, coverImage: dataUrl }));
+                            e.target.value = '';
+                          }}
+                        />
+                        <ImagePlus size={22} />
+                        <span>点击上传封面图片</span>
+                        <span className="ia-cover-uploader__hint">支持 jpg / png / webp，小于 2MB</span>
+                      </label>
+                    )}
+                  </div>
+
                   {/* 元信息 */}
                   <div className="ia-modal__meta-row">
                     <span><Calendar size={14} /> {draft.date}</span>
@@ -1699,6 +1779,41 @@ export default function InternalArticles() {
                     onChange={(e) => setEditingArchive({ ...editingArchive, url: e.target.value })}
                     placeholder="公众号文章链接"
                   />
+                </div>
+
+                {/* 封面图片：首页/文章列表卡片展示用 */}
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <ImagePlus size={14} /> 封面图片
+                  </label>
+                  {editingArchive.coverImage ? (
+                    <div className="ia-cover-uploader__preview">
+                      <img src={editingArchive.coverImage} alt="封面预览" />
+                      <button
+                        type="button"
+                        className="ia-cover-uploader__remove"
+                        onClick={() => setEditingArchive({ ...editingArchive, coverImage: '' })}
+                      >
+                        <X size={14} /> 移除
+                      </button>
+                    </div>
+                  ) : (
+                    <label className="ia-cover-uploader__drop">
+                      <input
+                        type="file"
+                        accept="image/*"
+                        hidden
+                        onChange={async (e) => {
+                          const dataUrl = await readCoverImage(e.target.files?.[0]);
+                          if (dataUrl) setEditingArchive((prev) => ({ ...prev, coverImage: dataUrl }));
+                          e.target.value = '';
+                        }}
+                      />
+                      <ImagePlus size={22} />
+                      <span>点击上传封面图片</span>
+                      <span className="ia-cover-uploader__hint">支持 jpg / png / webp，小于 2MB</span>
+                    </label>
+                  )}
                 </div>
               </div>
             </div>

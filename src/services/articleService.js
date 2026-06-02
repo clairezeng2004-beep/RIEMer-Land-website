@@ -9,20 +9,53 @@
 // ========== 常见标题前缀（自动删减） ==========
 const TITLE_PREFIXES = [
   /^听\s*RIEMer\s*说\s*[|｜·丨:：]\s*/i,
+  /^RIEMer\s*小记\s*[|｜·丨:：]\s*/i,
   /^RIEMer\s*Land\s*[|｜·丨:：]\s*/i,
   /^RIEMer['']?s?\s*Space\s*[|｜·丨:：]\s*/i,
   /^RIEMer\s*课程测评\s*[|｜·丨:：]\s*/i,
   /^「听\s*RIEMer\s*说」\s*/,
+  /^「RIEMer\s*小记」\s*/,
   /^「RIEMer\s*Land」\s*/,
   /^【.*?】\s*/,
 ];
 
+function escapeRegExp(str) {
+  return String(str).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function buildDynamicPrefixRegex(prefix) {
+  const source = String(prefix || '').trim();
+  if (!source) return null;
+  const flexibleSource = source.split(/\s+/).map(escapeRegExp).join('\\s*');
+  return new RegExp(
+    `^(?:[「【《]?\\s*${flexibleSource}\\s*[」】》]?)(?:\\s*[|｜·丨:：\\-—]\\s*|\\s+)`,
+    'i',
+  );
+}
+
+function normalizeDynamicPrefixes(prefixes = []) {
+  const normalized = [];
+  for (const prefix of prefixes) {
+    const value = String(prefix || '').trim();
+    if (!value) continue;
+    normalized.push(value);
+    if (value.endsWith('系列')) {
+      const withoutSeries = value.replace(/\s*系列$/, '').trim();
+      if (withoutSeries) normalized.push(withoutSeries);
+    }
+  }
+  return [...new Set(normalized)];
+}
+
 /**
  * 删减标题前缀
  */
-export function cleanTitle(rawTitle) {
-  let title = rawTitle.trim();
-  for (const prefix of TITLE_PREFIXES) {
+export function cleanTitle(rawTitle, dynamicPrefixes = []) {
+  let title = String(rawTitle || '').trim();
+  const dynamicTitlePrefixes = normalizeDynamicPrefixes(dynamicPrefixes)
+    .map(buildDynamicPrefixRegex)
+    .filter(Boolean);
+  for (const prefix of [...dynamicTitlePrefixes, ...TITLE_PREFIXES]) {
     title = title.replace(prefix, '');
   }
   return title.trim();
