@@ -578,8 +578,11 @@
   color: var(--color-text-muted);
   box-shadow: var(--shadow-sm);
   cursor: pointer;
-  opacity: 0;
-  transform: translateY(-2px);
+  /* 默认就常驻可见（半透明），保证触屏设备（无 hover）也能发现并点到编辑入口。
+     之前是 opacity:0 仅靠 .ia-card:hover 显形 → 手机上永远看不到，体感「完全
+     不支持编辑」。桌面 hover 时再提到完全不透明，作为强化反馈。 */
+  opacity: 0.65;
+  transform: translateY(0);
   transition: all var(--transition-fast);
 }
 
@@ -587,6 +590,13 @@
 .ia-card__edit-btn:focus-visible {
   opacity: 1;
   transform: translateY(0);
+}
+
+/* 触屏设备：无 hover，直接常亮，避免半透明被误以为不可用 */
+@media (hover: none) {
+  .ia-card__edit-btn {
+    opacity: 1;
+  }
 }
 
 .ia-card__edit-btn:hover {

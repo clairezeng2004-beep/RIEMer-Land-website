@@ -301,6 +301,12 @@ export default function InternalArticles() {
   // 跨模块联动提示
   const [taskPrompt, setTaskPrompt] = useState(null);
 
+  // ---- 已归档文章编辑弹窗状态 ----
+  const [editingArchive, setEditingArchive] = useState(null);
+  const [archiveEditCategory, setArchiveEditCategory] = useState('');
+  const [archiveNewCategory, setArchiveNewCategory] = useState('');
+  const [archiveTagsInput, setArchiveTagsInput] = useState('');
+
   // ---- 批量阅读量录入弹窗 ----
   const [showReadNumModal, setShowReadNumModal] = useState(false);
   // { [articleId]: string }  保存用户输入的字符串，方便校验
@@ -321,6 +327,11 @@ export default function InternalArticles() {
   const allArticles = useMemo(
     () => [...userArticles, ...articlesData].sort((a, b) => b.date.localeCompare(a.date)),
     [userArticles]
+  );
+
+  const archivedArticleIds = useMemo(
+    () => new Set(userArticles.map((article) => article.id)),
+    [userArticles],
   );
 
   // ---- 异步批量加载每篇文章的评论数 ----
@@ -831,6 +842,72 @@ export default function InternalArticles() {
     }
   };
 
+  const openArchiveEditor = (article) => {
+    setEditingArchive({ ...article });
+    setArchiveEditCategory(article.category || '');
+    setArchiveNewCategory('');
+    setArchiveTagsInput((article.tags || []).join('、'));
+  };
+
+  const closeArchiveEditor = () => {
+    setEditingArchive(null);
+    setArchiveEditCategory('');
+    setArchiveNewCategory('');
+    setArchiveTagsInput('');
+  };
+
+  const handleSaveArchiveEdit = async () => {
+    if (!editingArchive) return;
+
+    const newCategoryLabel = archiveNewCategory.trim();
+    if (archiveEditCategory === '__new__' && !newCategoryLabel) {
+      alert('请输入新分类名称');
+      return;
+    }
+
+    let finalCategory = archiveEditCategory === '__new__'
+      ? newCategoryLabel
+      : (archiveEditCategory || editingArchive.category || '');
+
+    if (archiveEditCategory === '__new__' && newCategoryLabel) {
+      const existing = categories.find(
+        (cat) => cat !== '全部' && cat.trim().toLowerCase() === newCategoryLabel.toLowerCase(),
+      );
+      if (existing) {
+        finalCategory = existing;
+      } else {
+        const updated = [
+          ...categoryList,
+          {
+            key: 'acat_' + Date.now(),
+            label: newCategoryLabel,
+            color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
+          },
+        ];
+        setCategoryList(updated);
+        persistCategories(updated, lastCatSyncRef);
+      }
+    }
+
+    const updates = {
+      title: editingArchive.title.trim(),
+      date: editingArchive.date,
+      category: finalCategory,
+      tags: archiveTagsInput.split(/[,，、]/).map((tag) => tag.trim()).filter(Boolean),
+      excerpt: editingArchive.excerpt.trim(),
+      url: editingArchive.url || '',
+      author: editingArchive.author || 'RIEMer Land',
+    };
+
+    if (!updates.title) {
+      alert('请输入文章标题');
+      return;
+    }
+
+    await updateArticle(editingArchive.id, updates);
+    closeArchiveEditor();
+  };
+
   // 总阅读量（用于弹窗顶部汇总展示）
   const totalReadNum = useMemo(() => {
     return Object.values(readNumDraft).reduce(
@@ -1161,6 +1238,7 @@ export default function InternalArticles() {
             const commentCount = getCommentCount('article', article.id);
             // 归档文章卡片：优先跳转公众号原链接；如无原链接则回退站内详情页
             const hasExternal = !!(article.url && /^https?:\/\//i.test(article.url));
+            const canEditArchive = archivedArticleIds.has(article.id);
             const commonInner = (
               <div className="ia-card__body">
                 <span className="ia-card__category">{article.category}</span>
@@ -1181,27 +1259,40 @@ export default function InternalArticles() {
                 </div>
               </div>
             );
-            if (hasExternal) {
-              return (
-                <a
-                  key={article.id}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="ia-card card"
-                >
-                  {commonInner}
-                </a>
-              );
-            }
             return (
-              <Link
-                key={article.id}
-                to={`/internal/article/${article.id}`}
-                className="ia-card card"
-              >
-                {commonInner}
-              </Link>
+              <article key={article.id} className="ia-card card">
+                {canEditArchive && (
+                  <button
+                    type="button"
+                    className="ia-card__edit-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      openArchiveEditor(article);
+                    }}
+                    title="编辑归档信息"
+                  >
+                    <Pencil size={14} />
+                  </button>
+                )}
+                {hasExternal ? (
+                  <a
+                    href={article.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="ia-card__link"
+                  >
+                    {commonInner}
+                  </a>
+                ) : (
+                  <Link
+                    to={`/internal/article/${article.id}`}
+                    className="ia-card__link"
+                  >
+                    {commonInner}
+                  </Link>
+                )}
+              </article>
             );
           })}
         </div>
@@ -1482,6 +1573,123 @@ export default function InternalArticles() {
                 </button>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ========== 编辑归档弹窗 ========== */}
+      {editingArchive && (
+        <div className="ia-modal-overlay" onClick={closeArchiveEditor}>
+          <div className="ia-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ia-modal__header">
+              <h2>编辑归档信息</h2>
+              <button className="ia-modal__close" onClick={closeArchiveEditor}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ia-modal__body">
+              <div className="ia-modal__step-confirm">
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">标题</label>
+                  <input
+                    type="text"
+                    className="ia-modal__text-input"
+                    value={editingArchive.title}
+                    onChange={(e) => setEditingArchive({ ...editingArchive, title: e.target.value })}
+                  />
+                </div>
+
+                <div className="ia-modal__field-row">
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">
+                      <Calendar size={14} /> 发布日期
+                    </label>
+                    <input
+                      type="date"
+                      className="ia-modal__text-input"
+                      value={editingArchive.date || ''}
+                      onChange={(e) => setEditingArchive({ ...editingArchive, date: e.target.value })}
+                    />
+                  </div>
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">分类</label>
+                    <CustomSelect
+                      className="ia-modal__category-select"
+                      value={archiveEditCategory}
+                      onChange={(value) => {
+                        setArchiveEditCategory(value);
+                        if (value !== '__new__') setArchiveNewCategory('');
+                      }}
+                      options={articleCategoryOptions}
+                      placeholder="选择分类"
+                      searchable
+                      searchPlaceholder="搜索分类…"
+                    />
+                    {archiveEditCategory === '__new__' && (
+                      <input
+                        type="text"
+                        className="ia-modal__text-input"
+                        value={archiveNewCategory}
+                        onChange={(e) => setArchiveNewCategory(e.target.value)}
+                        placeholder="输入新分类名称，保存后会加入分类列表"
+                        maxLength={24}
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <Tag size={14} /> 标签
+                  </label>
+                  <input
+                    type="text"
+                    className="ia-modal__text-input"
+                    value={archiveTagsInput}
+                    onChange={(e) => setArchiveTagsInput(e.target.value)}
+                    placeholder="用逗号或顿号分隔标签"
+                  />
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">摘要</label>
+                  <textarea
+                    className="ia-modal__textarea"
+                    value={editingArchive.excerpt || ''}
+                    onChange={(e) => setEditingArchive({ ...editingArchive, excerpt: e.target.value })}
+                    rows={3}
+                    placeholder="编辑文章卡片展示摘要"
+                  />
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <Link2 size={14} /> 原文链接
+                  </label>
+                  <input
+                    type="url"
+                    className="ia-modal__text-input"
+                    value={editingArchive.url || ''}
+                    onChange={(e) => setEditingArchive({ ...editingArchive, url: e.target.value })}
+                    placeholder="公众号文章链接"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="ia-modal__footer">
+              <button className="btn btn-ghost" onClick={closeArchiveEditor}>
+                取消
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={handleSaveArchiveEdit}
+                disabled={!editingArchive.title.trim()}
+              >
+                <Check size={16} /> 保存修改
+              </button>
+            </div>
           </div>
         </div>
       )}
