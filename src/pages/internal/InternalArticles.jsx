@@ -460,13 +460,11 @@ export default function InternalArticles() {
   }, [categories]);
 
   const articleTagOptions = useMemo(() => {
-    const filterLabels = [
-      ...categories.filter((cat) => cat && cat !== '全部'),
-      ...existingTags.map(({ tag }) => tag),
-    ];
-    return [...new Set(filterLabels.filter(Boolean))]
+    return existingTags
+      .map(({ tag }) => tag)
+      .filter(Boolean)
       .map((tag) => ({ value: tag, label: tag }));
-  }, [categories, existingTags]);
+  }, [existingTags]);
 
   const seriesTitlePrefixes = useMemo(
     () => categoryList.map((cat) => cat.label).filter((label) => label && label.includes('系列')),
