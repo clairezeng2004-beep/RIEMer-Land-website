@@ -874,6 +874,22 @@
   color: currentColor;
 }
 
+/* 新建分类输入行：输入框占满 + 右侧「取消」返回下拉选择 */
+.ia-modal__new-cat-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.ia-modal__new-cat-row .ia-modal__text-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.ia-modal__new-cat-row .btn {
+  flex-shrink: 0;
+}
+
 .ia-modal__error {
   display: flex;
   align-items: center;

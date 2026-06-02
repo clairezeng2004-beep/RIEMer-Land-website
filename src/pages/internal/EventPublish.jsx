@@ -25,7 +25,15 @@ import {
   Pencil,
   Trash2,
   CheckSquare,
+  Link2,
+  Loader2,
+  Wand2,
 } from 'lucide-react';
+import {
+  fetchAndParseArticle,
+  generateSummaryAI,
+  generateSummaryLocal,
+} from '../../services/articleService';
 import {
   SITE_KEYS,
   fetchSetting,
@@ -219,6 +227,44 @@ export default function EventPublish() {
   const [isPublishingEvent, setIsPublishingEvent] = useState(false);
   // 新建活动弹窗内"其他"自定义分类临时值
   const [customCategoryInput, setCustomCategoryInput] = useState('');
+
+  // ---- 公众号链接一键提取（复用文章归档的抓取/摘要能力）----
+  // 用户先粘贴公众号推文链接，点「一键提取」后自动填入标题、日期、活动简介，
+  // 仍可手动修改。和「公众号历史文章归档」的提取体验保持一致。
+  const [extracting, setExtracting] = useState(false);
+  const [extractError, setExtractError] = useState('');
+
+  const handleExtractFromUrl = async () => {
+    const url = (draft.officialUrl || '').trim();
+    if (!url) {
+      setExtractError('请先填写公众号推文链接');
+      return;
+    }
+    setExtractError('');
+    setExtracting(true);
+    try {
+      const parsed = await fetchAndParseArticle(url);
+      // 活动简介：优先走 AI 摘要，失败则回退本地摘要，保证总能填上点东西
+      let excerpt = '';
+      try {
+        excerpt = await generateSummaryAI(parsed.title, parsed.content);
+      } catch {
+        excerpt = generateSummaryLocal(parsed.content, 120);
+      }
+      setDraft((prev) => ({
+        ...prev,
+        // 已手动填过标题就不覆盖，否则用抓取到的标题
+        title: prev.title && prev.title.trim() ? prev.title : (parsed.title || ''),
+        date: parsed.date || prev.date,
+        excerpt: excerpt || prev.excerpt,
+        officialUrl: url,
+      }));
+    } catch (err) {
+      setExtractError(err.message || '提取失败，请检查链接是否为公众号文章');
+    } finally {
+      setExtracting(false);
+    }
+  };
 
   // 跨模块预填：Tasks 页"未闭环清单 / 完成弹窗"带 workItemId + suggestedTitle
   // 跳过来时，自动打开新建弹窗并把标题预填上，确认发布时把 workItemId 写入 event。
@@ -445,6 +491,8 @@ export default function EventPublish() {
     setDraft({ ...EMPTY_EVENT, category: defaultCat });
     setCustomCategoryInput('');
     setFormError('');
+    setExtractError('');
+    setExtracting(false);
     setShowModal(true);
   };
 
@@ -454,6 +502,8 @@ export default function EventPublish() {
     setDraft(EMPTY_EVENT);
     setCustomCategoryInput('');
     setFormError('');
+    setExtractError('');
+    setExtracting(false);
   };
 
   const handleSave = async () => {
@@ -1046,18 +1096,61 @@ export default function EventPublish() {
                   />
                 </div>
 
-                {/* 公众号推文链接 */}
+                {/* 公众号推文链接 + 一键提取 */}
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">
                     <ExternalLink size={14} /> 公众号推文链接
                   </label>
-                  <input
-                    type="url"
-                    className="ia-modal__text-input"
-                    placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
-                    value={draft.officialUrl}
-                    onChange={(e) => setDraft({ ...draft, officialUrl: e.target.value })}
-                  />
+                  <div className="ia-modal__url-row">
+                    <div className="ia-modal__url-input-wrap">
+                      <Link2 size={18} className="ia-modal__url-icon" />
+                      <input
+                        type="url"
+                        className="ia-modal__url-input"
+                        placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
+                        value={draft.officialUrl}
+                        onChange={(e) => setDraft({ ...draft, officialUrl: e.target.value })}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !extracting && draft.officialUrl.trim()) {
+                            e.preventDefault();
+                            handleExtractFromUrl();
+                          }
+                        }}
+                        disabled={extracting}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary ia-modal__fetch-btn"
+                      onClick={handleExtractFromUrl}
+                      disabled={extracting || !draft.officialUrl.trim()}
+                    >
+                      {extracting ? (
+                        <>
+                          <Loader2 size={14} className="ia-modal__spinner" />
+                          <span>提取中</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 size={14} />
+                          <span>一键提取</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {extractError && (
+                    <div className="ia-modal__error" style={{ marginTop: 8 }}>
+                      <AlertCircle size={16} /> {extractError}
+                    </div>
+                  )}
+                  <p style={{
+                    fontSize: 12,
+                    color: 'var(--color-text-muted)',
+                    marginTop: 8,
+                    lineHeight: 1.6,
+                  }}>
+                    粘贴公众号推文链接后点「一键提取」，系统会自动填入标题、活动日期与活动简介；提取后仍可手动修改。
+                  </p>
                 </div>
 
                 {/* 回放设置 */}

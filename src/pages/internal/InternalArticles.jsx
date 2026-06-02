@@ -612,7 +612,8 @@ export default function InternalArticles() {
       setEditTitle(parsed.title || pendingSuggestedTitle || '');
       setEditCategory(parsed.category);
       setConfirmNewCategory('');
-      setEditTags([...parsed.tags]);
+      // 不再用推断标签预选：留空让用户自行从「已有标签」里挑或手动新增
+      setEditTags([]);
       setEditExcerpt(parsed.excerpt || '');
       setAiError('');
       setStep('confirm');
@@ -702,7 +703,7 @@ export default function InternalArticles() {
       coverImage: null,
       date: draft.date,
       category: finalCategory,
-      tags: editTags.length > 0 ? editTags : draft.tags,
+      tags: editTags,
       excerpt: editExcerpt.trim() || draft.excerpt,
       outline: [],
       url: draft.url,
@@ -1401,26 +1402,39 @@ export default function InternalArticles() {
                   {/* 分类 */}
                   <div className="ia-modal__field">
                     <label className="ia-modal__label">分类</label>
-                    <CustomSelect
-                      className="ia-modal__category-select"
-                      value={editCategory}
-                      onChange={(value) => {
-                        setEditCategory(value);
-                        if (value !== '__new__') setConfirmNewCategory('');
-                      }}
-                      options={articleCategoryOptions}
-                      placeholder="选择分类"
-                      searchable
-                      searchPlaceholder="搜索分类…"
-                    />
-                    {editCategory === '__new__' && (
-                      <input
-                        type="text"
-                        className="ia-modal__text-input"
-                        value={confirmNewCategory}
-                        onChange={(e) => setConfirmNewCategory(e.target.value)}
-                        placeholder="输入新分类名称，保存后会加入分类列表"
-                        maxLength={24}
+                    {/* 进入「新建分类」输入态后，隐藏上面显示「＋ 新建分类…」的下拉框，
+                        只留输入行 + 取消，避免输入行上方再出现一行「新建分类」造成误导 */}
+                    {editCategory === '__new__' ? (
+                      <div className="ia-modal__new-cat-row">
+                        <input
+                          type="text"
+                          className="ia-modal__text-input"
+                          value={confirmNewCategory}
+                          onChange={(e) => setConfirmNewCategory(e.target.value)}
+                          placeholder="输入新分类名称，保存后会加入分类列表"
+                          maxLength={24}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => { setEditCategory(''); setConfirmNewCategory(''); }}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <CustomSelect
+                        className="ia-modal__category-select"
+                        value={editCategory}
+                        onChange={(value) => {
+                          setEditCategory(value);
+                          if (value !== '__new__') setConfirmNewCategory('');
+                        }}
+                        options={articleCategoryOptions}
+                        placeholder="选择分类"
+                        searchable
+                        searchPlaceholder="搜索分类…"
                       />
                     )}
                   </div>
@@ -1614,26 +1628,37 @@ export default function InternalArticles() {
                   </div>
                   <div className="ia-modal__field">
                     <label className="ia-modal__label">分类</label>
-                    <CustomSelect
-                      className="ia-modal__category-select"
-                      value={archiveEditCategory}
-                      onChange={(value) => {
-                        setArchiveEditCategory(value);
-                        if (value !== '__new__') setArchiveNewCategory('');
-                      }}
-                      options={articleCategoryOptions}
-                      placeholder="选择分类"
-                      searchable
-                      searchPlaceholder="搜索分类…"
-                    />
-                    {archiveEditCategory === '__new__' && (
-                      <input
-                        type="text"
-                        className="ia-modal__text-input"
-                        value={archiveNewCategory}
-                        onChange={(e) => setArchiveNewCategory(e.target.value)}
-                        placeholder="输入新分类名称，保存后会加入分类列表"
-                        maxLength={24}
+                    {archiveEditCategory === '__new__' ? (
+                      <div className="ia-modal__new-cat-row">
+                        <input
+                          type="text"
+                          className="ia-modal__text-input"
+                          value={archiveNewCategory}
+                          onChange={(e) => setArchiveNewCategory(e.target.value)}
+                          placeholder="输入新分类名称，保存后会加入分类列表"
+                          maxLength={24}
+                          autoFocus
+                        />
+                        <button
+                          type="button"
+                          className="btn btn-ghost btn-sm"
+                          onClick={() => { setArchiveEditCategory(''); setArchiveNewCategory(''); }}
+                        >
+                          取消
+                        </button>
+                      </div>
+                    ) : (
+                      <CustomSelect
+                        className="ia-modal__category-select"
+                        value={archiveEditCategory}
+                        onChange={(value) => {
+                          setArchiveEditCategory(value);
+                          if (value !== '__new__') setArchiveNewCategory('');
+                        }}
+                        options={articleCategoryOptions}
+                        placeholder="选择分类"
+                        searchable
+                        searchPlaceholder="搜索分类…"
                       />
                     )}
                   </div>
