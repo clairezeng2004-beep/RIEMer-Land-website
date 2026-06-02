@@ -26,6 +26,11 @@ import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
 import { fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../../services/siteSettingsService';
 import { isSupabaseConfigured } from '../../lib/supabase';
+import {
+  bindExistingTaskToWorkItem,
+  createLinkedTask,
+  fetchTasksForLinking,
+} from '../../services/taskLinkService';
 
 // ---- 分类管理 ----
 const ARTICLE_CATEGORIES_KEY = 'riemer_article_categories';
@@ -223,7 +228,10 @@ function findMatchingArticleId(titleText, articles) {
 
 export default function InternalArticles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
-  const { userArticles, addArticle, updateArticle, internalConfig, updateInternalConfig } = useSiteContent();
+  const {
+    userArticles, addArticle, updateArticle, internalConfig, updateInternalConfig,
+    filterOptions,
+  } = useSiteContent();
   const { addNotification } = useNotifications();
   const { editing } = useWysiwyg();
   const navigate = useNavigate();
@@ -334,6 +342,12 @@ export default function InternalArticles() {
   const tagSuggestionsRef = useRef(null);
   // 跨模块联动提示
   const [taskPrompt, setTaskPrompt] = useState(null);
+  const [taskLinkMode, setTaskLinkMode] = useState('none');
+  const [linkableTasks, setLinkableTasks] = useState([]);
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [newLinkedTaskTitle, setNewLinkedTaskTitle] = useState('');
+  const [syncNewTaskTitle, setSyncNewTaskTitle] = useState(true);
+  const [taskLinkError, setTaskLinkError] = useState('');
 
   // ---- 已归档文章编辑弹窗状态 ----
   const [editingArchive, setEditingArchive] = useState(null);
@@ -412,6 +426,32 @@ export default function InternalArticles() {
       ({ tag }) => !editTags.includes(tag) && (!newTagInput.trim() || tag.toLowerCase().includes(newTagInput.trim().toLowerCase()))
     );
   }, [existingTags, editTags, newTagInput]);
+
+  const articleTaskOptions = useMemo(() => {
+    const usedWorkItemIds = new Set(
+      userArticles.map((article) => article.workItemId).filter(Boolean),
+    );
+    return linkableTasks.filter((task) => {
+      if (!task) return false;
+      if (task.workItemKind && task.workItemKind !== 'article') return false;
+      if (task.workItemId && usedWorkItemIds.has(task.workItemId)) return false;
+      return true;
+    });
+  }, [linkableTasks, userArticles]);
+
+  useEffect(() => {
+    if (!showModal || step !== 'confirm') return;
+    let cancelled = false;
+    fetchTasksForLinking().then((tasks) => {
+      if (!cancelled) setLinkableTasks(tasks || []);
+    });
+    return () => { cancelled = true; };
+  }, [showModal, step]);
+
+  useEffect(() => {
+    if (!syncNewTaskTitle) return;
+    setNewLinkedTaskTitle(editTitle || draft?.title || pendingSuggestedTitle || '');
+  }, [syncNewTaskTitle, editTitle, draft?.title, pendingSuggestedTitle]);
 
   // 点击外部关闭标签建议下拉
   useEffect(() => {
@@ -626,6 +666,11 @@ export default function InternalArticles() {
     setFetching(false);
     setAiLoading(false);
     setAiError('');
+    setTaskLinkMode('none');
+    setSelectedTaskId('');
+    setNewLinkedTaskTitle('');
+    setSyncNewTaskTitle(true);
+    setTaskLinkError('');
   };
 
   // ---- 抓取文章 ----
@@ -660,6 +705,14 @@ export default function InternalArticles() {
       setEditTags([]);
       setEditExcerpt(parsed.excerpt || '');
       setAiError('');
+      if (pendingWorkItemId) {
+        setTaskLinkMode('none');
+      } else {
+        setTaskLinkMode('none');
+        setSelectedTaskId('');
+        setNewLinkedTaskTitle(parsedWithCleanTitle.title || pendingSuggestedTitle || '');
+        setSyncNewTaskTitle(true);
+      }
       setStep('confirm');
     } catch (err) {
       setFetchError(err.message || '抓取失败，请检查链接');
@@ -738,6 +791,41 @@ export default function InternalArticles() {
       }
     }
 
+    let linkedWorkItemId = pendingWorkItemId || null;
+    if (!linkedWorkItemId && taskLinkMode === 'existing') {
+      const task = linkableTasks.find((item) => String(item.id) === String(selectedTaskId));
+      if (!task) {
+        setTaskLinkError('请选择要绑定的事项');
+        return;
+      }
+      const res = await bindExistingTaskToWorkItem(task, 'article');
+      if (!res.success) {
+        setTaskLinkError(`事项绑定失败：${res.error || '未知错误'}`);
+        return;
+      }
+      linkedWorkItemId = res.workItemId;
+    }
+    if (!linkedWorkItemId && taskLinkMode === 'new') {
+      const taskTitle = (syncNewTaskTitle ? editTitle : newLinkedTaskTitle).trim();
+      if (!taskTitle) {
+        setTaskLinkError('请输入新事项标题');
+        return;
+      }
+      const res = await createLinkedTask({
+        title: taskTitle,
+        kind: 'article',
+        category: filterOptions?.taskCategories?.includes('公众号文章')
+          ? '公众号文章'
+          : (filterOptions?.taskCategories?.[0] || ''),
+        assigneeId: user?.id || null,
+      });
+      if (!res.success) {
+        setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
+        return;
+      }
+      linkedWorkItemId = res.workItemId;
+    }
+
     const newArticle = {
       id: `user-${Date.now()}`,
       title: editTitle.trim() || draft.title,
@@ -757,7 +845,7 @@ export default function InternalArticles() {
       // 跨模块关联（见 src/utils/workItem.js）：
       // 从 Tasks 页跳转带过来的 workItemId 写入新归档，完成"姿势 C"的回填闭环。
       // 不带时为 null，不影响独立新建流程。
-      workItemId: pendingWorkItemId || null,
+      workItemId: linkedWorkItemId,
     };
 
     const articleTitle = newArticle.title;
@@ -1481,6 +1569,100 @@ export default function InternalArticles() {
                         searchable
                         searchPlaceholder="搜索分类…"
                       />
+                    )}
+                  </div>
+
+                  {/* 事项绑定 */}
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">
+                      <CheckSquare size={16} /> 对应事项
+                    </label>
+                    {pendingWorkItemId ? (
+                      <div className="ia-work-link__notice">
+                        已从事项追踪带入关联：「{pendingSuggestedTitle || editTitle || '未命名事项'}」
+                      </div>
+                    ) : (
+                      <div className="ia-work-link">
+                        <div className="ia-work-link__modes">
+                          <label className="ia-work-link__mode">
+                            <input
+                              type="radio"
+                              name="articleTaskLinkMode"
+                              value="none"
+                              checked={taskLinkMode === 'none'}
+                              onChange={() => setTaskLinkMode('none')}
+                            />
+                            不绑定
+                          </label>
+                          <label className="ia-work-link__mode">
+                            <input
+                              type="radio"
+                              name="articleTaskLinkMode"
+                              value="existing"
+                              checked={taskLinkMode === 'existing'}
+                              onChange={() => setTaskLinkMode('existing')}
+                            />
+                            绑定已有事项
+                          </label>
+                          <label className="ia-work-link__mode">
+                            <input
+                              type="radio"
+                              name="articleTaskLinkMode"
+                              value="new"
+                              checked={taskLinkMode === 'new'}
+                              onChange={() => {
+                                setTaskLinkMode('new');
+                                if (!newLinkedTaskTitle) setNewLinkedTaskTitle(editTitle || draft.title || '');
+                              }}
+                            />
+                            新建事项
+                          </label>
+                        </div>
+
+                        {taskLinkMode === 'existing' && (
+                          <select
+                            className="ia-modal__text-input"
+                            value={selectedTaskId}
+                            onChange={(e) => {
+                              setSelectedTaskId(e.target.value);
+                              setTaskLinkError('');
+                            }}
+                          >
+                            <option value="">选择一个未绑定公众号归档的事项</option>
+                            {articleTaskOptions.map((task) => (
+                              <option key={task.id} value={task.id}>
+                                {task.title || '未命名事项'}{task.status ? `（${task.status}）` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )}
+
+                        {taskLinkMode === 'new' && (
+                          <div className="ia-work-link__new">
+                            <label className="ia-work-link__sync">
+                              <input
+                                type="checkbox"
+                                checked={syncNewTaskTitle}
+                                onChange={(e) => setSyncNewTaskTitle(e.target.checked)}
+                              />
+                              事项标题同步为当前文章标题
+                            </label>
+                            <input
+                              type="text"
+                              className="ia-modal__text-input"
+                              value={syncNewTaskTitle ? (editTitle || draft.title || '') : newLinkedTaskTitle}
+                              onChange={(e) => setNewLinkedTaskTitle(e.target.value)}
+                              disabled={syncNewTaskTitle}
+                              placeholder="新事项标题"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {taskLinkError && (
+                      <div className="ia-modal__error" style={{ marginTop: 8 }}>
+                        <AlertCircle size={14} /> {taskLinkError}
+                      </div>
                     )}
                   </div>
 

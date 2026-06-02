@@ -40,6 +40,11 @@ import {
   saveSetting,
   subscribeSetting,
 } from '../../services/siteSettingsService';
+import {
+  bindExistingTaskToWorkItem,
+  createLinkedTask,
+  fetchTasksForLinking,
+} from '../../services/taskLinkService';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
@@ -145,7 +150,7 @@ const EMPTY_EVENT = {
 };
 
 export default function EventPublish() {
-  const { isAuthenticated, isAdmin } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
   // flushSettingToCloud / SITE_KEYS：当我们做"分类改名 / 删除分类"这种需要级联
   // 修改 events[].category 的操作时，events 默认走 context 的 400ms 去抖写云。
   // 如果用户删完立即关 tab，events 的去抖尚未触发就被取消 → B 设备看到分类列表
@@ -154,6 +159,7 @@ export default function EventPublish() {
   // flushSettingToCloud(EVENTS) 把 events 强制推上云端。
   const {
     events, addEvent, updateEvent, internalConfig, updateInternalConfig,
+    filterOptions,
     flushSettingToCloud,
     SITE_KEYS: CTX_SITE_KEYS,
   } = useSiteContent();
@@ -239,6 +245,12 @@ export default function EventPublish() {
   // 仍可手动修改。和「公众号历史文章归档」的提取体验保持一致。
   const [extracting, setExtracting] = useState(false);
   const [extractError, setExtractError] = useState('');
+  const [taskLinkMode, setTaskLinkMode] = useState('none');
+  const [linkableTasks, setLinkableTasks] = useState([]);
+  const [selectedTaskId, setSelectedTaskId] = useState('');
+  const [newLinkedTaskTitle, setNewLinkedTaskTitle] = useState('');
+  const [syncNewTaskTitle, setSyncNewTaskTitle] = useState(true);
+  const [taskLinkError, setTaskLinkError] = useState('');
 
   const handleExtractFromUrl = async () => {
     const url = (draft.officialUrl || '').trim();
@@ -326,6 +338,30 @@ export default function EventPublish() {
     });
     return sortWithOtherLast(result);
   }, [events, categoryList]);
+
+  const eventTaskOptions = useMemo(() => {
+    const usedWorkItemIds = new Set(events.map((event) => event.workItemId).filter(Boolean));
+    return linkableTasks.filter((task) => {
+      if (!task) return false;
+      if (task.workItemKind && task.workItemKind !== 'event') return false;
+      if (task.workItemId && usedWorkItemIds.has(task.workItemId)) return false;
+      return true;
+    });
+  }, [events, linkableTasks]);
+
+  useEffect(() => {
+    if (!showModal) return;
+    let cancelled = false;
+    fetchTasksForLinking().then((tasks) => {
+      if (!cancelled) setLinkableTasks(tasks || []);
+    });
+    return () => { cancelled = true; };
+  }, [showModal]);
+
+  useEffect(() => {
+    if (!syncNewTaskTitle) return;
+    setNewLinkedTaskTitle(draft.title || '');
+  }, [syncNewTaskTitle, draft.title]);
 
   // 排序：未来活动优先（按日期升序），过去活动按降序
   const sortedEvents = useMemo(() => {
@@ -499,6 +535,11 @@ export default function EventPublish() {
     setFormError('');
     setExtractError('');
     setExtracting(false);
+    setTaskLinkMode('none');
+    setSelectedTaskId('');
+    setNewLinkedTaskTitle('');
+    setSyncNewTaskTitle(true);
+    setTaskLinkError('');
     setShowModal(true);
   };
 
@@ -510,6 +551,11 @@ export default function EventPublish() {
     setFormError('');
     setExtractError('');
     setExtracting(false);
+    setTaskLinkMode('none');
+    setSelectedTaskId('');
+    setNewLinkedTaskTitle('');
+    setSyncNewTaskTitle(true);
+    setTaskLinkError('');
   };
 
   const handleSave = async () => {
@@ -542,6 +588,41 @@ export default function EventPublish() {
         await persistEventCategories(updated, lastCatSyncRef);
       }
     }
+    let linkedWorkItemId = pendingWorkItemId || null;
+    if (!linkedWorkItemId && taskLinkMode === 'existing') {
+      const task = linkableTasks.find((item) => String(item.id) === String(selectedTaskId));
+      if (!task) {
+        setTaskLinkError('请选择要绑定的事项');
+        return;
+      }
+      const res = await bindExistingTaskToWorkItem(task, 'event');
+      if (!res.success) {
+        setTaskLinkError(`事项绑定失败：${res.error || '未知错误'}`);
+        return;
+      }
+      linkedWorkItemId = res.workItemId;
+    }
+    if (!linkedWorkItemId && taskLinkMode === 'new') {
+      const taskTitle = (syncNewTaskTitle ? draft.title : newLinkedTaskTitle).trim();
+      if (!taskTitle) {
+        setTaskLinkError('请输入新事项标题');
+        return;
+      }
+      const res = await createLinkedTask({
+        title: taskTitle,
+        kind: 'event',
+        category: filterOptions?.taskCategories?.includes('线上分享')
+          ? '线上分享'
+          : (filterOptions?.taskCategories?.[0] || ''),
+        assigneeId: user?.id || null,
+      });
+      if (!res.success) {
+        setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
+        return;
+      }
+      linkedWorkItemId = res.workItemId;
+    }
+
     const newEvent = {
       ...draft,
       category: finalCategory,
@@ -556,7 +637,7 @@ export default function EventPublish() {
       // 从 Tasks 页带过来的 workItemId 写入新 event，让事项/活动两侧形成闭环。
       // events 存在 site_settings.value 的 JSON 数组里，workItemId 作为普通
       // 字段即可，无需 Supabase schema 迁移。
-      workItemId: pendingWorkItemId || null,
+      workItemId: linkedWorkItemId,
     };
     const savedTitle = draft.title.trim();
     const hadWorkItem = !!pendingWorkItemId;
@@ -1173,6 +1254,100 @@ export default function EventPublish() {
                       />
                     )}
                   </div>
+                </div>
+
+                {/* 事项绑定 */}
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <CheckSquare size={16} /> 对应事项
+                  </label>
+                  {pendingWorkItemId ? (
+                    <div className="ia-work-link__notice">
+                      已从事项追踪带入关联：「{draft.title || '未命名事项'}」
+                    </div>
+                  ) : (
+                    <div className="ia-work-link">
+                      <div className="ia-work-link__modes">
+                        <label className="ia-work-link__mode">
+                          <input
+                            type="radio"
+                            name="eventTaskLinkMode"
+                            value="none"
+                            checked={taskLinkMode === 'none'}
+                            onChange={() => setTaskLinkMode('none')}
+                          />
+                          不绑定
+                        </label>
+                        <label className="ia-work-link__mode">
+                          <input
+                            type="radio"
+                            name="eventTaskLinkMode"
+                            value="existing"
+                            checked={taskLinkMode === 'existing'}
+                            onChange={() => setTaskLinkMode('existing')}
+                          />
+                          绑定已有事项
+                        </label>
+                        <label className="ia-work-link__mode">
+                          <input
+                            type="radio"
+                            name="eventTaskLinkMode"
+                            value="new"
+                            checked={taskLinkMode === 'new'}
+                            onChange={() => {
+                              setTaskLinkMode('new');
+                              if (!newLinkedTaskTitle) setNewLinkedTaskTitle(draft.title || '');
+                            }}
+                          />
+                          新建事项
+                        </label>
+                      </div>
+
+                      {taskLinkMode === 'existing' && (
+                        <select
+                          className="ia-modal__text-input"
+                          value={selectedTaskId}
+                          onChange={(e) => {
+                            setSelectedTaskId(e.target.value);
+                            setTaskLinkError('');
+                          }}
+                        >
+                          <option value="">选择一个未绑定活动发布的事项</option>
+                          {eventTaskOptions.map((task) => (
+                            <option key={task.id} value={task.id}>
+                              {task.title || '未命名事项'}{task.status ? `（${task.status}）` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {taskLinkMode === 'new' && (
+                        <div className="ia-work-link__new">
+                          <label className="ia-work-link__sync">
+                            <input
+                              type="checkbox"
+                              checked={syncNewTaskTitle}
+                              onChange={(e) => setSyncNewTaskTitle(e.target.checked)}
+                            />
+                            事项标题同步为当前活动标题
+                          </label>
+                          <input
+                            type="text"
+                            className="ia-modal__text-input"
+                            value={syncNewTaskTitle ? (draft.title || '') : newLinkedTaskTitle}
+                            onChange={(e) => setNewLinkedTaskTitle(e.target.value)}
+                            disabled={syncNewTaskTitle}
+                            placeholder="新事项标题"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {taskLinkError && (
+                    <div className="ia-modal__error" style={{ marginTop: 8 }}>
+                      <AlertCircle size={14} /> {taskLinkError}
+                    </div>
+                  )}
                 </div>
 
                 {/* 地点 */}

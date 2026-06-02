@@ -935,6 +935,46 @@
   background: rgba(0, 0, 0, 0.72);
 }
 
+/* 事项绑定 */
+.ia-work-link {
+  display: grid;
+  gap: var(--space-sm);
+}
+
+.ia-work-link__modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.ia-work-link__mode,
+.ia-work-link__sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.ia-work-link__mode input,
+.ia-work-link__sync input {
+  margin: 0;
+}
+
+.ia-work-link__new {
+  display: grid;
+  gap: 8px;
+}
+
+.ia-work-link__notice {
+  padding: 10px 12px;
+  border: 1px solid rgba(91, 140, 62, 0.24);
+  border-radius: var(--radius-md);
+  background: rgba(91, 140, 62, 0.08);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
 /* 新建分类输入行：输入框占满 + 右侧「取消」返回下拉选择 */
 .ia-modal__new-cat-row {
   display: flex;
