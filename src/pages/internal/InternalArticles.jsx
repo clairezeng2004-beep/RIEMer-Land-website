@@ -48,6 +48,12 @@ const DEFAULT_ARTICLE_CATEGORIES = [
   { key: 'experience', label: '经验分享', color: '#F59E0B' },
 ];
 
+const DEFAULT_ARTICLE_TAGS = [
+  '保研', '考研', '留学', '求职', '实习', '课程测评',
+  '经验分享', '互联网', '金融', '经济学', '学术', '数学建模',
+  '辩论赛', '招新',
+];
+
 function loadArticleCategories() {
   try {
     const stored = localStorage.getItem(ARTICLE_CATEGORIES_KEY);
@@ -335,11 +341,7 @@ export default function InternalArticles() {
   const [editCategory, setEditCategory] = useState('');
   const [confirmNewCategory, setConfirmNewCategory] = useState('');
   const [editExcerpt, setEditExcerpt] = useState('');
-  const [newTagInput, setNewTagInput] = useState('');
   const [showTagsEditor, setShowTagsEditor] = useState(true);
-  const [showTagSuggestions, setShowTagSuggestions] = useState(false);
-  const tagInputRef = useRef(null);
-  const tagSuggestionsRef = useRef(null);
   // 跨模块联动提示
   const [taskPrompt, setTaskPrompt] = useState(null);
   const [taskLinkMode, setTaskLinkMode] = useState('none');
@@ -353,7 +355,7 @@ export default function InternalArticles() {
   const [editingArchive, setEditingArchive] = useState(null);
   const [archiveEditCategory, setArchiveEditCategory] = useState('');
   const [archiveNewCategory, setArchiveNewCategory] = useState('');
-  const [archiveTagsInput, setArchiveTagsInput] = useState('');
+  const [archiveEditTags, setArchiveEditTags] = useState([]);
 
   // ---- 批量阅读量录入弹窗 ----
   const [showReadNumModal, setShowReadNumModal] = useState(false);
@@ -420,12 +422,16 @@ export default function InternalArticles() {
       .map(([tag, count]) => ({ tag, count }));
   }, [allArticles]);
 
-  // 根据输入过滤标签建议（排除已选中的）
-  const filteredTagSuggestions = useMemo(() => {
-    return existingTags.filter(
-      ({ tag }) => !editTags.includes(tag) && (!newTagInput.trim() || tag.toLowerCase().includes(newTagInput.trim().toLowerCase()))
-    );
-  }, [existingTags, editTags, newTagInput]);
+  const articleTagOptions = useMemo(() => {
+    const tags = [
+      ...DEFAULT_ARTICLE_TAGS,
+      ...existingTags.map(({ tag }) => tag),
+      ...editTags,
+      ...archiveEditTags,
+    ];
+    return [...new Set(tags.filter(Boolean))]
+      .map((tag) => ({ value: tag, label: tag }));
+  }, [archiveEditTags, editTags, existingTags]);
 
   const articleTaskOptions = useMemo(() => {
     const usedWorkItemIds = new Set(
@@ -452,20 +458,6 @@ export default function InternalArticles() {
     if (!syncNewTaskTitle) return;
     setNewLinkedTaskTitle(editTitle || draft?.title || pendingSuggestedTitle || '');
   }, [syncNewTaskTitle, editTitle, draft?.title, pendingSuggestedTitle]);
-
-  // 点击外部关闭标签建议下拉
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (
-        tagSuggestionsRef.current && !tagSuggestionsRef.current.contains(e.target) &&
-        tagInputRef.current && !tagInputRef.current.contains(e.target)
-      ) {
-        setShowTagSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
 
   // 合并持久化分类 + 文章中动态提取的分类（去重）
   const categories = useMemo(() => {
@@ -661,7 +653,6 @@ export default function InternalArticles() {
     setFetchError('');
     setDraft(null);
     setEditTags([]);
-    setNewTagInput('');
     setConfirmNewCategory('');
     setFetching(false);
     setAiLoading(false);
@@ -739,19 +730,6 @@ export default function InternalArticles() {
       setAiError(err.message || 'AI 生成失败，请稍后重试');
     } finally {
       setAiLoading(false);
-    }
-  };
-
-  // ---- 标签操作 ----
-  const removeTag = (index) => {
-    setEditTags((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  const addTag = () => {
-    const tag = newTagInput.trim();
-    if (tag && !editTags.includes(tag)) {
-      setEditTags((prev) => [...prev, tag]);
-      setNewTagInput('');
     }
   };
 
@@ -979,14 +957,14 @@ export default function InternalArticles() {
     setEditingArchive({ ...article });
     setArchiveEditCategory(article.category || '');
     setArchiveNewCategory('');
-    setArchiveTagsInput((article.tags || []).join('、'));
+    setArchiveEditTags(article.tags || []);
   };
 
   const closeArchiveEditor = () => {
     setEditingArchive(null);
     setArchiveEditCategory('');
     setArchiveNewCategory('');
-    setArchiveTagsInput('');
+    setArchiveEditTags([]);
   };
 
   const handleSaveArchiveEdit = async () => {
@@ -1026,7 +1004,7 @@ export default function InternalArticles() {
       title: editingArchive.title.trim(),
       date: editingArchive.date,
       category: finalCategory,
-      tags: archiveTagsInput.split(/[,，、]/).map((tag) => tag.trim()).filter(Boolean),
+      tags: archiveEditTags,
       excerpt: editingArchive.excerpt.trim(),
       url: editingArchive.url || '',
       author: editingArchive.author || 'RIEMer Land',
@@ -1722,74 +1700,16 @@ export default function InternalArticles() {
                     </div>
                     {showTagsEditor && (
                       <div className="ia-modal__tags-editor">
-                        <div className="ia-modal__tags-list">
-                          {editTags.map((tag, idx) => (
-                            <span key={idx} className="ia-modal__tag">
-                              {tag}
-                              <button
-                                className="ia-modal__tag-remove"
-                                onClick={() => removeTag(idx)}
-                              >
-                                <X size={12} />
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                        <div className="ia-modal__tag-add" style={{ position: 'relative' }}>
-                          <input
-                            ref={tagInputRef}
-                            type="text"
-                            className="ia-modal__tag-input"
-                            placeholder="输入标签名…"
-                            value={newTagInput}
-                            onChange={(e) => {
-                              setNewTagInput(e.target.value);
-                              setShowTagSuggestions(true);
-                            }}
-                            onFocus={() => setShowTagSuggestions(true)}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter') {
-                                addTag();
-                                setShowTagSuggestions(false);
-                              }
-                            }}
-                          />
-                          <button
-                            className="btn btn-ghost btn-sm ia-modal__tag-add-btn"
-                            onClick={() => {
-                              addTag();
-                              setShowTagSuggestions(false);
-                            }}
-                            disabled={!newTagInput.trim()}
-                          >
-                            新增标签
-                          </button>
-                          {/* 标签建议下拉 */}
-                          {showTagSuggestions && filteredTagSuggestions.length > 0 && (
-                            <div ref={tagSuggestionsRef} className="ia-modal__tag-suggestions">
-                              <div className="ia-modal__tag-suggestions-header">
-                                已有标签
-                              </div>
-                              {filteredTagSuggestions.map(({ tag, count }) => (
-                                <button
-                                  key={tag}
-                                  className="ia-modal__tag-suggestion-item"
-                                  onClick={() => {
-                                    if (!editTags.includes(tag)) {
-                                      setEditTags((prev) => [...prev, tag]);
-                                    }
-                                    setNewTagInput('');
-                                    setShowTagSuggestions(false);
-                                  }}
-                                >
-                                  <Tag size={12} />
-                                  <span className="ia-modal__tag-suggestion-label">{tag}</span>
-                                  <span className="ia-modal__tag-suggestion-count">{count} 篇</span>
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </div>
+                        <CustomSelect
+                          className="ia-modal__tag-select"
+                          value={editTags}
+                          onChange={setEditTags}
+                          options={articleTagOptions}
+                          placeholder="选择标签"
+                          multiple
+                          searchable
+                          searchPlaceholder="搜索标签…"
+                        />
                       </div>
                     )}
                   </div>
@@ -1930,12 +1850,15 @@ export default function InternalArticles() {
                   <label className="ia-modal__label">
                     <Tag size={14} /> 标签
                   </label>
-                  <input
-                    type="text"
-                    className="ia-modal__text-input"
-                    value={archiveTagsInput}
-                    onChange={(e) => setArchiveTagsInput(e.target.value)}
-                    placeholder="用逗号或顿号分隔标签"
+                  <CustomSelect
+                    className="ia-modal__tag-select"
+                    value={archiveEditTags}
+                    onChange={setArchiveEditTags}
+                    options={articleTagOptions}
+                    placeholder="选择标签"
+                    multiple
+                    searchable
+                    searchPlaceholder="搜索标签…"
                   />
                 </div>
 

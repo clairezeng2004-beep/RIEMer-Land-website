@@ -1229,6 +1229,10 @@
   border: 1px solid var(--color-border-light);
 }
 
+.ia-modal__tag-select {
+  width: 100%;
+}
+
 .ia-modal__tags-list {
   display: flex;
   flex-wrap: wrap;
