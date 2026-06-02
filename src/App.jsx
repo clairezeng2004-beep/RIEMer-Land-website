@@ -51,6 +51,38 @@ const FULLSCREEN_PATHS = [
   '/internal/process-templates/view/',
 ];
 
+function RouteSkeleton() {
+  return (
+    <div className="route-skeleton" aria-label="页面加载中" aria-busy="true">
+      <section className="route-skeleton__hero">
+        <div className="container">
+          <div className="route-skeleton__title route-skeleton__shimmer" />
+          <div className="route-skeleton__line route-skeleton__line--wide route-skeleton__shimmer" />
+          <div className="route-skeleton__line route-skeleton__line--short route-skeleton__shimmer" />
+        </div>
+      </section>
+
+      <section className="route-skeleton__section">
+        <div className="container">
+          <div className="route-skeleton__grid">
+            {Array.from({ length: 6 }).map((_, index) => (
+              <div key={index} className="route-skeleton__card">
+                <div className="route-skeleton__thumb route-skeleton__shimmer" />
+                <div className="route-skeleton__card-body">
+                  <div className="route-skeleton__line route-skeleton__line--tiny route-skeleton__shimmer" />
+                  <div className="route-skeleton__line route-skeleton__shimmer" />
+                  <div className="route-skeleton__line route-skeleton__line--wide route-skeleton__shimmer" />
+                  <div className="route-skeleton__line route-skeleton__line--short route-skeleton__shimmer" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 function AppShell() {
   const { pathname } = useLocation();
   usePageTracking();
@@ -107,7 +139,7 @@ function AppShell() {
       <ScrollToTop />
       {!isFullscreen && <Navbar />}
       <main>
-        <Suspense fallback={null}>
+        <Suspense fallback={<RouteSkeleton />}>
           {isInternal ? (
             <NotificationRulesProvider>{routes}</NotificationRulesProvider>
           ) : (
