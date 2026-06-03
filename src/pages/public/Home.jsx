@@ -239,7 +239,7 @@ export default function Home() {
           <div className="featured__header">
             <h2 className="section-title">{content.articlesSectionTitle}</h2>
           </div>
-          <div className="featured__grid">
+          <div className="featured__grid featured__grid--articles">
             {recentArticles.map((article) => {
               const hasUrl = !!article.url;
               const trackClick = () =>
