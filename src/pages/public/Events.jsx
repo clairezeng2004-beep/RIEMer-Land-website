@@ -1,10 +1,9 @@
 import { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  ArrowRight,
+  ArrowLeft,
   Clock,
   MapPin,
-  FileText,
   Video,
   Lock,
   Eye,
@@ -13,9 +12,8 @@ import {
   ExternalLink,
   AlertCircle,
   CalendarDays,
+  CalendarRange,
 } from 'lucide-react';
-import CoverImage from '../../components/CoverImage';
-import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { trackEvent } from '../../lib/analytics';
 import './Home.css';
@@ -31,81 +29,48 @@ function normalizeEventCategory(category) {
   return EVENT_CATEGORY_RENAMES[value] || value;
 }
 
-export default function Home() {
-  const { content, userArticles, events } = useSiteContent();
+export default function Events() {
+  const { events } = useSiteContent();
+
+  const [selectedCategory, setSelectedCategory] = useState('全部');
 
   // 密码弹窗状态
-  const [replayModal, setReplayModal] = useState(null); // { event, passwordInput, error, showPassword }
+  const [replayModal, setReplayModal] = useState(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
-  // 合并硬编码文章和用户添加的文章，按日期降序排列
-  const allArticles = [...userArticles, ...articlesData]
-    .sort((a, b) => b.date.localeCompare(a.date));
-
-  const recentArticles = allArticles.slice(0, 6);
-  // 最新活动：按日期从新到旧排序，首页最多展示 3 场，更多通过"查看全部活动"进入 /events。
   const sortedEvents = useMemo(
     () => [...events].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
     [events],
   );
-  const recentEvents = sortedEvents.slice(0, 3);
 
-  // 计算活动倒计时天数（活动日期比当前晚则返回天数，否则返回 null）
+  const categories = useMemo(() => {
+    const cats = [...new Set(sortedEvents.map((e) => normalizeEventCategory(e.category)).filter(Boolean))];
+    return ['全部', ...cats];
+  }, [sortedEvents]);
+
+  const filtered = useMemo(() => {
+    if (selectedCategory === '全部') return sortedEvents;
+    return sortedEvents.filter((e) => normalizeEventCategory(e.category) === selectedCategory);
+  }, [sortedEvents, selectedCategory]);
+
   const getCountdownDays = (eventDate) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const target = new Date(eventDate + 'T00:00:00');
     const diff = target - today;
-    if (diff > 0) {
-      return Math.ceil(diff / (1000 * 60 * 60 * 24));
-    }
+    if (diff > 0) return Math.ceil(diff / (1000 * 60 * 60 * 24));
     return null;
   };
 
-  // 动态计算统计数据：
-  // - 活动讲座 = events 总数
-  // - 文章分享 = 所有文章总数
-  // - 公众号累计阅读 = 所有文章 readNum 求和（>=1000 时显示 "X.XK+"）
-  const totalReadNum = allArticles.reduce(
-    (sum, a) => sum + (Number(a.readNum) || 0),
-    0,
-  );
-  const formatReadNum = (n) => {
-    if (!n || n <= 0) return '0';
-    if (n >= 10000) {
-      // 1.2w+ 形式，保留一位小数（但若为整数则去小数）
-      const v = n / 10000;
-      return `${v >= 10 ? Math.floor(v) : v.toFixed(1).replace(/\.0$/, '')}w+`;
-    }
-    if (n >= 1000) {
-      const v = n / 1000;
-      return `${v.toFixed(1).replace(/\.0$/, '')}k+`;
-    }
-    return `${n}`;
-  };
-
-  const dynamicStats = content.stats.map((stat) => {
-    if (stat.label === '活动讲座') {
-      return { ...stat, value: `${events.length}` };
-    }
-    if (stat.label === '文章分享') {
-      return { ...stat, value: `${allArticles.length}` };
-    }
-    if (stat.label === '公众号累计阅读') {
-      return { ...stat, value: formatReadNum(totalReadNum) };
-    }
-    return stat;
-  });
-
-  // 点击活动卡片
   const handleEventClick = (event) => {
     trackEvent('event_click', {
       event_id: event.id,
       event_title: event.title,
       event_category: normalizeEventCategory(event.category),
       has_replay: event.hasReplay,
+      source: 'events_page',
     });
     if (event.hasReplay && event.replayUrl) {
       setReplayModal(event);
@@ -115,28 +80,20 @@ export default function Home() {
     }
   };
 
-  // 验证密码
   const handlePasswordSubmit = () => {
     if (!replayModal) return;
     if (passwordInput === replayModal.replayPassword) {
-      trackEvent('replay_unlock', {
-        event_id: replayModal.id,
-        event_title: replayModal.title,
-      });
+      trackEvent('replay_unlock', { event_id: replayModal.id, event_title: replayModal.title });
       window.open(replayModal.replayUrl, '_blank', 'noopener,noreferrer');
       setReplayModal(null);
       setPasswordInput('');
       setPasswordError('');
     } else {
-      trackEvent('replay_unlock_fail', {
-        event_id: replayModal.id,
-        event_title: replayModal.title,
-      });
+      trackEvent('replay_unlock_fail', { event_id: replayModal.id, event_title: replayModal.title });
       setPasswordError('密码不正确，请重试');
     }
   };
 
-  // 关闭弹窗
   const closeModal = () => {
     setReplayModal(null);
     setPasswordInput('');
@@ -146,60 +103,34 @@ export default function Home() {
 
   return (
     <div className="home">
-      {/* Hero Section — 与 Articles / Timeline 保持一致的简洁风格 */}
+      {/* Hero */}
       <section className="hero">
         <div className="hero__content container">
           <h1 className="hero__title">
-            <span className="hero__title-accent">{content.heroTitle}</span>
+            <span className="hero__title-accent">全部活动</span>
           </h1>
-          <p className="hero__subtitle">{content.heroDescription}</p>
+          <p className="hero__subtitle">回顾 RIEMer Land 的历次活动与讲座，查看回放与往期内容。</p>
         </div>
       </section>
 
-
-      {/* Stats Section */}
-      <section className="stats section">
-        <div className="container">
-          <div className="stats__grid">
-            {dynamicStats.map((stat, i) => {
-              // 「活动讲座」「文章分享」两个统计支持点击跳转到对应列表页
-              const statLink =
-                stat.label === '活动讲座' ? '/events'
-                : stat.label === '文章分享' ? '/articles'
-                : null;
-              const inner = (
-                <>
-                  <div className="stats__value">{stat.value}</div>
-                  <div className="stats__label">{stat.label}</div>
-                </>
-              );
-              return statLink ? (
-                <Link
-                  key={i}
-                  to={statLink}
-                  className="stats__item stats__item--link"
-                  onClick={() => trackEvent('nav_click', { link: statLink, source: 'home_stats' })}
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <div key={i} className="stats__item">
-                  {inner}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Latest Events */}
       <section className="featured section section--compact">
         <div className="container">
-          <div className="featured__header">
-            <h2 className="section-title">最新活动</h2>
-          </div>
+          {categories.length > 1 && (
+            <div className="featured__header" style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {categories.map((cat) => (
+                <button
+                  key={cat}
+                  className={`featured__tag-btn ${selectedCategory === cat ? 'featured__tag-btn--active' : ''}`}
+                  onClick={() => setSelectedCategory(cat)}
+                >
+                  {cat}
+                </button>
+              ))}
+            </div>
+          )}
+
           <div className="featured__grid">
-            {recentEvents.map((event) => {
+            {filtered.map((event) => {
               const countdownDays = getCountdownDays(event.date);
               const eventCategory = normalizeEventCategory(event.category);
               return (
@@ -249,92 +180,18 @@ export default function Home() {
               );
             })}
           </div>
-          {events.length > recentEvents.length && (
-            <div className="featured__more">
-              <Link to="/events" className="btn btn-secondary" onClick={() => trackEvent('nav_click', { link: '/events', source: 'home' })}>
-                查看全部活动 <ArrowRight size={16} />
-              </Link>
+
+          {filtered.length === 0 && (
+            <div className="articles-list__empty" style={{ textAlign: 'center', padding: '3rem 0', color: 'var(--color-text-muted)' }}>
+              <CalendarRange size={48} />
+              <h3>暂无活动</h3>
+              <p>换个分类看看，或稍后再来。</p>
             </div>
           )}
-        </div>
-      </section>
 
-      {/* Featured Articles */}
-      <section className="featured section">
-        <div className="container">
-          <div className="featured__header">
-            <h2 className="section-title">{content.articlesSectionTitle}</h2>
-          </div>
-          <div className="featured__grid featured__grid--articles">
-            {recentArticles.map((article) => {
-              const hasUrl = !!article.url;
-              const trackClick = () =>
-                trackEvent('article_click', {
-                  article_id: article.id,
-                  article_title: article.title,
-                  article_category: article.category,
-                  source: 'home',
-                  target: hasUrl ? 'wechat' : 'detail',
-                });
-
-              const cardInner = (
-                <>
-                  {/* 封面图 */}
-                  <div className="featured__cover">
-                    {article.coverImage ? (
-                      <CoverImage
-                        src={article.coverImage}
-                        alt={article.title}
-                        className="featured__cover-img"
-                      />
-                    ) : (
-                      <div className="featured__cover-placeholder">
-                        <FileText size={28} />
-                      </div>
-                    )}
-                  </div>
-                  <div className="featured__card-body">
-                    <h3 className="featured__title">{article.title}</h3>
-                    <p className="featured__excerpt">{article.excerpt}</p>
-                    <div className="featured__meta">
-                      <span className="featured__meta-item">
-                        <Clock size={14} />
-                        {article.date}
-                      </span>
-                      {article.category && (
-                        <span className="featured__category">{article.category}</span>
-                      )}
-                    </div>
-                  </div>
-                </>
-              );
-
-              return hasUrl ? (
-                <a
-                  key={article.id}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="featured__card"
-                  onClick={trackClick}
-                >
-                  {cardInner}
-                </a>
-              ) : (
-                <Link
-                  key={article.id}
-                  to={`/article/${article.id}`}
-                  className="featured__card"
-                  onClick={trackClick}
-                >
-                  {cardInner}
-                </Link>
-              );
-            })}
-          </div>
           <div className="featured__more">
-            <Link to="/articles" className="btn btn-secondary" onClick={() => trackEvent('nav_click', { link: '/articles', source: 'home' })}>
-              查看全部文章 <ArrowRight size={16} />
+            <Link to="/" className="btn btn-secondary">
+              <ArrowLeft size={16} /> 返回首页
             </Link>
           </div>
         </div>
@@ -400,17 +257,13 @@ export default function Home() {
               >
                 <ExternalLink size={16} /> 验证并打开回放
               </button>
-              <button
-                className="btn btn-ghost"
-                onClick={closeModal}
-              >
+              <button className="btn btn-ghost" onClick={closeModal}>
                 取消
               </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }

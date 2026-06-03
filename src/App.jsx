@@ -11,6 +11,7 @@ import Footer from './components/Footer';
 const Home = lazy(() => import('./pages/public/Home'));
 const Timeline = lazy(() => import('./pages/public/Timeline'));
 const Articles = lazy(() => import('./pages/public/Articles'));
+const Events = lazy(() => import('./pages/public/Events'));
 const ArticleDetail = lazy(() => import('./pages/public/ArticleDetail'));
 const Login = lazy(() => import('./pages/internal/Login'));
 const ResetPassword = lazy(() => import('./pages/internal/ResetPassword'));
@@ -134,6 +135,7 @@ function AppShell() {
       <Route path="/" element={<Home />} />
       <Route path="/timeline" element={<Timeline />} />
       <Route path="/articles" element={<Articles />} />
+      <Route path="/events" element={<Events />} />
       <Route path="/article/:id" element={<ArticleDetail />} />
 
       {/* Auth */}

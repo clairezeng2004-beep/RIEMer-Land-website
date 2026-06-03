@@ -74,6 +74,14 @@
   border-color: var(--color-primary);
 }
 
+/* 可点击的统计卡片（活动讲座 / 文章分享）：去掉链接默认样式并显示手型 */
+.stats__item--link {
+  display: block;
+  cursor: pointer;
+  text-decoration: none;
+  color: inherit;
+}
+
 .stats__value {
   font-size: var(--text-2xl);
   font-weight: 700;
