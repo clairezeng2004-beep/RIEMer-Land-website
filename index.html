@@ -133,7 +133,84 @@
     </script>
   </head>
   <body>
-    <div id="root"></div>
+    <!--
+      首屏骨架屏（App Shell Skeleton）
+      纯 HTML/CSS，放在 #root 内部：在 JS bundle 还没下载/执行、React 尚未挂载前就能显示，
+      避免移动端慢网络下首页长时间空白。React 一旦 mount 会自动用真实内容替换掉这些占位节点。
+    -->
+    <style>
+      @keyframes app-skeleton-shimmer {
+        0% { background-position: -468px 0; }
+        100% { background-position: 468px 0; }
+      }
+      #app-skeleton {
+        min-height: 100vh;
+        background: #F7FAF5;
+        padding: 0;
+        /* React 挂载后此节点被移除；这里只在首屏短暂出现 */
+      }
+      #app-skeleton .sk-container {
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0 20px;
+      }
+      #app-skeleton .sk-hero {
+        padding: 56px 0 40px;
+        text-align: center;
+      }
+      #app-skeleton .sk-block {
+        background: #e9efe6;
+        background-image: linear-gradient(90deg, #e9efe6 0px, #f3f7f1 40px, #e9efe6 80px);
+        background-size: 600px 100%;
+        border-radius: 10px;
+        animation: app-skeleton-shimmer 1.4s ease-in-out infinite;
+      }
+      #app-skeleton .sk-title { height: 38px; width: 60%; margin: 0 auto 16px; border-radius: 12px; }
+      #app-skeleton .sk-subtitle { height: 18px; width: 80%; margin: 0 auto; border-radius: 8px; }
+      #app-skeleton .sk-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin: 8px 0 40px;
+      }
+      #app-skeleton .sk-stat { height: 84px; border-radius: 12px; }
+      #app-skeleton .sk-section-title { height: 26px; width: 140px; margin: 24px 0 20px; border-radius: 8px; }
+      #app-skeleton .sk-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 20px;
+      }
+      #app-skeleton .sk-card { height: 260px; border-radius: 14px; }
+      @media (max-width: 768px) {
+        #app-skeleton .sk-hero { padding: 40px 0 28px; }
+        #app-skeleton .sk-title { height: 30px; width: 78%; }
+        #app-skeleton .sk-stats { grid-template-columns: repeat(2, 1fr); gap: 12px; }
+        #app-skeleton .sk-grid { grid-template-columns: 1fr; gap: 16px; }
+        #app-skeleton .sk-card { height: 150px; }
+      }
+    </style>
+    <div id="root">
+      <div id="app-skeleton" aria-hidden="true">
+        <div class="sk-container">
+          <div class="sk-hero">
+            <div class="sk-block sk-title"></div>
+            <div class="sk-block sk-subtitle"></div>
+          </div>
+          <div class="sk-stats">
+            <div class="sk-block sk-stat"></div>
+            <div class="sk-block sk-stat"></div>
+            <div class="sk-block sk-stat"></div>
+            <div class="sk-block sk-stat"></div>
+          </div>
+          <div class="sk-block sk-section-title"></div>
+          <div class="sk-grid">
+            <div class="sk-block sk-card"></div>
+            <div class="sk-block sk-card"></div>
+            <div class="sk-block sk-card"></div>
+          </div>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>
