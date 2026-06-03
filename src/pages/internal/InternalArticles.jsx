@@ -429,13 +429,13 @@ export default function InternalArticles() {
   }, [linkableTasks, userArticles]);
 
   useEffect(() => {
-    if (!showModal || step !== 'confirm') return;
+    if (!(showModal && step === 'confirm') && !editingArchive) return;
     let cancelled = false;
     fetchTasksForLinking().then((tasks) => {
       if (!cancelled) setLinkableTasks(tasks || []);
     });
     return () => { cancelled = true; };
-  }, [showModal, step]);
+  }, [editingArchive, showModal, step]);
 
   useEffect(() => {
     if (!syncNewTaskTitle) return;
@@ -948,6 +948,11 @@ export default function InternalArticles() {
     setArchiveEditCategory(article.category || '');
     setArchiveNewCategory('');
     setArchiveEditTags(article.tags || []);
+    setTaskLinkMode('none');
+    setSelectedTaskId('');
+    setNewLinkedTaskTitle(article.title || '');
+    setSyncNewTaskTitle(true);
+    setTaskLinkError('');
   };
 
   const closeArchiveEditor = () => {
@@ -955,6 +960,11 @@ export default function InternalArticles() {
     setArchiveEditCategory('');
     setArchiveNewCategory('');
     setArchiveEditTags([]);
+    setTaskLinkMode('none');
+    setSelectedTaskId('');
+    setNewLinkedTaskTitle('');
+    setSyncNewTaskTitle(true);
+    setTaskLinkError('');
   };
 
   const handleSaveArchiveEdit = async () => {
@@ -990,6 +1000,45 @@ export default function InternalArticles() {
       }
     }
 
+    let linkedWorkItemId = editingArchive.workItemId || null;
+    if (!linkedWorkItemId && taskLinkMode === 'existing') {
+      const task = linkableTasks.find((item) => String(item.id) === String(selectedTaskId));
+      if (!task) {
+        setTaskLinkError('请选择要绑定的事项');
+        return;
+      }
+      const res = await bindExistingTaskToWorkItem(task, 'article');
+      if (!res.success) {
+        setTaskLinkError(`事项绑定失败：${res.error || '未知错误'}`);
+        return;
+      }
+      linkedWorkItemId = res.workItemId;
+    }
+    if (!linkedWorkItemId && taskLinkMode === 'new') {
+      const taskTitle = (
+        syncNewTaskTitle
+          ? editingArchive.title
+          : newLinkedTaskTitle
+      ).trim();
+      if (!taskTitle) {
+        setTaskLinkError('请输入新事项标题');
+        return;
+      }
+      const res = await createLinkedTask({
+        title: taskTitle,
+        kind: 'article',
+        category: filterOptions?.taskCategories?.includes('公众号文章')
+          ? '公众号文章'
+          : (filterOptions?.taskCategories?.[0] || ''),
+        assigneeId: user?.id || null,
+      });
+      if (!res.success) {
+        setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
+        return;
+      }
+      linkedWorkItemId = res.workItemId;
+    }
+
     const updates = {
       title: editingArchive.title.trim(),
       date: editingArchive.date,
@@ -999,6 +1048,7 @@ export default function InternalArticles() {
       url: editingArchive.url || '',
       author: editingArchive.author || 'RIEMer Land',
       coverImage: editingArchive.coverImage || null,
+      workItemId: linkedWorkItemId,
     };
 
     if (!updates.title) {
@@ -1850,6 +1900,99 @@ export default function InternalArticles() {
                     searchable
                     searchPlaceholder="搜索标签…"
                   />
+                </div>
+
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <CheckSquare size={14} /> 对应事项
+                  </label>
+                  {editingArchive.workItemId ? (
+                    <div className="ia-work-link__notice">
+                      这篇文章已绑定事项
+                    </div>
+                  ) : (
+                    <div className="ia-work-link">
+                      <div className="ia-work-link__modes">
+                        <label className="ia-work-link__mode">
+                          <input
+                            type="radio"
+                            name="archiveTaskLinkMode"
+                            value="none"
+                            checked={taskLinkMode === 'none'}
+                            onChange={() => setTaskLinkMode('none')}
+                          />
+                          不绑定
+                        </label>
+                        <label className="ia-work-link__mode">
+                          <input
+                            type="radio"
+                            name="archiveTaskLinkMode"
+                            value="existing"
+                            checked={taskLinkMode === 'existing'}
+                            onChange={() => setTaskLinkMode('existing')}
+                          />
+                          绑定已有事项
+                        </label>
+                        <label className="ia-work-link__mode">
+                          <input
+                            type="radio"
+                            name="archiveTaskLinkMode"
+                            value="new"
+                            checked={taskLinkMode === 'new'}
+                            onChange={() => {
+                              setTaskLinkMode('new');
+                              if (!newLinkedTaskTitle) setNewLinkedTaskTitle(editingArchive.title || '');
+                            }}
+                          />
+                          新建事项
+                        </label>
+                      </div>
+
+                      {taskLinkMode === 'existing' && (
+                        <select
+                          className="ia-modal__text-input"
+                          value={selectedTaskId}
+                          onChange={(e) => {
+                            setSelectedTaskId(e.target.value);
+                            setTaskLinkError('');
+                          }}
+                        >
+                          <option value="">选择一个未绑定公众号归档的事项</option>
+                          {articleTaskOptions.map((task) => (
+                            <option key={task.id} value={task.id}>
+                              {task.title || '未命名事项'}{task.status ? `（${task.status}）` : ''}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+
+                      {taskLinkMode === 'new' && (
+                        <div className="ia-work-link__new">
+                          <label className="ia-work-link__sync">
+                            <input
+                              type="checkbox"
+                              checked={syncNewTaskTitle}
+                              onChange={(e) => setSyncNewTaskTitle(e.target.checked)}
+                            />
+                            事项标题同步为当前文章标题
+                          </label>
+                          <input
+                            type="text"
+                            className="ia-modal__text-input"
+                            value={syncNewTaskTitle ? (editingArchive.title || '') : newLinkedTaskTitle}
+                            onChange={(e) => setNewLinkedTaskTitle(e.target.value)}
+                            disabled={syncNewTaskTitle}
+                            placeholder="新事项标题"
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  {taskLinkError && (
+                    <div className="ia-modal__error" style={{ marginTop: 8 }}>
+                      <AlertCircle size={14} /> {taskLinkError}
+                    </div>
+                  )}
                 </div>
 
                 <div className="ia-modal__field">
