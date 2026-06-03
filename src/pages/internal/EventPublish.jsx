@@ -161,7 +161,7 @@ export default function EventPublish() {
   // 把它补回成派生分类 → "筛选项删了又冒出来"。所以需要在级联完立即 await
   // flushSettingToCloud(EVENTS) 把 events 强制推上云端。
   const {
-    events, addEvent, updateEvent, internalConfig, updateInternalConfig,
+    events, addEvent, updateEvent, deleteEvent, internalConfig, updateInternalConfig,
     filterOptions,
     flushSettingToCloud,
     SITE_KEYS: CTX_SITE_KEYS,
@@ -639,6 +639,8 @@ export default function EventPublish() {
       officialUrl: draft.officialUrl.trim(),
       replayUrl: draft.replayUrl.trim(),
       replayPassword: draft.replayPassword.trim(),
+      createdById: user?.id || null,
+      createdBy: user?.nickname || user?.name || user?.email || '',
       // 跨模块关联（见 src/utils/workItem.js）：
       // 从 Tasks 页带过来的 workItemId 写入新 event，让事项/活动两侧形成闭环。
       // events 存在 site_settings.value 的 JSON 数组里，workItemId 作为普通
@@ -752,6 +754,20 @@ export default function EventPublish() {
     } finally {
       setIsSavingEventEdit(false);
     }
+  };
+
+  const handleDeleteEvent = async (event) => {
+    if (!event) return;
+    const title = event.title || '未命名活动';
+    if (!window.confirm(`确定删除「${title}」这个活动吗？`)) return;
+
+    const nextEvents = events.filter((item) => String(item.id) !== String(event.id));
+    const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+    if (!res?.success) {
+      alert(`活动没有从云端删除：${res?.error || '未知错误'}。请稍后重试。`);
+      return;
+    }
+    deleteEvent(event.id);
   };
 
   // ---- 卡片点击：
@@ -1099,6 +1115,9 @@ export default function EventPublish() {
             const countdownDays = getCountdownDays(event.date);
             const hasOfficial = !!(event.officialUrl && /^https?:\/\//i.test(event.officialUrl));
             const clickable = hasOfficial || (event.hasReplay && event.replayUrl);
+            const canManageEvent = isAdmin || (
+              event.createdById && String(event.createdById) === String(user?.id)
+            );
             return (
               <div
                 key={event.id}
@@ -1106,7 +1125,7 @@ export default function EventPublish() {
                 onClick={() => handleCardClick(event)}
                 style={clickable ? { cursor: 'pointer' } : undefined}
               >
-                {isAdmin && (
+                {canManageEvent && (
                   <button
                     type="button"
                     className="ia-card__edit-btn"
@@ -1118,6 +1137,20 @@ export default function EventPublish() {
                     title="编辑活动信息"
                   >
                     <Pencil size={14} />
+                  </button>
+                )}
+                {canManageEvent && (
+                  <button
+                    type="button"
+                    className="ia-card__edit-btn ia-card__delete-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteEvent(event);
+                    }}
+                    title="删除活动"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 )}
                 <div className="ia-card__body">

@@ -241,6 +241,7 @@ function dbToFrontend(row) {
     content: row.content || '',
     readNum: typeof row.read_num === 'number' ? row.read_num : Number(row.read_num) || 0,
     archivedBy: row.archived_by || '未知',
+    archivedById: row.archived_by_id || null,
     archivedAt: row.created_at || new Date().toISOString(),
     // 工作项关联（WorkItem）：用于和 tasks / events 之间串"同一件工作"
     // 的闭环。老数据无此列 → 读出来是 undefined → 统一归一成 null。

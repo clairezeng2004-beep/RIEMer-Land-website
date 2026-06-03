@@ -605,6 +605,16 @@
   color: var(--color-primary);
 }
 
+.ia-card__delete-btn {
+  right: 48px;
+}
+
+.ia-card__delete-btn:hover {
+  border-color: color-mix(in srgb, #D9534F 38%, transparent);
+  background: color-mix(in srgb, #D9534F 10%, var(--color-bg-card, #fff));
+  color: #D9534F;
+}
+
 .ia-card__body {
   padding: clamp(0.75rem, 2vw, 1.5rem);
   display: flex;

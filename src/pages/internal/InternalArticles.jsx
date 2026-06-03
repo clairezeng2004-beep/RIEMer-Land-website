@@ -229,7 +229,7 @@ function findMatchingArticleId(titleText, articles) {
 export default function InternalArticles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const {
-    userArticles, addArticle, updateArticle, internalConfig, updateInternalConfig,
+    userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig,
     filterOptions,
   } = useSiteContent();
   const { addNotification } = useNotifications();
@@ -812,6 +812,7 @@ export default function InternalArticles() {
       url: draft.url,
       content: draft.content,
       archivedBy: user?.name || user?.nickname || '未知',
+      archivedById: user?.id || null,
       archivedAt: new Date().toISOString(),
       // 跨模块关联（见 src/utils/workItem.js）：
       // 从 Tasks 页跳转带过来的 workItemId 写入新归档，完成"姿势 C"的回填闭环。
@@ -1064,6 +1065,13 @@ export default function InternalArticles() {
 
     await updateArticle(editingArchive.id, updates);
     closeArchiveEditor();
+  };
+
+  const handleDeleteArchive = async (article) => {
+    if (!article) return;
+    const title = article.title || '未命名文章';
+    if (!window.confirm(`确定删除「${title}」这条文章归档吗？`)) return;
+    await deleteArticle(article.id);
   };
 
   // 总阅读量（用于弹窗顶部汇总展示）
@@ -1397,6 +1405,9 @@ export default function InternalArticles() {
             // 归档文章卡片：优先跳转公众号原链接；如无原链接则回退站内详情页
             const hasExternal = !!(article.url && /^https?:\/\//i.test(article.url));
             const canEditArchive = archivedArticleIds.has(article.id);
+            const canManageArchive = canEditArchive && (
+              isAdmin || (article.archivedById && String(article.archivedById) === String(user?.id))
+            );
             const commonInner = (
               <div className="ia-card__body">
                 <span className="ia-card__category">{article.category}</span>
@@ -1419,7 +1430,7 @@ export default function InternalArticles() {
             );
             return (
               <article key={article.id} className="ia-card card">
-                {canEditArchive && (
+                {canManageArchive && (
                   <button
                     type="button"
                     className="ia-card__edit-btn"
@@ -1431,6 +1442,20 @@ export default function InternalArticles() {
                     title="编辑归档信息"
                   >
                     <Pencil size={14} />
+                  </button>
+                )}
+                {canManageArchive && (
+                  <button
+                    type="button"
+                    className="ia-card__edit-btn ia-card__delete-btn"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      handleDeleteArchive(article);
+                    }}
+                    title="删除归档"
+                  >
+                    <Trash2 size={14} />
                   </button>
                 )}
                 {hasExternal ? (
