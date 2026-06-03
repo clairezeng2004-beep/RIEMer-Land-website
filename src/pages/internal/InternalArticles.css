@@ -633,7 +633,8 @@
   border-radius: var(--radius-full);
   background: rgba(91, 140, 62, 0.1);
   color: var(--color-primary);
-  align-self: flex-start;
+  /* 放在卡片底部一行，并靠右与日期同行 */
+  margin-left: auto;
 }
 
 .ia-card__title {
@@ -691,7 +692,7 @@
 }
 
 .ia-card__arrow {
-  margin-left: auto;
+  /* 有系列时系列胶囊用 margin-left:auto 占据右侧，箭头紧随其后靠右 */
   color: var(--color-text-muted);
   opacity: 0;
   transform: translateX(-4px);

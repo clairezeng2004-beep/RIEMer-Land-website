@@ -1410,7 +1410,6 @@ export default function InternalArticles() {
             );
             const commonInner = (
               <div className="ia-card__body">
-                <span className="ia-card__category">{article.category}</span>
                 <h3 className="ia-card__title">{article.title}</h3>
                 <p className="ia-card__excerpt">{article.excerpt}</p>
                 <div className="ia-card__footer">
@@ -1421,6 +1420,9 @@ export default function InternalArticles() {
                     <span className="ia-card__comments">
                       <MessageSquare size={13} /> {commentCount}
                     </span>
+                  )}
+                  {article.category && (
+                    <span className="ia-card__category">{article.category}</span>
                   )}
                   <span className="ia-card__arrow">
                     <ArrowRight size={14} />

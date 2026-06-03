@@ -1154,19 +1154,20 @@ export default function EventPublish() {
                   </button>
                 )}
                 <div className="ia-card__body">
-                  <div className="ep-card__top">
-                    <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
-                    {countdownDays && (
-                      <span className="ep-card__badge ep-card__badge--upcoming">
-                        <Calendar size={12} /> {countdownDays} 天后
-                      </span>
-                    )}
-                    {event.hasReplay && (
-                      <span className="ep-card__badge ep-card__badge--replay">
-                        <Video size={12} /> 回放
-                      </span>
-                    )}
-                  </div>
+                  {(countdownDays || event.hasReplay) && (
+                    <div className="ep-card__top">
+                      {countdownDays && (
+                        <span className="ep-card__badge ep-card__badge--upcoming">
+                          <Calendar size={12} /> {countdownDays} 天后
+                        </span>
+                      )}
+                      {event.hasReplay && (
+                        <span className="ep-card__badge ep-card__badge--replay">
+                          <Video size={12} /> 回放
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <h3 className="ia-card__title">{event.title}</h3>
                   {event.excerpt && (
                     <p className="ia-card__excerpt">{event.excerpt}</p>
@@ -1184,6 +1185,9 @@ export default function EventPublish() {
                       <span className="ia-card__meta ep-card__meta--lock">
                         <Lock size={12} /> 需密码
                       </span>
+                    )}
+                    {normalizeEventCategory(event.category) && (
+                      <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
                     )}
                     <span className="ia-card__arrow">
                       <ArrowRight size={14} />
