@@ -530,7 +530,8 @@
 /* ============ Responsive ============ */
 @media (max-width: 1200px) {
   .featured__grid { grid-template-columns: repeat(2, 1fr); }
-  .featured__title { min-height: auto; }
+  /* 仍是多列并排：保留标题的两行高度预留，
+     让单行标题卡片与多行标题卡片的正文从同一水平线开始 */
   .featured__excerpt { min-height: auto; }
 }
 
