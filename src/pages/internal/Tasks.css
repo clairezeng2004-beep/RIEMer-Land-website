@@ -681,14 +681,7 @@
   padding: 2px 6px;
   border-radius: var(--radius-sm);
   background: rgba(91, 140, 62, 0.06);
-  transition: all var(--transition-fast);
   white-space: nowrap;
-}
-
-.tasks-table__member-link:hover {
-  background: rgba(91, 140, 62, 0.14);
-  color: var(--color-primary-dark);
-  text-decoration: none;
 }
 
 .tasks-table__helpers {
