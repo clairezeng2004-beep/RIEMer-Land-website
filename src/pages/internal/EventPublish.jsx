@@ -64,10 +64,11 @@ const EVENT_CATEGORIES_KEY = 'riemer_event_categories';
 
 const DEFAULT_EVENT_LOCATION = '线上腾讯会议';
 const EVENT_CATEGORY_RENAMES = {
-  腾讯会议分享会: '腾讯会议分享',
+  腾讯会议分享会: '经验分享',
+  腾讯会议分享: '经验分享',
 };
-const HIDDEN_EVENT_CATEGORIES = new Set(['分享会', '经验分享']);
-const DEFAULT_EVENT_CATEGORIES = ['腾讯会议分享', '团队招新', '其他'];
+const HIDDEN_EVENT_CATEGORIES = new Set(['分享会']);
+const DEFAULT_EVENT_CATEGORIES = ['经验分享', '团队招新', '其他'];
 
 function normalizeEventCategory(category) {
   const value = String(category || '').trim();
@@ -1186,13 +1187,15 @@ export default function EventPublish() {
                         <Lock size={12} /> 需密码
                       </span>
                     )}
-                    {normalizeEventCategory(event.category) && (
-                      <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
-                    )}
                     <span className="ia-card__arrow">
                       <ArrowRight size={14} />
                     </span>
                   </div>
+                  {normalizeEventCategory(event.category) && (
+                    <div className="ep-card__category-row">
+                      <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             );

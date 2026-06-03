@@ -20,6 +20,14 @@
   margin-bottom: var(--space-sm, 10px);
 }
 
+/* 系列标签独占日期/地点下方第二行，左对齐 */
+.ep-card__category-row {
+  margin-top: var(--space-xs, 6px);
+}
+.ep-card__category-row .ia-card__category {
+  margin-left: 0; /* 覆盖底部一行时用的靠右逻辑，这里左对齐 */
+}
+
 .ep-card__badge {
   display: inline-flex;
   align-items: center;
