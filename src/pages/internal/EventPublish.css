@@ -52,6 +52,14 @@
   gap: var(--space-md, 14px);
 }
 
+.ia-modal__url-input::placeholder {
+  font-size: var(--text-sm);
+}
+
+.ep-modal__top-error {
+  margin-bottom: var(--space-md, 14px);
+}
+
 @media (max-width: 480px) {
   .ep-modal__row {
     grid-template-columns: 1fr;

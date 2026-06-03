@@ -1203,6 +1203,72 @@ export default function EventPublish() {
                     </span>
                   </div>
                 )}
+                {formError && (
+                  <div className="ia-modal__error ep-modal__top-error">
+                    <AlertCircle size={16} /> {formError}
+                  </div>
+                )}
+
+                {/* 公众号推文链接 + 一键提取 */}
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <ExternalLink size={14} /> 公众号推文链接
+                  </label>
+                  <div className="ia-modal__url-row">
+                    <div className="ia-modal__url-input-wrap">
+                      <Link2 size={18} className="ia-modal__url-icon" />
+                      <input
+                        type="url"
+                        className="ia-modal__url-input"
+                        placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
+                        value={draft.officialUrl}
+                        onChange={(e) => {
+                          setDraft({ ...draft, officialUrl: e.target.value });
+                          setFormError('');
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !extracting && draft.officialUrl.trim()) {
+                            e.preventDefault();
+                            handleExtractFromUrl();
+                          }
+                        }}
+                        disabled={extracting}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-primary ia-modal__fetch-btn"
+                      onClick={handleExtractFromUrl}
+                      disabled={extracting || !draft.officialUrl.trim()}
+                    >
+                      {extracting ? (
+                        <>
+                          <Loader2 size={14} className="ia-modal__spinner" />
+                          <span>提取中</span>
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 size={14} />
+                          <span>一键提取</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                  {extractError && (
+                    <div className="ia-modal__error" style={{ marginTop: 8 }}>
+                      <AlertCircle size={16} /> {extractError}
+                    </div>
+                  )}
+                  <p style={{
+                    fontSize: 12,
+                    color: 'var(--color-text-muted)',
+                    marginTop: 8,
+                    lineHeight: 1.6,
+                  }}>
+                    粘贴公众号推文链接后点「一键提取」，系统会自动填入标题、活动日期与活动简介；提取后仍可手动修改。
+                  </p>
+                </div>
+
                 {/* 标题 */}
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">活动标题 *</label>
@@ -1211,7 +1277,10 @@ export default function EventPublish() {
                     className="ia-modal__text-input"
                     placeholder="请输入活动标题…"
                     value={draft.title}
-                    onChange={(e) => setDraft({ ...draft, title: e.target.value })}
+                    onChange={(e) => {
+                      setDraft({ ...draft, title: e.target.value });
+                      setFormError('');
+                    }}
                     autoFocus
                   />
                 </div>
@@ -1224,7 +1293,10 @@ export default function EventPublish() {
                       type="date"
                       className="ia-modal__text-input"
                       value={draft.date}
-                      onChange={(e) => setDraft({ ...draft, date: e.target.value })}
+                      onChange={(e) => {
+                        setDraft({ ...draft, date: e.target.value });
+                        setFormError('');
+                      }}
                     />
                   </div>
                   <div className="ia-modal__field">
@@ -1377,63 +1449,6 @@ export default function EventPublish() {
                   />
                 </div>
 
-                {/* 公众号推文链接 + 一键提取 */}
-                <div className="ia-modal__field">
-                  <label className="ia-modal__label">
-                    <ExternalLink size={14} /> 公众号推文链接
-                  </label>
-                  <div className="ia-modal__url-row">
-                    <div className="ia-modal__url-input-wrap">
-                      <Link2 size={18} className="ia-modal__url-icon" />
-                      <input
-                        type="url"
-                        className="ia-modal__url-input"
-                        placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
-                        value={draft.officialUrl}
-                        onChange={(e) => setDraft({ ...draft, officialUrl: e.target.value })}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' && !extracting && draft.officialUrl.trim()) {
-                            e.preventDefault();
-                            handleExtractFromUrl();
-                          }
-                        }}
-                        disabled={extracting}
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      className="btn btn-primary ia-modal__fetch-btn"
-                      onClick={handleExtractFromUrl}
-                      disabled={extracting || !draft.officialUrl.trim()}
-                    >
-                      {extracting ? (
-                        <>
-                          <Loader2 size={14} className="ia-modal__spinner" />
-                          <span>提取中</span>
-                        </>
-                      ) : (
-                        <>
-                          <Wand2 size={14} />
-                          <span>一键提取</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-                  {extractError && (
-                    <div className="ia-modal__error" style={{ marginTop: 8 }}>
-                      <AlertCircle size={16} /> {extractError}
-                    </div>
-                  )}
-                  <p style={{
-                    fontSize: 12,
-                    color: 'var(--color-text-muted)',
-                    marginTop: 8,
-                    lineHeight: 1.6,
-                  }}>
-                    粘贴公众号推文链接后点「一键提取」，系统会自动填入标题、活动日期与活动简介；提取后仍可手动修改。
-                  </p>
-                </div>
-
                 {/* 回放设置 */}
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">
@@ -1456,7 +1471,10 @@ export default function EventPublish() {
                         className="ia-modal__text-input"
                         placeholder="https://meeting.tencent.com/…"
                         value={draft.replayUrl}
-                        onChange={(e) => setDraft({ ...draft, replayUrl: e.target.value })}
+                        onChange={(e) => {
+                          setDraft({ ...draft, replayUrl: e.target.value });
+                          setFormError('');
+                        }}
                       />
                     </div>
                     <div className="ia-modal__field">
@@ -1472,11 +1490,6 @@ export default function EventPublish() {
                   </>
                 )}
 
-                {formError && (
-                  <div className="ia-modal__error">
-                    <AlertCircle size={16} /> {formError}
-                  </div>
-                )}
               </div>
             </div>
 
@@ -1505,6 +1518,19 @@ export default function EventPublish() {
 
             <div className="ia-modal__body">
               <div className="ia-modal__step-confirm">
+                <div className="ia-modal__field">
+                  <label className="ia-modal__label">
+                    <ExternalLink size={14} /> 公众号推文链接
+                  </label>
+                  <input
+                    type="url"
+                    className="ia-modal__text-input"
+                    value={editingEvent.officialUrl || ''}
+                    onChange={(e) => setEditingEvent({ ...editingEvent, officialUrl: e.target.value })}
+                    placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
+                  />
+                </div>
+
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">活动标题 *</label>
                   <input
@@ -1576,19 +1602,6 @@ export default function EventPublish() {
                     onChange={(e) => setEditingEvent({ ...editingEvent, excerpt: e.target.value })}
                     rows={3}
                     placeholder="简要介绍活动内容…"
-                  />
-                </div>
-
-                <div className="ia-modal__field">
-                  <label className="ia-modal__label">
-                    <ExternalLink size={14} /> 公众号推文链接
-                  </label>
-                  <input
-                    type="url"
-                    className="ia-modal__text-input"
-                    value={editingEvent.officialUrl || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, officialUrl: e.target.value })}
-                    placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
                   />
                 </div>
 
