@@ -1498,7 +1498,7 @@ export default function Tasks() {
                 <strong>
                   {archivePrompt.target === 'event'
                     ? '活动发布'
-                    : '公众号历史文章归档'}
+                    : '公众号文字分享归档'}
                 </strong>
                 页面补登{archivePrompt.target === 'event' ? '对应的活动' : '对应的文章'}？
               </p>
