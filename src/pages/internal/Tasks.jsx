@@ -526,6 +526,7 @@ export default function Tasks() {
     const task = {
       ...newTask,
       id: genId(),
+      assignee: Array.isArray(newTask.assignee) ? newTask.assignee : [],
       // 新任务的"亮点总结 / 经验复盘"初始化为空串（而不是 undefined），
       // 避免受控 input 的 value 在首次输入时从 undefined 变成 '' 触发 React 警告。
       highlights: '',
@@ -1039,12 +1040,12 @@ export default function Tasks() {
                   />
                 </div>
                 <div className="tasks-form__field">
-                  <label>负责人</label>
+                  <label>负责人（可不选）</label>
                   <CustomSelect
                     value={newTask.assignee}
                     onChange={(vals) => setNewTask({ ...newTask, assignee: vals })}
                     options={assigneeOptions}
-                    placeholder="选择负责人…"
+                    placeholder="可不选择负责人…"
                     multiple
                   />
                 </div>
