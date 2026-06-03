@@ -22,9 +22,10 @@ import { useEqualTitleHeights } from '../../hooks/useEqualTitleHeights';
 import './Home.css';
 
 const EVENT_CATEGORY_RENAMES = {
-  腾讯会议分享会: '腾讯会议分享',
+  腾讯会议分享会: '经验分享',
+  腾讯会议分享: '经验分享',
 };
-const HIDDEN_EVENT_CATEGORIES = new Set(['分享会', '经验分享']);
+const HIDDEN_EVENT_CATEGORIES = new Set(['分享会']);
 
 function normalizeEventCategory(category) {
   const value = String(category || '').trim();
@@ -206,7 +207,6 @@ export default function Home() {
           <div className="featured__grid" ref={eventsGridRef}>
             {recentEvents.map((event) => {
               const countdownDays = getCountdownDays(event.date);
-              const eventCategory = normalizeEventCategory(event.category);
               return (
                 <div
                   key={event.id}
@@ -230,17 +230,14 @@ export default function Home() {
                         <Clock size={14} />
                         {event.date}
                       </span>
-                      {eventCategory && (
-                        <span className="featured__category">{eventCategory}</span>
+                      {event.location && (
+                        <span className="featured__meta-item">
+                          <MapPin size={12} /> {event.location}
+                        </span>
                       )}
                       {event.hasReplay && (
                         <span className="featured__replay-badge">
                           <Video size={12} /> 回放
-                        </span>
-                      )}
-                      {countdownDays && (
-                        <span className="featured__meta-item featured__meta-item--countdown">
-                          <MapPin size={12} /> {event.location}
                         </span>
                       )}
                       {event.hasReplay && (

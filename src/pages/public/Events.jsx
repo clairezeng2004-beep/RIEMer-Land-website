@@ -20,9 +20,10 @@ import { useEqualTitleHeights } from '../../hooks/useEqualTitleHeights';
 import './Home.css';
 
 const EVENT_CATEGORY_RENAMES = {
-  腾讯会议分享会: '腾讯会议分享',
+  腾讯会议分享会: '经验分享',
+  腾讯会议分享: '经验分享',
 };
-const HIDDEN_EVENT_CATEGORIES = new Set(['分享会', '经验分享']);
+const HIDDEN_EVENT_CATEGORIES = new Set(['分享会']);
 
 function normalizeEventCategory(category) {
   const value = String(category || '').trim();
