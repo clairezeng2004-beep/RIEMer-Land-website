@@ -20,6 +20,17 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { trackEvent } from '../../lib/analytics';
 import './Home.css';
 
+const EVENT_CATEGORY_RENAMES = {
+  腾讯会议分享会: '腾讯会议分享',
+};
+const HIDDEN_EVENT_CATEGORIES = new Set(['分享会', '经验分享']);
+
+function normalizeEventCategory(category) {
+  const value = String(category || '').trim();
+  if (!value || HIDDEN_EVENT_CATEGORIES.has(value)) return '';
+  return EVENT_CATEGORY_RENAMES[value] || value;
+}
+
 export default function Home() {
   const { content, userArticles, events } = useSiteContent();
 
@@ -95,7 +106,7 @@ export default function Home() {
     trackEvent('event_click', {
       event_id: event.id,
       event_title: event.title,
-      event_category: event.category,
+      event_category: normalizeEventCategory(event.category),
       has_replay: event.hasReplay,
     });
     if (event.hasReplay && event.replayUrl) {
@@ -171,6 +182,7 @@ export default function Home() {
           <div className="featured__grid">
             {recentEvents.map((event) => {
               const countdownDays = getCountdownDays(event.date);
+              const eventCategory = normalizeEventCategory(event.category);
               return (
                 <div
                   key={event.id}
@@ -181,7 +193,9 @@ export default function Home() {
                   <div className="featured__card-accent" />
                   <div className="featured__card-body">
                     <div className="featured__card-top">
-                      <span className="featured__category">{event.category}</span>
+                      {eventCategory && (
+                        <span className="featured__category">{eventCategory}</span>
+                      )}
                       {countdownDays && (
                         <span className="featured__countdown-badge">
                           <CalendarDays size={12} /> {countdownDays} 天后
