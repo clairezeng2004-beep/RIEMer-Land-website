@@ -29,7 +29,12 @@ export default function Articles() {
   );
 
   const categories = useMemo(() => {
-    const cats = [...new Set(allArticles.map((a) => a.category))];
+    // 过滤掉空/未命名系列：没有归类的文章不应生成一个空白的系列按钮
+    const cats = [...new Set(
+      allArticles
+        .map((a) => (a.category || '').trim())
+        .filter(Boolean)
+    )];
     return ['全部', ...cats];
   }, [allArticles]);
 
