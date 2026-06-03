@@ -821,7 +821,6 @@
   color: var(--color-text-muted);
   opacity: 0.7;
   white-space: nowrap;
-  margin-left: auto;
 }
 
 .tasks-empty {
