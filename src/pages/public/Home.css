@@ -266,7 +266,9 @@
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
-  min-height: calc(var(--text-md) * 1.4 * 2);
+  /* 不再强制预留两行：标题高度交给 subgrid（历史文章）或 useEqualTitleHeights（活动）
+     按"当前行内是否有换行标题"动态决定，单行就只占一行。 */
+  min-height: 0;
 }
 
 .featured__excerpt {

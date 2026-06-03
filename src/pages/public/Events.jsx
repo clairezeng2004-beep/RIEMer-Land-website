@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { trackEvent } from '../../lib/analytics';
+import { useEqualTitleHeights } from '../../hooks/useEqualTitleHeights';
 import './Home.css';
 
 const EVENT_CATEGORY_RENAMES = {
@@ -54,6 +55,10 @@ export default function Events() {
     if (selectedCategory === '全部') return sortedEvents;
     return sortedEvents.filter((e) => normalizeEventCategory(e.category) === selectedCategory);
   }, [sortedEvents, selectedCategory]);
+
+  // 活动卡片标题按行对齐
+  const eventsGridRef = useRef(null);
+  useEqualTitleHeights(eventsGridRef, '.featured__title', [filtered.length, selectedCategory]);
 
   const getCountdownDays = (eventDate) => {
     const today = new Date();
@@ -129,7 +134,7 @@ export default function Events() {
             </div>
           )}
 
-          <div className="featured__grid">
+          <div className="featured__grid" ref={eventsGridRef}>
             {filtered.map((event) => {
               const countdownDays = getCountdownDays(event.date);
               const eventCategory = normalizeEventCategory(event.category);

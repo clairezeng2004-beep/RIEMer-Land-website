@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -18,6 +18,7 @@ import CoverImage from '../../components/CoverImage';
 import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { trackEvent } from '../../lib/analytics';
+import { useEqualTitleHeights } from '../../hooks/useEqualTitleHeights';
 import './Home.css';
 
 const EVENT_CATEGORY_RENAMES = {
@@ -51,6 +52,10 @@ export default function Home() {
     [events],
   );
   const recentEvents = sortedEvents.slice(0, 3);
+
+  // 活动卡片标题按行对齐（结构含可选倒计时行，无法用 subgrid，改用 JS 逐行等高）
+  const eventsGridRef = useRef(null);
+  useEqualTitleHeights(eventsGridRef, '.featured__title', [recentEvents.length]);
 
   // 计算活动倒计时天数（活动日期比当前晚则返回天数，否则返回 null）
   const getCountdownDays = (eventDate) => {
@@ -198,7 +203,7 @@ export default function Home() {
           <div className="featured__header">
             <h2 className="section-title">最新活动</h2>
           </div>
-          <div className="featured__grid">
+          <div className="featured__grid" ref={eventsGridRef}>
             {recentEvents.map((event) => {
               const countdownDays = getCountdownDays(event.date);
               const eventCategory = normalizeEventCategory(event.category);
