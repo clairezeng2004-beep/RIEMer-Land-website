@@ -1706,13 +1706,18 @@ export default function InternalArticles() {
                         )}
                       </button>
                     </div>
-                    <textarea
-                      className="ia-modal__textarea"
-                      value={editExcerpt}
-                      onChange={(e) => setEditExcerpt(e.target.value)}
-                      placeholder="点击上方「AI 生成」按钮，由 AI 根据文章全文生成摘要。也可手动编辑。"
-                      rows={3}
-                    />
+                    <div className="ia-modal__textarea-wrap">
+                      <textarea
+                        className="ia-modal__textarea"
+                        value={editExcerpt}
+                        onChange={(e) => setEditExcerpt(e.target.value)}
+                        placeholder="点击上方「AI 生成」按钮，由 AI 根据文章全文生成摘要。也可手动编辑。"
+                        rows={3}
+                      />
+                      <span className="ia-modal__char-count">
+                        {(editExcerpt || '').length} 字（建议不超过80字符）
+                      </span>
+                    </div>
                     {aiError && (
                       <div className="ia-modal__error" style={{ marginTop: 6 }}>
                         <AlertCircle size={14} />
@@ -1997,13 +2002,18 @@ export default function InternalArticles() {
 
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">摘要</label>
-                  <textarea
-                    className="ia-modal__textarea"
-                    value={editingArchive.excerpt || ''}
-                    onChange={(e) => setEditingArchive({ ...editingArchive, excerpt: e.target.value })}
-                    rows={3}
-                    placeholder="编辑文章卡片展示摘要"
-                  />
+                  <div className="ia-modal__textarea-wrap">
+                    <textarea
+                      className="ia-modal__textarea"
+                      value={editingArchive.excerpt || ''}
+                      onChange={(e) => setEditingArchive({ ...editingArchive, excerpt: e.target.value })}
+                      rows={3}
+                      placeholder="编辑文章卡片展示摘要"
+                    />
+                    <span className="ia-modal__char-count">
+                      {(editingArchive.excerpt || '').length} 字（建议不超过80字符）
+                    </span>
+                  </div>
                 </div>
 
                 <div className="ia-modal__field">

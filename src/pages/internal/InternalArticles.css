@@ -1138,6 +1138,25 @@
   transition: all var(--transition-fast);
 }
 
+.ia-modal__textarea-wrap {
+  position: relative;
+}
+
+.ia-modal__textarea-wrap .ia-modal__textarea {
+  width: 100%;
+  padding-bottom: 1.8rem;
+}
+
+.ia-modal__char-count {
+  position: absolute;
+  right: 0.85rem;
+  bottom: 0.55rem;
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+  line-height: 1;
+  pointer-events: none;
+}
+
 .ia-modal__textarea:focus {
   border-color: var(--color-primary);
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
