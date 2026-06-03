@@ -615,6 +615,7 @@ export default function EventPublish() {
           ? '线上分享'
           : (filterOptions?.taskCategories?.[0] || ''),
         assigneeId: user?.id || null,
+        completedAt: draft.date,
       });
       if (!res.success) {
         setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);

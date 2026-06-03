@@ -99,9 +99,10 @@ export async function bindExistingTaskToWorkItem(task, kind) {
   }
 }
 
-export async function createLinkedTask({ title, kind, category, assigneeId }) {
+export async function createLinkedTask({ title, kind, category, assigneeId, completedAt }) {
   const workItemId = genWorkItemId();
   const now = new Date().toISOString();
+  const completedDate = completedAt || now.slice(0, 10);
   const task = {
     id: genTaskId(),
     title: (title || '').trim() || '未命名事项',
@@ -110,12 +111,19 @@ export async function createLinkedTask({ title, kind, category, assigneeId }) {
     status: '已完成',
     assignee: assigneeId ? [assigneeId] : [],
     helpers: [],
-    statusHistory: [],
+    statusHistory: [
+      {
+        from: '待启动',
+        to: '已完成',
+        reason: '',
+        date: completedDate,
+      },
+    ],
     highlights: '',
     reflections: '',
     workItemId,
     workItemKind: kind,
-    createdAt: now.slice(0, 10),
+    createdAt: completedDate,
   };
 
   if (!isSupabaseConfigured || !supabase) {

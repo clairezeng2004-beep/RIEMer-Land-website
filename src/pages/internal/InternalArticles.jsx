@@ -786,6 +786,7 @@ export default function InternalArticles() {
           ? '公众号文章'
           : (filterOptions?.taskCategories?.[0] || ''),
         assigneeId: user?.id || null,
+        completedAt: draft.date,
       });
       if (!res.success) {
         setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
@@ -1031,6 +1032,7 @@ export default function InternalArticles() {
           ? '公众号文章'
           : (filterOptions?.taskCategories?.[0] || ''),
         assigneeId: user?.id || null,
+        completedAt: editingArchive.date,
       });
       if (!res.success) {
         setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
