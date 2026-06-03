@@ -192,21 +192,13 @@ export default function Home() {
                 >
                   <div className="featured__card-accent" />
                   <div className="featured__card-body">
-                    <div className="featured__card-top">
-                      {eventCategory && (
-                        <span className="featured__category">{eventCategory}</span>
-                      )}
-                      {countdownDays && (
+                    {countdownDays && (
+                      <div className="featured__card-top">
                         <span className="featured__countdown-badge">
                           <CalendarDays size={12} /> {countdownDays} 天后
                         </span>
-                      )}
-                      {event.hasReplay && (
-                        <span className="featured__replay-badge">
-                          <Video size={12} /> 回放
-                        </span>
-                      )}
-                    </div>
+                      </div>
+                    )}
                     <h3 className="featured__title">{event.title}</h3>
                     <p className="featured__excerpt">{event.excerpt}</p>
                     <div className="featured__meta">
@@ -214,6 +206,14 @@ export default function Home() {
                         <Clock size={14} />
                         {event.date}
                       </span>
+                      {eventCategory && (
+                        <span className="featured__category">{eventCategory}</span>
+                      )}
+                      {event.hasReplay && (
+                        <span className="featured__replay-badge">
+                          <Video size={12} /> 回放
+                        </span>
+                      )}
                       {countdownDays && (
                         <span className="featured__meta-item featured__meta-item--countdown">
                           <MapPin size={12} /> {event.location}
@@ -268,9 +268,6 @@ export default function Home() {
                     )}
                   </div>
                   <div className="featured__card-body">
-                    <div className="featured__card-top">
-                      <span className="featured__category">{article.category}</span>
-                    </div>
                     <h3 className="featured__title">{article.title}</h3>
                     <p className="featured__excerpt">{article.excerpt}</p>
                     <div className="featured__meta">
@@ -278,6 +275,9 @@ export default function Home() {
                         <Clock size={14} />
                         {article.date}
                       </span>
+                      {article.category && (
+                        <span className="featured__category">{article.category}</span>
+                      )}
                     </div>
                   </div>
                 </>
