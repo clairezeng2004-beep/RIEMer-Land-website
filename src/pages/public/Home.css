@@ -550,6 +550,7 @@
   .featured__tags-filter { margin-top: var(--space-sm); gap: 4px; }
   .featured__tag-btn { font-size: 11px; padding: 0.2rem 0.6rem; }
   .featured .section-title { margin-bottom: var(--space-md); }
+  .featured .section-title::after { margin-top: var(--space-xs); }
   .featured__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
   /* 手机端隐藏卡片封面图，只保留文字 */
   .featured__cover { display: none; }
@@ -573,7 +574,8 @@
   .featured.section { padding-top: var(--space-xl); }
   .featured__header { margin-bottom: var(--space-xs); }
   .featured__tags-filter { margin-top: var(--space-xs); }
-  .featured .section-title { margin-bottom: var(--space-sm); }
+  .featured .section-title { margin-bottom: var(--space-md); }
+  .featured .section-title::after { margin-top: 6px; }
   .featured__grid { grid-template-columns: 1fr; }
   .featured.section:has(.featured__more) { padding-bottom: var(--space-lg); }
   .stats__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); }
