@@ -228,6 +228,8 @@ const rowToTask = (r) => ({
   statusHistory: Array.isArray(r.status_history) ? r.status_history : [],
   highlights: r.highlights || '',
   reflections: r.reflections || '',
+  createdById: r.created_by_id || r.createdById || null,
+  createdBy: r.created_by || r.createdBy || '',
   // 工作项关联（WorkItem）：与文章归档 / 活动发布共享同一个 workItemId 时代表同一件工作。
   // 详见 src/utils/workItem.js。老数据没有这些列 → 统一归一成 null。
   workItemId: r.work_item_id || null,
@@ -246,10 +248,17 @@ const taskToRow = (t) => ({
   status_history: Array.isArray(t.statusHistory) ? t.statusHistory : [],
   highlights: t.highlights || '',
   reflections: t.reflections || '',
+  created_by_id: t.createdById || null,
+  created_by: t.createdBy || '',
   // 工作项关联：允许把 null 显式写回数据库以解除关联。
   work_item_id: t.workItemId || null,
   work_item_kind: t.workItemKind || null,
 });
+
+const stripOptionalTaskColumns = (row) => {
+  const { created_by_id, created_by, ...rest } = row;
+  return rest;
+};
 
 export default function Tasks() {
   const { isAuthenticated, isAdmin, user, getAllUsers, supabaseOk } = useAuth();
@@ -527,6 +536,8 @@ export default function Tasks() {
       ...newTask,
       id: genId(),
       assignee: Array.isArray(newTask.assignee) ? newTask.assignee : [],
+      createdById: user?.id || null,
+      createdBy: user?.nickname || user?.name || user?.email || '',
       // 新任务的"亮点总结 / 经验复盘"初始化为空串（而不是 undefined），
       // 避免受控 input 的 value 在首次输入时从 undefined 变成 '' 触发 React 警告。
       highlights: '',
@@ -568,7 +579,13 @@ export default function Tasks() {
       try {
         const row = taskToRow(task);
         console.log('[Tasks] 向 Supabase 插入新事项:', row);
-        const { data, error } = await supabase.from('tasks').insert(row).select();
+        let { data, error } = await supabase.from('tasks').insert(row).select();
+        if (error && /created_by/i.test(error.message || '')) {
+          console.warn('[Tasks] tasks 表缺少创建人字段，降级写入:', error.message);
+          const fallback = await supabase.from('tasks').insert(stripOptionalTaskColumns(row)).select();
+          data = fallback.data;
+          error = fallback.error;
+        }
         if (error) throw error;
         console.log('[Tasks] ✅ Supabase 插入成功:', data);
       } catch (err) {
@@ -690,7 +707,14 @@ export default function Tasks() {
     }, 500);
   };
 
-  const deleteTask = async (id) => {
+  const canDeleteTask = (task) => (
+    !!isAdmin ||
+    (!!user?.id && !!task?.createdById && String(task.createdById) === String(user.id))
+  );
+
+  const deleteTask = async (task) => {
+    if (!canDeleteTask(task)) return;
+    const id = task.id;
     if (!window.confirm('确定要删除这个事项吗？')) return;
     setTasks((prev) => prev.filter((t) => t.id !== id));
     if (canUseSupabase) {
@@ -1328,12 +1352,6 @@ export default function Tasks() {
                 const assigneeIds = Array.isArray(task.assignee)
                   ? task.assignee
                   : task.assignee ? [task.assignee] : [];
-                const assigneeMembers = assigneeIds
-                  .map((aId) => memberMap[aId])
-                  .filter(Boolean);
-                const helperMembers = (task.helpers || [])
-                  .map((hId) => memberMap[hId])
-                  .filter(Boolean);
                 return (
                 <tr key={task.id} className={`tasks-table__row tasks-table__row--${task.status === '已完成' ? 'done' : ''}`}>
                   <td>
@@ -1368,43 +1386,55 @@ export default function Tasks() {
                     </div>
                   </td>
                   <td>
-                    <span className="badge badge-secondary">{task.category}</span>
+                    <CustomSelect
+                      value={task.category || ''}
+                      onChange={(val) => updateTaskField(task.id, 'category', val)}
+                      options={taskCategories.map((c) => ({ value: c, label: c }))}
+                      placeholder="选择分类"
+                      size="sm"
+                    />
                   </td>
                   <td>
                     <div className="tasks-table__title-cell">
-                      <span className="tasks-table__title">{task.title}</span>
-                      {task.description && (
-                        <span className="tasks-table__desc">{task.description}</span>
-                      )}
+                      <input
+                        type="text"
+                        className="tasks-table__inline-input tasks-table__inline-input--title"
+                        value={task.title || ''}
+                        onChange={(e) => updateTaskField(task.id, 'title', e.target.value)}
+                        placeholder="事项标题"
+                      />
+                      <input
+                        type="text"
+                        className="tasks-table__inline-input tasks-table__inline-input--desc"
+                        value={task.description || ''}
+                        onChange={(e) => updateTaskField(task.id, 'description', e.target.value)}
+                        placeholder="事项描述"
+                      />
                     </div>
                   </td>
                   <td>
-                    {assigneeMembers.length > 0 ? (
-                      <div className="tasks-table__helpers">
-                        {assigneeMembers.map((m) => (
-                          <span key={m.id} className="tasks-table__member-link">
-                            @{m.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="tasks-table__assignee">
-                        {(Array.isArray(task.assignee) ? task.assignee.join(', ') : task.assignee) || '—'}
-                      </span>
-                    )}
+                    <CustomSelect
+                      value={assigneeIds}
+                      onChange={(vals) => updateTaskField(task.id, 'assignee', vals)}
+                      options={assigneeOptions}
+                      placeholder="可不选择负责人"
+                      multiple
+                      size="sm"
+                      searchable
+                      searchPlaceholder="搜索负责人…"
+                    />
                   </td>
                   <td>
-                    {helperMembers.length > 0 ? (
-                      <div className="tasks-table__helpers">
-                        {helperMembers.map((h) => (
-                          <span key={h.id} className="tasks-table__member-link">
-                            @{h.name}
-                          </span>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="tasks-table__assignee">—</span>
-                    )}
+                    <CustomSelect
+                      value={(task.helpers || [])}
+                      onChange={(vals) => updateTaskField(task.id, 'helpers', vals)}
+                      options={assigneeOptions}
+                      placeholder="选择协助人"
+                      multiple
+                      size="sm"
+                      searchable
+                      searchPlaceholder="搜索协助人…"
+                    />
                   </td>
                   <td>
                     <div className="tasks-table__note-cell">
@@ -1428,13 +1458,15 @@ export default function Tasks() {
                         value={task.reflections || ''}
                         onChange={(e) => updateTaskField(task.id, 'reflections', e.target.value)}
                       />
-                      <button
-                        onClick={() => deleteTask(task.id)}
-                        className="tasks-table__delete"
-                        title="删除"
-                      >
-                        <X size={14} />
-                      </button>
+                      {canDeleteTask(task) && (
+                        <button
+                          onClick={() => deleteTask(task)}
+                          className="tasks-table__delete"
+                          title="删除"
+                        >
+                          <X size={14} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>

@@ -450,6 +450,8 @@ CREATE TABLE IF NOT EXISTS tasks (
   -- 亮点总结 / 经验复盘：随任务持久化，非状态切换时的一次性 reason
   highlights TEXT NOT NULL DEFAULT '',
   reflections TEXT NOT NULL DEFAULT '',
+  created_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_by TEXT NOT NULL DEFAULT '',
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
@@ -457,6 +459,8 @@ CREATE TABLE IF NOT EXISTS tasks (
 -- 老库增量迁移：v3 新增 highlights / reflections
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS highlights TEXT NOT NULL DEFAULT '';
 ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reflections TEXT NOT NULL DEFAULT '';
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL;
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS created_by TEXT NOT NULL DEFAULT '';
 
 CREATE INDEX IF NOT EXISTS idx_tasks_created_at ON tasks (created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks (status);
@@ -487,11 +491,18 @@ CREATE POLICY "认证用户可更新事项"
   USING (true)
   WITH CHECK (true);
 
--- 所有已认证用户可删除（如需更严可改成仅 admin）
+-- 管理员或事项创建人可删除
 CREATE POLICY "认证用户可删除事项"
   ON tasks FOR DELETE
   TO authenticated
-  USING (true);
+  USING (
+    created_by_id = auth.uid()
+    OR EXISTS (
+      SELECT 1 FROM profiles
+      WHERE profiles.id = auth.uid()
+        AND profiles.role = 'admin'
+    )
+  );
 
 -- ============================================
 -- 20. 创建 documents 表（流程模板 / 规章制度等文档，跨设备同步）
