@@ -21,6 +21,8 @@ function rowToTask(row) {
     statusHistory: Array.isArray(row.status_history) ? row.status_history : [],
     highlights: row.highlights || '',
     reflections: row.reflections || '',
+    createdById: row.created_by_id || row.createdById || null,
+    createdBy: row.created_by || row.createdBy || '',
     workItemId: row.work_item_id || null,
     workItemKind: row.work_item_kind || null,
     createdAt: row.created_at ? String(row.created_at).slice(0, 10) : '',
@@ -39,9 +41,16 @@ function taskToRow(task) {
     status_history: Array.isArray(task.statusHistory) ? task.statusHistory : [],
     highlights: task.highlights || '',
     reflections: task.reflections || '',
+    created_by_id: task.createdById || null,
+    created_by: task.createdBy || '',
     work_item_id: task.workItemId || null,
     work_item_kind: task.workItemKind || null,
   };
+}
+
+function stripOptionalTaskColumns(row) {
+  const { created_by_id, created_by, ...rest } = row;
+  return rest;
 }
 
 function getLocalTasks() {
@@ -99,7 +108,15 @@ export async function bindExistingTaskToWorkItem(task, kind) {
   }
 }
 
-export async function createLinkedTask({ title, kind, category, assigneeId, completedAt }) {
+export async function createLinkedTask({
+  title,
+  kind,
+  category,
+  assigneeId,
+  completedAt,
+  creatorId,
+  creatorName,
+}) {
   const workItemId = genWorkItemId();
   const now = new Date().toISOString();
   const completedDate = completedAt || now.slice(0, 10);
@@ -121,6 +138,8 @@ export async function createLinkedTask({ title, kind, category, assigneeId, comp
     ],
     highlights: '',
     reflections: '',
+    createdById: creatorId || assigneeId || null,
+    createdBy: creatorName || '',
     workItemId,
     workItemKind: kind,
     createdAt: completedDate,
@@ -132,11 +151,20 @@ export async function createLinkedTask({ title, kind, category, assigneeId, comp
   }
 
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('tasks')
       .insert(taskToRow(task))
       .select()
       .single();
+    if (error && /created_by/i.test(error.message || '')) {
+      const fallback = await supabase
+        .from('tasks')
+        .insert(stripOptionalTaskColumns(taskToRow(task)))
+        .select()
+        .single();
+      data = fallback.data;
+      error = fallback.error;
+    }
     if (error) throw error;
     return { success: true, workItemId, task: data ? rowToTask(data) : task };
   } catch (err) {

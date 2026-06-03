@@ -616,6 +616,8 @@ export default function EventPublish() {
           : (filterOptions?.taskCategories?.[0] || ''),
         assigneeId: user?.id || null,
         completedAt: draft.date,
+        creatorId: user?.id || null,
+        creatorName: user?.nickname || user?.name || user?.email || '',
       });
       if (!res.success) {
         setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
