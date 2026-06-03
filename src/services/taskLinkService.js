@@ -107,7 +107,7 @@ export async function createLinkedTask({ title, kind, category, assigneeId }) {
     title: (title || '').trim() || '未命名事项',
     description: '',
     category: category || '',
-    status: '待启动',
+    status: '已完成',
     assignee: assigneeId ? [assigneeId] : [],
     helpers: [],
     statusHistory: [],

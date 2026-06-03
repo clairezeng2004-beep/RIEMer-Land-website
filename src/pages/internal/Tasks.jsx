@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Navigate, Link, useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -1382,15 +1382,9 @@ export default function Tasks() {
                     {assigneeMembers.length > 0 ? (
                       <div className="tasks-table__helpers">
                         {assigneeMembers.map((m) => (
-                          m.profileUrl ? (
-                            <Link key={m.id} to={m.profileUrl} className="tasks-table__member-link">
-                              @{m.name}
-                            </Link>
-                          ) : (
-                            <span key={m.id} className="tasks-table__member-link">
-                              @{m.name}
-                            </span>
-                          )
+                          <span key={m.id} className="tasks-table__member-link">
+                            @{m.name}
+                          </span>
                         ))}
                       </div>
                     ) : (
@@ -1403,9 +1397,9 @@ export default function Tasks() {
                     {helperMembers.length > 0 ? (
                       <div className="tasks-table__helpers">
                         {helperMembers.map((h) => (
-                          <Link key={h.id} to={h.profileUrl} className="tasks-table__member-link">
+                          <span key={h.id} className="tasks-table__member-link">
                             @{h.name}
-                          </Link>
+                          </span>
                         ))}
                       </div>
                     ) : (
