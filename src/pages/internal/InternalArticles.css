@@ -606,7 +606,9 @@
 }
 
 .ia-card__delete-btn {
-  right: 48px;
+  /* 放到编辑按钮正下方，避免和卡片标题/文字重叠 */
+  top: 50px;
+  right: 10px;
 }
 
 .ia-card__delete-btn:hover {
