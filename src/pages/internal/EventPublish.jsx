@@ -249,7 +249,7 @@ export default function EventPublish() {
   const [linkableTasks, setLinkableTasks] = useState([]);
   const [selectedTaskId, setSelectedTaskId] = useState('');
   const [newLinkedTaskTitle, setNewLinkedTaskTitle] = useState('');
-  const [syncNewTaskTitle, setSyncNewTaskTitle] = useState(true);
+  const [hasEditedNewTaskTitle, setHasEditedNewTaskTitle] = useState(false);
   const [taskLinkError, setTaskLinkError] = useState('');
 
   const handleExtractFromUrl = async () => {
@@ -359,9 +359,9 @@ export default function EventPublish() {
   }, [showModal]);
 
   useEffect(() => {
-    if (!syncNewTaskTitle) return;
+    if (taskLinkMode !== 'new' || hasEditedNewTaskTitle) return;
     setNewLinkedTaskTitle(draft.title || '');
-  }, [syncNewTaskTitle, draft.title]);
+  }, [taskLinkMode, hasEditedNewTaskTitle, draft.title]);
 
   // 排序：未来活动优先（按日期升序），过去活动按降序
   const sortedEvents = useMemo(() => {
@@ -538,7 +538,7 @@ export default function EventPublish() {
     setTaskLinkMode('none');
     setSelectedTaskId('');
     setNewLinkedTaskTitle('');
-    setSyncNewTaskTitle(true);
+    setHasEditedNewTaskTitle(false);
     setTaskLinkError('');
     setShowModal(true);
   };
@@ -554,7 +554,7 @@ export default function EventPublish() {
     setTaskLinkMode('none');
     setSelectedTaskId('');
     setNewLinkedTaskTitle('');
-    setSyncNewTaskTitle(true);
+    setHasEditedNewTaskTitle(false);
     setTaskLinkError('');
   };
 
@@ -603,7 +603,7 @@ export default function EventPublish() {
       linkedWorkItemId = res.workItemId;
     }
     if (!linkedWorkItemId && taskLinkMode === 'new') {
-      const taskTitle = (syncNewTaskTitle ? draft.title : newLinkedTaskTitle).trim();
+      const taskTitle = (hasEditedNewTaskTitle ? newLinkedTaskTitle : draft.title).trim();
       if (!taskTitle) {
         setTaskLinkError('请输入新事项标题');
         return;
@@ -1371,7 +1371,7 @@ export default function EventPublish() {
                             checked={taskLinkMode === 'new'}
                             onChange={() => {
                               setTaskLinkMode('new');
-                              if (!newLinkedTaskTitle) setNewLinkedTaskTitle(draft.title || '');
+                              if (!hasEditedNewTaskTitle) setNewLinkedTaskTitle(draft.title || '');
                             }}
                           />
                           新建事项
@@ -1398,20 +1398,15 @@ export default function EventPublish() {
 
                       {taskLinkMode === 'new' && (
                         <div className="ia-work-link__new">
-                          <label className="ia-work-link__sync">
-                            <input
-                              type="checkbox"
-                              checked={syncNewTaskTitle}
-                              onChange={(e) => setSyncNewTaskTitle(e.target.checked)}
-                            />
-                            事项标题同步为当前活动标题
-                          </label>
                           <input
                             type="text"
                             className="ia-modal__text-input"
-                            value={syncNewTaskTitle ? (draft.title || '') : newLinkedTaskTitle}
-                            onChange={(e) => setNewLinkedTaskTitle(e.target.value)}
-                            disabled={syncNewTaskTitle}
+                            value={newLinkedTaskTitle}
+                            onChange={(e) => {
+                              setNewLinkedTaskTitle(e.target.value);
+                              setHasEditedNewTaskTitle(true);
+                              setTaskLinkError('');
+                            }}
                             placeholder="新事项标题"
                           />
                         </div>
