@@ -37,6 +37,10 @@
      已能解决问题，加 justify 反而会让中文段落字间距变宽不自然 */
   text-wrap: pretty;
   text-wrap: balance;
+  /* 中文断行：keep-all 让浏览器只在标点/空格处换行，不再把「互助平台」这类
+     连续词语从中间拆成两行；overflow-wrap 作为兜底，遇到超长且无标点的串才强制断。 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* ============ Hero Actions (below hero bg) ============ */

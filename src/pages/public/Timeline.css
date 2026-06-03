@@ -31,6 +31,9 @@
   /* 段落排版优化：均衡每行长度，避免孤字成段（详见 Home.css .hero__subtitle 注释） */
   text-wrap: pretty;
   text-wrap: balance;
+  /* 中文断行：只在标点/空格处换行，避免连续词语被拆成两行 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* ============ Horizontal Timeline ============ */
@@ -312,6 +315,9 @@
      比原来的 --text-xs 提升一档。 */
   font-size: var(--text-sm);
   line-height: 1.6;
+  /* 中文断行：只在标点/空格处换行，避免连续词语被拆成两行 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
 }
 
 /* 滑动提示 */
