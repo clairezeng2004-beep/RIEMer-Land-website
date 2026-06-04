@@ -518,14 +518,21 @@ export default function Tasks() {
     return matchesStatus && matchesCategory && matchesAssignee && matchesMine;
   });
 
-  // 按"最近一次状态更新时间"从新到旧排序：
-  // 取 statusHistory 最后一条记录的日期，没有状态变更历史时回退到创建时间。
+  // 排序规则：
+  // 1) 未结束事项（未标记"已完成/已取消"）优先；
+  // 2) 未结束事项内部、已结束事项内部，都按最近一次状态更新时间从新到旧；
+  // 3) 没有状态变更历史时回退到创建时间。
   const lastStatusUpdate = (task) => {
     const hist = Array.isArray(task.statusHistory) ? task.statusHistory : [];
     if (hist.length > 0) return hist[hist.length - 1].date || task.createdAt || '';
     return task.createdAt || '';
   };
-  filtered.sort((a, b) => lastStatusUpdate(b).localeCompare(lastStatusUpdate(a)));
+  const isClosedTask = (task) => task.status === '已完成' || task.status === '已取消';
+  filtered.sort((a, b) => {
+    const closedDelta = Number(isClosedTask(a)) - Number(isClosedTask(b));
+    if (closedDelta !== 0) return closedDelta;
+    return lastStatusUpdate(b).localeCompare(lastStatusUpdate(a));
+  });
 
   const handleAddTask = async (e) => {
     e.preventDefault();
