@@ -7,25 +7,39 @@
 
 import { articlesData } from '../data/siteData';
 
-// 构建文章摘要上下文（发送给后端供大模型使用）
-function buildArticlesContext() {
-  return articlesData
+// 合并"用户上传的最新文章" + 静态内置文章，按 id 去重（用户文章优先）。
+// 这样助手读取的是当前实际已上传的文章，而不是历史缓存。
+function mergeArticles(userArticles) {
+  const seen = new Set();
+  const all = [];
+  [...(userArticles || []), ...articlesData].forEach((a) => {
+    if (!a || a.id == null || seen.has(a.id)) return;
+    seen.add(a.id);
+    all.push(a);
+  });
+  return all;
+}
+
+// 构建文章摘要上下文（发送给后端供大模型使用）。
+// 用顺序编号 #n 作为引用标记（不依赖文章 id 的格式，兼容 user-xxx 这类非数字 id）。
+function buildArticlesContext(all) {
+  return all
     .map(
-      (a) =>
-        `[ID:${a.id}] 标题：${a.title} | 分类：${a.category} | 标签：${a.tags.join('、')} | 摘要：${a.excerpt}`
+      (a, i) =>
+        `#${i + 1} 标题：${a.title} | 分类：${a.category || ''} | 标签：${(a.tags || []).join('、')} | 摘要：${a.excerpt || ''}`
     )
     .join('\n');
 }
 
 // ========== 通过后端 Serverless Function 调用 DeepSeek ==========
-async function callLLMApi(messages) {
+async function callLLMApi(messages, articlesContext) {
   try {
     const response = await fetch('/api/chat', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         messages,
-        articlesContext: buildArticlesContext(),
+        articlesContext,
       }),
     });
 
@@ -238,7 +252,7 @@ function isLookingForArticles(query) {
   return articleIntentSignals.some((s) => q.includes(s));
 }
 
-function localSearch(query) {
+function localSearch(query, articles = articlesData) {
   const trimmed = query.trim();
 
   // 1. 先检查是否为打招呼/寒暄
@@ -273,7 +287,7 @@ function localSearch(query) {
     return { text: reply, articles: [] };
   }
 
-  const scored = articlesData.map((article) => {
+  const scored = articles.map((article) => {
     const searchText = `${article.title} ${article.category} ${article.tags.join(' ')} ${article.excerpt} ${article.content}`.toLowerCase();
     let score = 0;
     for (const kw of keywords) {
@@ -322,29 +336,41 @@ function localSearch(query) {
 }
 
 // ========== 主入口 ==========
-export async function sendMessage(messages) {
+// userArticles：来自 SiteContent 的实时上传文章列表，确保助手读取最新内容。
+export async function sendMessage(messages, userArticles = []) {
   // 尝试调用大模型 API
   const userMessages = messages.map((m) => ({
     role: m.role,
     content: m.content,
   }));
 
-  const llmReply = await callLLMApi(userMessages);
+  const allArticles = mergeArticles(userArticles);
+  const llmReply = await callLLMApi(userMessages, buildArticlesContext(allArticles));
 
   if (llmReply) {
-    // 从回复中提取提到的文章 ID
+    // 回复里用 #n 引用文章 → 映射回真实文章，渲染成可点击卡片
     const idMatches = [...llmReply.matchAll(/#(\d+)/g)];
-    const mentionedArticles = idMatches
-      .map((m) => articlesData.find((a) => a.id === m[1]))
-      .filter(Boolean);
+    const mentionedArticles = [];
+    const seen = new Set();
+    idMatches.forEach((m) => {
+      const idx = parseInt(m[1], 10) - 1;
+      const art = allArticles[idx];
+      if (art && !seen.has(art.id)) {
+        seen.add(art.id);
+        mentionedArticles.push(art);
+      }
+    });
+
+    // 文本里去掉裸露的 #n 编号，避免出现"只看到编号"的观感；卡片在下方单独渲染
+    const cleanText = llmReply.replace(/\s*#\d+/g, '').replace(/[ \t]+\n/g, '\n').trim();
 
     return {
-      text: llmReply,
+      text: cleanText,
       articles: mentionedArticles,
     };
   }
 
   // fallback: 智能本地搜索（支持自然对话 + 关键词提取）
   const lastUserMessage = messages[messages.length - 1]?.content || '';
-  return localSearch(lastUserMessage);
+  return localSearch(lastUserMessage, allArticles);
 }

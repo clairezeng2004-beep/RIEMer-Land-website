@@ -2,6 +2,7 @@ import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { MessageCircle, X, Send, ArrowRight, Loader2, Mic, MicOff } from 'lucide-react';
 import { sendMessage } from '../services/chatService';
+import { useSiteContent } from '../contexts/SiteContentContext';
 import './ArticleChat.css';
 
 // 浏览器 SpeechRecognition 兼容处理
@@ -66,6 +67,7 @@ function getContextQuickActions(lastAssistantMsg) {
 }
 
 export default function ArticleChat() {
+  const { userArticles } = useSiteContent();
   const [isOpen, setIsOpen] = useState(false);
   const [input, setInput] = useState('');
   const [messages, setMessages] = useState([
@@ -190,7 +192,8 @@ export default function ArticleChat() {
 
     try {
       const result = await sendMessage(
-        newMessages.map((m) => ({ role: m.role, content: m.content }))
+        newMessages.map((m) => ({ role: m.role, content: m.content })),
+        userArticles
       );
       setMessages((prev) => [
         ...prev,
