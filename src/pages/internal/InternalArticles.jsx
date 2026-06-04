@@ -1177,6 +1177,7 @@ export default function InternalArticles() {
           </div>
           <div className="ia-list__filter-bar">
             <div className="ia-list__categories">
+              <span className="ia-list__filter-label"><Tag size={13} /> 系列</span>
               {categories.map((cat) => {
                 if (cat === '全部') {
                   return (
