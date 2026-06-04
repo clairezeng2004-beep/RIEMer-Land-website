@@ -625,6 +625,15 @@
   flex: 1;
 }
 
+/* 右上角有「编辑/删除」两个绝对定位的图标按钮（约 42px 宽、上下两枚）。
+   只给顶部的标签/标题/摘要留出右侧空间，避免窄屏 / 手机端文字钻到按钮下面；
+   底部 footer 不缩进，便于地点/系列继续靠右下角。 */
+.ia-card__body .ep-card__top,
+.ia-card__body .ia-card__title,
+.ia-card__body .ia-card__excerpt {
+  padding-right: 44px;
+}
+
 .ia-card__category {
   display: inline-block;
   font-size: var(--text-xs);
@@ -691,18 +700,9 @@
   font-weight: 500;
 }
 
+/* 后台卡片不再显示悬浮小箭头 */
 .ia-card__arrow {
-  /* 有系列时系列胶囊用 margin-left:auto 占据右侧，箭头紧随其后靠右 */
-  color: var(--color-text-muted);
-  opacity: 0;
-  transform: translateX(-4px);
-  transition: all var(--transition-fast);
-}
-
-.ia-card:hover .ia-card__arrow {
-  opacity: 1;
-  transform: translateX(0);
-  color: var(--color-primary);
+  display: none;
 }
 
 /* 空状态 */

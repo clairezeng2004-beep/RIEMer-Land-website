@@ -20,6 +20,11 @@
   margin-bottom: var(--space-sm, 10px);
 }
 
+/* 地点信息靠右下角对齐（其后若有"需密码"也一并靠右） */
+.ep-card__meta--location {
+  margin-left: auto;
+}
+
 /* 系列标签独占日期/地点下方第二行，左对齐 */
 .ep-card__category-row {
   margin-top: var(--space-xs, 6px);

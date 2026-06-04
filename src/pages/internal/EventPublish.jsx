@@ -1178,7 +1178,7 @@ export default function EventPublish() {
                       <Calendar size={13} /> {event.date}
                     </span>
                     {event.location && (
-                      <span className="ia-card__meta">
+                      <span className="ia-card__meta ep-card__meta--location">
                         <MapPin size={13} /> {event.location}
                       </span>
                     )}
