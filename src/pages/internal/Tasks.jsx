@@ -1101,21 +1101,6 @@ export default function Tasks() {
                   options={orderedTaskCategories}
                 />
               </div>
-              {/* 关联目标（workItemKind）——弱提示：默认"不关联"，选了 article/event 会
-                  在创建时自动生成 workItemId，串联到归档/活动发布两侧。
-                  产品决策：只做"提示 + 可选强绑"，不强制。 */}
-              <div className="tasks-form__field">
-                <label>关联目标</label>
-                <CustomSelect
-                  value={newTask.workItemKind || 'none'}
-                  onChange={(val) => setNewTask({ ...newTask, workItemKind: val })}
-                  options={[
-                    { value: 'none', label: '不关联（纯内部事项）' },
-                    { value: 'article', label: '将产出公众号文章 → 稍后归档' },
-                    { value: 'event', label: '将落地一场活动 → 稍后发布' },
-                  ]}
-                />
-              </div>
               <button type="submit" className="btn btn-primary">
                 <Plus size={16} /> 创建事项
               </button>
