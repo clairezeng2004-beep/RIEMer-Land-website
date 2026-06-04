@@ -19,7 +19,7 @@ const SIDEBAR_FALLBACK = {
   labelTasks: '事项追踪',
   labelProcessTemplates: '流程模板文件',
   labelMemberSharing: '成员内部分享',
-  labelArticles: '公众号文字分享归档',
+  labelArticles: '公众号长文分享归档',
   labelEventPublish: '活动发布',
   labelContributions: '成员贡献度',
   labelSuggestions: '建设建议',

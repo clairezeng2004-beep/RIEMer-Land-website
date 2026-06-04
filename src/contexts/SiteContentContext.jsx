@@ -139,7 +139,7 @@ const getDefaultInternalConfig = () => ({
     labelTasks: '事项追踪',
     labelProcessTemplates: '流程模板文件',
     labelMemberSharing: '成员内部分享',
-    labelArticles: '公众号文字分享归档',
+    labelArticles: '公众号长文分享归档',
     labelContributions: '成员贡献',
     labelSuggestions: '建设建议',
     labelGuestbook: '访客留言板',
@@ -229,7 +229,7 @@ const getDefaultInternalConfig = () => ({
   },
   // 公众号历史文章页
   internalArticles: {
-    pageTitle: '公众号文字分享归档',
+    pageTitle: '公众号长文分享归档',
     pageDesc: '浏览公众号历史推送内容，回顾与归档',
   },
   // 个人主页
@@ -290,6 +290,10 @@ const getDefaultFilters = () => ({
 const SIDEBAR_LEGACY_LABEL_MIGRATION = {
   sectionLabelMembers: { from: ['成员'], to: '成员信息' },
   sectionLabelAdmin: { from: ['管理'], to: '网站管理' },
+  labelArticles: {
+    from: ['公众号历史文章归档', '公众号文字分享归档'],
+    to: '公众号长文分享归档',
+  },
 };
 
 function migrateSidebarLegacyLabels(sidebar) {
