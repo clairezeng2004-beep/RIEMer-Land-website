@@ -20,7 +20,7 @@
 .navbar__container {
   width: 100%;
   margin: 0 auto;
-  padding: 0 clamp(1.5rem, 5vw, 4rem);
+  padding: 0 clamp(1rem, 3vw, 2.5rem);
   padding-left: clamp(0.75rem, 2vw, 1.5rem);
   display: flex;
   align-items: center;
@@ -142,13 +142,13 @@
 .navbar__user {
   display: flex;
   align-items: center;
-  gap: var(--space-sm);
-  margin-left: var(--space-md);
+  gap: var(--space-md);
+  margin-left: var(--space-sm);
 }
 
 .navbar__user-avatar {
-  width: 28px;
-  height: 28px;
+  width: 34px;
+  height: 34px;
   border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
@@ -174,7 +174,7 @@
 }
 
 .navbar__user-name {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   color: var(--color-text-muted);
   font-weight: 500;
 }
@@ -185,9 +185,20 @@
   gap: 8px;
   text-decoration: none;
   border-radius: var(--radius-md);
-  padding: 4px 8px;
+  padding: 5px 8px;
   transition: all var(--transition-fast);
   cursor: pointer;
+}
+
+.navbar__user .btn-sm {
+  min-height: 42px;
+  padding: 0.55rem 1.15rem;
+  font-size: var(--text-base);
+}
+
+.navbar__user .btn-sm svg {
+  width: 18px;
+  height: 18px;
 }
 
 .navbar__user-link:hover {
