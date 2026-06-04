@@ -1349,6 +1349,7 @@ export default function Tasks() {
                 const latestStatusChange = Array.isArray(task.statusHistory) && task.statusHistory.length > 0
                   ? task.statusHistory[task.statusHistory.length - 1]
                   : null;
+                const statusDisplayDate = latestStatusChange?.date || task.createdAt || '';
                 return (
                 <tr key={task.id} className={`tasks-table__row tasks-table__row--${task.status === '已完成' ? 'done' : ''}`}>
                   <td>
@@ -1363,10 +1364,10 @@ export default function Tasks() {
                         size="sm"
                         style={{ color: statusColors[task.status] }}
                       />
-                      {latestStatusChange?.date && (
+                      {statusDisplayDate && (
                         <div className="tasks-table__history">
                           <div className="tasks-table__history-item">
-                            <span className="tasks-table__history-date">{latestStatusChange.date}</span>
+                            <span className="tasks-table__history-date">{statusDisplayDate}</span>
                           </div>
                         </div>
                       )}
