@@ -767,7 +767,7 @@
   padding: 0.3rem 0.6rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   color: var(--color-text);
   background: var(--color-bg);
   outline: none;
@@ -816,8 +816,24 @@
   color: var(--color-text-muted);
   opacity: 0.7;
   white-space: nowrap;
-  font-size: 11px;
+  font-size: var(--text-xs);
   line-height: 1;
+}
+
+.tasks-table .custom-select--sm .custom-select__trigger {
+  min-height: 34px;
+  padding: 0.35rem 0.55rem;
+  font-size: var(--text-sm);
+}
+
+.tasks-table .custom-select--multiple .custom-select__trigger {
+  min-height: 34px;
+}
+
+.tasks-table .custom-select__tag {
+  padding: 2px 7px 2px 9px;
+  font-size: var(--text-sm);
+  line-height: 1.35;
 }
 
 .tasks-empty {
