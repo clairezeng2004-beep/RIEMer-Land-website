@@ -72,11 +72,19 @@
 /* 公开页面中等宽度（769–960px）：4 列会挤压文字，降级为 2 列 */
 @media (max-width: 960px) and (min-width: 769px) {
   .footer__grid {
-    grid-template-columns: repeat(2, 1fr);
+    grid-template-columns: max-content max-content;
     grid-template-areas:
       "nav about"
       "contact qrcode";
+    justify-content: center;
+    justify-items: start;
+    column-gap: clamp(var(--space-2xl), 8vw, var(--space-4xl));
     row-gap: var(--space-xl);
+  }
+
+  .footer__qrcode {
+    align-items: flex-start;
+    text-align: left;
   }
 }
 
