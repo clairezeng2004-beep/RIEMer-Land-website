@@ -255,6 +255,11 @@ const taskToRow = (t) => ({
   work_item_kind: t.workItemKind || null,
 });
 
+const formatCompactTaskDate = (date) => {
+  const value = String(date || '');
+  return /^\d{4}-/.test(value) ? value.slice(2) : value;
+};
+
 const stripOptionalTaskColumns = (row) => {
   const { created_by_id, created_by, ...rest } = row;
   return rest;
@@ -1357,6 +1362,7 @@ export default function Tasks() {
                   ? task.statusHistory[task.statusHistory.length - 1]
                   : null;
                 const statusDisplayDate = latestStatusChange?.date || task.createdAt || '';
+                const compactStatusDisplayDate = formatCompactTaskDate(statusDisplayDate);
                 return (
                 <tr key={task.id} className={`tasks-table__row tasks-table__row--${task.status === '已完成' ? 'done' : ''}`}>
                   <td>
@@ -1374,7 +1380,7 @@ export default function Tasks() {
                       {statusDisplayDate && (
                         <div className="tasks-table__history">
                           <div className="tasks-table__history-item">
-                            <span className="tasks-table__history-date">{statusDisplayDate}</span>
+                            <span className="tasks-table__history-date">{compactStatusDisplayDate}</span>
                           </div>
                         </div>
                       )}
