@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react';
+import { useState, useMemo, useRef, useLayoutEffect } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowRight,
@@ -52,10 +52,27 @@ export default function Home() {
     () => [...events].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
     [events],
   );
-  const recentEvents = sortedEvents.slice(0, 3);
+  // 首页"最新活动"展示数量随屏幕宽度自适应：默认填满一整行（列数由网格宽度决定），
+  // 宽屏列更多就显示更多，避免页面留白。列数通过读取网格实际渲染的列轨道数得到。
+  const eventsGridRef = useRef(null);
+  const [eventCols, setEventCols] = useState(3);
+  useLayoutEffect(() => {
+    const grid = eventsGridRef.current;
+    if (!grid) return;
+    const measure = () => {
+      const cols = getComputedStyle(grid)
+        .gridTemplateColumns.split(' ')
+        .filter((v) => v && v !== 'none').length;
+      setEventCols(Math.max(1, cols));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(grid);
+    return () => ro.disconnect();
+  }, []);
+  const recentEvents = sortedEvents.slice(0, eventCols);
 
   // 活动卡片标题按行对齐（结构含可选倒计时行，无法用 subgrid，改用 JS 逐行等高）
-  const eventsGridRef = useRef(null);
   useEqualTitleHeights(eventsGridRef, '.featured__title', [recentEvents.length]);
 
   // 计算活动倒计时天数（活动日期比当前晚则返回天数，否则返回 null）
@@ -204,7 +221,7 @@ export default function Home() {
           <div className="featured__header">
             <h2 className="section-title">最新活动</h2>
           </div>
-          <div className="featured__grid" ref={eventsGridRef}>
+          <div className="featured__grid featured__grid--events" ref={eventsGridRef}>
             {recentEvents.map((event) => {
               const countdownDays = getCountdownDays(event.date);
               return (

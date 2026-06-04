@@ -151,6 +151,12 @@
   gap: clamp(0.75rem, 2vw, 2rem);
 }
 
+/* 活动网格：列数随宽度自适应（每列至少 ~300px），配合 JS 只渲染一整行，
+   宽屏多列就多显示，窄屏自动降到 1 列。min() 防止超窄屏出现横向溢出。 */
+.featured__grid.featured__grid--events {
+  grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+}
+
 /* 历史文章网格：用 subgrid 让同一行卡片的封面/标题/摘要/底部按行对齐。
    标题不再强制两行——只有当同一行里有卡片标题换行时，其它卡片才跟着多留行高。 */
 .featured__grid--articles .featured__card {
