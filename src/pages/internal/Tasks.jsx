@@ -1391,13 +1391,6 @@ export default function Tasks() {
                         onChange={(e) => updateTaskField(task.id, 'title', e.target.value)}
                         placeholder="事项标题"
                       />
-                      <input
-                        type="text"
-                        className="tasks-table__inline-input tasks-table__inline-input--desc"
-                        value={task.description || ''}
-                        onChange={(e) => updateTaskField(task.id, 'description', e.target.value)}
-                        placeholder="事项描述"
-                      />
                     </div>
                   </td>
                   <td>
