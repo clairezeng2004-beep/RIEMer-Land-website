@@ -1633,6 +1633,24 @@
 }
 
 @media (max-width: 640px) {
+  .ia-readnum-summary {
+    padding: 0.55rem 0.75rem;
+    margin-bottom: var(--space-sm);
+    border-radius: var(--radius-sm, 6px);
+  }
+
+  .ia-readnum-summary__label {
+    font-size: var(--text-xs);
+  }
+
+  .ia-readnum-summary__value {
+    font-size: var(--text-base);
+  }
+
+  .ia-readnum-summary__sub {
+    font-size: 11px;
+  }
+
   .ia-readnum-item {
     flex-direction: column;
     align-items: stretch;
