@@ -318,7 +318,12 @@ export default function InternalArticles() {
     if (s.workItemId) setPendingWorkItemId(s.workItemId);
     if (s.suggestedTitle) setPendingSuggestedTitle(s.suggestedTitle);
     setShowModal(true);
-    setStep('input');
+    setStep('confirm');
+    setDraft(makeEmptyDraft());
+    if (s.suggestedTitle) {
+      setEditTitle(s.suggestedTitle);
+      setNewLinkedTaskTitle(s.suggestedTitle);
+    }
     navigate(location.pathname, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -627,13 +632,36 @@ export default function InternalArticles() {
     });
   }, [allArticles, searchTerm, selectedCategory]);
 
+  // 空白草稿：单弹窗直接呈现完整表单（不再先提取链接再二次进入）
+  const makeEmptyDraft = () => ({
+    rawTitle: '',
+    title: '',
+    author: 'RIEMer Land',
+    coverImage: null,
+    date: new Date().toISOString().split('T')[0],
+    category: '',
+    excerpt: '',
+    content: '',
+    url: '',
+  });
+
   // ---- 打开新建弹窗 ----
   const openModal = () => {
     setShowModal(true);
-    setStep('input');
+    setStep('confirm');
     setUrlInput('');
     setFetchError('');
-    setDraft(null);
+    setDraft(makeEmptyDraft());
+    setEditTitle('');
+    setEditCategory('');
+    setConfirmNewCategory('');
+    setEditTags([]);
+    setEditExcerpt('');
+    setTaskLinkMode('none');
+    setSelectedTaskId('');
+    setNewLinkedTaskTitle('');
+    setSyncNewTaskTitle(true);
+    setTaskLinkError('');
   };
 
   const closeModal = () => {
@@ -675,7 +703,7 @@ export default function InternalArticles() {
         ...seriesTitlePrefixes,
         parsed.category,
       ]);
-      const parsedWithCleanTitle = { ...parsed, title: cleanedTitle || parsed.title };
+      const parsedWithCleanTitle = { ...parsed, title: cleanedTitle || parsed.title, url };
       setDraft(parsedWithCleanTitle);
       // 如果是从 Tasks 页带着 suggestedTitle 跳过来的，优先用抓取到的标题；
       // 抓取标题为空时用 suggestedTitle 兜底，避免用户要手动再输一次。
@@ -726,6 +754,11 @@ export default function InternalArticles() {
   // ---- 确认保存 ----
   const handleConfirmSave = async () => {
     if (!draft) return;
+
+    if (!editTitle.trim() && !draft.title) {
+      alert('请填写文章标题');
+      return;
+    }
 
     const newCategoryLabel = confirmNewCategory.trim();
     if (editCategory === '__new__' && !newCategoryLabel) {
@@ -809,7 +842,7 @@ export default function InternalArticles() {
       tags: editTags,
       excerpt: editExcerpt.trim() || draft.excerpt,
       outline: [],
-      url: draft.url,
+      url: draft.url || urlInput.trim(),
       content: draft.content,
       archivedBy: user?.name || user?.nickname || '未知',
       archivedById: user?.id || null,
@@ -1501,10 +1534,7 @@ export default function InternalArticles() {
         <div className="ia-modal-overlay" onClick={closeModal}>
           <div className="ia-modal" onClick={(e) => e.stopPropagation()}>
             <div className="ia-modal__header">
-              <h2>
-                {step === 'input' && '新建文章归档'}
-                {step === 'confirm' && '确认归档信息'}
-              </h2>
+              <h2>新建文章归档</h2>
               <button className="ia-modal__close" onClick={closeModal}>
                 <X size={20} />
               </button>
@@ -1530,53 +1560,50 @@ export default function InternalArticles() {
                   </span>
                 </div>
               )}
-              {/* Step 1: 输入链接 */}
-              {step === 'input' && (
-                <div className="ia-modal__step-input">
-                  <p className="ia-modal__hint">
-                    请输入微信公众号文章链接，系统将自动提取标题、系列、日期和标签。
-                    摘要需在下一步手动点击「AI 生成」。
-                  </p>
-                  <div className="ia-modal__url-row">
-                    <div className="ia-modal__url-input-wrap">
-                      <Link2 size={18} className="ia-modal__url-icon" />
-                      <input
-                        type="url"
-                        className="ia-modal__url-input"
-                        placeholder="粘贴微信公众号文章链接…"
-                        value={urlInput}
-                        onChange={(e) => setUrlInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && !fetching && handleFetch()}
-                        autoFocus
-                        disabled={fetching}
-                      />
-                    </div>
-                    <button
-                      className="btn btn-primary ia-modal__fetch-btn"
-                      onClick={handleFetch}
-                      disabled={!urlInput.trim() || fetching}
-                    >
-                      {fetching ? (
-                        <>
-                          <Loader2 size={14} className="ia-modal__spinner" />
-                          <span>提取文章</span>
-                        </>
-                      ) : (
-                        <span>提取文章</span>
-                      )}
-                    </button>
-                  </div>
-                  {fetchError && (
-                    <div className="ia-modal__error">
-                      <AlertCircle size={16} /> {fetchError}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Step 2: 确认 */}
-              {step === 'confirm' && draft && (
+              {draft && (
                 <div className="ia-modal__step-confirm">
+                  {/* 文章链接（可选）：粘贴后点「提取自动填充」自动抓取标题/系列/日期/封面，
+                      也可以完全手动填写下方字段。不再强制先抓取再二次进入。 */}
+                  <div className="ia-modal__field">
+                    <label className="ia-modal__label">
+                      <Link2 size={16} /> 文章链接（可选）
+                    </label>
+                    <div className="ia-modal__url-row">
+                      <div className="ia-modal__url-input-wrap">
+                        <Link2 size={18} className="ia-modal__url-icon" />
+                        <input
+                          type="url"
+                          className="ia-modal__url-input"
+                          placeholder="粘贴微信公众号文章链接，点右侧自动填充…"
+                          value={urlInput}
+                          onChange={(e) => setUrlInput(e.target.value)}
+                          onKeyDown={(e) => e.key === 'Enter' && !fetching && handleFetch()}
+                          disabled={fetching}
+                        />
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary ia-modal__fetch-btn"
+                        onClick={handleFetch}
+                        disabled={!urlInput.trim() || fetching}
+                      >
+                        {fetching ? (
+                          <>
+                            <Loader2 size={14} className="ia-modal__spinner" />
+                            <span>提取中…</span>
+                          </>
+                        ) : (
+                          <span>提取自动填充</span>
+                        )}
+                      </button>
+                    </div>
+                    {fetchError && (
+                      <div className="ia-modal__error" style={{ marginTop: 6 }}>
+                        <AlertCircle size={16} /> {fetchError}
+                      </div>
+                    )}
+                  </div>
+
                   {/* 标题 */}
                   <div className="ia-modal__field">
                     <label className="ia-modal__label">标题</label>
@@ -1845,16 +1872,14 @@ export default function InternalArticles() {
             </div>
 
             {/* 底部按钮 */}
-            {step === 'confirm' && (
-              <div className="ia-modal__footer">
-                <button className="btn btn-ghost" onClick={() => { setStep('input'); setFetchError(''); }}>
-                  重新输入
-                </button>
-                <button className="btn btn-primary" onClick={handleConfirmSave}>
-                  <Check size={16} /> 确认归档
-                </button>
-              </div>
-            )}
+            <div className="ia-modal__footer">
+              <button className="btn btn-ghost" onClick={closeModal}>
+                取消
+              </button>
+              <button className="btn btn-primary" onClick={handleConfirmSave}>
+                <Check size={16} /> 确认归档
+              </button>
+            </div>
           </div>
         </div>
       )}
