@@ -870,6 +870,16 @@
     line-height: 1.4;
   }
 
+  .tasks-table__inline-input--title {
+    font-size: var(--text-xs);
+    line-height: 1.35;
+  }
+
+  .tasks-table__inline-input--desc {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
   .tasks-table {
     min-width: 980px;
   }
