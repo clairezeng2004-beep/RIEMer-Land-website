@@ -1155,41 +1155,37 @@ export default function EventPublish() {
                   </button>
                 )}
                 <div className="ia-card__body">
-                  {(countdownDays || event.hasReplay) && (
+                  {countdownDays && (
                     <div className="ep-card__top">
-                      {countdownDays && (
-                        <span className="ep-card__badge ep-card__badge--upcoming">
-                          <Calendar size={12} /> {countdownDays} 天后
-                        </span>
-                      )}
-                      {event.hasReplay && (
-                        <span className="ep-card__badge ep-card__badge--replay">
-                          <Video size={12} /> 回放
-                        </span>
-                      )}
+                      <span className="ep-card__badge ep-card__badge--upcoming">
+                        <Calendar size={12} /> {countdownDays} 天后
+                      </span>
                     </div>
                   )}
                   <h3 className="ia-card__title">{event.title}</h3>
                   {event.excerpt && (
                     <p className="ia-card__excerpt">{event.excerpt}</p>
                   )}
-                  <div className="ia-card__footer">
+                  {/* 信息标签统一排布（与首页一致）：日期 · 地点 · 回放 · 是否需密码 */}
+                  <div className="ia-card__footer ep-card__info">
                     <span className="ia-card__meta">
                       <Calendar size={13} /> {event.date}
                     </span>
                     {event.location && (
-                      <span className="ia-card__meta ep-card__meta--location">
+                      <span className="ia-card__meta">
                         <MapPin size={13} /> {event.location}
                       </span>
                     )}
                     {event.hasReplay && (
+                      <span className="ep-card__badge ep-card__badge--replay">
+                        <Video size={12} /> 回放
+                      </span>
+                    )}
+                    {event.hasReplay && event.replayPassword && (
                       <span className="ia-card__meta ep-card__meta--lock">
                         <Lock size={12} /> 需密码
                       </span>
                     )}
-                    <span className="ia-card__arrow">
-                      <ArrowRight size={14} />
-                    </span>
                   </div>
                   {normalizeEventCategory(event.category) && (
                     <div className="ep-card__category-row">

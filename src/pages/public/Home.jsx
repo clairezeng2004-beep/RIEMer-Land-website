@@ -257,7 +257,7 @@ export default function Home() {
                           <Video size={12} /> 回放
                         </span>
                       )}
-                      {event.hasReplay && (
+                      {event.hasReplay && event.replayPassword && (
                         <span className="featured__meta-item featured__meta-item--replay">
                           <Lock size={12} /> 需密码
                         </span>
