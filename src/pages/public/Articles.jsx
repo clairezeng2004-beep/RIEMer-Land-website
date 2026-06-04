@@ -38,19 +38,18 @@ export default function Articles() {
     return ['全部', ...cats];
   }, [allArticles]);
 
-  // 筛选标签 = 系列 + 标签；系列放在前面，便于优先按文章系列浏览。
-  const allTags = useMemo(() => {
+  const contentTags = useMemo(() => {
     const tagCount = {};
     allArticles.forEach((a) => {
       (a.tags || []).forEach((t) => {
-        tagCount[t] = (tagCount[t] || 0) + 1;
+        const tag = (t || '').trim();
+        if (tag) tagCount[tag] = (tagCount[tag] || 0) + 1;
       });
     });
-    const tags = Object.entries(tagCount)
+    return Object.entries(tagCount)
       .sort((a, b) => b[1] - a[1])
       .map(([tag]) => tag);
-    return [...new Set([...categories.filter((cat) => cat && cat !== '全部'), ...tags])];
-  }, [allArticles, categories]);
+  }, [allArticles]);
 
   const filtered = useMemo(() => {
     return allArticles.filter((article) => {
@@ -65,7 +64,6 @@ export default function Articles() {
         selectedCategory === '全部' || article.category === selectedCategory;
       const matchesTag =
         selectedTag === '全部' ||
-        article.category === selectedTag ||
         (article.tags || []).includes(selectedTag);
       return matchesSearch && matchesCategory && matchesTag;
     });
@@ -99,36 +97,42 @@ export default function Articles() {
                 className="articles-filters__input"
               />
             </div>
-            <div className="articles-filters__categories">
-              {categories.map((cat) => (
-                <button
-                  key={cat}
-                  className={`articles-filters__cat ${
-                    selectedCategory === cat ? 'articles-filters__cat--active' : ''
-                  }`}
-                  onClick={() => setSelectedCategory(cat)}
-                >
-                  {cat}
-                </button>
-              ))}
-            </div>
-            {allTags.length > 0 && (
-              <div className="articles-filters__tags">
-                <button
-                  className={`articles-filters__tag ${selectedTag === '全部' ? 'articles-filters__tag--active' : ''}`}
-                  onClick={() => setSelectedTag('全部')}
-                >
-                  全部标签
-                </button>
-                {allTags.map((tag) => (
+            <div className="articles-filters__group">
+              <div className="articles-filters__group-title">系列</div>
+              <div className="articles-filters__categories">
+                {categories.map((cat) => (
                   <button
-                    key={tag}
-                    className={`articles-filters__tag ${selectedTag === tag ? 'articles-filters__tag--active' : ''}`}
-                    onClick={() => setSelectedTag(tag)}
+                    key={cat}
+                    className={`articles-filters__cat ${
+                      selectedCategory === cat ? 'articles-filters__cat--active' : ''
+                    }`}
+                    onClick={() => setSelectedCategory(cat)}
                   >
-                    <Tag size={12} /> {tag}
+                    {cat === '全部' ? '全部系列' : cat}
                   </button>
                 ))}
+              </div>
+            </div>
+            {contentTags.length > 0 && (
+              <div className="articles-filters__group">
+                <div className="articles-filters__group-title">内容标签</div>
+                <div className="articles-filters__tags">
+                  <button
+                    className={`articles-filters__tag ${selectedTag === '全部' ? 'articles-filters__tag--active' : ''}`}
+                    onClick={() => setSelectedTag('全部')}
+                  >
+                    全部内容标签
+                  </button>
+                  {contentTags.map((tag) => (
+                    <button
+                      key={tag}
+                      className={`articles-filters__tag ${selectedTag === tag ? 'articles-filters__tag--active' : ''}`}
+                      onClick={() => setSelectedTag(tag)}
+                    >
+                      <Tag size={12} /> {tag}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

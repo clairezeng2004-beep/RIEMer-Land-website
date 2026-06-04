@@ -120,12 +120,12 @@
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 0.3rem 0.75rem;
+  padding: 0.4rem 1rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
   background: transparent;
   color: var(--color-text-light);
-  font-size: var(--text-xs);
+  font-size: var(--text-sm);
   font-weight: 500;
   cursor: pointer;
   transition: all var(--transition-fast);
@@ -589,7 +589,6 @@
   .featured.section { padding-top: var(--space-2xl); }
   .featured__header { margin-bottom: var(--space-sm); }
   .featured__tags-filter { margin-top: var(--space-sm); gap: 4px; }
-  .featured__tag-btn { font-size: 11px; padding: 0.2rem 0.6rem; }
   .featured .section-title { margin-bottom: var(--space-md); }
   .featured .section-title::after { margin-top: var(--space-xs); }
   .featured__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-md); }
