@@ -741,22 +741,23 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       setDocuments((prev) => prev.filter((d) => String(d.id) !== sid));
       setPreviewDoc((prev) => (prev && String(prev.id) === sid ? null : prev));
       setViewLogDoc((prev) => (prev && String(prev.id) === sid ? null : prev));
-      const isUser = sid.startsWith('doc-');
-      // userDocs 中可能存在同 id 的覆盖层（即便 id 不以 doc- 开头），
-      // 一并从本地/云端删除，避免删除后因覆盖层残留仍然显示。
+
+      // 判断这条到底是「内置默认示例」还是「用户/云端发布的文档」：
+      // 之前用 id 是否以 'doc-' 开头来判断，但新发布的文档 id 其实是纯数字
+      // （Date.now().toString()），导致它被误判为默认示例，云端那一行没被删除，
+      // 刷新后又从云端拉回来 —— 这正是「流程模板删了又出现」的根因。
+      // 现在改为：只有 id 真的存在于内置 documentsData 里才算默认示例，其余一律
+      // 当作用户/云端文档，删除时必须删掉云端那一行。
+      const isDefaultDoc = documentsData.some((d) => String(d.id) === sid);
+
+      // 本地缓存里若有同 id 记录，一并移除（含覆盖层）
       const userDocs = loadUserDocs();
-      const hasOverrideRow = userDocs.some((d) => String(d.id) === sid);
-      if (hasOverrideRow) {
+      if (userDocs.some((d) => String(d.id) === sid)) {
         saveUserDocs(userDocs.filter((d) => String(d.id) !== sid));
-        if (shouldUseCloudDocs) {
-          deleteUserDoc(id).catch((err) => {
-            console.warn('[Documents] 云端删除文档失败:', err);
-          });
-        }
       }
-      // 若本来就是默认模拟数据（id 不以 doc- 开头），再额外写一条"已删除"标记，
-      // 保证其它设备拉取时不再渲染该默认示例。
-      if (!isUser) {
+
+      if (isDefaultDoc) {
+        // 内置示例：写一条「已删除默认」标记（本地 + 云端），保证其它设备也不再渲染。
         const deletedIds = loadDeletedDefaultIds();
         if (!deletedIds.includes(sid)) {
           deletedIds.push(sid);
@@ -767,6 +768,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
             console.warn('[Documents] 云端标记默认文档删除失败:', err);
           });
         }
+      } else if (shouldUseCloudDocs) {
+        // 用户/云端文档：直接删掉云端那一行（deleteUserDoc 内部会同时清本地缓存）。
+        deleteUserDoc(id).catch((err) => {
+          console.warn('[Documents] 云端删除文档失败:', err);
+        });
       }
       // 通知由规则引擎统一触发。消息通知作为操作记录保留，但不再手写本地通知，
       // 避免一端删除后另一端只看到本机缓存里的旧通知文案。
