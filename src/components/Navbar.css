@@ -115,7 +115,7 @@
   align-items: center;
   flex-shrink: 0;
   gap: var(--space-sm);
-  margin-left: var(--space-lg);
+  margin-left: auto;
   min-width: 60px;
 }
 
@@ -343,9 +343,9 @@
    800-900px 时，右侧成员入口（包含「主理团队内部空间」链接 + 头像 +
    昵称 + 退出按钮）会把中间 nav-bar 挤得过窄，"分享回顾"和"关于我们"
    两个 nav 项的文字盒子互相重叠（视觉上"折叠在一起"）。
-   把折叠到汉堡的断点提到 900px 后，凡是不够放下完整 navbar 的宽度
+   把折叠到汉堡的断点提到 1100px 后，凡是不够放下完整 navbar 的宽度
    都直接进入汉堡菜单状态，不再出现挤压重叠。 */
-@media (max-width: 900px) {
+@media (max-width: 1100px) {
   .navbar__container {
     height: 64px;
     padding: 0 clamp(0.75rem, 3vw, 1.5rem);
@@ -388,13 +388,13 @@
     position: fixed;
     top: 64px;
     right: 0;
-    width: 55vw;
-    max-width: 280px;
+    width: min(46vw, 240px);
+    min-width: 190px;
     bottom: auto;
     background: #ffffff;
     flex-direction: column;
     align-items: stretch;
-    padding: var(--space-md) var(--space-md);
+    padding: var(--space-sm);
     gap: 2px;
     box-shadow: -4px 4px 20px rgba(0, 0, 0, 0.08);
     border-radius: 0 0 0 var(--radius-lg);
