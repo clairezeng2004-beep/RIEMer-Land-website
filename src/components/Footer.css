@@ -334,12 +334,14 @@
      各自独占一行，垂直堆叠。单行项目保留接近"给我们留言"按钮的高度，
      避免链接、简介和联系方式在小屏上挤成一团。 */
   .footer__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, max-content);
     grid-template-rows: none;
     grid-template-areas: none;
     row-gap: var(--space-lg);
     column-gap: 0;
     text-align: center;
+    justify-content: center;
+    justify-items: center;
   }
 
   .footer__grid > .footer__nav,
@@ -354,7 +356,7 @@
     border-bottom: none;
     justify-content: flex-start;
     gap: var(--space-xs);
-    width: 100%;
+    width: min(100%, 360px);
   }
 
   /* 标题显示回来（之前"关于我们"标题被 display:none 隐藏，现在统一恢复） */
@@ -420,6 +422,7 @@
     justify-content: center;
     white-space: normal;
     flex-wrap: nowrap;
+    text-align: center;
   }
 
   /* "给我们留言"按钮：居中、胶囊样式 */
@@ -465,6 +468,7 @@
   /* 二维码 */
   .footer__qrcode {
     align-items: center;
+    text-align: center;
   }
 
   .footer__qrcode-img {
