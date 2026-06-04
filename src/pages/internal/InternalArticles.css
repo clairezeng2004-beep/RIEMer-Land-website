@@ -97,6 +97,23 @@
   gap: var(--space-sm);
 }
 
+/* 第二段：内容标签筛选 */
+.ia-list__filter-bar--tags {
+  margin-top: var(--space-sm);
+  padding-top: var(--space-sm);
+  border-top: 1px dashed var(--color-border-light);
+}
+
+.ia-list__filter-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  margin-right: 4px;
+}
+
 .ia-list__manage-btn {
   display: flex;
   align-items: center;

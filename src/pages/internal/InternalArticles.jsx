@@ -244,6 +244,8 @@ export default function InternalArticles() {
   const updateIA = useCallback((key, val) => updateInternalConfig({ internalArticles: { [key]: val } }), [updateInternalConfig]);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('全部');
+  // 内容标签筛选（与"系列"分开的第二段筛选）
+  const [selectedTag, setSelectedTag] = useState('全部');
 
   // ---- 系列管理状态 ----
   const [categoryList, setCategoryList] = useState(loadArticleCategories);
@@ -628,9 +630,25 @@ export default function InternalArticles() {
         a.tags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCat =
         selectedCategory === '全部' || a.category === selectedCategory;
-      return matchesSearch && matchesCat;
+      const matchesTag =
+        selectedTag === '全部' || (a.tags || []).includes(selectedTag);
+      return matchesSearch && matchesCat && matchesTag;
     });
-  }, [allArticles, searchTerm, selectedCategory]);
+  }, [allArticles, searchTerm, selectedCategory, selectedTag]);
+
+  // 所有文章里出现过的内容标签（按出现频次降序），用于第二段标签筛选
+  const allContentTags = useMemo(() => {
+    const count = {};
+    allArticles.forEach((a) => {
+      (a.tags || []).forEach((t) => {
+        const tag = String(t || '').trim();
+        if (tag) count[tag] = (count[tag] || 0) + 1;
+      });
+    });
+    return Object.entries(count)
+      .sort((x, y) => y[1] - x[1])
+      .map(([tag]) => tag);
+  }, [allArticles]);
 
   // 空白草稿：单弹窗直接呈现完整表单（不再先提取链接再二次进入）
   const makeEmptyDraft = () => ({
@@ -1329,6 +1347,30 @@ export default function InternalArticles() {
               </button>
             )}
           </div>
+
+          {/* 第二段：内容标签筛选（与系列筛选分开） */}
+          {allContentTags.length > 0 && (
+            <div className="ia-list__filter-bar ia-list__filter-bar--tags">
+              <div className="ia-list__categories">
+                <span className="ia-list__filter-label"><Tag size={13} /> 内容标签</span>
+                <button
+                  className={`ia-list__cat ${selectedTag === '全部' ? 'ia-list__cat--active' : ''}`}
+                  onClick={() => setSelectedTag('全部')}
+                >
+                  全部
+                </button>
+                {allContentTags.map((tag) => (
+                  <button
+                    key={tag}
+                    className={`ia-list__cat ${selectedTag === tag ? 'ia-list__cat--active' : ''}`}
+                    onClick={() => setSelectedTag(tag)}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 系列管理面板 */}
           {editing && showCatManager && (
