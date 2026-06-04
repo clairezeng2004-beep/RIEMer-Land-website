@@ -732,7 +732,7 @@ export default function MemberSharingCreate() {
           >
             取消
           </button>
-          <button type="submit" form="msc-create-form" className="btn btn-primary">
+          <button type="button" className="btn btn-primary" onClick={handleCreate}>
             <Share2 size={16} /> 发布分享
           </button>
         </div>
