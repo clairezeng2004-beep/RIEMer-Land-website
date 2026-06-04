@@ -1305,15 +1305,6 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
               {/* 信息区 */}
               <div className="doc-card__body">
-                <div className="doc-card__top">
-                  <span
-                    className="doc-card__type-badge"
-                    style={{ color: typeColors[doc.type], background: `${typeColors[doc.type]}15` }}
-                  >
-                    {typeLabels[doc.type]}
-                  </span>
-                </div>
-
                 <h4 className="doc-card__title">{doc.title}</h4>
                 <p className="doc-card__desc">{decodePlainText(doc.description)}</p>
 
@@ -1335,10 +1326,17 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   </button>
                 </div>
 
+                {/* 日期 + 系列名同一行：日期居左，系列名靠右下角（对齐活动发布/长文归档卡片） */}
                 <div className="doc-card__meta">
                   <span className="doc-card__meta-item">
                     <Clock size={14} />
                     {doc.date}
+                  </span>
+                  <span
+                    className="doc-card__type-badge"
+                    style={{ color: typeColors[doc.type], background: `${typeColors[doc.type]}15` }}
+                  >
+                    {typeLabels[doc.type]}
                   </span>
                 </div>
               </div>

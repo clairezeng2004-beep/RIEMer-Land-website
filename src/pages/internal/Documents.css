@@ -563,6 +563,8 @@
 
 .doc-card__body {
   padding: clamp(0.75rem, 2vw, 1.5rem);
+  /* 底部留白交给日期行自身的对称内边距，避免日期"文字偏上、上下留白不均" */
+  padding-bottom: 0;
   flex: 1;
   display: flex;
   flex-direction: column;
@@ -622,9 +624,16 @@
   justify-content: space-between;
   align-items: center;
   gap: var(--space-lg);
+  /* 上下对称内边距，让日期在这一行里垂直居中 */
   padding-top: var(--space-sm);
+  padding-bottom: var(--space-sm);
   border-top: 1px solid var(--color-border-light);
   margin-top: auto;
+}
+
+/* 系列名靠右下角 */
+.doc-card__meta .doc-card__type-badge {
+  margin-left: auto;
 }
 
 .doc-card__meta-item {
@@ -1341,6 +1350,7 @@
   }
   .doc-card__meta {
     padding-top: 4px;
+    padding-bottom: 4px;
     margin-top: 0;
   }
   .doc-card__bottom {
