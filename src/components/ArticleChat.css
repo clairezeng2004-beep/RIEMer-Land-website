@@ -48,7 +48,8 @@
   bottom: 24px;
   right: 24px;
   width: 560px;
-  max-height: 720px;
+  /* 固定高度（视口不足时自适应），避免弹出时偏低、聊天过程中高度跳变 */
+  height: min(720px, calc(100vh - 48px));
   background: var(--color-bg-card);
   border-radius: var(--radius-xl);
   box-shadow: 0 12px 48px rgba(44, 62, 45, 0.18);
@@ -410,7 +411,8 @@
     left: auto;
     width: 66vw;
     max-width: 360px;
-    max-height: 70vh;
+    /* 手机端同样用固定高度，保持弹窗高度稳定 */
+    height: 70vh;
     border-radius: var(--radius-xl);
   }
 }
