@@ -842,12 +842,17 @@ export default function InternalArticles() {
       console.warn('[InternalArticles] 发送归档通知失败:', err?.message || err);
     }
 
+    // 仅当本次归档是「从 Tasks 页带着已有事项跳过来」时，才提示去标记该事项完成。
+    // 在弹窗里新建事项 / 不关联事项的常规归档不再打扰用户。
+    const hadWorkItem = !!pendingWorkItemId;
+
     closeModal();
     // 归档成功后，清空从 Tasks 页带过来的预填缓存，避免下次新建时意外沿用
     setPendingWorkItemId(null);
     setPendingSuggestedTitle('');
-    // 归档成功后提示用户是否去事项追踪标记对应事项为"已完成"
-    setTaskPrompt({ articleTitle });
+    if (hadWorkItem) {
+      setTaskPrompt({ articleTitle });
+    }
   };
 
   // ---- 批量录入阅读量 ----
