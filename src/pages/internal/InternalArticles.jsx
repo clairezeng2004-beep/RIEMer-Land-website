@@ -263,6 +263,8 @@ export default function InternalArticles() {
   const [quickCatError, setQuickCatError] = useState('');
   // 管理员：就地新增系列（对齐流程模板文件页的"+添加系列"体验，管理员不必先打开面板）
   const [showInlineAddCat, setShowInlineAddCat] = useState(false);
+  const [editingTagLabel, setEditingTagLabel] = useState(null);
+  const [editTagLabel, setEditTagLabel] = useState('');
 
   // 记录本设备最近一次 push 的 updated_at，避免 realtime 回流覆盖自己
   const lastCatSyncRef = useRef(null);
@@ -587,6 +589,52 @@ export default function InternalArticles() {
     const cat = categoryList.find((c) => c.key === key);
     if (!cat) return;
     handleDeleteCategoryByLabel(cat.label);
+  };
+
+  const startEditTag = (tag) => {
+    setEditingTagLabel(tag);
+    setEditTagLabel(tag);
+  };
+
+  const saveEditTag = async () => {
+    const prevLabel = editingTagLabel;
+    const nextLabel = editTagLabel.trim();
+    if (!prevLabel || !nextLabel) return;
+    if (nextLabel !== prevLabel && allContentTags.includes(nextLabel)) {
+      alert('该内容标签已存在');
+      return;
+    }
+
+    if (nextLabel !== prevLabel) {
+      const affected = allArticles.filter((a) => (a.tags || []).includes(prevLabel));
+      await Promise.all(
+        affected.map((a) => updateArticle(a.id, {
+          tags: [...new Set((a.tags || []).map((tag) => (
+            tag === prevLabel ? nextLabel : tag
+          )))],
+        })),
+      );
+      if (selectedTag === prevLabel) setSelectedTag(nextLabel);
+    }
+
+    setEditingTagLabel(null);
+    setEditTagLabel('');
+  };
+
+  const handleDeleteTagByLabel = async (label) => {
+    if (!label) return;
+    const affected = allArticles.filter((a) => (a.tags || []).includes(label));
+    const msg = affected.length > 0
+      ? `确定要删除内容标签「${label}」吗？\n该标签会从 ${affected.length} 篇文章中移除（文章本身保留）。`
+      : `确定要删除内容标签「${label}」吗？`;
+    if (!window.confirm(msg)) return;
+
+    await Promise.all(
+      affected.map((a) => updateArticle(a.id, {
+        tags: (a.tags || []).filter((tag) => tag !== label),
+      })),
+    );
+    if (selectedTag === label) setSelectedTag('全部');
   };
 
   // ---- 普通成员快速新增系列（所有登录成员可用） ----
@@ -1360,15 +1408,78 @@ export default function InternalArticles() {
                 >
                   全部
                 </button>
-                {allContentTags.map((tag) => (
-                  <button
-                    key={tag}
-                    className={`ia-list__cat ${selectedTag === tag ? 'ia-list__cat--active' : ''}`}
-                    onClick={() => setSelectedTag(tag)}
-                  >
-                    {tag}
-                  </button>
-                ))}
+                {allContentTags.map((tag) => {
+                  const canEditInline = isAdmin;
+                  const isRenaming = canEditInline && editingTagLabel === tag;
+
+                  if (isRenaming) {
+                    return (
+                      <span key={tag} className="ia-list__cat-rename">
+                        <input
+                          type="text"
+                          className="ia-list__cat-rename-input"
+                          value={editTagLabel}
+                          onChange={(e) => setEditTagLabel(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') saveEditTag();
+                            if (e.key === 'Escape') setEditingTagLabel(null);
+                          }}
+                          autoFocus
+                        />
+                        <button
+                          className="ia-list__cat-rename-confirm"
+                          onClick={saveEditTag}
+                          disabled={!editTagLabel.trim()}
+                          title="确认"
+                        >
+                          <Check size={14} />
+                        </button>
+                        <button
+                          className="ia-list__cat-rename-cancel"
+                          onClick={() => setEditingTagLabel(null)}
+                          title="取消"
+                        >
+                          <X size={14} />
+                        </button>
+                      </span>
+                    );
+                  }
+
+                  return (
+                    <div key={tag} className="ia-list__cat-wrapper">
+                      <button
+                        className={`ia-list__cat ${selectedTag === tag ? 'ia-list__cat--active' : ''}`}
+                        onClick={() => setSelectedTag(tag)}
+                      >
+                        {tag}
+                      </button>
+                      {canEditInline && (
+                        <div className="ia-list__cat-actions">
+                          <button
+                            className="ia-list__cat-edit"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              startEditTag(tag);
+                            }}
+                            title="重命名"
+                          >
+                            <Pencil size={12} />
+                          </button>
+                          <button
+                            className="ia-list__cat-delete"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDeleteTagByLabel(tag);
+                            }}
+                            title="删除内容标签"
+                          >
+                            <X size={12} />
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}
