@@ -128,7 +128,7 @@ export default function MemberSharing() {
 
   const [sharings, setSharings] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   const views = loadViews();
 
   // 动态分类管理
@@ -304,7 +304,7 @@ export default function MemberSharing() {
 
     setCatOpBusy(true);
     setCategoryList((prev) => prev.filter((c) => c.key !== key));
-    if (selectedCategory === key) setSelectedCategory('全部');
+    setSelectedCategories((prev) => prev.filter((item) => item !== key));
 
     try {
       const res = await deleteCategoryRemote(key);
@@ -322,7 +322,7 @@ export default function MemberSharing() {
       !searchTerm ||
       pinyinMatch(s.title, searchTerm) ||
       pinyinMatch(s.author, searchTerm);
-    const matchCat = selectedCategory === '全部' || s.category === selectedCategory;
+    const matchCat = selectedCategories.length === 0 || selectedCategories.includes(s.category);
     return matchSearch && matchCat;
   });
 
@@ -445,8 +445,8 @@ export default function MemberSharing() {
                   return (
                     <button
                       key={cat}
-                      className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
+                      className={`ms-filters__cat ${selectedCategories.length === 0 ? 'ms-filters__cat--active' : ''}`}
+                      onClick={() => setSelectedCategories([])}
                     >
                       全部
                     </button>
@@ -497,8 +497,10 @@ export default function MemberSharing() {
                 return (
                   <div key={cat} className="ms-filters__cat-wrapper">
                     <button
-                      className={`ms-filters__cat ${selectedCategory === cat ? 'ms-filters__cat--active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
+                      className={`ms-filters__cat ${selectedCategories.includes(cat) ? 'ms-filters__cat--active' : ''}`}
+                      onClick={() => setSelectedCategories((prev) => (
+                        prev.includes(cat) ? prev.filter((item) => item !== cat) : [...prev, cat]
+                      ))}
                     >
                       {categoryLabels[cat] || cat}
                     </button>

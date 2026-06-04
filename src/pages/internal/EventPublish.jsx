@@ -176,7 +176,7 @@ export default function EventPublish() {
 
   // ---- 列表筛选 ----
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [selectedCategories, setSelectedCategories] = useState([]);
 
   // ---- 分类管理（跨设备同步：事件分类单独存 site_settings.event_categories）----
   const [categoryList, setCategoryList] = useState(loadEventCategories);
@@ -396,10 +396,10 @@ export default function EventPublish() {
         (e.title || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (e.excerpt || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
         (e.location || '').toLowerCase().includes(searchTerm.toLowerCase());
-      const matchesCat = selectedCategory === '全部' || e.category === selectedCategory;
+      const matchesCat = selectedCategories.length === 0 || selectedCategories.includes(e.category);
       return matchesSearch && matchesCat;
     });
-  }, [sortedEvents, searchTerm, selectedCategory]);
+  }, [sortedEvents, searchTerm, selectedCategories]);
 
   // ---- 分类 CRUD ----
   // 普通成员快速新增（打开弹窗）
@@ -480,7 +480,7 @@ export default function EventPublish() {
     }
 
     // 如果当前选中的正是被改名的分类，同步选中到新名
-    if (selectedCategory === prev) setSelectedCategory(next);
+    setSelectedCategories((current) => current.map((item) => (item === prev ? next : item)));
     setEditingCatLabel(null);
     setEditCatDraft('');
   };
@@ -509,7 +509,7 @@ export default function EventPublish() {
       }
     }
 
-    if (selectedCategory === label) setSelectedCategory('全部');
+    setSelectedCategories((current) => current.filter((item) => item !== label));
   };
   const handleAddCategoryInManager = () => {
     const label = newCatLabel.trim();
@@ -858,8 +858,8 @@ export default function EventPublish() {
                   return (
                     <button
                       key={cat}
-                      className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
+                      className={`ia-list__cat ${selectedCategories.length === 0 ? 'ia-list__cat--active' : ''}`}
+                      onClick={() => setSelectedCategories([])}
                     >
                       全部
                     </button>
@@ -912,8 +912,10 @@ export default function EventPublish() {
                 return (
                   <div key={cat} className="ia-list__cat-wrapper">
                     <button
-                      className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
+                      className={`ia-list__cat ${selectedCategories.includes(cat) ? 'ia-list__cat--active' : ''}`}
+                      onClick={() => setSelectedCategories((current) => (
+                        current.includes(cat) ? current.filter((item) => item !== cat) : [...current, cat]
+                      ))}
                     >
                       {cat}
                     </button>

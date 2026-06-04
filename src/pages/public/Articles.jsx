@@ -18,9 +18,15 @@ import './Articles.css';
 
 export default function Articles() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('全部');
-  const [selectedTag, setSelectedTag] = useState('全部');
+  const [selectedCategories, setSelectedCategories] = useState([]);
+  const [selectedTags, setSelectedTags] = useState([]);
   const { userArticles } = useSiteContent();
+
+  const toggleSelection = (setter, value) => {
+    setter((prev) => (
+      prev.includes(value) ? prev.filter((item) => item !== value) : [...prev, value]
+    ));
+  };
 
   // 合并所有文章，按日期降序
   const allArticles = useMemo(
@@ -61,13 +67,13 @@ export default function Articles() {
         pinyinMatch(article.category, searchTerm) ||
         article.tags.some((t) => pinyinMatch(t, searchTerm));
       const matchesCategory =
-        selectedCategory === '全部' || article.category === selectedCategory;
+        selectedCategories.length === 0 || selectedCategories.includes(article.category);
       const matchesTag =
-        selectedTag === '全部' ||
-        (article.tags || []).includes(selectedTag);
+        selectedTags.length === 0 ||
+        selectedTags.some((tag) => (article.tags || []).includes(tag));
       return matchesSearch && matchesCategory && matchesTag;
     });
-  }, [searchTerm, selectedCategory, selectedTag]);
+  }, [searchTerm, selectedCategories, selectedTags]);
 
   return (
     <div className="articles-page">
@@ -104,9 +110,14 @@ export default function Articles() {
                   <button
                     key={cat}
                     className={`articles-filters__cat ${
-                      selectedCategory === cat ? 'articles-filters__cat--active' : ''
+                      (cat === '全部' ? selectedCategories.length === 0 : selectedCategories.includes(cat))
+                        ? 'articles-filters__cat--active'
+                        : ''
                     }`}
-                    onClick={() => setSelectedCategory(cat)}
+                    onClick={() => {
+                      if (cat === '全部') setSelectedCategories([]);
+                      else toggleSelection(setSelectedCategories, cat);
+                    }}
                   >
                     {cat === '全部' ? '全部系列' : cat}
                   </button>
@@ -118,16 +129,16 @@ export default function Articles() {
                 <div className="articles-filters__group-title">内容标签</div>
                 <div className="articles-filters__tags">
                   <button
-                    className={`articles-filters__tag ${selectedTag === '全部' ? 'articles-filters__tag--active' : ''}`}
-                    onClick={() => setSelectedTag('全部')}
+                    className={`articles-filters__tag ${selectedTags.length === 0 ? 'articles-filters__tag--active' : ''}`}
+                    onClick={() => setSelectedTags([])}
                   >
                     全部内容标签
                   </button>
                   {contentTags.map((tag) => (
                     <button
                       key={tag}
-                      className={`articles-filters__tag ${selectedTag === tag ? 'articles-filters__tag--active' : ''}`}
-                      onClick={() => setSelectedTag(tag)}
+                      className={`articles-filters__tag ${selectedTags.includes(tag) ? 'articles-filters__tag--active' : ''}`}
+                      onClick={() => toggleSelection(setSelectedTags, tag)}
                     >
                       <Tag size={12} /> {tag}
                     </button>

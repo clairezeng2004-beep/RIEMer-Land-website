@@ -243,9 +243,9 @@ export default function InternalArticles() {
   const ia = internalConfig.internalArticles || {};
   const updateIA = useCallback((key, val) => updateInternalConfig({ internalArticles: { [key]: val } }), [updateInternalConfig]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [selectedCategories, setSelectedCategories] = useState([]);
   // 内容标签筛选（与"系列"分开的第二段筛选）
-  const [selectedTag, setSelectedTag] = useState('全部');
+  const [selectedTags, setSelectedTags] = useState([]);
 
   // ---- 系列管理状态 ----
   const [categoryList, setCategoryList] = useState(loadArticleCategories);
@@ -555,7 +555,7 @@ export default function InternalArticles() {
         affected.map((a) => updateArticle(a.id, { category: nextLabel })),
       );
       // 如果当前选中的正是被改名的系列，把选中项同步切到新名
-      if (selectedCategory === prevLabel) setSelectedCategory(nextLabel);
+      setSelectedCategories((prev) => prev.map((item) => (item === prevLabel ? nextLabel : item)));
     }
 
     setEditingCatKey(null);
@@ -581,7 +581,7 @@ export default function InternalArticles() {
     await Promise.all(
       affected.map((a) => updateArticle(a.id, { category: '' })),
     );
-    if (selectedCategory === label) setSelectedCategory('全部');
+    setSelectedCategories((prev) => prev.filter((item) => item !== label));
   };
 
   // 旧签名（按 key 删）保留给齿轮面板等已有调用点，内部委托到 byLabel
@@ -614,7 +614,7 @@ export default function InternalArticles() {
           )))],
         })),
       );
-      if (selectedTag === prevLabel) setSelectedTag(nextLabel);
+      setSelectedTags((prev) => prev.map((item) => (item === prevLabel ? nextLabel : item)));
     }
 
     setEditingTagLabel(null);
@@ -634,7 +634,7 @@ export default function InternalArticles() {
         tags: (a.tags || []).filter((tag) => tag !== label),
       })),
     );
-    if (selectedTag === label) setSelectedTag('全部');
+    setSelectedTags((prev) => prev.filter((item) => item !== label));
   };
 
   // ---- 普通成员快速新增系列（所有登录成员可用） ----
@@ -665,7 +665,7 @@ export default function InternalArticles() {
     const updated = [...categoryList, { key, label, color: quickCatColor }];
     setCategoryList(updated);
     persistCategories(updated, lastCatSyncRef);
-    setSelectedCategory(label); // 新增后自动选中
+    setSelectedCategories((prev) => (prev.includes(label) ? prev : [...prev, label])); // 新增后自动选中
     closeAddCatModal();
   };
 
@@ -677,12 +677,12 @@ export default function InternalArticles() {
         a.excerpt.toLowerCase().includes(searchTerm.toLowerCase()) ||
         a.tags.some((t) => t.toLowerCase().includes(searchTerm.toLowerCase()));
       const matchesCat =
-        selectedCategory === '全部' || a.category === selectedCategory;
+        selectedCategories.length === 0 || selectedCategories.includes(a.category);
       const matchesTag =
-        selectedTag === '全部' || (a.tags || []).includes(selectedTag);
+        selectedTags.length === 0 || selectedTags.some((tag) => (a.tags || []).includes(tag));
       return matchesSearch && matchesCat && matchesTag;
     });
-  }, [allArticles, searchTerm, selectedCategory, selectedTag]);
+  }, [allArticles, searchTerm, selectedCategories, selectedTags]);
 
   // 所有文章里出现过的内容标签（按出现频次降序），用于第二段标签筛选
   const allContentTags = useMemo(() => {
@@ -1231,8 +1231,8 @@ export default function InternalArticles() {
                   return (
                     <button
                       key={cat}
-                      className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
+                      className={`ia-list__cat ${selectedCategories.length === 0 ? 'ia-list__cat--active' : ''}`}
+                      onClick={() => setSelectedCategories([])}
                     >
                       全部
                     </button>
@@ -1289,8 +1289,10 @@ export default function InternalArticles() {
                 return (
                   <div key={cat} className="ia-list__cat-wrapper">
                     <button
-                      className={`ia-list__cat ${selectedCategory === cat ? 'ia-list__cat--active' : ''}`}
-                      onClick={() => setSelectedCategory(cat)}
+                      className={`ia-list__cat ${selectedCategories.includes(cat) ? 'ia-list__cat--active' : ''}`}
+                      onClick={() => setSelectedCategories((prev) => (
+                        prev.includes(cat) ? prev.filter((item) => item !== cat) : [...prev, cat]
+                      ))}
                     >
                       {cat}
                     </button>
@@ -1403,8 +1405,8 @@ export default function InternalArticles() {
               <div className="ia-list__categories">
                 <span className="ia-list__filter-label"><Tag size={13} /> 内容标签</span>
                 <button
-                  className={`ia-list__cat ${selectedTag === '全部' ? 'ia-list__cat--active' : ''}`}
-                  onClick={() => setSelectedTag('全部')}
+                  className={`ia-list__cat ${selectedTags.length === 0 ? 'ia-list__cat--active' : ''}`}
+                  onClick={() => setSelectedTags([])}
                 >
                   全部
                 </button>
@@ -1448,8 +1450,10 @@ export default function InternalArticles() {
                   return (
                     <div key={tag} className="ia-list__cat-wrapper">
                       <button
-                        className={`ia-list__cat ${selectedTag === tag ? 'ia-list__cat--active' : ''}`}
-                        onClick={() => setSelectedTag(tag)}
+                        className={`ia-list__cat ${selectedTags.includes(tag) ? 'ia-list__cat--active' : ''}`}
+                        onClick={() => setSelectedTags((prev) => (
+                          prev.includes(tag) ? prev.filter((item) => item !== tag) : [...prev, tag]
+                        ))}
                       >
                         {tag}
                       </button>

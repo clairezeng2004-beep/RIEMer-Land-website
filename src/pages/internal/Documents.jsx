@@ -418,7 +418,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       updateFilterOptions(nextFilterOptions);
       flushFilterOptionsNow(nextFilterOptions);
     }
-    if (selectedType === typeKey) setSelectedType('全部');
+    setSelectedTypes((prev) => prev.filter((type) => type !== typeKey));
   };
   const [documents, setDocuments] = useState(() => {
     if (canUseSupabase()) return [];
@@ -571,7 +571,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     };
   }, [refreshDocs, shouldUseCloudDocs]);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedType, setSelectedType] = useState('全部');
+  const [selectedTypes, setSelectedTypes] = useState([]);
   const [showUpload, setShowUpload] = useState(false);
   const [newDoc, setNewDoc] = useState({ title: '', type: filterTypes ? filterTypes[0] : 'course', description: '' });
   // 贡献者多选（id 数组）。默认上传者本人，打开上传表单时用 useEffect 同步一次。
@@ -634,7 +634,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       !searchTerm ||
       pinyinMatch(doc.title, searchTerm) ||
       pinyinMatch(desc, searchTerm);
-    const matchesType = selectedType === '全部' || doc.type === selectedType;
+    const matchesType = selectedTypes.length === 0 || selectedTypes.includes(doc.type);
     return matchesSearch && matchesType;
   });
 
@@ -1192,9 +1192,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 ) : (
                   <button
                     className={`documents-filters__type ${
-                      selectedType === type ? 'documents-filters__type--active' : ''
+                      (type === '全部' ? selectedTypes.length === 0 : selectedTypes.includes(type))
+                        ? 'documents-filters__type--active'
+                        : ''
                     }`}
-                    onClick={() => setSelectedType(type)}
+                    onClick={() => {
+                      if (type === '全部') setSelectedTypes([]);
+                      else {
+                        setSelectedTypes((prev) => (
+                          prev.includes(type) ? prev.filter((item) => item !== type) : [...prev, type]
+                        ));
+                      }
+                    }}
                   >
                     {type === '全部' ? '全部' : typeLabels[type] || type}
                   </button>

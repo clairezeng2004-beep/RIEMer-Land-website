@@ -34,7 +34,7 @@ function normalizeEventCategory(category) {
 export default function Events() {
   const { events } = useSiteContent();
 
-  const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [selectedCategories, setSelectedCategories] = useState([]);
 
   // 密码弹窗状态
   const [replayModal, setReplayModal] = useState(null);
@@ -53,13 +53,19 @@ export default function Events() {
   }, [sortedEvents]);
 
   const filtered = useMemo(() => {
-    if (selectedCategory === '全部') return sortedEvents;
-    return sortedEvents.filter((e) => normalizeEventCategory(e.category) === selectedCategory);
-  }, [sortedEvents, selectedCategory]);
+    if (selectedCategories.length === 0) return sortedEvents;
+    return sortedEvents.filter((e) => selectedCategories.includes(normalizeEventCategory(e.category)));
+  }, [sortedEvents, selectedCategories]);
 
   // 活动卡片标题按行对齐
   const eventsGridRef = useRef(null);
-  useEqualTitleHeights(eventsGridRef, '.featured__title', [filtered.length, selectedCategory]);
+  useEqualTitleHeights(eventsGridRef, '.featured__title', [filtered.length, selectedCategories.join('|')]);
+
+  const toggleCategory = (cat) => {
+    setSelectedCategories((prev) => (
+      prev.includes(cat) ? prev.filter((item) => item !== cat) : [...prev, cat]
+    ));
+  };
 
   const getCountdownDays = (eventDate) => {
     const today = new Date();
@@ -126,8 +132,15 @@ export default function Events() {
               {categories.map((cat) => (
                 <button
                   key={cat}
-                  className={`featured__tag-btn ${selectedCategory === cat ? 'featured__tag-btn--active' : ''}`}
-                  onClick={() => setSelectedCategory(cat)}
+                  className={`featured__tag-btn ${
+                    (cat === '全部' ? selectedCategories.length === 0 : selectedCategories.includes(cat))
+                      ? 'featured__tag-btn--active'
+                      : ''
+                  }`}
+                  onClick={() => {
+                    if (cat === '全部') setSelectedCategories([]);
+                    else toggleCategory(cat);
+                  }}
                 >
                   {cat}
                 </button>
