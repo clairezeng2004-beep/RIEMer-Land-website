@@ -8,37 +8,67 @@ import usePageTracking from './hooks/usePageTracking';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 
-const Home = lazy(() => import('./pages/public/Home'));
-const Timeline = lazy(() => import('./pages/public/Timeline'));
-const Articles = lazy(() => import('./pages/public/Articles'));
-const Events = lazy(() => import('./pages/public/Events'));
-const ArticleDetail = lazy(() => import('./pages/public/ArticleDetail'));
-const Login = lazy(() => import('./pages/internal/Login'));
-const ResetPassword = lazy(() => import('./pages/internal/ResetPassword'));
-const InternalLayout = lazy(() => import('./components/InternalLayout'));
-const Documents = lazy(() => import('./pages/internal/Documents'));
-const ProcessTemplates = lazy(() => import('./pages/internal/ProcessTemplates'));
-const ProcessTemplateCreate = lazy(() => import('./pages/internal/ProcessTemplateCreate'));
-const ProcessTemplateDetail = lazy(() => import('./pages/internal/ProcessTemplateDetail'));
-const MemberSharing = lazy(() => import('./pages/internal/MemberSharing'));
-const MemberSharingCreate = lazy(() => import('./pages/internal/MemberSharingCreate'));
-const MemberSharingDetail = lazy(() => import('./pages/internal/MemberSharingDetail'));
-const Tasks = lazy(() => import('./pages/internal/Tasks'));
-const UserManagement = lazy(() => import('./pages/internal/UserManagement'));
-const ContentManagement = lazy(() => import('./pages/internal/ContentManagement'));
-const Notifications = lazy(() => import('./pages/internal/Notifications'));
-const Gallery = lazy(() => import('./pages/internal/Gallery'));
-const InternalArticles = lazy(() => import('./pages/internal/InternalArticles'));
-const InternalArticleDetail = lazy(() => import('./pages/internal/InternalArticleDetail'));
-const MemberContributions = lazy(() => import('./pages/internal/MemberContributions'));
-const MemberProfiles = lazy(() => import('./pages/internal/MemberProfiles'));
-const Profile = lazy(() => import('./pages/internal/Profile'));
-const Suggestions = lazy(() => import('./pages/internal/Suggestions'));
-const Guestbook = lazy(() => import('./pages/internal/Guestbook'));
-const NotificationManagement = lazy(() => import('./pages/internal/NotificationManagement'));
-const EventPublish = lazy(() => import('./pages/internal/EventPublish'));
-const SyncDiagnostic = lazy(() => import('./pages/internal/SyncDiagnostic'));
-const NotificationRulesProvider = lazy(() =>
+// 懒加载防错包装：
+// 路由都是 lazy(() => import(...))，发布新版本后旧的分包(chunk)文件名会失效，
+// 此时已经打开页面的用户点进某个路由会因为 import() 失败而触发"页面加载出错了"，
+// 刷新后才正常。这里先重试一次（应对偶发网络抖动），仍失败则自动整页刷新一次
+// 去拉取最新资源；用 sessionStorage 时间戳防止无限刷新循环。
+function lazyWithReload(factory) {
+  return lazy(async () => {
+    try {
+      return await factory();
+    } catch (err) {
+      // 重试一次
+      try {
+        await new Promise((r) => setTimeout(r, 350));
+        return await factory();
+      } catch {
+        const KEY = 'chunkReloadAt';
+        const last = Number(sessionStorage.getItem(KEY) || 0);
+        // 10 秒内只自动刷新一次，避免真正的错误导致反复刷新
+        if (Date.now() - last > 10000) {
+          sessionStorage.setItem(KEY, String(Date.now()));
+          window.location.reload();
+          // 返回永不 resolve 的占位，等待刷新接管渲染
+          return new Promise(() => {});
+        }
+        throw err;
+      }
+    }
+  });
+}
+
+const Home = lazyWithReload(() => import('./pages/public/Home'));
+const Timeline = lazyWithReload(() => import('./pages/public/Timeline'));
+const Articles = lazyWithReload(() => import('./pages/public/Articles'));
+const Events = lazyWithReload(() => import('./pages/public/Events'));
+const ArticleDetail = lazyWithReload(() => import('./pages/public/ArticleDetail'));
+const Login = lazyWithReload(() => import('./pages/internal/Login'));
+const ResetPassword = lazyWithReload(() => import('./pages/internal/ResetPassword'));
+const InternalLayout = lazyWithReload(() => import('./components/InternalLayout'));
+const Documents = lazyWithReload(() => import('./pages/internal/Documents'));
+const ProcessTemplates = lazyWithReload(() => import('./pages/internal/ProcessTemplates'));
+const ProcessTemplateCreate = lazyWithReload(() => import('./pages/internal/ProcessTemplateCreate'));
+const ProcessTemplateDetail = lazyWithReload(() => import('./pages/internal/ProcessTemplateDetail'));
+const MemberSharing = lazyWithReload(() => import('./pages/internal/MemberSharing'));
+const MemberSharingCreate = lazyWithReload(() => import('./pages/internal/MemberSharingCreate'));
+const MemberSharingDetail = lazyWithReload(() => import('./pages/internal/MemberSharingDetail'));
+const Tasks = lazyWithReload(() => import('./pages/internal/Tasks'));
+const UserManagement = lazyWithReload(() => import('./pages/internal/UserManagement'));
+const ContentManagement = lazyWithReload(() => import('./pages/internal/ContentManagement'));
+const Notifications = lazyWithReload(() => import('./pages/internal/Notifications'));
+const Gallery = lazyWithReload(() => import('./pages/internal/Gallery'));
+const InternalArticles = lazyWithReload(() => import('./pages/internal/InternalArticles'));
+const InternalArticleDetail = lazyWithReload(() => import('./pages/internal/InternalArticleDetail'));
+const MemberContributions = lazyWithReload(() => import('./pages/internal/MemberContributions'));
+const MemberProfiles = lazyWithReload(() => import('./pages/internal/MemberProfiles'));
+const Profile = lazyWithReload(() => import('./pages/internal/Profile'));
+const Suggestions = lazyWithReload(() => import('./pages/internal/Suggestions'));
+const Guestbook = lazyWithReload(() => import('./pages/internal/Guestbook'));
+const NotificationManagement = lazyWithReload(() => import('./pages/internal/NotificationManagement'));
+const EventPublish = lazyWithReload(() => import('./pages/internal/EventPublish'));
+const SyncDiagnostic = lazyWithReload(() => import('./pages/internal/SyncDiagnostic'));
+const NotificationRulesProvider = lazyWithReload(() =>
   import('./contexts/NotificationRulesContext').then((module) => ({
     default: module.NotificationRulesProvider,
   }))
