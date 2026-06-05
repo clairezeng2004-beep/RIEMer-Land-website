@@ -99,6 +99,8 @@
    * 如果管理员后台继续输入更长的描述，可单独调这一个变量即可全局生效。
    */
   --tl-slot-h: 280px;
+  --tl-card-w: 310px;
+  --tl-card-h: 190px;
 
   display: flex;
   align-items: center;
@@ -187,8 +189,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  width: 280px;
-  min-width: 280px;
+  width: 350px;
+  min-width: 350px;
 }
 
 /* 节点圆点 */
@@ -273,11 +275,13 @@
 /* 卡片 */
 .timeline__card {
   padding: var(--space-lg);
-  width: 250px;
+  width: var(--tl-card-w);
+  height: var(--tl-card-h);
   text-align: center;
   transition: all var(--transition-normal);
-  height: auto;
-  overflow: visible;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .timeline__item:hover .timeline__card {
@@ -306,7 +310,7 @@
   font-size: var(--text-md);
   font-weight: 600;
   margin-bottom: var(--space-xs);
-  line-height: 1.5;
+  line-height: 1.42;
 }
 
 .timeline__desc {
@@ -314,10 +318,12 @@
   /* 与首页活动卡片 .featured__excerpt / 文章卡片 .article-card__excerpt 对齐（--text-sm），
      比原来的 --text-xs 提升一档。 */
   font-size: var(--text-sm);
-  line-height: 1.6;
-  /* 中文断行：只在标点/空格处换行，避免连续词语被拆成两行 */
-  word-break: keep-all;
-  overflow-wrap: break-word;
+  line-height: 1.55;
+  text-align: justify;
+  text-align-last: left;
+  text-justify: inter-ideograph;
+  word-break: normal;
+  overflow-wrap: anywhere;
 }
 
 /* 滑动提示 */
@@ -494,6 +500,8 @@
     /* 手机端：内容更容易换行，单侧高度反而可能需要比桌面更多
        （卡片变窄后描述行数会增加）。把变量上调到 300px 保平安。 */
     --tl-slot-h: 300px;
+    --tl-card-w: 260px;
+    --tl-card-h: 205px;
     padding: var(--tl-slot-h) 1.5rem;
     /* 手机端 mask 渐隐宽度收窄到 16px，避免在 375px 屏上占比过大。 */
     -webkit-mask-image: linear-gradient(
@@ -513,15 +521,12 @@
   }
 
   .timeline__item {
-    width: 240px;
-    min-width: 240px;
+    width: 290px;
+    min-width: 290px;
   }
 
   .timeline__card {
-    width: 220px;
     padding: var(--space-md);
-    height: auto;
-    overflow: visible;
   }
 
   .timeline__card-wrapper {
@@ -551,6 +556,8 @@
     /* 超小屏（<=480px）：容器更窄，卡片描述可能再多一行。
        保守设 310px，与手机端基本持平即可。 */
     --tl-slot-h: 310px;
+    --tl-card-w: 248px;
+    --tl-card-h: 210px;
     padding: var(--tl-slot-h) 1rem;
     -webkit-mask-image: linear-gradient(
       to right,
@@ -569,15 +576,12 @@
   }
 
   .timeline__item {
-    width: 240px;
-    min-width: 240px;
+    width: 276px;
+    min-width: 276px;
   }
 
   .timeline__card {
-    width: 210px;
     padding: var(--space-sm) var(--space-md);
-    height: auto;
-    overflow: visible;
   }
 
   .timeline__card-wrapper {
