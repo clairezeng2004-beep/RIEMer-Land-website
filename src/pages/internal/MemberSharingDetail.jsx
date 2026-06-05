@@ -216,11 +216,7 @@ export default function MemberSharingDetail() {
     if (!post) return '';
     const rawContent = String(post.content || '');
     if (post.format === 'markdown') {
-      marked.setOptions({
-        breaks: true,
-        gfm: true,
-      });
-      return stripUnderline(marked.parse(stripUnderline(rawContent)));
+      return stripUnderline(marked.parse(stripUnderline(rawContent), { breaks: true, gfm: true }));
     }
     // word (HTML) 格式直接返回（清掉下划线）
     return stripUnderline(rawContent);

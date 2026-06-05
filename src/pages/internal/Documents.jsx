@@ -939,8 +939,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const renderedTextContent = useMemo(() => {
     if (!previewDoc || !previewDoc.content) return '';
     if (previewDoc.format === 'markdown') {
-      marked.setOptions({ breaks: true, gfm: true });
-      return stripUnderline(marked.parse(stripUnderline(previewDoc.content)));
+      return stripUnderline(marked.parse(stripUnderline(previewDoc.content), { breaks: true, gfm: true }));
     }
     // word 格式本身就是 HTML，原样返回（清掉下划线）
     return stripUnderline(previewDoc.content);

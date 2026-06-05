@@ -677,8 +677,7 @@ export default function ProcessTemplateDetail() {
   const renderedContent = useMemo(() => {
     if (!doc || !doc.content) return '';
     if (doc.format === 'markdown') {
-      marked.setOptions({ breaks: true, gfm: true });
-      return stripUnderline(marked.parse(stripUnderline(doc.content)));
+      return stripUnderline(marked.parse(stripUnderline(doc.content), { breaks: true, gfm: true }));
     }
     return stripUnderline(doc.content); // word 格式：已是 HTML
   }, [doc]);
@@ -1099,8 +1098,7 @@ export default function ProcessTemplateDetail() {
   const editMarkdownPreview = useMemo(() => {
     if (!doc || doc.format !== 'markdown') return '';
     if (!editContent || !editContent.trim()) return '';
-    marked.setOptions({ breaks: true, gfm: true });
-    return stripUnderline(marked.parse(stripUnderline(editContent)));
+    return stripUnderline(marked.parse(stripUnderline(editContent), { breaks: true, gfm: true }));
   }, [editContent, doc?.format, doc]);
 
   /* ========== 目录（TOC） ==========

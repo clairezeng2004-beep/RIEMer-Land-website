@@ -613,8 +613,7 @@ export default function MemberSharingCreate() {
   // Markdown 实时预览
   const markdownPreview = useMemo(() => {
     if (newPost.format !== 'markdown' || !newPost.content.trim()) return '';
-    marked.setOptions({ breaks: true, gfm: true });
-    return marked.parse(newPost.content);
+    return marked.parse(newPost.content, { breaks: true, gfm: true });
   }, [newPost.format, newPost.content]);
 
   /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 + 分栏 + 表格 ============ */

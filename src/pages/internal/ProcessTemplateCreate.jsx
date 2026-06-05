@@ -440,8 +440,7 @@ export default function ProcessTemplateCreate() {
   /* ============ Markdown 预览 ============ */
   const markdownPreview = useMemo(() => {
     if (newDoc.format !== 'markdown' || !newDoc.content.trim()) return '';
-    marked.setOptions({ breaks: true, gfm: true });
-    return marked.parse(newDoc.content);
+    return marked.parse(newDoc.content, { breaks: true, gfm: true });
   }, [newDoc.format, newDoc.content]);
 
   /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 + 分栏 + 表格 ============ */

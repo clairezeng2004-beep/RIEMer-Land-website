@@ -885,6 +885,7 @@
 .ia-modal__tag-input::placeholder,
 .ia-modal__outline-input::placeholder {
   font-family: var(--font-body);
+  font-size: var(--text-xs);
   letter-spacing: 0;
 }
 
@@ -894,7 +895,15 @@
 }
 
 .ia-modal__fetch-btn {
-  min-width: 112px;
+  width: auto;
+  min-width: 104px;
+  padding: 0.65rem 0.8rem;
+  font-size: var(--text-xs);
+  box-shadow: 0 3px 10px rgba(91, 140, 62, 0.22);
+}
+
+.ia-modal__fetch-btn:hover:not(:disabled) {
+  color: white;
 }
 
 .ia-modal__fetch-btn .ia-modal__spinner {
@@ -1439,6 +1448,12 @@
 
   .ia-modal__url-row {
     flex-direction: column;
+    align-items: stretch;
+  }
+
+  .ia-modal__fetch-btn {
+    width: auto;
+    align-self: flex-start;
   }
 
   .ia-list__header {

@@ -39,7 +39,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0.75rem 2rem 0.75rem 1rem;
+  min-height: 72px;
+  padding: 0 2rem 0 1rem;
   background: var(--color-bg, #f9fafb);
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
@@ -85,7 +86,7 @@
   /* v4：topbar 不再 fixed，内容区不需要再为它的"悬浮高度"让路；
      只保留常规的上下左右 padding。上方 1rem 缓冲让 topbar 底边
      到第一个表单项之间有呼吸空间。 */
-  padding: 1rem 2rem 1.5rem;
+  padding: 0.5rem 2rem 1.5rem;
 }
 
 .msc-content__inner {
@@ -762,7 +763,7 @@
      - z-index 10：高于编辑器及图片，但低于 FloatingTextToolbar(z-index: 1200)
        和 Navbar(z-index: 1000)，保证浮层仍在它之上。 */
   position: sticky;
-  top: 60px; /* msc-topbar 高度（贴在其下方） */
+  top: 72px; /* msc-topbar 高度（贴在其下方） */
   z-index: 10;
   background: var(--color-bg, #f9fafb);
   padding: 6px 0;
@@ -790,9 +791,9 @@
     display: none;
   }
 
-  /* 全屏页无 Navbar / mobile-nav，工具栏停在 msc-topbar 下方（~60px） */
+  /* 全屏页无 Navbar / mobile-nav，工具栏停在 msc-topbar 下方（72px） */
   .msc-form__editor-toolbar {
-    top: 60px;
+    top: 72px;
   }
 }
 
@@ -1110,7 +1111,8 @@
   .msc-topbar {
     /* 全屏页无 Navbar / mobile-nav，贴视口顶端 */
     top: 0;
-    padding: 0.75rem 1rem;
+    min-height: 72px;
+    padding: 0 1rem;
   }
 
   .msc-content {

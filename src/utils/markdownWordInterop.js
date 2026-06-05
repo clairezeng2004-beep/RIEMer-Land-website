@@ -131,7 +131,6 @@ export function htmlToMarkdown(html = '') {
 
 export function markdownToHtml(markdown = '') {
   if (!markdown.trim()) return '';
-  marked.setOptions({ breaks: true, gfm: true });
-  return marked.parse(markdown);
+  return marked.parse(markdown, { breaks: true, gfm: true });
 }
 

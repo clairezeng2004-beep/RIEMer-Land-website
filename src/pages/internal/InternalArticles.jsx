@@ -1741,7 +1741,7 @@ export default function InternalArticles() {
                       </div>
                       <button
                         type="button"
-                        className="btn btn-secondary ia-modal__fetch-btn"
+                        className="btn btn-primary ia-modal__fetch-btn"
                         onClick={handleFetch}
                         disabled={!urlInput.trim() || fetching}
                       >
