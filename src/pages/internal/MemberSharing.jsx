@@ -31,7 +31,6 @@ import {
   Eye,
   Trash2,
   FileText,
-  Code2,
   ThumbsUp,
   Settings2,
   X,
@@ -69,6 +68,34 @@ function loadViews() {
     if (stored) return JSON.parse(stored);
   } catch { /* ignore */ }
   return {};
+}
+
+function getAttachmentExtension(file = {}) {
+  const name = String(file.name || '');
+  const type = String(file.type || '').toLowerCase();
+  const ext = name.includes('.') ? name.split('.').pop().toLowerCase() : '';
+  if (ext) return ext;
+  if (type.includes('pdf')) return 'pdf';
+  if (type.includes('word') || type.includes('msword')) return 'docx';
+  if (type.includes('zip') || type.includes('compressed')) return 'zip';
+  return '';
+}
+
+function getAttachmentTypeLabel(file) {
+  const ext = getAttachmentExtension(file);
+  if (ext === 'pdf') return 'PDF';
+  if (['doc', 'docx'].includes(ext)) return 'Word';
+  if (['zip', 'rar', '7z', 'tar', 'gz'].includes(ext)) return 'ZIP';
+  if (['ppt', 'pptx'].includes(ext)) return 'PPT';
+  if (['xls', 'xlsx', 'csv'].includes(ext)) return 'Excel';
+  if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(ext)) return '图片';
+  return ext ? ext.toUpperCase() : '附件';
+}
+
+function getAttachmentTypeSummary(attachments) {
+  if (!Array.isArray(attachments) || attachments.length === 0) return '';
+  const labels = [...new Set(attachments.map(getAttachmentTypeLabel).filter(Boolean))];
+  return labels.join(' / ');
 }
 
 export default function MemberSharing() {
@@ -838,9 +865,11 @@ export default function MemberSharing() {
                       >
                         {categoryLabels[post.category] || post.category}
                       </span>
-                      <span className="ms-card__format-tag">
-                        {post.format === 'markdown' ? <><Code2 size={13} /> Markdown</> : <><FileText size={13} /> Word</>}
-                      </span>
+                      {getAttachmentTypeSummary(post.attachments) && (
+                        <span className="ms-card__format-tag">
+                          <FileText size={13} /> {getAttachmentTypeSummary(post.attachments)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 </div>
