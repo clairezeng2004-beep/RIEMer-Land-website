@@ -21,6 +21,10 @@
 }
 
 .ms-page__header p {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-xs) var(--space-sm);
   color: var(--color-text-muted);
   font-size: var(--text-sm);
 }
@@ -29,7 +33,6 @@
   display: inline-flex;
   align-items: center;
   vertical-align: baseline;
-  margin-left: var(--space-sm);
   padding: 0.08rem 0.5rem;
   border-radius: var(--radius-full);
   background: rgba(192, 57, 43, 0.08);
@@ -1064,8 +1067,7 @@
   }
 
   .ms-page__confidential-note {
-    margin-left: 0;
-    margin-top: var(--space-xs);
+    margin-top: 0;
   }
 
   .ms-create__row {
