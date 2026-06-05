@@ -621,19 +621,21 @@
 
 .doc-card__meta {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
-  gap: var(--space-lg);
+  gap: var(--space-sm) var(--space-lg);
   /* 上下对称内边距，让日期在这一行里垂直居中 */
   padding-top: var(--space-sm);
   padding-bottom: var(--space-sm);
   border-top: 1px solid var(--color-border-light);
   margin-top: auto;
+  flex-wrap: wrap;
 }
 
 /* 系列名靠右下角 */
 .doc-card__meta .doc-card__type-badge {
   margin-left: auto;
+  white-space: nowrap;
 }
 
 .doc-card__meta-item {
@@ -642,6 +644,7 @@
   gap: 4px;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  white-space: nowrap;
 }
 
 .doc-card__author {
@@ -1352,6 +1355,9 @@
     padding-top: 4px;
     padding-bottom: 4px;
     margin-top: 0;
+  }
+  .doc-card__meta .doc-card__type-badge {
+    margin-left: 0;
   }
   .doc-card__bottom {
     padding: 4px var(--space-lg);
