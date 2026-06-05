@@ -28,14 +28,15 @@
 .ms-page__confidential-note {
   display: inline-flex;
   align-items: center;
+  vertical-align: baseline;
   margin-left: var(--space-sm);
-  padding: 0.15rem 0.55rem;
+  padding: 0.08rem 0.5rem;
   border-radius: var(--radius-full);
   background: rgba(192, 57, 43, 0.08);
   color: var(--color-danger);
-  font-size: var(--text-xs);
+  font-size: inherit;
   font-weight: 600;
-  line-height: 1.4;
+  line-height: inherit;
 }
 
 .ms-page__header .btn {
