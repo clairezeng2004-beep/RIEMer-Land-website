@@ -49,7 +49,7 @@
 /* Layout: tabs + panel */
 .content-mgmt__layout {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 148px 1fr;
   gap: var(--space-xl);
   align-items: flex-start;
 }
@@ -67,7 +67,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 0.65rem 1rem;
+  padding: 0.65rem 0.75rem;
   border: none;
   background: none;
   border-radius: var(--radius-md);
@@ -91,7 +91,7 @@
 
 @media (max-width: 1100px) {
   .content-mgmt__layout {
-    grid-template-columns: 160px 1fr;
+    grid-template-columns: 136px 1fr;
     gap: var(--space-lg);
   }
 
@@ -103,7 +103,7 @@
 
 @media (max-width: 900px) {
   .content-mgmt__layout {
-    grid-template-columns: 132px 1fr;
+    grid-template-columns: 124px 1fr;
     gap: var(--space-md);
   }
 
