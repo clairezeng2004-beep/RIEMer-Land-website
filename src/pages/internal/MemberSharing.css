@@ -1041,6 +1041,11 @@
     gap: var(--space-md);
   }
 
+  .ms-page__confidential-note {
+    margin-left: 0;
+    margin-top: var(--space-xs);
+  }
+
   .ms-create__row {
     grid-template-columns: 1fr;
   }
