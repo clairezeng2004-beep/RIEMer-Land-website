@@ -683,12 +683,22 @@
   font-size: var(--text-sm);
   color: var(--color-text-light);
   line-height: 1.7;
-  display: -webkit-box;
-  -webkit-line-clamp: 3;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  overflow-y: auto;
   flex: 1 1 auto;
   min-height: calc(var(--text-sm) * 1.7 * 3);
+  max-height: calc(var(--text-sm) * 1.7 * 5);
+  padding-right: 6px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-primary) 35%, transparent) transparent;
+}
+
+.ia-card__excerpt::-webkit-scrollbar {
+  width: 4px;
+}
+
+.ia-card__excerpt::-webkit-scrollbar-thumb {
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-primary) 35%, transparent);
 }
 
 .ia-card__footer {
