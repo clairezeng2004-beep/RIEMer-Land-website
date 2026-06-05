@@ -23,15 +23,15 @@
 /* 活动信息标签统一排布：日期 · 回放 · 地点，始终保持同一行 */
 .ep-card__info {
   display: grid;
-  grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 1fr);
+  grid-template-columns: max-content minmax(2.6rem, auto) minmax(0, 1fr);
   align-items: center;
-  column-gap: var(--space-sm, 8px);
+  column-gap: var(--space-xs, 6px);
 }
 
 .ep-card__info-center {
   display: inline-flex;
   justify-content: center;
-  min-width: 3.4rem;
+  min-width: 2.6rem;
 }
 
 .ep-card__location {
@@ -40,6 +40,7 @@
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 系列标签独占日期/地点下方第二行，左对齐 */
