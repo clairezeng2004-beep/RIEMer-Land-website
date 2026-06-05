@@ -28,6 +28,16 @@ const DEVICE_KEY = 'riemer_device_id';
 const PROFILE_CACHE_KEY = 'riemer_profile_cache';
 // 预授权邮箱列表（管理员直接输入邮箱授权，用户注册后自动拥有权限）
 const PRE_AUTH_EMAILS_KEY = 'riemer_pre_authorized_emails';
+const USER_LIST_QUERY_TIMEOUT_MS = 7000;
+const USER_LIST_SESSION_TIMEOUT_MS = 2500;
+const USER_LIST_COLUMNS = 'id, email, name, nickname, avatar, signature, role, authorized, created_at';
+
+const withTimeout = (promise, ms, label) => {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} 超时 (${ms/1000}s)`)), ms)),
+  ]);
+};
 
 const getDeviceId = () => {
   let deviceId = localStorage.getItem(DEVICE_KEY);
@@ -265,14 +275,6 @@ export function AuthProvider({ children }) {
         if (parsed?.id && parsed?.authorized) hasCachedUser = true;
       }
     } catch { /* ignore */ }
-
-    /** 带超时的 Promise 包装器 */
-    const withTimeout = (promise, ms, label) => {
-      return Promise.race([
-        promise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error(`${label} 超时 (${ms/1000}s)`)), ms)),
-      ]);
-    };
 
     const initSession = async () => {
       const startTime = Date.now();
@@ -1303,35 +1305,55 @@ export function AuthProvider({ children }) {
     try {
       console.log('[Auth] getAllUsers: 尝试 Supabase 查询... (supabaseOk=' + supabaseOk + ', user=' + (user?.email || 'null') + ')');
 
-      // 预检 session：如果 session 不存在或明确失效，先尝试刷新，
-      // 避免直接把 RLS 降级成 anon 角色导致 profiles 被过滤。
+      // 预检 session：如果 session 不存在，短暂尝试刷新。
+      // 这里必须有较短超时，否则用户管理页会在 auth 网络抖动时一直等不到列表。
       try {
-        const { data: sess } = await supabase.auth.getSession();
+        const { data: sess } = await withTimeout(
+          supabase.auth.getSession(),
+          USER_LIST_SESSION_TIMEOUT_MS,
+          '用户列表 session 预检'
+        );
         if (!sess?.session) {
           console.warn('[Auth] getAllUsers: 当前 session 为空，先刷新...');
-          await supabase.auth.refreshSession();
+          await withTimeout(
+            supabase.auth.refreshSession(),
+            USER_LIST_SESSION_TIMEOUT_MS,
+            '用户列表 session 刷新'
+          );
         }
       } catch (e) {
         console.warn('[Auth] getAllUsers: session 预检异常:', e?.message);
       }
 
       // 第一次尝试查询
-      let { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .order('created_at', { ascending: true });
+      let { data, error } = await withTimeout(
+        supabase
+          .from('profiles')
+          .select(USER_LIST_COLUMNS)
+          .order('created_at', { ascending: true }),
+        USER_LIST_QUERY_TIMEOUT_MS,
+        '用户列表查询'
+      );
 
       // 如果查询失败（可能是 401/session 过期），尝试刷新 session 后重试
       if (error) {
         console.warn('[Auth] Supabase profiles 第一次查询失败:', error.message, error.code, '，尝试刷新 session...');
         try {
-          const { data: refreshData } = await supabase.auth.refreshSession();
+          const { data: refreshData } = await withTimeout(
+            supabase.auth.refreshSession(),
+            USER_LIST_SESSION_TIMEOUT_MS,
+            '用户列表错误后 session 刷新'
+          );
           if (refreshData?.session) {
             console.log('[Auth] Session 刷新成功，重试查询...');
-            const retry = await supabase
-              .from('profiles')
-              .select('*')
-              .order('created_at', { ascending: true });
+            const retry = await withTimeout(
+              supabase
+                .from('profiles')
+                .select(USER_LIST_COLUMNS)
+                .order('created_at', { ascending: true }),
+              USER_LIST_QUERY_TIMEOUT_MS,
+              '用户列表重试查询'
+            );
             data = retry.data;
             error = retry.error;
             if (error) {
@@ -1358,12 +1380,20 @@ export function AuthProvider({ children }) {
       if (!data || data.length === 0) {
         console.warn('[Auth] Supabase profiles 查询为空，二次刷新 session 后再试一次...');
         try {
-          const { data: refreshData } = await supabase.auth.refreshSession();
+          const { data: refreshData } = await withTimeout(
+            supabase.auth.refreshSession(),
+            USER_LIST_SESSION_TIMEOUT_MS,
+            '用户列表空结果 session 刷新'
+          );
           if (refreshData?.session) {
-            const retry2 = await supabase
-              .from('profiles')
-              .select('*')
-              .order('created_at', { ascending: true });
+            const retry2 = await withTimeout(
+              supabase
+                .from('profiles')
+                .select(USER_LIST_COLUMNS)
+                .order('created_at', { ascending: true }),
+              USER_LIST_QUERY_TIMEOUT_MS,
+              '用户列表空结果重试查询'
+            );
             if (!retry2.error && Array.isArray(retry2.data) && retry2.data.length > 0) {
               console.log('[Auth] 二次刷新后拿到', retry2.data.length, '条');
               data = retry2.data;
@@ -1381,9 +1411,13 @@ export function AuthProvider({ children }) {
         // 如果 head-count > 0 但 select 空 → 铁证是 RLS / session 把行过滤光了
         // 如果 head-count 也是 0 → 数据库确实是空的
         try {
-          const { count, error: cntErr } = await supabase
-            .from('profiles')
-            .select('*', { count: 'exact', head: true });
+          const { count, error: cntErr } = await withTimeout(
+            supabase
+              .from('profiles')
+              .select('id', { count: 'exact', head: true }),
+            USER_LIST_SESSION_TIMEOUT_MS,
+            '用户列表 count 诊断'
+          );
           if (cntErr) {
             console.warn('[Auth] HEAD count 查询失败:', cntErr.message, cntErr.code);
           } else {
@@ -1393,10 +1427,14 @@ export function AuthProvider({ children }) {
               // 却拿不到 select 的 data —— 这通常是"response headers 里 count
               // 有但 body 被 accept-encoding/压缩/代理截断"的诡异场景，
               // 或者某些 Supabase 版本的 bug。这里再追加一次 range 查询作兜底。
-              const rng = await supabase
-                .from('profiles')
-                .select('id, email, name, nickname, avatar, signature, role, authorized, created_at')
-                .range(0, Math.max(499, count - 1));
+              const rng = await withTimeout(
+                supabase
+                  .from('profiles')
+                  .select(USER_LIST_COLUMNS)
+                  .range(0, Math.max(499, count - 1)),
+                USER_LIST_QUERY_TIMEOUT_MS,
+                '用户列表 range 兜底查询'
+              );
               if (!rng.error && Array.isArray(rng.data) && rng.data.length > 0) {
                 console.log('[Auth] range 兜底查询拿到', rng.data.length, '条');
                 data = rng.data;
