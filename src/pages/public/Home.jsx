@@ -15,6 +15,7 @@ import {
   CalendarDays,
 } from 'lucide-react';
 import CoverImage from '../../components/CoverImage';
+import ArticlePreviewModal from '../../components/ArticlePreviewModal';
 import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { trackEvent } from '../../lib/analytics';
@@ -38,6 +39,8 @@ export default function Home() {
 
   // 密码弹窗状态
   const [replayModal, setReplayModal] = useState(null); // { event, passwordInput, error, showPassword }
+  const [eventPreview, setEventPreview] = useState(null);
+  const [previewArticle, setPreviewArticle] = useState(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -130,8 +133,13 @@ export default function Home() {
       event_category: normalizeEventCategory(event.category),
       has_replay: event.hasReplay,
     });
+    setEventPreview(event);
+  };
+
+  const handleEventReplayRequest = (event) => {
     if (event.hasReplay && event.replayUrl) {
       setReplayModal(event);
+      setEventPreview(null);
       setPasswordInput('');
       setPasswordError('');
       setShowPassword(false);
@@ -242,24 +250,21 @@ export default function Home() {
                     )}
                     <h3 className="featured__title">{event.title}</h3>
                     <p className="featured__excerpt">{event.excerpt}</p>
-                    <div className="featured__meta">
+                    <div className="featured__meta featured__meta--event">
                       <span className="featured__meta-item">
                         <Clock size={14} />
                         {event.date}
                       </span>
+                      <span className="featured__meta-center">
+                        {event.hasReplay && (
+                          <span className="featured__replay-badge">
+                            <Video size={12} /> 回放
+                          </span>
+                        )}
+                      </span>
                       {event.location && (
-                        <span className="featured__meta-item">
+                        <span className="featured__meta-item featured__meta-location">
                           <MapPin size={12} /> {event.location}
-                        </span>
-                      )}
-                      {event.hasReplay && (
-                        <span className="featured__replay-badge">
-                          <Video size={12} /> 回放
-                        </span>
-                      )}
-                      {event.hasReplay && event.replayPassword && (
-                        <span className="featured__meta-item featured__meta-item--replay">
-                          <Lock size={12} /> 需密码
                         </span>
                       )}
                     </div>
@@ -286,16 +291,6 @@ export default function Home() {
           </div>
           <div className="featured__grid featured__grid--articles">
             {recentArticles.map((article) => {
-              const hasUrl = !!article.url;
-              const trackClick = () =>
-                trackEvent('article_click', {
-                  article_id: article.id,
-                  article_title: article.title,
-                  article_category: article.category,
-                  source: 'home',
-                  target: hasUrl ? 'wechat' : 'detail',
-                });
-
               const cardInner = (
                 <>
                   {/* 封面图 */}
@@ -328,26 +323,22 @@ export default function Home() {
                 </>
               );
 
-              return hasUrl ? (
-                <a
+              return (
+                <button
                   key={article.id}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="featured__card"
-                  onClick={trackClick}
+                  type="button"
+                  onClick={() => {
+                    trackEvent('article_preview_open', {
+                      article_id: article.id,
+                      article_title: article.title,
+                      source: 'home',
+                    });
+                    setPreviewArticle(article);
+                  }}
                 >
                   {cardInner}
-                </a>
-              ) : (
-                <Link
-                  key={article.id}
-                  to={`/article/${article.id}`}
-                  className="featured__card"
-                  onClick={trackClick}
-                >
-                  {cardInner}
-                </Link>
+                </button>
               );
             })}
           </div>
@@ -360,6 +351,59 @@ export default function Home() {
       </section>
 
       {/* 密码验证弹窗 */}
+      {eventPreview && (
+        <div className="replay-modal__overlay" onClick={() => setEventPreview(null)}>
+          <div className="replay-modal replay-modal--event-preview" onClick={(e) => e.stopPropagation()}>
+            <button className="replay-modal__close" onClick={() => setEventPreview(null)}>
+              <X size={18} />
+            </button>
+
+            <div className="replay-modal__icon">
+              <CalendarDays size={32} />
+            </div>
+
+            <h3 className="replay-modal__title">{eventPreview.title}</h3>
+            <div className="event-preview__meta">
+              {eventPreview.date && (
+                <span className="event-preview__meta-item">
+                  <Clock size={14} /> {eventPreview.date}
+                </span>
+              )}
+              {eventPreview.location && (
+                <span className="event-preview__meta-item">
+                  <MapPin size={14} /> {eventPreview.location}
+                </span>
+              )}
+              {normalizeEventCategory(eventPreview.category) && (
+                <span className="event-preview__category">
+                  {normalizeEventCategory(eventPreview.category)}
+                </span>
+              )}
+            </div>
+            <p className="replay-modal__desc event-preview__desc">
+              {eventPreview.excerpt || '暂无活动简介'}
+            </p>
+
+            <div className="replay-modal__actions">
+              {eventPreview.hasReplay && eventPreview.replayUrl && (
+                <button
+                  className="btn btn-primary replay-modal__submit"
+                  onClick={() => handleEventReplayRequest(eventPreview)}
+                >
+                  <Video size={16} /> 查看活动回放
+                </button>
+              )}
+              <button
+                className="btn btn-ghost"
+                onClick={() => setEventPreview(null)}
+              >
+                先不打开
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {replayModal && (
         <div className="replay-modal__overlay" onClick={closeModal}>
           <div className="replay-modal" onClick={(e) => e.stopPropagation()}>
@@ -429,6 +473,20 @@ export default function Home() {
           </div>
         </div>
       )}
+
+      <ArticlePreviewModal
+        article={previewArticle}
+        onClose={() => setPreviewArticle(null)}
+        onOpen={(article, target) => {
+          trackEvent('article_click', {
+            article_id: article.id,
+            article_title: article.title,
+            article_category: article.category,
+            source: 'home',
+            target,
+          });
+        }}
+      />
 
     </div>
   );

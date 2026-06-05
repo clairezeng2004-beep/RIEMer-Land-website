@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Search,
   Filter,
@@ -14,12 +13,14 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import ArticleChat from '../../components/ArticleChat';
 import CoverImage from '../../components/CoverImage';
+import ArticlePreviewModal from '../../components/ArticlePreviewModal';
 import './Articles.css';
 
 export default function Articles() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [selectedTags, setSelectedTags] = useState([]);
+  const [previewArticle, setPreviewArticle] = useState(null);
   const { userArticles } = useSiteContent();
 
   const toggleSelection = (setter, value) => {
@@ -158,16 +159,6 @@ export default function Articles() {
           </div>
           <div className="articles-list__grid">
             {filtered.map((article) => {
-              const hasUrl = !!article.url;
-              const trackClick = () =>
-                trackEvent('article_click', {
-                  article_id: article.id,
-                  article_title: article.title,
-                  article_category: article.category,
-                  source: 'articles_list',
-                  target: hasUrl ? 'wechat' : 'detail',
-                });
-
               const cardInner = (
                 <>
                   {/* 封面图 */}
@@ -207,26 +198,22 @@ export default function Articles() {
                 </>
               );
 
-              return hasUrl ? (
-                <a
+              return (
+                <button
                   key={article.id}
-                  href={article.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
                   className="article-card card"
-                  onClick={trackClick}
+                  type="button"
+                  onClick={() => {
+                    trackEvent('article_preview_open', {
+                      article_id: article.id,
+                      article_title: article.title,
+                      source: 'articles_list',
+                    });
+                    setPreviewArticle(article);
+                  }}
                 >
                   {cardInner}
-                </a>
-              ) : (
-                <Link
-                  key={article.id}
-                  to={`/article/${article.id}`}
-                  className="article-card card"
-                  onClick={trackClick}
-                >
-                  {cardInner}
-                </Link>
+                </button>
               );
             })}
           </div>
@@ -243,6 +230,19 @@ export default function Articles() {
 
       {/* 查询助手对话窗口 */}
       <ArticleChat />
+      <ArticlePreviewModal
+        article={previewArticle}
+        onClose={() => setPreviewArticle(null)}
+        onOpen={(article, target) => {
+          trackEvent('article_click', {
+            article_id: article.id,
+            article_title: article.title,
+            article_category: article.category,
+            source: 'articles_list',
+            target,
+          });
+        }}
+      />
     </div>
   );
 }

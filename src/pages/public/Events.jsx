@@ -5,7 +5,6 @@ import {
   Clock,
   MapPin,
   Video,
-  Lock,
   Eye,
   EyeOff,
   X,
@@ -169,24 +168,21 @@ export default function Events() {
                     )}
                     <h3 className="featured__title">{event.title}</h3>
                     <p className="featured__excerpt">{event.excerpt}</p>
-                    <div className="featured__meta">
+                    <div className="featured__meta featured__meta--event">
                       <span className="featured__meta-item">
                         <Clock size={14} />
                         {event.date}
                       </span>
+                      <span className="featured__meta-center">
+                        {event.hasReplay && (
+                          <span className="featured__replay-badge">
+                            <Video size={12} /> 回放
+                          </span>
+                        )}
+                      </span>
                       {event.location && (
-                        <span className="featured__meta-item">
+                        <span className="featured__meta-item featured__meta-location">
                           <MapPin size={12} /> {event.location}
-                        </span>
-                      )}
-                      {event.hasReplay && (
-                        <span className="featured__replay-badge">
-                          <Video size={12} /> 回放
-                        </span>
-                      )}
-                      {event.hasReplay && event.replayPassword && (
-                        <span className="featured__meta-item featured__meta-item--replay">
-                          <Lock size={12} /> 需密码
                         </span>
                       )}
                     </div>
