@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useMemo } from 'react';
+import { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { ChevronDown, Check, X, Search } from 'lucide-react';
 import { pinyinMatch } from '../utils/pinyinSearch';
 import './CustomSelect.css';
@@ -37,9 +38,33 @@ export default function CustomSelect({
 }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
+  const [dropdownStyle, setDropdownStyle] = useState(null);
   const ref = useRef(null);
   const dropdownRef = useRef(null);
   const searchInputRef = useRef(null);
+
+  const updateDropdownPosition = useCallback(() => {
+    const trigger = ref.current?.querySelector('.custom-select__trigger');
+    if (!trigger) return;
+
+    const rect = trigger.getBoundingClientRect();
+    const viewportPadding = 8;
+    const preferredHeight = 220;
+    const gap = 4;
+    const spaceBelow = window.innerHeight - rect.bottom - viewportPadding;
+    const spaceAbove = rect.top - viewportPadding;
+    const openUp = spaceBelow < 160 && spaceAbove > spaceBelow;
+    const maxHeight = Math.max(120, Math.min(preferredHeight, openUp ? spaceAbove - gap : spaceBelow - gap));
+
+    setDropdownStyle({
+      position: 'fixed',
+      top: openUp ? 'auto' : rect.bottom + gap,
+      bottom: openUp ? window.innerHeight - rect.top + gap : 'auto',
+      left: rect.left,
+      width: rect.width,
+      maxHeight,
+    });
+  }, []);
 
   // 标准化 options 为 { value, label }
   const normalised = useMemo(
@@ -69,13 +94,30 @@ export default function CustomSelect({
   // 点击外部关闭
   useEffect(() => {
     const handler = (e) => {
-      if (ref.current && !ref.current.contains(e.target)) {
+      if (
+        ref.current &&
+        !ref.current.contains(e.target) &&
+        dropdownRef.current &&
+        !dropdownRef.current.contains(e.target)
+      ) {
         setOpen(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    updateDropdownPosition();
+    const onMove = () => updateDropdownPosition();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [open, updateDropdownPosition]);
 
   // 下拉打开时，自动把"当前选中项"滚到可视区中间，
   // 避免长列表（如年份 2015~2027）打开后只看得到开头、找不到选中值的情况。
@@ -183,8 +225,12 @@ export default function CustomSelect({
         )}
       </button>
 
-      {open && (
-        <div className="custom-select__dropdown" ref={dropdownRef}>
+      {open && createPortal(
+        <div
+          className={`custom-select__dropdown custom-select__dropdown--portal ${size === 'sm' ? 'custom-select__dropdown--sm' : ''}`}
+          ref={dropdownRef}
+          style={dropdownStyle || undefined}
+        >
           {showSearch && (
             <div
               className="custom-select__search"
@@ -246,7 +292,8 @@ export default function CustomSelect({
               );
             })
           )}
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

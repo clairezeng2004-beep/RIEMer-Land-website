@@ -82,6 +82,12 @@
   animation: customSelectFadeIn 0.15s ease;
 }
 
+.custom-select__dropdown--portal {
+  right: auto;
+  min-width: 0;
+  z-index: 1300;
+}
+
 @keyframes customSelectFadeIn {
   from {
     opacity: 0;
@@ -131,6 +137,10 @@
 }
 
 .custom-select--sm .custom-select__dropdown {
+  min-width: 120px;
+}
+
+.custom-select__dropdown--sm {
   min-width: 120px;
 }
 
