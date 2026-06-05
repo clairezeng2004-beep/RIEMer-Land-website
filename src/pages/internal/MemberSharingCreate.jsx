@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
@@ -38,6 +38,8 @@ import { stripUnderline } from '../../utils/stripUnderline';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import {
   addSharing,
+  updateSharing,
+  fetchSharingById,
   fetchCategories,
   addCategory as addCategoryRemote,
   DEFAULT_CATEGORIES,
@@ -56,6 +58,28 @@ function getYears() {
 
 const MONTHS = Array.from({ length: 12 }, (_, i) => i + 1);
 const YEARS = getYears();
+
+function parsePeriodValue(period) {
+  if (!period) {
+    return { startYear: null, startMonth: null, endYear: null, endMonth: null };
+  }
+  const parts = String(period).split(/\s*-\s*/);
+  const parsePart = (value) => {
+    const match = String(value || '').trim().match(/^(\d{4})(?:\.(\d{1,2}))?$/);
+    return {
+      year: match ? Number(match[1]) : null,
+      month: match?.[2] ? Number(match[2]) : null,
+    };
+  };
+  const start = parsePart(parts[0]);
+  const end = parsePart(parts[1]);
+  return {
+    startYear: start.year,
+    startMonth: start.month,
+    endYear: end.year,
+    endMonth: end.month,
+  };
+}
 
 /* ====== 自定义分类选择器 ====== */
 function CategorySelect({ cats, value, onChange, onAddCategory }) {
@@ -423,19 +447,22 @@ function AttachmentUploader({ attachments, onChange }) {
 
 /* ====== 主组件 ====== */
 export default function MemberSharingCreate() {
-  const { isAuthenticated, user } = useAuth();
+  const { isAuthenticated, isAdmin, user } = useAuth();
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
+  const location = useLocation();
   const wordEditorRef = useRef(null);
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
+  const editId = useMemo(() => new URLSearchParams(location.search).get('edit'), [location.search]);
+  const isEditingPost = !!editId;
 
   // 浏览器标签页标题：新窗口里更直观地显示当前在编辑什么文档
   useEffect(() => {
     const prev = document.title;
-    document.title = '成员内部分享 - 文档编辑';
+    document.title = isEditingPost ? '成员内部分享 - 编辑文档' : '成员内部分享 - 文档编辑';
     return () => { document.title = prev; };
-  }, []);
+  }, [isEditingPost]);
 
   /* ============ Markdown 同步滚动 ============
    * 统一由 useMarkdownSyncScroll hook 管理：
@@ -480,6 +507,44 @@ export default function MemberSharingCreate() {
     attachments: [],
   });
   const [isPublishing, setIsPublishing] = useState(false);
+  const [editingSource, setEditingSource] = useState(null);
+
+  useEffect(() => {
+    if (!editId || !isAuthenticated) return;
+    let cancelled = false;
+    fetchSharingById(editId)
+      .then((post) => {
+        if (cancelled) return;
+        if (!post) {
+          alert('没有找到这篇分享');
+          navigate('/internal/member-sharing', { replace: true });
+          return;
+        }
+        const canEdit = isAdmin || (post.authorId && String(post.authorId) === String(user?.id));
+        if (!canEdit) {
+          alert('你没有权限编辑这篇分享');
+          navigate('/internal/member-sharing', { replace: true });
+          return;
+        }
+        setEditingSource(post);
+        setNewPost({
+          title: post.title || '',
+          category: post.category || 'experience',
+          format: post.format || 'word',
+          content: post.content || '',
+          period: parsePeriodValue(post.period),
+          attachments: Array.isArray(post.attachments) ? post.attachments : [],
+        });
+      })
+      .catch(() => {
+        if (cancelled) return;
+        alert('加载分享内容失败，请稍后再试');
+        navigate('/internal/member-sharing', { replace: true });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [editId, isAuthenticated, isAdmin, navigate, user?.id]);
 
   // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
   useAutoResizeTextarea(mdEditorRef, newPost.content, { minHeight: 360 });
@@ -713,40 +778,51 @@ export default function MemberSharingCreate() {
     }));
 
     const post = {
-      id: `sharing-${Date.now()}`,
+      id: editingSource?.id || `sharing-${Date.now()}`,
       title: newPost.title.trim(),
       category: newPost.category,
       format: newPost.format,
       content: normalizedContent,
       period: periodStr || null,
       attachments: attachments.length > 0 ? attachments : null,
-      author: user?.nickname || user?.name || 'Unknown',
-      authorId: user?.id || null,
-      createdAt: new Date().toISOString().split('T')[0],
-      likes: [],
+      author: editingSource?.author || user?.name || user?.nickname || 'Unknown',
+      authorId: editingSource?.authorId || user?.id || null,
+      createdAt: editingSource?.createdAt || new Date().toISOString().split('T')[0],
+      likes: editingSource?.likes || [],
     };
 
     try {
-      try {
-        await addSharing(post);
-      } catch (err) {
-        console.warn('[MemberSharingCreate] 发布失败:', err?.message || err);
-        alert(`发布失败：${err?.message || '请检查网络或稍后再试。'}`);
-        return;
-      }
-
-      // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
-      try {
-        const categoryLabel =
-          cats.find((c) => c.key === post.category)?.label || '';
-        emitNotificationEvent('sharing.new', {
-          operator: post.author,
-          operatorUserId: user?.id,
+      if (isEditingPost) {
+        await updateSharing(post.id, {
           title: post.title,
-          categoryLabel,
+          category: post.category,
+          format: post.format,
+          content: post.content,
+          period: post.period,
+          attachments: post.attachments,
         });
-      } catch (err) {
-        console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);
+      } else {
+        try {
+          await addSharing(post);
+        } catch (err) {
+          console.warn('[MemberSharingCreate] 发布失败:', err?.message || err);
+          alert(`发布失败：${err?.message || '请检查网络或稍后再试。'}`);
+          return;
+        }
+
+        // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
+        try {
+          const categoryLabel =
+            cats.find((c) => c.key === post.category)?.label || '';
+          emitNotificationEvent('sharing.new', {
+            operator: post.author,
+            operatorUserId: user?.id,
+            title: post.title,
+            categoryLabel,
+          });
+        } catch (err) {
+          console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);
+        }
       }
 
       // 跳转回列表页
@@ -772,7 +848,7 @@ export default function MemberSharingCreate() {
             取消
           </button>
           <button type="button" className="btn btn-primary" onClick={handleCreate} disabled={isPublishing}>
-            <Share2 size={16} /> {isPublishing ? '发布中...' : '发布分享'}
+            <Share2 size={16} /> {isPublishing ? (isEditingPost ? '保存中...' : '发布中...') : (isEditingPost ? '保存修改' : '发布分享')}
           </button>
         </div>
       </div>
@@ -780,8 +856,8 @@ export default function MemberSharingCreate() {
       {/* 全屏编辑区 */}
       <div className="msc-content">
         <div className="msc-content__inner">
-          <h2 className="msc-content__title"><Plus size={22} /> 发布新分享</h2>
-          <p className="msc-content__desc">填写以下内容发布分享，支持 Markdown 和 Word 格式</p>
+          <h2 className="msc-content__title"><Plus size={22} /> {isEditingPost ? '编辑分享' : '发布新分享'}</h2>
+          <p className="msc-content__desc">{isEditingPost ? '修改分享内容，保存后会同步更新列表与详情页' : '填写以下内容发布分享，支持 Markdown 和 Word 格式'}</p>
 
           <form id="msc-create-form" onSubmit={handleCreate} className="msc-form">
             {/* 第一行：标题 + 分类 */}

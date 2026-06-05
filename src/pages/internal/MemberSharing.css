@@ -738,6 +738,7 @@
 .ms-card {
   display: flex;
   flex-direction: column;
+  position: relative;
   overflow: hidden;
   transition: all var(--transition-normal);
   height: 100%;
@@ -759,6 +760,11 @@
   flex-direction: column;
   gap: var(--space-sm);
   flex: 1;
+}
+
+.ms-card__body .ms-card__title,
+.ms-card__body .ms-card__excerpt {
+  padding-right: 44px;
 }
 
 .ms-card__top {
@@ -884,6 +890,55 @@
   display: flex;
   align-items: center;
   gap: 4px;
+}
+
+.ms-card__edit-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 2;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-full);
+  background: color-mix(in srgb, var(--color-bg-card, #fff) 92%, transparent);
+  color: var(--color-text-muted);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+  opacity: 0.65;
+  transition: all var(--transition-fast);
+  text-decoration: none;
+}
+
+.ms-card:hover .ms-card__edit-btn,
+.ms-card__edit-btn:focus-visible {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .ms-card__edit-btn {
+    opacity: 1;
+  }
+}
+
+.ms-card__edit-btn:hover {
+  border-color: color-mix(in srgb, var(--color-primary) 35%, transparent);
+  background: color-mix(in srgb, var(--color-primary) 10%, var(--color-bg-card, #fff));
+  color: var(--color-primary);
+}
+
+.ms-card__delete-btn {
+  top: 50px;
+  right: 10px;
+}
+
+.ms-card__delete-btn:hover {
+  border-color: color-mix(in srgb, var(--color-danger) 38%, transparent);
+  background: color-mix(in srgb, var(--color-danger) 10%, var(--color-bg-card, #fff));
+  color: var(--color-danger);
 }
 
 .ms-card__like-btn {

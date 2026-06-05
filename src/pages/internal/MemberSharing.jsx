@@ -31,7 +31,6 @@ import {
   FileText,
   Code2,
   ThumbsUp,
-  ExternalLink,
   Settings2,
   X,
   Check,
@@ -116,6 +115,18 @@ export default function MemberSharing() {
         return user.name || user.nickname;
       }
       return like?.userName || '访客';
+    },
+    [userNameMap, user],
+  );
+
+  const resolveAuthorName = useCallback(
+    (post) => {
+      const uid = post?.authorId;
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return post?.author || 'Unknown';
     },
     [userNameMap, user],
   );
@@ -321,6 +332,7 @@ export default function MemberSharing() {
     const matchSearch =
       !searchTerm ||
       pinyinMatch(s.title, searchTerm) ||
+      pinyinMatch(resolveAuthorName(s), searchTerm) ||
       pinyinMatch(s.author, searchTerm);
     const matchCat = selectedCategories.length === 0 || selectedCategories.includes(s.category);
     return matchSearch && matchCat;
@@ -713,6 +725,32 @@ export default function MemberSharing() {
           {filtered.map((post) => (
             <div key={post.id} className="ms-card card">
               <div className="ms-card__accent" style={{ background: categoryColors[post.category] || '#6B7280' }} />
+              {canModify(post) && (
+                <a
+                  href={`/internal/member-sharing/create?edit=${encodeURIComponent(post.id)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="ms-card__edit-btn"
+                  title="编辑分享"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <Pencil size={14} />
+                </a>
+              )}
+              {canModify(post) && (
+                <button
+                  type="button"
+                  className="ms-card__edit-btn ms-card__delete-btn"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleDelete(post.id);
+                  }}
+                  title="删除分享"
+                >
+                  <Trash2 size={14} />
+                </button>
+              )}
               <a href={`/internal/member-sharing/view/${post.id}`} target="_blank" rel="noopener noreferrer" className="ms-card__body-link">
                 <div className="ms-card__body">
                   {Array.isArray(post.attachments) && post.attachments.length > 0 && (
@@ -735,7 +773,7 @@ export default function MemberSharing() {
 
                   <div className="ms-card__meta">
                     <span className="ms-card__author">
-                      <User size={13} /> {post.author}
+                      <User size={13} /> {resolveAuthorName(post)}
                     </span>
                     <span className="ms-card__date">
                       <Clock size={13} /> {post.createdAt}
@@ -789,24 +827,6 @@ export default function MemberSharing() {
                   )}
                 </div>
                 <div className="ms-card__bottom-right">
-                  <a
-                    href={`/internal/member-sharing/view/${post.id}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ms-card__action-icon"
-                    title="查看全文"
-                  >
-                    <ExternalLink size={14} />
-                  </a>
-                  {canModify(post) && (
-                    <button
-                      className="ms-card__action-icon ms-card__action-icon--danger"
-                      onClick={() => handleDelete(post.id)}
-                      title="删除"
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  )}
                 </div>
               </div>
             </div>
