@@ -108,6 +108,22 @@ function normaliseAttachmentsForDb(attachments) {
   return attachments.map(({ dataUrl, blobUrl, file, _file, ...att }) => att);
 }
 
+function stripInlineDataUrls(content = '') {
+  return String(content).replace(
+    /\s(src|href)=["']data:[^"']+["']/gi,
+    ' data-local-preview="pending-upload"',
+  );
+}
+
+function makeLocalPreviewPost(post) {
+  return {
+    ...post,
+    content: stripInlineDataUrls(post.content),
+    attachments: normaliseAttachmentsForDb(post.attachments),
+    _syncing: true,
+  };
+}
+
 function withTimeout(promise, ms, label) {
   let timeoutId;
   const timeout = new Promise((_, reject) => {
@@ -290,11 +306,17 @@ export async function addSharing(post) {
   }
 
   if (!localResult.success) {
-    // localStorage 可能因为内容/附件过大或空间不足而失败。此时不能假装发布成功，
-    // 改为等待云端保存；云端也失败时把错误抛给发布页，让用户留在编辑页。
-    const saved = await syncSharingToCloud(post);
-    if (saved?._fromDb) return saved;
-    throw new Error(saved?._saveError || localResult.error || '成员分享保存失败');
+    // localStorage 可能因为正文内联图片/附件 dataUrl 太大而失败。
+    // 这时保存一份轻量预览，完整内容继续后台上云，避免发布按钮卡到上传结束。
+    const previewPost = makeLocalPreviewPost(post);
+    const previewResult = addLocalSharing(previewPost);
+    if (!previewResult.success && (!isSupabaseConfigured || !supabase)) {
+      throw new Error(previewResult.error || localResult.error || '成员分享保存失败');
+    }
+    syncSharingToCloud(post).catch((err) => {
+      console.warn('[MemberSharingDB] 后台同步分享失败:', err?.message || err);
+    });
+    return { ...previewPost, _syncing: true };
   }
 
   // 本地已保存，可以立即返回列表；云端同步放到后台，成功后会用云端返回值覆盖本地附件 URL 等元数据。
