@@ -20,10 +20,26 @@
   margin-bottom: var(--space-sm, 10px);
 }
 
-/* 活动信息标签统一排布：日期 · 地点 · 回放 · 需密码，按需换行，左对齐 */
+/* 活动信息标签统一排布：日期 · 回放 · 地点，始终保持同一行 */
 .ep-card__info {
-  flex-wrap: wrap;
-  row-gap: var(--space-xs, 6px);
+  display: grid;
+  grid-template-columns: minmax(max-content, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  column-gap: var(--space-sm, 8px);
+}
+
+.ep-card__info-center {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 3.4rem;
+}
+
+.ep-card__location {
+  justify-self: end;
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* 系列标签独占日期/地点下方第二行，左对齐 */
@@ -53,10 +69,6 @@
 .ep-card__badge--replay {
   background: rgba(79, 191, 196, 0.15);
   color: #2c8c8f;
-}
-
-.ep-card__meta--lock {
-  color: #c89020;
 }
 
 /* 弹窗内：日期 + 分类同行 */

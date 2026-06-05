@@ -1168,24 +1168,21 @@ export default function EventPublish() {
                   {event.excerpt && (
                     <p className="ia-card__excerpt">{event.excerpt}</p>
                   )}
-                  {/* 信息标签统一排布（与首页一致）：日期 · 地点 · 回放 · 是否需密码 */}
+                  {/* 信息标签统一排布：日期 · 回放 · 地点 */}
                   <div className="ia-card__footer ep-card__info">
                     <span className="ia-card__meta">
                       <Calendar size={13} /> {event.date}
                     </span>
+                    <span className="ep-card__info-center">
+                      {event.hasReplay && (
+                        <span className="ep-card__badge ep-card__badge--replay">
+                          <Video size={12} /> 回放
+                        </span>
+                      )}
+                    </span>
                     {event.location && (
-                      <span className="ia-card__meta">
+                      <span className="ia-card__meta ep-card__location">
                         <MapPin size={13} /> {event.location}
-                      </span>
-                    )}
-                    {event.hasReplay && (
-                      <span className="ep-card__badge ep-card__badge--replay">
-                        <Video size={12} /> 回放
-                      </span>
-                    )}
-                    {event.hasReplay && event.replayPassword && (
-                      <span className="ia-card__meta ep-card__meta--lock">
-                        <Lock size={12} /> 需密码
                       </span>
                     )}
                   </div>
