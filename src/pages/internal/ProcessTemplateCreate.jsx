@@ -36,6 +36,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
+import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './MemberSharingCreate.css';
@@ -311,6 +312,16 @@ export default function ProcessTemplateCreate() {
     }));
   }, []);
 
+  const handleFormatChange = useCallback((format) => {
+    setNewDoc((prev) => {
+      if (prev.format === format) return prev;
+      if (format === 'markdown') {
+        return { ...prev, format, content: htmlToMarkdown(prev.content) };
+      }
+      return { ...prev, format, content: stripUnderline(markdownToHtml(prev.content)) };
+    });
+  }, []);
+
   /* ============ Word 粘贴清洗（与 MemberSharingCreate 保持一致） ============ */
   const cleanWordHtml = useCallback((html) => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -464,6 +475,13 @@ export default function ProcessTemplateCreate() {
       imageApiRef.current = null;
     };
   }, [newDoc.format]);
+
+  useEffect(() => {
+    if (newDoc.format !== 'word' || !wordEditorRef.current) return;
+    if (wordEditorRef.current.innerHTML !== newDoc.content) {
+      wordEditorRef.current.innerHTML = newDoc.content || '';
+    }
+  }, [newDoc.format, newDoc.content]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -687,14 +705,14 @@ export default function ProcessTemplateCreate() {
                 <button
                   type="button"
                   className={`msc-form__format-btn ${newDoc.format === 'word' ? 'msc-form__format-btn--active' : ''}`}
-                  onClick={() => setNewDoc({ ...newDoc, format: 'word' })}
+                  onClick={() => handleFormatChange('word')}
                 >
                   <FileText size={14} /> Word (HTML)
                 </button>
                 <button
                   type="button"
                   className={`msc-form__format-btn ${newDoc.format === 'markdown' ? 'msc-form__format-btn--active' : ''}`}
-                  onClick={() => setNewDoc({ ...newDoc, format: 'markdown' })}
+                  onClick={() => handleFormatChange('markdown')}
                 >
                   <Code2 size={14} /> Markdown
                 </button>

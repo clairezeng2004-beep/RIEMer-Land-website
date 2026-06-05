@@ -35,6 +35,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
+import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import {
   addSharing,
   fetchCategories,
@@ -481,6 +482,16 @@ export default function MemberSharingCreate() {
     addCategoryRemote(cat).catch(() => { /* ignore */ });
   };
 
+  const handleFormatChange = useCallback((format) => {
+    setNewPost((prev) => {
+      if (prev.format === format) return prev;
+      if (format === 'markdown') {
+        return { ...prev, format, content: htmlToMarkdown(prev.content) };
+      }
+      return { ...prev, format, content: stripUnderline(markdownToHtml(prev.content)) };
+    });
+  }, []);
+
   // 清理从 Word/网页粘贴过来的 HTML，只保留安全标签
   const cleanWordHtml = useCallback((html) => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
@@ -636,6 +647,13 @@ export default function MemberSharingCreate() {
       imageApiRef.current = null;
     };
   }, [newPost.format]);
+
+  useEffect(() => {
+    if (newPost.format !== 'word' || !wordEditorRef.current) return;
+    if (wordEditorRef.current.innerHTML !== newPost.content) {
+      wordEditorRef.current.innerHTML = newPost.content || '';
+    }
+  }, [newPost.format, newPost.content]);
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -807,14 +825,14 @@ export default function MemberSharingCreate() {
                 <button
                   type="button"
                   className={`msc-form__format-btn ${newPost.format === 'word' ? 'msc-form__format-btn--active' : ''}`}
-                  onClick={() => setNewPost({ ...newPost, format: 'word' })}
+                  onClick={() => handleFormatChange('word')}
                 >
                   <FileText size={14} /> Word (HTML)
                 </button>
                 <button
                   type="button"
                   className={`msc-form__format-btn ${newPost.format === 'markdown' ? 'msc-form__format-btn--active' : ''}`}
-                  onClick={() => setNewPost({ ...newPost, format: 'markdown' })}
+                  onClick={() => handleFormatChange('markdown')}
                 >
                   <Code2 size={14} /> Markdown
                 </button>
