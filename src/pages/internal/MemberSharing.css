@@ -778,7 +778,9 @@
 
 .ms-card__body .ms-card__title,
 .ms-card__body .ms-card__excerpt {
-  padding-right: 44px;
+  /* 给右上角浮动的编辑/删除图标让位。图标右缘对齐到 --space-xl，
+     图标宽 32px，故文字需在 (--space-xl + 32 + 间隙) 处收住，避免压到图标下面。 */
+  padding-right: calc(var(--space-xl) + 40px);
 }
 
 .ms-card__top {
@@ -835,6 +837,9 @@
   line-height: 1.4;
   font-weight: 600;
   transition: color var(--transition-fast);
+  /* 与活动/文章卡片（.ia-card__title）一致：标题至少留 2 行高度，
+     让卡片整体长度对齐活动分享卡片。 */
+  min-height: calc(var(--text-md) * 1.4 * 2);
 }
 
 .ms-card:hover .ms-card__title {
@@ -846,9 +851,12 @@
   color: var(--color-text-light);
   line-height: 1.7;
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  /* 与活动/文章卡片（.ia-card__excerpt）一致：摘要 3 行高度，
+     卡片纵向长度与活动分享卡片对齐。 */
+  min-height: calc(var(--text-sm) * 1.7 * 3);
 }
 
 .ms-card__period {
@@ -889,7 +897,9 @@
 .ms-card__edit-btn {
   position: absolute;
   top: 10px;
-  right: 10px;
+  /* 右边与卡片正文/下方分割线右端对齐（正文右内边距为 --space-xl），
+     之前 10px 比分割线更靠右，显得图标偏出。 */
+  right: var(--space-xl);
   z-index: 2;
   width: 32px;
   height: 32px;
@@ -926,7 +936,7 @@
 
 .ms-card__delete-btn {
   top: 50px;
-  right: 10px;
+  right: var(--space-xl);
 }
 
 .ms-card__delete-btn:hover {
