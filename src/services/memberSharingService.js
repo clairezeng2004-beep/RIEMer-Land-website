@@ -184,6 +184,13 @@ async function prepareSharingForCloud(post) {
 // Sharings（分享帖）
 // ================================================================
 
+/** 同步读取本地缓存的分享。
+ * 供列表页首屏作为初始值，先把上次缓存的内容立刻显示出来，
+ * 避免手机端云端拉取较慢时出现"先空一下再加载"的空窗。 */
+export function getCachedSharings() {
+  return getLocalSharings();
+}
+
 /** 获取所有分享（按 created_at 降序） */
 export async function fetchSharings() {
   const local = getLocalSharings();
@@ -203,7 +210,12 @@ export async function fetchSharings() {
       console.warn('[MemberSharingDB] 获取分享失败，回退本地:', error.message);
       return local;
     }
-    return mergeSharings((data || []).map(dbToFrontend), local);
+    const merged = mergeSharings((data || []).map(dbToFrontend), local);
+    // 把云端结果回写本地缓存（best-effort）：下次进入/刷新时 getCachedSharings()
+    // 能立刻拿到内容当首屏，规避空窗。saveLocalSharings 内部已处理配额不足，
+    // 失败只静默警告、不影响本次返回。
+    saveLocalSharings(merged);
+    return merged;
   } catch (err) {
     console.warn('[MemberSharingDB] 获取分享异常，回退本地:', err.message);
     return local;

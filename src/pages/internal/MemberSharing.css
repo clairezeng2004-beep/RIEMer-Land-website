@@ -1041,6 +1041,17 @@
   margin-bottom: var(--space-xs);
 }
 
+/* 加载占位：转圈图标（覆盖 .ms-empty svg 的淡化，保持清晰并旋转） */
+.ms-empty--loading .ms-empty__spinner {
+  opacity: 0.9;
+  color: var(--color-primary);
+  animation: msEmptySpin 0.9s linear infinite;
+}
+
+@keyframes msEmptySpin {
+  to { transform: rotate(360deg); }
+}
+
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .ms-page {

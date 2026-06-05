@@ -18,6 +18,7 @@ import {
   updateCategory as updateCategoryRemote,
   deleteCategory as deleteCategoryRemote,
   subscribeCategories,
+  getCachedSharings,
   DEFAULT_CATEGORIES,
 } from '../../services/memberSharingService';
 import { moveToRecycleBin } from '../../services/recycleBinService';
@@ -38,6 +39,7 @@ import {
   Pencil,
   Palette,
   Paperclip,
+  Loader2,
 } from 'lucide-react';
 import './MemberSharing.css';
 
@@ -138,7 +140,11 @@ export default function MemberSharing() {
     [updateInternalConfig],
   );
 
-  const [sharings, setSharings] = useState([]);
+  // 首屏用本地缓存做种子，先把上次的内容立刻显示出来（手机端尤其明显），
+  // 云端数据回来后再覆盖/合并，避免"先空一下再加载"的空窗。
+  const [sharings, setSharings] = useState(() => getCachedSharings());
+  // 首次云端拉取是否完成：未完成且暂无内容时显示"加载中"而不是"暂无分享"
+  const [loaded, setLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
   const views = loadViews();
@@ -166,6 +172,8 @@ export default function MemberSharing() {
         if (Array.isArray(cats)) setCategoryList(cats);
       } catch (err) {
         console.warn('[MemberSharing] 初次加载失败:', err);
+      } finally {
+        if (!cancelled) setLoaded(true);
       }
     })();
     return () => { cancelled = true; };
@@ -841,7 +849,17 @@ export default function MemberSharing() {
           ))}
         </div>
 
-        {filtered.length === 0 && (
+        {/* 首屏云端拉取未完成且暂无内容 → 显示"加载中"占位，
+            避免在数据回来前先闪一下"暂无分享"空状态（手机端尤其明显）。 */}
+        {!loaded && filtered.length === 0 && (
+          <div className="ms-empty ms-empty--loading">
+            <Loader2 size={40} className="ms-empty__spinner" />
+            <h3>加载中…</h3>
+            <p>正在为你加载成员分享内容</p>
+          </div>
+        )}
+
+        {loaded && filtered.length === 0 && (
           <div className="ms-empty">
             <Share2 size={48} />
             <h3>暂无分享</h3>
