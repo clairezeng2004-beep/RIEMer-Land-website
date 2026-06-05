@@ -88,7 +88,7 @@ src/
 
 ## 📬 联系我们
 
-- 📧 邮箱：riemerland@swufe.edu.cn
+- 📧 邮箱：riemer_gzh@163.com
 - 📍 地址：西南财经大学 经济与管理研究院
 
 ---
