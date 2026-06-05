@@ -46,11 +46,14 @@ import {
 } from '../../services/memberSharingService';
 import './MemberSharingCreate.css';
 
-// 生成年份列表（当前年份往前 10 年，往后 2 年）
+// 生成年份列表：从「当前年份」开始往前 10 年（不含未来年份）。
+// 这样下拉默认定位到当前年份，而不是之前从 cur+2 起头、顶部停在未来年份
+// （例如 2026 年时停在 2028）。选项数 > 6，CustomSelect 会自动显示搜索框，
+// 用户可直接打字筛选/输入想要的年份，时间段本身仍为选填、可不选。
 function getYears() {
   const cur = new Date().getFullYear();
   const years = [];
-  for (let y = cur + 2; y >= cur - 10; y--) {
+  for (let y = cur; y >= cur - 10; y--) {
     years.push(y);
   }
   return years;
