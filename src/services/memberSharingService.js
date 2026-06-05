@@ -12,7 +12,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const LOCAL_SHARINGS_KEY = 'riemer_member_sharing';
 const LOCAL_CATEGORIES_KEY = 'riemer_sharing_categories';
 const MEMBER_SHARING_BUCKET = 'member-sharing-attachments';
-const MEMBER_SHARING_CLOUD_TIMEOUT_MS = 8000;
+const MEMBER_SHARING_CLOUD_TIMEOUT_MS = 25000;
 
 // 默认分类（与原页面保持一致）
 export const DEFAULT_CATEGORIES = [
@@ -255,26 +255,37 @@ async function syncSharingToCloud(post) {
     );
     if (error) {
       console.warn('[MemberSharingDB] 新增分享失败（仅保存本地）:', error.message);
-      return { ...post, _localOnly: true };
+      return { ...post, _localOnly: true, _saveError: error.message };
     }
     const saved = dbToFrontend(data);
     addLocalSharing(saved);
     return saved;
   } catch (err) {
     console.warn('[MemberSharingDB] 新增分享异常:', err.message);
-    return { ...post, _localOnly: true };
+    return { ...post, _localOnly: true, _saveError: err.message };
   }
 }
 
 export async function addSharing(post) {
   // 先写本地，确保发布按钮不会被 Storage/PostgREST 的慢请求卡住。
-  addLocalSharing(post);
+  const localResult = addLocalSharing(post);
 
   if (!isSupabaseConfigured || !supabase) {
+    if (!localResult.success) {
+      throw new Error(localResult.error || '本地缓存保存失败');
+    }
     return { ...post, _localOnly: true };
   }
 
-  // 云端同步放到后台；成功后会用云端返回值覆盖本地附件 URL 等元数据。
+  if (!localResult.success) {
+    // localStorage 可能因为内容/附件过大或空间不足而失败。此时不能假装发布成功，
+    // 改为等待云端保存；云端也失败时把错误抛给发布页，让用户留在编辑页。
+    const saved = await syncSharingToCloud(post);
+    if (saved?._fromDb) return saved;
+    throw new Error(saved?._saveError || localResult.error || '成员分享保存失败');
+  }
+
+  // 本地已保存，可以立即返回列表；云端同步放到后台，成功后会用云端返回值覆盖本地附件 URL 等元数据。
   syncSharingToCloud(post).catch((err) => {
     console.warn('[MemberSharingDB] 后台同步分享失败:', err?.message || err);
   });
@@ -528,14 +539,23 @@ function getLocalSharings() {
 function saveLocalSharings(list) {
   try {
     localStorage.setItem(LOCAL_SHARINGS_KEY, JSON.stringify(list));
-  } catch { /* ignore quota */ }
+    return { success: true, error: null };
+  } catch (err) {
+    console.warn('[MemberSharingDB] 本地分享缓存保存失败:', err?.message || err);
+    return {
+      success: false,
+      error: err?.name === 'QuotaExceededError'
+        ? '浏览器本地缓存空间不足，无法保存这篇分享。'
+        : (err?.message || '本地缓存保存失败'),
+    };
+  }
 }
 
 function addLocalSharing(post) {
   const list = getLocalSharings();
   // 按 id 去重（防止同 id 重复插入）
   const next = [post, ...list.filter((s) => String(s.id) !== String(post.id))];
-  saveLocalSharings(next);
+  return saveLocalSharings(next);
 }
 
 function updateLocalSharing(id, updates) {
