@@ -12,6 +12,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const LOCAL_SHARINGS_KEY = 'riemer_member_sharing';
 const LOCAL_CATEGORIES_KEY = 'riemer_sharing_categories';
 const MEMBER_SHARING_BUCKET = 'member-sharing-attachments';
+const MEMBER_SHARING_CLOUD_TIMEOUT_MS = 8000;
 
 // 默认分类（与原页面保持一致）
 export const DEFAULT_CATEGORIES = [
@@ -107,6 +108,29 @@ function normaliseAttachmentsForDb(attachments) {
   return attachments.map(({ dataUrl, blobUrl, file, _file, ...att }) => att);
 }
 
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error(`${label} 超时`));
+    }, ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+function mergeSharings(remote = [], local = []) {
+  const map = new Map();
+  [...local, ...remote].forEach((item) => {
+    if (!item?.id) return;
+    map.set(String(item.id), item);
+  });
+  return Array.from(map.values()).sort((a, b) => {
+    const at = new Date(a.createdAt || 0).getTime();
+    const bt = new Date(b.createdAt || 0).getTime();
+    return bt - at;
+  });
+}
+
 async function uploadAttachmentAsset({ postId, attachment, userId }) {
   // 已经是云端 URL 的附件直接复用；旧数据 dataUrl 只在准备上云时上传。
   if (!attachment?.dataUrl || attachment.url) return attachment;
@@ -162,22 +186,27 @@ async function prepareSharingForCloud(post) {
 
 /** 获取所有分享（按 created_at 降序） */
 export async function fetchSharings() {
+  const local = getLocalSharings();
   if (!isSupabaseConfigured || !supabase) {
-    return getLocalSharings();
+    return local;
   }
   try {
-    const { data, error } = await supabase
-      .from('member_sharing')
-      .select('*')
-      .order('created_at', { ascending: false });
+    const { data, error } = await withTimeout(
+      supabase
+        .from('member_sharing')
+        .select('*')
+        .order('created_at', { ascending: false }),
+      MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+      '获取成员分享',
+    );
     if (error) {
       console.warn('[MemberSharingDB] 获取分享失败，回退本地:', error.message);
-      return getLocalSharings();
+      return local;
     }
-    return (data || []).map(dbToFrontend);
+    return mergeSharings((data || []).map(dbToFrontend), local);
   } catch (err) {
     console.warn('[MemberSharingDB] 获取分享异常，回退本地:', err.message);
-    return getLocalSharings();
+    return local;
   }
 }
 
@@ -204,35 +233,52 @@ export async function fetchSharingById(id) {
 }
 
 /** 新增分享 */
-export async function addSharing(post) {
-  if (!isSupabaseConfigured || !supabase) {
-    addLocalSharing(post);
-    return { ...post, _localOnly: true };
-  }
+async function syncSharingToCloud(post) {
   try {
     // 附件必须先进入 Storage，DB 只保存 URL / storagePath 等元数据。
     // 否则 base64 dataUrl 直接塞 JSONB 很容易超过 PostgREST 请求体上限，
     // 且 localStorage 缓存也会迅速爆掉，跨设备同步不稳定。
-    const cloudPost = await prepareSharingForCloud(post);
+    const cloudPost = await withTimeout(
+      prepareSharingForCloud(post),
+      MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+      '成员分享附件上传',
+    );
     const row = frontendToDbInsert(cloudPost);
-    const { data, error } = await supabase
-      .from('member_sharing')
-      .insert(row)
-      .select()
-      .single();
+    const { data, error } = await withTimeout(
+      supabase
+        .from('member_sharing')
+        .insert(row)
+        .select()
+        .single(),
+      MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+      '成员分享云端保存',
+    );
     if (error) {
       console.warn('[MemberSharingDB] 新增分享失败（仅保存本地）:', error.message);
-      addLocalSharing(post);
-      return post;
+      return { ...post, _localOnly: true };
     }
     const saved = dbToFrontend(data);
     addLocalSharing(saved);
     return saved;
   } catch (err) {
     console.warn('[MemberSharingDB] 新增分享异常:', err.message);
-    addLocalSharing(post);
-    return post;
+    return { ...post, _localOnly: true };
   }
+}
+
+export async function addSharing(post) {
+  // 先写本地，确保发布按钮不会被 Storage/PostgREST 的慢请求卡住。
+  addLocalSharing(post);
+
+  if (!isSupabaseConfigured || !supabase) {
+    return { ...post, _localOnly: true };
+  }
+
+  // 云端同步放到后台；成功后会用云端返回值覆盖本地附件 URL 等元数据。
+  syncSharingToCloud(post).catch((err) => {
+    console.warn('[MemberSharingDB] 后台同步分享失败:', err?.message || err);
+  });
+  return { ...post, _syncing: true };
 }
 
 /** 更新分享（支持部分字段，例如只更新 likes） */
@@ -312,11 +358,19 @@ export async function migrateLocalSharingsToDb() {
   let migrated = 0;
   for (const post of toMigrate) {
     try {
-      const cloudPost = await prepareSharingForCloud(post);
+      const cloudPost = await withTimeout(
+        prepareSharingForCloud(post),
+        MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+        '迁移成员分享附件上传',
+      );
       const row = frontendToDbInsert(cloudPost);
-      const { error } = await supabase
-        .from('member_sharing')
-        .upsert(row, { onConflict: 'id' });
+      const { error } = await withTimeout(
+        supabase
+          .from('member_sharing')
+          .upsert(row, { onConflict: 'id' }),
+        MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+        '迁移成员分享云端保存',
+      );
       if (!error) migrated++;
       else console.warn('[MemberSharingDB] 迁移分享失败:', post.title, error.message);
     } catch (err) {

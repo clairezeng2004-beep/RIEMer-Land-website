@@ -140,8 +140,8 @@ export default function MemberSharing() {
     let cancelled = false;
     (async () => {
       try {
-        // 先把 localStorage 的旧数据迁到云端（幂等、只在云端可用时生效）
-        await migrateLocalSharingsToDb();
+        // 把 localStorage 的旧数据后台迁到云端，不阻塞列表首屏加载。
+        migrateLocalSharingsToDb().catch(() => { /* ignore */ });
       } catch { /* ignore */ }
       if (cancelled) return;
       try {
