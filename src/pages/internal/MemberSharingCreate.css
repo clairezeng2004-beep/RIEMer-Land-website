@@ -39,10 +39,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* 顶栏更紧凑：高度 72→56px，让“返回/发布/取消”这一行整体上移，
-     与上一级内部空间的 Navbar（RIEMer Land 品牌行）视觉高度对齐，
-     同时减少顶部留白。 */
-  min-height: 56px;
+  /* 顶栏继续压紧：高度收到 48px，让“返回/发布/取消”这一行进一步上移，
+     贴近上一级 Navbar 里“RIEMer Land”品牌所在的高度，并尽量减少顶部留白。 */
+  min-height: 48px;
   padding: 0 2rem 0 1rem;
   background: var(--color-bg, #f9fafb);
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
@@ -87,9 +86,9 @@
   display: flex;
   justify-content: center;
   /* v4：topbar 不再 fixed，内容区不需要再为它的"悬浮高度"让路；
-     只保留常规的上下左右 padding。上方收紧到 0.25rem，进一步减少
-     topbar 底边到第一个表单项之间的顶部留白。 */
-  padding: 0.25rem 2rem 1.5rem;
+     只保留常规的上下左右 padding。上方清零，顶栏底边直接接表单，
+     把顶部留白压到最少。 */
+  padding: 0 2rem 1.5rem;
 }
 
 .msc-content__inner {
