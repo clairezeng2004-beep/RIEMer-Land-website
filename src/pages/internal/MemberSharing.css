@@ -896,7 +896,7 @@
 
 .ms-card__edit-btn {
   position: absolute;
-  top: 10px;
+  top: var(--space-lg);
   /* 右边与卡片正文/下方分割线右端对齐（正文右内边距为 --space-xl），
      之前 10px 比分割线更靠右，显得图标偏出。 */
   right: var(--space-xl);
@@ -935,7 +935,7 @@
 }
 
 .ms-card__delete-btn {
-  top: 50px;
+  top: calc(var(--space-lg) + 40px);
   right: var(--space-xl);
 }
 
