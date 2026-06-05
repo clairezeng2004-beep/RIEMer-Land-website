@@ -715,25 +715,13 @@ export default function MemberSharing() {
               <div className="ms-card__accent" style={{ background: categoryColors[post.category] || '#6B7280' }} />
               <a href={`/internal/member-sharing/view/${post.id}`} target="_blank" rel="noopener noreferrer" className="ms-card__body-link">
                 <div className="ms-card__body">
-                  <div className="ms-card__top">
-                    <span
-                      className="ms-card__badge"
-                      style={{
-                        color: categoryColors[post.category] || '#6B7280',
-                        background: `${categoryColors[post.category] || '#6B7280'}15`,
-                      }}
-                    >
-                      {categoryLabels[post.category] || post.category}
-                    </span>
-                    <span className="ms-card__format-tag">
-                      {post.format === 'markdown' ? <><Code2 size={11} /> Markdown</> : <><FileText size={11} /> Word</>}
-                    </span>
-                    {Array.isArray(post.attachments) && post.attachments.length > 0 && (
+                  {Array.isArray(post.attachments) && post.attachments.length > 0 && (
+                    <div className="ms-card__top">
                       <span className="ms-card__attach-tag">
                         <Paperclip size={11} /> {post.attachments.length} 个附件
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
 
                   <h4 className="ms-card__title">{post.title}</h4>
 
@@ -747,10 +735,10 @@ export default function MemberSharing() {
 
                   <div className="ms-card__meta">
                     <span className="ms-card__author">
-                      <User size={12} /> {post.author}
+                      <User size={13} /> {post.author}
                     </span>
                     <span className="ms-card__date">
-                      <Clock size={12} /> {post.createdAt}
+                      <Clock size={13} /> {post.createdAt}
                     </span>
                     <button
                       type="button"
@@ -763,8 +751,20 @@ export default function MemberSharing() {
                       }}
                       title="查看所有访问记录"
                     >
-                      <Eye size={12} /> {views[post.id] || 0}
+                      <Eye size={13} /> {views[post.id] || 0}
                     </button>
+                    <span
+                      className="ms-card__badge"
+                      style={{
+                        color: categoryColors[post.category] || '#6B7280',
+                        background: `${categoryColors[post.category] || '#6B7280'}15`,
+                      }}
+                    >
+                      {categoryLabels[post.category] || post.category}
+                    </span>
+                    <span className="ms-card__format-tag">
+                      {post.format === 'markdown' ? <><Code2 size={13} /> Markdown</> : <><FileText size={13} /> Word</>}
+                    </span>
                   </div>
                 </div>
               </a>
