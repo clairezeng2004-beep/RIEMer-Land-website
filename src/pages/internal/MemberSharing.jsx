@@ -785,7 +785,7 @@ export default function MemberSharing() {
 
                   {post.period && (
                     <span className="ms-card__period">
-                      <Clock size={11} /> {post.period}
+                      <Clock size={11} /> 经验时间段：{post.period}
                     </span>
                   )}
 
