@@ -791,6 +791,23 @@ export default function MemberSharing() {
                     >
                       <Eye size={13} /> {views[post.id] || 0}
                     </button>
+                    <button
+                      type="button"
+                      className={`ms-card__like-btn ${hasLiked(post) ? 'ms-card__like-btn--active' : ''}`}
+                      onClick={(e) => handleLike(post.id, e)}
+                    >
+                      <ThumbsUp size={13} />
+                      <span>{(post.likes || []).length}</span>
+                    </button>
+                    {Array.isArray(post.likes) && post.likes.length > 0 && (
+                      <div className="ms-card__like-names">
+                        {post.likes.map((l, idx) => (
+                          <span key={l.userId}>
+                            {resolveLikeUserName(l)}{idx < post.likes.length - 1 ? '、' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <span
                       className="ms-card__badge"
                       style={{
@@ -806,29 +823,6 @@ export default function MemberSharing() {
                   </div>
                 </div>
               </a>
-
-              <div className="ms-card__bottom" onClick={(e) => e.stopPropagation()}>
-                <div className="ms-card__bottom-left">
-                  <button
-                    className={`ms-card__like-btn ${hasLiked(post) ? 'ms-card__like-btn--active' : ''}`}
-                    onClick={(e) => handleLike(post.id, e)}
-                  >
-                    <ThumbsUp size={14} />
-                    <span>{(post.likes || []).length}</span>
-                  </button>
-                  {Array.isArray(post.likes) && post.likes.length > 0 && (
-                    <div className="ms-card__like-names">
-                      {post.likes.map((l, idx) => (
-                        <span key={l.userId}>
-                          {resolveLikeUserName(l)}{idx < post.likes.length - 1 ? '、' : ''}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="ms-card__bottom-right">
-                </div>
-              </div>
             </div>
           ))}
         </div>
