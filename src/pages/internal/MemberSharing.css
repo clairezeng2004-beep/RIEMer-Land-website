@@ -431,6 +431,17 @@
   box-shadow: 0 0 0 2px rgba(91, 140, 62, 0.15);
 }
 
+/* 手机端（触屏）字号统一：
+   index.css 里为防止 iOS 聚焦放大，给所有 input 强制 16px（选择器特异性很高）。
+   这会让"新建/重命名筛选分类"的内联输入框比筛选标签（14px）大一截，显得突兀。
+   这里用 !important 把它拉回与标签一致的 --text-sm，保证视觉统一。 */
+@media (pointer: coarse) {
+  .ms-filters__cat-rename-input,
+  .ms-filters__cat-add-input {
+    font-size: var(--text-sm) !important;
+  }
+}
+
 .ms-filters__cat-rename-confirm,
 .ms-filters__cat-rename-cancel,
 .ms-filters__cat-add-confirm,
