@@ -23,6 +23,7 @@ import { initialTasks } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
 // 把"其他"沉到筛选列表最末，符合产品"所有筛选中'其他'永远最后一位"的约定
 import { sortWithOtherLast } from '../../utils/sortWithOtherLast';
+import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 // 工作项关联（WorkItem）：让事项追踪 ↔ 公众号归档 ↔ 活动发布三者可以通过
 // 共享的 workItemId 串成"同一件工作"。详见 src/utils/workItem.js。
 import { genWorkItemId, collectOpenWorkItems } from '../../utils/workItem';
@@ -314,12 +315,14 @@ export default function Tasks() {
 
   // 已注册已授权用户列表（动态获取）
   const [authorizedMembers, setAuthorizedMembers] = useState([]);
+  const [authorizedMembersLoading, setAuthorizedMembersLoading] = useState(true);
 
   useEffect(() => {
     let cancelled = false;
     const fetchUsers = async () => {
+      setAuthorizedMembersLoading(true);
       try {
-        const allUsers = await getAllUsers();
+        const allUsers = await getCachedAllUsers(getAllUsers);
         if (!cancelled) {
           const authorized = (allUsers || [])
             .filter((u) => u.authorized)
@@ -336,17 +339,13 @@ export default function Tasks() {
             teamMembers.map((m) => ({ id: m.id, name: m.name }))
           );
         }
+      } finally {
+        if (!cancelled) setAuthorizedMembersLoading(false);
       }
     };
     fetchUsers();
     return () => { cancelled = true; };
   }, [getAllUsers, teamMembers]);
-
-  // 负责人选项列表（已授权用户真名）
-  const assigneeOptions = useMemo(
-    () => authorizedMembers.map((m) => ({ value: m.id, label: m.name })),
-    [authorizedMembers]
-  );
 
   // 添加新标签状态
   const [showAddCategory, setShowAddCategory] = useState(false);
@@ -475,6 +474,34 @@ export default function Tasks() {
     // 默认 'none'——保持旧行为，用户如果不选就不会强行生成 workItemId。
     workItemKind: 'none',
   });
+
+  // 负责人选项列表（已授权用户真名）。用户目录加载完成前，不把已选 user id 原样显示出来。
+  const assigneeOptions = useMemo(() => {
+    const optionMap = new Map();
+    authorizedMembers.forEach((m) => {
+      optionMap.set(m.id, { value: m.id, label: m.name });
+    });
+    teamMembers.forEach((m) => {
+      if (!optionMap.has(m.id)) {
+        optionMap.set(m.id, { value: m.id, label: m.name });
+      }
+    });
+    tasks.forEach((task) => {
+      const ids = [
+        ...(Array.isArray(task.assignee) ? task.assignee : task.assignee ? [task.assignee] : []),
+        ...(Array.isArray(task.helpers) ? task.helpers : []),
+      ];
+      ids.forEach((id) => {
+        if (id && !optionMap.has(id)) {
+          optionMap.set(id, {
+            value: id,
+            label: authorizedMembersLoading ? '加载成员…' : '未知成员',
+          });
+        }
+      });
+    });
+    return Array.from(optionMap.values());
+  }, [authorizedMembers, authorizedMembersLoading, teamMembers, tasks]);
   // 亮点总结 / 经验复盘 的 Supabase 写入防抖计时器
   // 结构：{ [taskId]: { [field]: number(timerId) } }
   const writeTimersRef = useRef({});
