@@ -901,8 +901,8 @@ export default function Tasks() {
     const inUseCount = tasks.filter((t) => t.status === name).length;
     const confirmMsg =
       inUseCount > 0
-        ? `确认删除状态「${name}」？\n\n当前有 ${inUseCount} 条事项正在使用这个状态。\n删除后，这些事项的状态字段不会被清除，但不会再出现在快捷筛选条里。\n\n此操作可撤销：随时可以在状态栏点「+ 添加状态」重新添加同名项。`
-        : `确认删除状态「${name}」？\n\n当前没有事项使用此状态，可以安全删除。`;
+        ? `确认删除状态「${name}」？\n\n当前有 ${inUseCount} 条事项正在使用这个状态。\n删除后，这些事项的状态字段不会被清除，但不会再出现在快捷筛选条里。重新添加同名状态后，仍需检查相关事项的绑定关系。`
+        : `确认删除状态「${name}」？\n\n当前没有事项使用此状态。`;
     if (!window.confirm(confirmMsg)) return;
 
     setDeletingStatusName(name);
@@ -935,8 +935,8 @@ export default function Tasks() {
     const inUseCount = tasks.filter((t) => t.category === name).length;
     const confirmMsg =
       inUseCount > 0
-        ? `确认删除分类「${name}」？\n\n当前有 ${inUseCount} 条事项属于这个分类。\n删除后，这些事项的分类字段不会被清除，但不会再出现在快捷筛选条里。\n\n此操作可撤销：随时可以在分类栏点「+ 添加标签」重新添加同名项。`
-        : `确认删除分类「${name}」？\n\n当前没有事项使用此分类，可以安全删除。`;
+        ? `确认删除分类「${name}」？\n\n当前有 ${inUseCount} 条事项属于这个分类。\n删除后，这些事项的分类字段不会被清除，但不会再出现在快捷筛选条里。重新添加同名标签后，仍需检查相关事项的绑定关系。`
+        : `确认删除分类「${name}」？\n\n当前没有事项使用此分类。`;
     if (!window.confirm(confirmMsg)) return;
 
     setDeletingCategoryName(name);
