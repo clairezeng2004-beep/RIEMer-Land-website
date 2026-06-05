@@ -782,54 +782,58 @@ export default function MemberSharing() {
                   )}
 
                   <div className="ms-card__meta">
-                    <span className="ms-card__author">
-                      <User size={13} /> {resolveAuthorName(post)}
-                    </span>
-                    <span className="ms-card__date">
-                      <Clock size={13} /> {post.createdAt}
-                    </span>
-                    <button
-                      type="button"
-                      className="ms-card__views views-trigger"
-                      onClick={(e) => {
-                        // 卡片本身包在 <a> 里，需要阻止默认导航与冒泡
-                        e.preventDefault();
-                        e.stopPropagation();
-                        setViewLogPost(post);
-                      }}
-                      title="查看所有访问记录"
-                    >
-                      <Eye size={13} /> {views[post.id] || 0}
-                    </button>
-                    <button
-                      type="button"
-                      className={`ms-card__like-btn ${hasLiked(post) ? 'ms-card__like-btn--active' : ''}`}
-                      onClick={(e) => handleLike(post.id, e)}
-                    >
-                      <ThumbsUp size={13} />
-                      <span>{(post.likes || []).length}</span>
-                    </button>
-                    {Array.isArray(post.likes) && post.likes.length > 0 && (
-                      <div className="ms-card__like-names">
-                        {post.likes.map((l, idx) => (
-                          <span key={l.userId}>
-                            {resolveLikeUserName(l)}{idx < post.likes.length - 1 ? '、' : ''}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <span
-                      className="ms-card__badge"
-                      style={{
-                        color: categoryColors[post.category] || '#6B7280',
-                        background: `${categoryColors[post.category] || '#6B7280'}15`,
-                      }}
-                    >
-                      {categoryLabels[post.category] || post.category}
-                    </span>
-                    <span className="ms-card__format-tag">
-                      {post.format === 'markdown' ? <><Code2 size={13} /> Markdown</> : <><FileText size={13} /> Word</>}
-                    </span>
+                    <div className="ms-card__meta-row ms-card__meta-row--primary">
+                      <span className="ms-card__author">
+                        <User size={13} /> {resolveAuthorName(post)}
+                      </span>
+                      <span className="ms-card__date">
+                        <Clock size={13} /> {post.createdAt}
+                      </span>
+                      <button
+                        type="button"
+                        className="ms-card__views views-trigger"
+                        onClick={(e) => {
+                          // 卡片本身包在 <a> 里，需要阻止默认导航与冒泡
+                          e.preventDefault();
+                          e.stopPropagation();
+                          setViewLogPost(post);
+                        }}
+                        title="查看所有访问记录"
+                      >
+                        <Eye size={13} /> {views[post.id] || 0}
+                      </button>
+                    </div>
+                    <div className="ms-card__meta-row ms-card__meta-row--secondary">
+                      <button
+                        type="button"
+                        className={`ms-card__like-btn ${hasLiked(post) ? 'ms-card__like-btn--active' : ''}`}
+                        onClick={(e) => handleLike(post.id, e)}
+                      >
+                        <ThumbsUp size={13} />
+                        <span>{(post.likes || []).length}</span>
+                      </button>
+                      {Array.isArray(post.likes) && post.likes.length > 0 && (
+                        <div className="ms-card__like-names">
+                          {post.likes.map((l, idx) => (
+                            <span key={l.userId}>
+                              {resolveLikeUserName(l)}{idx < post.likes.length - 1 ? '、' : ''}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+                      <span
+                        className="ms-card__badge"
+                        style={{
+                          color: categoryColors[post.category] || '#6B7280',
+                          background: `${categoryColors[post.category] || '#6B7280'}15`,
+                        }}
+                      >
+                        {categoryLabels[post.category] || post.category}
+                      </span>
+                      <span className="ms-card__format-tag">
+                        {post.format === 'markdown' ? <><Code2 size={13} /> Markdown</> : <><FileText size={13} /> Word</>}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </a>
