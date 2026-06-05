@@ -149,6 +149,13 @@ export default function MemberSharingDetail() {
   const [loaded, setLoaded] = useState(false);
   const post = sharings.find((s) => String(s.id) === String(id));
 
+  // 浏览器标签页标题：新窗口里直观显示这是成员分享的文档
+  useEffect(() => {
+    const prev = document.title;
+    document.title = '成员内部分享 - 文档查看';
+    return () => { document.title = prev; };
+  }, []);
+
   // 首次加载：云端拉取 + 分类拉取
   useEffect(() => {
     let cancelled = false;

@@ -891,6 +891,13 @@ export default function ProcessTemplateDetail() {
   useEffect(() => {
     isEditingRef.current = isEditing;
   }, [isEditing]);
+
+  // 浏览器标签页标题：新窗口里直观显示是流程模板文档，并区分查看/编辑
+  useEffect(() => {
+    const prev = document.title;
+    document.title = isEditing ? '流程模板文件 - 文档编辑' : '流程模板文件 - 文档查看';
+    return () => { document.title = prev; };
+  }, [isEditing]);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editContent, setEditContent] = useState('');

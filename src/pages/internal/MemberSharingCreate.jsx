@@ -430,6 +430,13 @@ export default function MemberSharingCreate() {
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
 
+  // 浏览器标签页标题：新窗口里更直观地显示当前在编辑什么文档
+  useEffect(() => {
+    const prev = document.title;
+    document.title = '成员内部分享 - 文档编辑';
+    return () => { document.title = prev; };
+  }, []);
+
   /* ============ Markdown 同步滚动 ============
    * 统一由 useMarkdownSyncScroll hook 管理：
    *   - 默认关闭，两侧各自独立滚动

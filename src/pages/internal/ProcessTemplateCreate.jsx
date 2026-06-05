@@ -95,6 +95,14 @@ export default function ProcessTemplateCreate() {
   const wordEditorRef = useRef(null);
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
+
+  // 浏览器标签页标题：新窗口里更直观地显示当前在编辑什么文档
+  useEffect(() => {
+    const prev = document.title;
+    document.title = '流程模板文件 - 文档编辑';
+    return () => { document.title = prev; };
+  }, []);
+
   /* ============ Markdown 同步滚动 ============
    * 使用公共 hook 管理，默认关闭。和其他 Markdown 编辑入口
    * （MemberSharingCreate / ProcessTemplateDetail 编辑态）保持一致。
