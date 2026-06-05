@@ -68,14 +68,15 @@ function TaskColumnFilter({ value, onChange, options, title }) {
     : value && value !== '全部' ? [value] : [];
   const active = selectedValues.length > 0;
 
-  // 计算面板位置：紧贴按钮下方、右对齐到按钮右边缘
+  // 计算面板位置：紧贴按钮下方，左边缘与漏斗按钮左边缘对齐。
   const recalcPosition = useCallback(() => {
     const btn = btnRef.current;
     if (!btn) return;
     const rect = btn.getBoundingClientRect();
     const PANEL_MIN_WIDTH = 160;
-    // 右对齐：panel.right = btn.right；换算成 left
-    const left = Math.max(8, rect.right - PANEL_MIN_WIDTH);
+    const viewportPadding = 8;
+    const maxLeft = window.innerWidth - PANEL_MIN_WIDTH - viewportPadding;
+    const left = Math.max(viewportPadding, Math.min(rect.left, maxLeft));
     const top = rect.bottom + 6;
     setPanelPos({ top, left });
   }, []);
