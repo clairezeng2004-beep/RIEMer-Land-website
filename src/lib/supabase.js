@@ -27,11 +27,66 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // 真正的"网络离线"场景由 checkSupabaseHealth() 判定，不靠这里的超时兜底。
 const FETCH_TIMEOUT_MS = 30000;
 
+// ============================================
+// 带硬超时的 auth 锁（修复 getSession / 所有查询整体卡死）
+// ============================================
+// supabase-js v2 默认用浏览器 Web Locks（navigator.locks）跨标签页协调 token 刷新。
+// 已知坑：某个标签页拿了锁却没释放（刷新卡住 / 标签页崩溃 / 同时开很多标签页），
+// 后续标签页会永远抢不到锁 —— 由于每个数据请求在拼 Authorization 头时都要先经过
+// 这把锁拿 token，结果就是 getSession() 和所有 supabase.from(...) 查询全部冻住、
+// 直到上层超时。本站大量用 target="_blank" 开新标签页，极易触发。
+//
+// 这里换一把"最多等 LOCK_ACQUIRE_TIMEOUT_MS 就放行"的锁：
+//   - 正常无争用时瞬间拿到锁，行为与默认一致；
+//   - 一旦遇到卡死的锁，抢占超时后直接执行（放弃跨标签页协调），
+//     保证 getSession / 查询永远不会被一把僵尸锁无限期冻住。
+// 代价仅是极端并发下两个标签页可能各刷新一次 token（supabase 自身可容忍），
+// 远好过当前"整站请求全部超时"。
+const LOCK_ACQUIRE_TIMEOUT_MS = 3000;
+
+async function timeoutAuthLock(name, _acquireTimeout, fn) {
+  // 没有 Web Locks API（老浏览器 / 部分 WebView）→ 直接执行，不做跨标签页协调
+  if (typeof navigator === 'undefined' || !navigator.locks || !navigator.locks.request) {
+    return await fn();
+  }
+
+  const controller = new AbortController();
+  // 无论 supabase 传入的 acquireTimeout 是多少（常见为 -1=无限等待），
+  // 一律用我们自己的上限封顶，杜绝"无限期等待"导致的死锁。
+  const timer = setTimeout(() => controller.abort(), LOCK_ACQUIRE_TIMEOUT_MS);
+
+  try {
+    return await navigator.locks.request(
+      name,
+      { signal: controller.signal },
+      async () => {
+        // 抢到锁，取消超时定时器；后续 fn 执行多久都不受 acquire 超时影响
+        clearTimeout(timer);
+        return await fn();
+      },
+    );
+  } catch (err) {
+    // 抢锁被超时 abort（说明锁被别的标签页卡住了）→ 不再等待，直接执行，避免冻住
+    if (err && err.name === 'AbortError') {
+      console.warn(
+        `[Supabase] auth 锁 "${name}" 抢占超过 ${LOCK_ACQUIRE_TIMEOUT_MS}ms，` +
+        '跳过跨标签页协调直接执行（防止整站请求卡死）',
+      );
+      return await fn();
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 export const supabase = supabaseUrl && supabaseAnonKey
   ? createClient(supabaseUrl, supabaseAnonKey, {
       auth: {
         autoRefreshToken: true,
         persistSession: true,
+        // 用带硬超时的锁替换默认 navigatorLock，根治 getSession/查询整体卡死
+        lock: timeoutAuthLock,
       },
       global: {
         fetch: (url, options = {}) => {
