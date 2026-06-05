@@ -68,6 +68,7 @@ const Guestbook = lazyWithReload(() => import('./pages/internal/Guestbook'));
 const NotificationManagement = lazyWithReload(() => import('./pages/internal/NotificationManagement'));
 const EventPublish = lazyWithReload(() => import('./pages/internal/EventPublish'));
 const SyncDiagnostic = lazyWithReload(() => import('./pages/internal/SyncDiagnostic'));
+const RecycleBin = lazyWithReload(() => import('./pages/internal/RecycleBin'));
 const NotificationRulesProvider = lazyWithReload(() =>
   import('./contexts/NotificationRulesContext').then((module) => ({
     default: module.NotificationRulesProvider,
@@ -201,6 +202,7 @@ function AppShell() {
         <Route path="member-profiles" element={<MemberProfiles />} />
         <Route path="event-publish" element={<EventPublish />} />
         <Route path="sync-diagnostic" element={<SyncDiagnostic />} />
+        <Route path="recycle-bin" element={<RecycleBin />} />
       </Route>
     </Routes>
   );

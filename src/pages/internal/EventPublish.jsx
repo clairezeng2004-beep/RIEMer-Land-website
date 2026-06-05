@@ -40,6 +40,7 @@ import {
   saveSetting,
   subscribeSetting,
 } from '../../services/siteSettingsService';
+import { moveToRecycleBin } from '../../services/recycleBinService';
 import {
   bindExistingTaskToWorkItem,
   createLinkedTask,
@@ -768,6 +769,9 @@ export default function EventPublish() {
       alert(`活动没有从云端删除：${res?.error || '未知错误'}。请稍后重试。`);
       return;
     }
+    // 云端已成功移除 → 把整条快照挪进回收站，支持后续恢复
+    moveToRecycleBin({ itemType: 'event', item: event, user })
+      .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
     deleteEvent(event.id);
   };
 

@@ -20,6 +20,7 @@ import {
   subscribeCategories,
   DEFAULT_CATEGORIES,
 } from '../../services/memberSharingService';
+import { moveToRecycleBin } from '../../services/recycleBinService';
 import {
   Share2,
   Plus,
@@ -340,6 +341,12 @@ export default function MemberSharing() {
 
   const handleDelete = (id) => {
     if (!window.confirm('确定要删除这篇分享吗？')) return;
+    const target = sharings.find((s) => String(s.id) === String(id));
+    // 删除前先把整条快照挪进回收站，支持后续恢复
+    if (target) {
+      moveToRecycleBin({ itemType: 'member_sharing', item: target, user })
+        .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
+    }
     setSharings((prev) => prev.filter((s) => s.id !== id));
     deleteSharing(id).catch(() => { /* ignore */ });
   };
@@ -431,6 +438,9 @@ export default function MemberSharing() {
                 onChange={(v) => updateSC('pageDesc', v)}
                 as="span"
               />
+              <span className="ms-page__confidential-note">
+                内部分享仅面向 RIEMer Land 主理团队，禁止外传。
+              </span>
             </p>
           </div>
           <a href="/internal/member-sharing/create" target="_blank" rel="noopener noreferrer" className="btn btn-primary">

@@ -25,6 +25,7 @@ import {
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
 import { fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../../services/siteSettingsService';
+import { moveToRecycleBin } from '../../services/recycleBinService';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import {
   bindExistingTaskToWorkItem,
@@ -1175,6 +1176,9 @@ export default function InternalArticles() {
     if (!article) return;
     const title = article.title || '未命名文章';
     if (!window.confirm(`确定删除「${title}」这条文章归档吗？`)) return;
+    // 删除前先把整条快照挪进回收站，支持后续恢复
+    moveToRecycleBin({ itemType: 'article', item: article, user })
+      .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
     await deleteArticle(article.id);
   };
 

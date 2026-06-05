@@ -47,6 +47,7 @@ import {
   subscribeDocuments,
   subscribeDeletedDefaults,
 } from '../../lib/documentsService';
+import { moveToRecycleBin } from '../../services/recycleBinService';
 import ViewLogPopover from '../../components/ViewLogPopover';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './Documents.css';
@@ -749,6 +750,13 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       // 现在改为：只有 id 真的存在于内置 documentsData 里才算默认示例，其余一律
       // 当作用户/云端文档，删除时必须删掉云端那一行。
       const isDefaultDoc = documentsData.some((d) => String(d.id) === sid);
+
+      // 用户/云端文档：删除前先把整条快照挪进回收站，支持恢复。
+      // 内置默认示例不进回收站（它本来就靠"已删除默认"标记隐藏，可在别处恢复）。
+      if (!isDefaultDoc) {
+        moveToRecycleBin({ itemType: 'document', item: target, user })
+          .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
+      }
 
       // 本地缓存里若有同 id 记录，一并移除（含覆盖层）
       const userDocs = loadUserDocs();

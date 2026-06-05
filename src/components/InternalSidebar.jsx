@@ -23,6 +23,7 @@ import {
   UserCircle,
   CalendarRange,
   Activity,
+  Trash2,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -101,6 +102,8 @@ export default function InternalSidebar() {
     { to: '/internal/users', icon: Users, configKey: 'labelUsers', label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, configKey: 'labelContent', label: sc.labelContent },
     { to: '/internal/notification-management', icon: BellRing, configKey: 'labelNotificationMgmt', label: sc.labelNotificationMgmt },
+    // 回收站：所有成员可见（管理员看全部，普通成员看自己删除/自己作为原作者的内容）
+    { to: '/internal/recycle-bin', icon: Trash2, label: '回收站' },
     // 同步诊断入口：仅管理员可见（用于排查跨设备数据同步问题）
     ...(isAdmin ? [
       { to: '/internal/sync-diagnostic', icon: Activity, label: '同步诊断' },
