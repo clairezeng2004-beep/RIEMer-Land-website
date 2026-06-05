@@ -472,6 +472,7 @@ export default function MemberSharingCreate() {
     period: { startYear: null, startMonth: null, endYear: null, endMonth: null },
     attachments: [],
   });
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
   useAutoResizeTextarea(mdEditorRef, newPost.content, { minHeight: 360 });
@@ -658,13 +659,21 @@ export default function MemberSharingCreate() {
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const handleCreate = async (e) => {
-    e.preventDefault();
-    const hasContent = newPost.content.trim().length > 0;
+    e?.preventDefault?.();
+    if (isPublishing) return;
+
+    const currentContent = newPost.format === 'word' && wordEditorRef.current
+      ? wordEditorRef.current.innerHTML
+      : newPost.content;
+    const normalizedContent = stripUnderline(currentContent || '');
+    const hasContent = normalizedContent.trim().length > 0;
     const hasAttachments = newPost.attachments.length > 0;
     if (!newPost.title.trim() || (!hasContent && !hasAttachments)) {
       alert('请填写标题，并提供正文内容或上传至少一个附件');
       return;
     }
+
+    setIsPublishing(true);
 
     // 构建时间段字符串（如果有填写）
     // 规则：
@@ -702,7 +711,7 @@ export default function MemberSharingCreate() {
       title: newPost.title.trim(),
       category: newPost.category,
       format: newPost.format,
-      content: stripUnderline(newPost.content),
+      content: normalizedContent,
       period: periodStr || null,
       attachments: attachments.length > 0 ? attachments : null,
       author: user?.nickname || user?.name || 'Unknown',
@@ -712,27 +721,31 @@ export default function MemberSharingCreate() {
     };
 
     try {
-      await addSharing(post);
-    } catch (err) {
-      console.warn('[MemberSharingCreate] 发布失败（已降级写本地）:', err?.message || err);
-    }
+      try {
+        await addSharing(post);
+      } catch (err) {
+        console.warn('[MemberSharingCreate] 发布失败（已降级写本地）:', err?.message || err);
+      }
 
-    // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
-    try {
-      const categoryLabel =
-        cats.find((c) => c.key === post.category)?.label || '';
-      emitNotificationEvent('sharing.new', {
-        operator: post.author,
-        operatorUserId: user?.id,
-        title: post.title,
-        categoryLabel,
-      });
-    } catch (err) {
-      console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);
-    }
+      // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
+      try {
+        const categoryLabel =
+          cats.find((c) => c.key === post.category)?.label || '';
+        emitNotificationEvent('sharing.new', {
+          operator: post.author,
+          operatorUserId: user?.id,
+          title: post.title,
+          categoryLabel,
+        });
+      } catch (err) {
+        console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);
+      }
 
-    // 跳转回列表页
-    navigate('/internal/member-sharing');
+      // 跳转回列表页
+      navigate('/internal/member-sharing');
+    } finally {
+      setIsPublishing(false);
+    }
   };
 
   return (
@@ -750,8 +763,8 @@ export default function MemberSharingCreate() {
           >
             取消
           </button>
-          <button type="button" className="btn btn-primary" onClick={handleCreate}>
-            <Share2 size={16} /> 发布分享
+          <button type="button" className="btn btn-primary" onClick={handleCreate} disabled={isPublishing}>
+            <Share2 size={16} /> {isPublishing ? '发布中...' : '发布分享'}
           </button>
         </div>
       </div>
