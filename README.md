@@ -93,4 +93,4 @@ src/
 
 ---
 
-*Made with ❤️ by RIEMer Land 主理团队*
+*Made by RIEMer Land 主理团队*
