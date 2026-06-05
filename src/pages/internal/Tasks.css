@@ -646,6 +646,7 @@
   display: flex;
   align-items: center;
   gap: var(--space-xs);
+  min-height: 34px;
 }
 
 .tasks-table__title-cell {
@@ -764,10 +765,14 @@
 .tasks-table__reason-input {
   flex: 1;
   min-width: 80px;
-  padding: 0.3rem 0.6rem;
+  min-height: 34px;
+  box-sizing: border-box;
+  padding: 0.35rem 0.55rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
+  line-height: 1.35;
+  font-family: inherit;
   color: var(--color-text);
   background: var(--color-bg);
   outline: none;
