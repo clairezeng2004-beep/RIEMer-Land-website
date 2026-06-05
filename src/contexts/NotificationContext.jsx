@@ -453,7 +453,7 @@ export function NotificationProvider({ children }) {
   // 未读消息数 + 当前路由 + 侧栏 Tab 名 → 同步到网页标题
   // 规则详见 src/lib/pageTitle.js：
   //   公共站: "RIEMer Land" 或 "RIEMer Land — 分享回顾/关于我们/…"
-  //   内部空间: "内部空间 — <Tab>" 或 "内部空间 — <Tab> — 新建文件"
+  //   内部空间: "内部空间 — <Tab>" 或 "内部空间 — <Tab> — 文档编辑"
   //   有未读消息时整体前面加 "(N条未读消息) "
   useEffect(() => {
     document.title = buildDocumentTitle(

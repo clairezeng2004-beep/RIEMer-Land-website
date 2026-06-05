@@ -4,7 +4,7 @@
  * 设计原则：
  * - 公共站（/）以 `RIEMer Land` 为站点名，具体板块通过 `— XXX` 附在其后。
  * - 内部空间（/internal/**）以 `内部空间` 为前缀，后面接当前所在 Tab 的名称；
- *   新建/编辑页面再加一级 `— 新建文件`。
+ *   独立文档编辑页面再加一级 `— 文档编辑`。
  * - Tab 名称尽量读取 `internalConfig.sidebar.labelXxx`，保证用户在站点内改名后
  *   浏览器标签名也会跟着变；若拿不到 sidebar 配置则回退到硬编码默认值。
  */
@@ -123,7 +123,7 @@ export function buildBaseTitle(pathname, sidebar) {
 
   const parts = ['内部空间'];
   if (tabName) parts.push(tabName);
-  if (isCreate) parts.push('新建文件');
+  if (isCreate) parts.push('文档编辑');
   return parts.join(SEP);
 }
 
