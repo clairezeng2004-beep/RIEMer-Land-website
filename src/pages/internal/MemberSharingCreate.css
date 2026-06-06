@@ -636,23 +636,24 @@
   line-height: 1.35;
 }
 
-/* 标题字号与 Word 编辑器固定一致：h1 21 / h2 18 / h3 16（编辑器基准 15px）。 */
+/* 标题字号与「详情页最终渲染」一致：h1 24 / h2 20 / h3 17（基准 15px）。
+   保证 Markdown 预览 = Word 编辑 = 详情页。 */
 .msc-md-split__preview h1 {
-  font-size: 21px;
+  font-size: 24px;
   font-weight: 700;
   margin: 1.2em 0 0.5em;
   padding-bottom: 0.35em;
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
 .msc-md-split__preview h2 {
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 700;
   margin: 1.1em 0 0.45em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
 .msc-md-split__preview h3 {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 600;
   margin: 1em 0 0.4em;
 }
@@ -921,12 +922,12 @@
   font-weight: 700;
 }
 
-/* 用固定 px 而非 em：em 是相对父级字号，contentEditable 里第一行与其它行的
-   DOM 包裹层级可能不同，导致 em 叠乘后"第一行 H1 比其它行 H1 偏大"。
-   固定 px 保证同级标题字号完全一致（editor 基准 15px，对应原 1.4/1.2/1.05em）。 */
-.msc-form__word-editor h1 { font-size: 21px; }
-.msc-form__word-editor h2 { font-size: 18px; }
-.msc-form__word-editor h3 { font-size: 16px; }
+/* 固定 px（避免 em 叠乘致第一行 H1 偏大），且与「详情页最终渲染」一致：
+   正文 15px / h1 24 / h2 20 / h3 17（见 .msd-article__content）。
+   保证 Word 编辑 = Markdown 预览 = 详情页三者字号统一。 */
+.msc-form__word-editor h1 { font-size: 24px; }
+.msc-form__word-editor h2 { font-size: 20px; }
+.msc-form__word-editor h3 { font-size: 17px; }
 
 .msc-form__word-editor p { margin: 0.4em 0; }
 

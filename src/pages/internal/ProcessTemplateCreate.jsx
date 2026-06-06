@@ -817,6 +817,7 @@ export default function ProcessTemplateCreate() {
                 </span>
               </label>
               {newDoc.format === 'markdown' ? (
+                <>
                 <div className="msc-md-split">
                   <div className="msc-md-split__pane">
                     <div className="msc-md-split__label">
@@ -861,9 +862,11 @@ export default function ProcessTemplateCreate() {
                       }}
                     />
                   </div>
-                  {/* Markdown 目录：扫描右侧预览里的标题，与 Word 模式一样可点击跳转 */}
-                  <EditorToc editorRef={mdPreviewRef} content={markdownPreview} />
                 </div>
+                {/* Markdown 目录：放在分栏网格外，默认折叠成小按钮，
+                    避免浮动面板盖住右侧"预览"栏标题与分割线（需要时点开）。 */}
+                <EditorToc editorRef={mdPreviewRef} content={markdownPreview} defaultOpen={false} />
+                </>
               ) : (
                 <div className="msc-form__word-editor-wrapper">
                   <WordEditorToolbar
