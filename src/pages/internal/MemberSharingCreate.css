@@ -14,11 +14,8 @@
    历史修复点：
    1. 最早 background: transparent + sticky，能"透出"下方内容背景；
       曾改 fixed 后必须有实底色兜底，否则文字会穿透遮挡。
-   2. 原 padding: 0.75rem 2rem 的左边距过大，用户反馈"返回列表按钮
-      没放在最左边"——2rem(32px) 的内缩把按钮挤到离 sidebar 右沿
-      很远的地方。现调整为 padding-left: 1rem，让"返回列表"紧贴
-      内部空间的左内边；右边保持 2rem 让"取消 / 发布"按钮和
-      页面右内缘距离不变。
+   2. 顶栏左右内边距和 .msc-content 保持一致，让"返回列表"按钮左边
+      与下方白色编辑卡片左边对齐。
    3. 原 z-index: 90 一般够用，但若子组件（如自定义 Select 下拉）
       在层叠上下文中创建出局部 z-index，滚动时容易透出。现提到 95，
       仍低于全站 Navbar(1000)，高于页内常见层（Select dropdown 200
@@ -39,10 +36,9 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  /* 顶栏继续压紧：高度收到 48px，让“返回/发布/取消”这一行进一步上移，
-     贴近上一级 Navbar 里“RIEMer Land”品牌所在的高度，并尽量减少顶部留白。 */
-  min-height: 48px;
-  padding: 0 2rem 0 1rem;
+  height: 72px;
+  min-height: 72px;
+  padding: 0 2rem;
   background: var(--color-bg, #f9fafb);
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
@@ -173,6 +169,34 @@
 .msc-form__input:focus {
   border-bottom-color: var(--color-primary, #5B8C3E);
   background: #fff;
+}
+
+.msc-form__textarea {
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  font-family: inherit;
+  font-size: var(--text-sm, 14px);
+  line-height: 1.7;
+  color: var(--color-text, #1f2937);
+  background: #fff;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+.msc-form__textarea::placeholder {
+  color: var(--color-text-muted, #9ca3af);
+}
+
+.msc-form__textarea:focus {
+  border-color: var(--color-primary, #5B8C3E);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
+}
+
+.msc-form__textarea--summary {
+  min-height: 86px;
 }
 
 /* ============ Custom Category Select ============ */
@@ -378,8 +402,12 @@
 }
 
 .msc-period__select {
-  /* 宽度控制（视觉样式由 CustomSelect 组件自带） */
-  min-width: 80px;
+  /* 固定宽度：让"未选择（空占位）"和"已选年份（如 2025）"两种状态下
+     文本框大小完全一致，避免空框比选中后更窄更小。
+     90px 足以容纳 4 位年份 + 下拉箭头。 */
+  width: 90px;
+  min-width: 90px;
+  flex: 0 0 auto;
 }
 
 .msc-period__sep {
@@ -761,19 +789,32 @@
      视觉处理：
      - 需要不透明背景色和下边界，下滑后工具栏会盖住编辑器顶部，
        否则文字会从工具栏下方透出。
-     - padding 纵向略加一点，避免按钮紧贴上/下边缘。
+     - padding 纵向加大一点，让工具栏 sticky 时形成完整遮挡带；
+       否则编辑器内容滚过顶部时会从"插入图片"这一行上沿透出。
      - z-index 10：高于编辑器及图片，但低于 FloatingTextToolbar(z-index: 1200)
        和 Navbar(z-index: 1000)，保证浮层仍在它之上。 */
   position: sticky;
   top: 72px; /* msc-topbar 高度（贴在其下方） */
   z-index: 10;
   background: var(--color-bg, #f9fafb);
-  padding: 6px 0;
+  min-height: 58px;
+  padding: 12px 0 10px;
   border-bottom: 1px solid transparent;
   /* 只在真正粘住（离开初始位置）时再显示分隔线：粗暴做法是始终显示，
      但视觉会在页面顶部就露出一条横线；这里先用 transparent，
      粘住后让 box-shadow 代替分隔视觉即可。 */
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.msc-form__editor-toolbar::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 8px;
+  background: var(--color-bg, #f9fafb);
+  pointer-events: none;
 }
 
 /* 浏览器支持时：sticky 真正激活（top 命中）那一刻加 box-shadow，
