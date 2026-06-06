@@ -38,6 +38,29 @@ function normalizeUrl(raw) {
   return `https://${v}`;
 }
 
+const HANDLE_SIZE = 22; // 与 .wbh__handle 的宽高一致，用于垂直居中
+
+/** 取「光标所在那一行」的矩形（视口坐标）。
+ *  用选区的 rect 而不是整块 rect：这样即使一个块里用 <br> 多行换行，
+ *  手柄也能精确跟到光标当前所在的视觉行，并能据此做行内垂直居中。 */
+function getCaretLineRect(editor) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0).cloneRange();
+  let rect = range.getBoundingClientRect();
+  // 折叠光标在空行/段首时，getBoundingClientRect 可能全 0 → 退回所在元素的行矩形
+  if (!rect || (rect.top === 0 && rect.height === 0)) {
+    let node = range.startContainer;
+    if (node && node.nodeType === 3) node = node.parentElement;
+    if (node && node.getClientRects) {
+      const rects = node.getClientRects();
+      rect = rects.length ? rects[0] : node.getBoundingClientRect();
+    }
+  }
+  if (!rect || (!rect.height && !rect.width)) return null;
+  return rect;
+}
+
 /** 从当前选区往上找「编辑器的直接子块」 */
 function getCurrentBlock(editor) {
   const sel = window.getSelection();
@@ -75,13 +98,13 @@ export default function WordBlockHandle({ editorRef, onChange }) {
 
     const block = getCurrentBlock(editor);
     if (!block) { setPos(null); return; }
-    blockRef.current = block;
+    blockRef.current = block; // 仍记录所在块，供格式命令使用
 
-    const blockRect = block.getBoundingClientRect();
+    // 位置以「光标当前所在行」为准：跟随换行、滚动，并与该行垂直居中。
+    const lineRect = getCaretLineRect(editor) || block.getBoundingClientRect();
     const editorRect = editor.getBoundingClientRect();
-    // 手柄放在编辑器左内边距外侧的「行首左边」，与块顶部大致对齐
     setPos({
-      top: blockRect.top + 2,
+      top: lineRect.top + lineRect.height / 2 - HANDLE_SIZE / 2,
       left: editorRect.left - 30,
     });
   }, [editorRef, menuOpen]);
