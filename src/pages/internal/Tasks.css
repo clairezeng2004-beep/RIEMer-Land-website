@@ -434,9 +434,11 @@
 
 /* Table */
 .tasks-table-wrapper {
-  /* 同时允许水平与垂直滚动，配合 thead sticky 冻结表头 */
-  overflow: auto;
-  max-height: calc(100vh - 260px);
+  /* 不再限制表格高度：表格随内容自然撑开，纵向滚动交给页面——
+     往下滑时既滚动页面也滚动整张表（不再有独立的表格内纵向滚动）。
+     仅保留横向滚动，承载窄屏下表格的最小宽度（min-width: 820px）。 */
+  overflow-x: auto;
+  overflow-y: visible;
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-border-light);
   background: var(--color-bg-card);
