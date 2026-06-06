@@ -410,6 +410,13 @@
   flex: 0 0 auto;
 }
 
+/* 让"未选择（空值）"状态下，触发器里的文字区也占满一行高度。
+   否则空值时只有下拉箭头撑高度，框会比选了"2025"后矮一点（用户反馈"小一些"）。 */
+.msc-period__select .custom-select__value {
+  min-height: 1.4em;
+  line-height: 1.4;
+}
+
 .msc-period__sep {
   font-size: var(--text-sm, 14px);
   color: var(--color-text-muted, #9ca3af);
@@ -901,9 +908,12 @@
   font-weight: 700;
 }
 
-.msc-form__word-editor h1 { font-size: 1.4em; }
-.msc-form__word-editor h2 { font-size: 1.2em; }
-.msc-form__word-editor h3 { font-size: 1.05em; }
+/* 用固定 px 而非 em：em 是相对父级字号，contentEditable 里第一行与其它行的
+   DOM 包裹层级可能不同，导致 em 叠乘后"第一行 H1 比其它行 H1 偏大"。
+   固定 px 保证同级标题字号完全一致（editor 基准 15px，对应原 1.4/1.2/1.05em）。 */
+.msc-form__word-editor h1 { font-size: 21px; }
+.msc-form__word-editor h2 { font-size: 18px; }
+.msc-form__word-editor h3 { font-size: 16px; }
 
 .msc-form__word-editor p { margin: 0.4em 0; }
 
