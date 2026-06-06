@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon } from 'lucide-react';
+import { Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
 import './FloatingTextToolbar.css';
 
 /**
@@ -314,6 +314,15 @@ export default function FloatingTextToolbar({
     fireChangeRich();
   }, [active, detectActiveRich, fireChangeRich]);
 
+  // 列表（富文本）：有序 insertOrderedList / 无序 insertUnorderedList。
+  // 再次点击同类型可取消列表（execCommand 自带切换）。生成的 <ul>/<ol> 支持
+  // 在编辑器里用 Tab / Shift+Tab 缩进到多级（见 utils/editorTabIndent.js）。
+  const applyListRich = useCallback((cmd) => {
+    document.execCommand(cmd, false, null);
+    detectActiveRich();
+    fireChangeRich();
+  }, [detectActiveRich, fireChangeRich]);
+
   /* -----------------------------------------------------------------
    * 链接：富文本模式
    *   - 当选中已是 <a>：弹框预填当前 href；用户留空 → 解除链接（unlink）；
@@ -468,6 +477,10 @@ export default function FloatingTextToolbar({
           return line.startsWith('### ') ? line.substring(4) : `### ${stripMd(line)}`;
         case 'quote':
           return line.startsWith('> ') ? line.substring(2) : `> ${stripMd(line)}`;
+        case 'ul':
+          return /^[-*+]\s/.test(line) ? line.replace(/^[-*+]\s/, '') : `- ${stripMd(line)}`;
+        case 'ol':
+          return /^\d+\.\s/.test(line) ? line.replace(/^\d+\.\s/, '') : `1. ${stripMd(line)}`;
         default:
           return line;
       }
@@ -511,6 +524,8 @@ export default function FloatingTextToolbar({
     ? () => applyMarkdown(wrap('**', '**'))
     : () => applyInlineRich('bold');
   const onLink = isMarkdown ? applyLinkMarkdown : applyLinkRich;
+  const onUL = isMarkdown ? () => applyLinePrefixV2('ul') : () => applyListRich('insertUnorderedList');
+  const onOL = isMarkdown ? () => applyLinePrefixV2('ol') : () => applyListRich('insertOrderedList');
 
   return (
     <div
@@ -532,6 +547,12 @@ export default function FloatingTextToolbar({
 
       <Btn onClick={onQuote} title="引用" activeFlag={active.blockquote}>
         <Quote size={16} />
+      </Btn>
+      <Btn onClick={onUL} title="无序列表（Tab 缩进多级）">
+        <List size={16} />
+      </Btn>
+      <Btn onClick={onOL} title="有序列表（Tab 缩进多级）">
+        <ListOrdered size={16} />
       </Btn>
       <Btn onClick={onBold} title="加粗 (Ctrl/Cmd+B)" activeFlag={active.bold}>
         <Bold size={16} />

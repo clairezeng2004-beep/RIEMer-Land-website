@@ -801,7 +801,9 @@ export default function MemberSharingCreate() {
 
     try {
       if (isEditingPost) {
-        await updateSharing(post.id, {
+        // updateSharing 内部会先同步更新本地缓存，云端在后台同步。
+        // 不再 await 云端，避免"保存后长时间无反应"。
+        updateSharing(post.id, {
           title: post.title,
           summary: post.summary,
           category: post.category,
@@ -809,15 +811,12 @@ export default function MemberSharingCreate() {
           content: post.content,
           period: post.period,
           attachments: post.attachments,
-        });
+        }).catch((err) => console.warn('[MemberSharingCreate] 云端更新失败（已写本地）:', err?.message || err));
       } else {
-        try {
-          await addSharing(post);
-        } catch (err) {
-          console.warn('[MemberSharingCreate] 发布失败:', err?.message || err);
-          alert(`发布失败：${err?.message || '请检查网络或稍后再试。'}`);
-          return;
-        }
+        // addSharing 在调用瞬间已同步写入本地缓存（列表页用缓存可立即显示），
+        // 云端同步放到后台进行。不再 await 云端附件上传/插入，
+        // 避免移动端冷启动/弱网下"点了发布要等很久、其实已发布却没反应"。
+        addSharing(post).catch((err) => console.warn('[MemberSharingCreate] 云端发布失败（已写本地）:', err?.message || err));
 
         // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
         try {
@@ -834,7 +833,7 @@ export default function MemberSharingCreate() {
         }
       }
 
-      // 跳转回列表页
+      // 本地已写入，立即跳转回列表页（列表用缓存秒显；云端后台同步 + Realtime 兜底）
       navigate('/internal/member-sharing');
     } finally {
       setIsPublishing(false);
