@@ -93,6 +93,12 @@
   color: #fff;
 }
 
+/* 选中态 hover 时保持白字：否则通用 :hover 把文字改成绿色，
+   绿底绿字会看不清。 */
+.rb-filters__chip--active:hover {
+  color: #fff;
+}
+
 /* ---- 卡片网格（与活动卡片同款栅格） ---- */
 .rb-list {
   display: grid;
