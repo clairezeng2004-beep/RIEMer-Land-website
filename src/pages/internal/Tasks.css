@@ -903,6 +903,17 @@
     line-height: 1.35;
   }
 
+  /* 展示态标题/描述也用与编辑态一致的紧凑字号，
+     避免手机端列表里标题字号偏大、与其它内容不协调。 */
+  .tasks-table__title {
+    font-size: var(--text-xs);
+    line-height: 1.35;
+  }
+  .tasks-table__desc {
+    font-size: 11px;
+    line-height: 1.35;
+  }
+
   .tasks-table {
     min-width: 980px;
   }
