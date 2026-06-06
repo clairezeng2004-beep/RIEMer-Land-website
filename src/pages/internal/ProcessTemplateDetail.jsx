@@ -36,6 +36,8 @@ import WordPreview from '../../components/WordPreview';
 import TextAnnotation from '../../components/TextAnnotation';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
+import WordBlockHandle from '../../components/WordBlockHandle';
+import { handleEditorTabIndent } from '../../utils/editorTabIndent';
 import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
@@ -1587,6 +1589,7 @@ export default function ProcessTemplateDetail() {
                         ref={ptdWordEditorRef}
                         className="msc-form__word-editor ptd-edit__word-editor"
                         contentEditable
+                        onKeyDown={handleEditorTabIndent}
                         onPaste={handleWordPaste}
                         onInput={() => {
                           if (ptdWordEditorRef.current) {
@@ -1597,6 +1600,10 @@ export default function ProcessTemplateDetail() {
                         suppressContentEditableWarning
                       />
                       <FloatingTextToolbar
+                        editorRef={ptdWordEditorRef}
+                        onChange={(html) => setEditContent(stripUnderline(html))}
+                      />
+                      <WordBlockHandle
                         editorRef={ptdWordEditorRef}
                         onChange={(html) => setEditContent(stripUnderline(html))}
                       />

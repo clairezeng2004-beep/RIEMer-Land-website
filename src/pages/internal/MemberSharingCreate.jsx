@@ -31,6 +31,8 @@ import {
 } from '../../utils/wordDocBlocks';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
+import WordBlockHandle from '../../components/WordBlockHandle';
+import { handleEditorTabIndent } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
@@ -503,6 +505,7 @@ export default function MemberSharingCreate() {
 
   const [newPost, setNewPost] = useState({
     title: '',
+    summary: '',
     category: cats.length > 0 ? cats[0].key : 'experience',
     format: 'word',
     content: '',
@@ -532,6 +535,7 @@ export default function MemberSharingCreate() {
         setEditingSource(post);
         setNewPost({
           title: post.title || '',
+          summary: post.summary || '',
           category: post.category || 'experience',
           format: post.format || 'word',
           content: post.content || '',
@@ -783,6 +787,7 @@ export default function MemberSharingCreate() {
     const post = {
       id: editingSource?.id || `sharing-${Date.now()}`,
       title: newPost.title.trim(),
+      summary: newPost.summary.trim(),
       category: newPost.category,
       format: newPost.format,
       content: normalizedContent,
@@ -798,6 +803,7 @@ export default function MemberSharingCreate() {
       if (isEditingPost) {
         await updateSharing(post.id, {
           title: post.title,
+          summary: post.summary,
           category: post.category,
           format: post.format,
           content: post.content,
@@ -885,6 +891,17 @@ export default function MemberSharingCreate() {
                   onAddCategory={handleAddCategory}
                 />
               </div>
+            </div>
+
+            <div className="msc-form__field">
+              <label>简介栏</label>
+              <textarea
+                className="msc-form__textarea msc-form__textarea--summary"
+                value={newPost.summary}
+                onChange={(e) => setNewPost({ ...newPost, summary: e.target.value })}
+                placeholder="此内容将显示在分享卡片上。可以在此处填写推荐理由、资料使用指南、本文概览等"
+                rows={3}
+              />
             </div>
 
             {/* 第二行：时间段 —— 仅对两类分类显示：
@@ -1062,6 +1079,7 @@ export default function MemberSharingCreate() {
                     ref={wordEditorRef}
                     className="msc-form__word-editor"
                     contentEditable
+                    onKeyDown={handleEditorTabIndent}
                     onPaste={handleWordPaste}
                     onInput={() => {
                       if (wordEditorRef.current) {
@@ -1072,6 +1090,10 @@ export default function MemberSharingCreate() {
                     suppressContentEditableWarning
                   />
                   <FloatingTextToolbar
+                    editorRef={wordEditorRef}
+                    onChange={(html) => setNewPost((prev) => ({ ...prev, content: html }))}
+                  />
+                  <WordBlockHandle
                     editorRef={wordEditorRef}
                     onChange={(html) => setNewPost((prev) => ({ ...prev, content: html }))}
                   />

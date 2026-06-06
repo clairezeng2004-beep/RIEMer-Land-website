@@ -32,6 +32,8 @@ import {
 } from '../../utils/wordDocBlocks';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
+import WordBlockHandle from '../../components/WordBlockHandle';
+import { handleEditorTabIndent } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
@@ -870,6 +872,7 @@ export default function ProcessTemplateCreate() {
                     ref={wordEditorRef}
                     className="msc-form__word-editor"
                     contentEditable
+                    onKeyDown={handleEditorTabIndent}
                     onPaste={handleWordPaste}
                     onInput={() => {
                       if (wordEditorRef.current) {
@@ -880,6 +883,10 @@ export default function ProcessTemplateCreate() {
                     suppressContentEditableWarning
                   />
                   <FloatingTextToolbar
+                    editorRef={wordEditorRef}
+                    onChange={(html) => setNewDoc((prev) => ({ ...prev, content: html }))}
+                  />
+                  <WordBlockHandle
                     editorRef={wordEditorRef}
                     onChange={(html) => setNewDoc((prev) => ({ ...prev, content: html }))}
                   />
