@@ -603,7 +603,9 @@
   border: none;
   border-top: 1px solid var(--color-border-light, #e5e7eb);
   border-radius: 0;
-  font-size: 16px;
+  /* 与 Word 编辑器正文一致（.msc-form__word-editor 为 15px），
+     标题也用与编辑器相同的固定 px，保证两种格式预览字号一致。 */
+  font-size: 15px;
   font-family: var(--font-body, 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif);
   color: var(--color-text, #1f2937);
   background: #fff;
@@ -624,33 +626,34 @@
   line-height: 1.35;
 }
 
+/* 标题字号与 Word 编辑器固定一致：h1 21 / h2 18 / h3 16（编辑器基准 15px）。 */
 .msc-md-split__preview h1 {
-  font-size: 1.5em;
+  font-size: 21px;
   font-weight: 700;
   margin: 1.2em 0 0.5em;
   padding-bottom: 0.35em;
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
 .msc-md-split__preview h2 {
-  font-size: 1.28em;
+  font-size: 18px;
   font-weight: 700;
   margin: 1.1em 0 0.45em;
   padding-bottom: 0.3em;
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
 }
 .msc-md-split__preview h3 {
-  font-size: 1.12em;
+  font-size: 16px;
   font-weight: 600;
   margin: 1em 0 0.4em;
 }
 .msc-md-split__preview h4 {
-  font-size: 1.02em;
+  font-size: 15px;
   font-weight: 600;
   margin: 0.9em 0 0.35em;
 }
 .msc-md-split__preview h5,
 .msc-md-split__preview h6 {
-  font-size: 0.95em;
+  font-size: 13px;
   font-weight: 600;
   margin: 0.8em 0 0.3em;
   color: var(--color-text-light, #6b7280);
