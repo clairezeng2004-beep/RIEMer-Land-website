@@ -528,8 +528,11 @@
   margin: 5px 0;
 }
 
-.ptd-article__content strong {
+.ptd-article__content strong,
+.ptd-article__content b {
   font-weight: 700;
+  /* 允许合成粗体：中文正文字体无真实粗体字重，否则全局 font-synthesis:none 会让加粗不可见 */
+  font-synthesis: weight;
 }
 
 .ptd-article__content em {

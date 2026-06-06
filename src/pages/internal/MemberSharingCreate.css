@@ -913,6 +913,18 @@
   pointer-events: none;
 }
 
+/* 正文里的加粗（Ctrl+B 生成的 <b>、Markdown ** 生成的 <strong>）：
+   全局 body 设了 font-synthesis: none（为让中文标题不被描成伪粗体），
+   但中文正文字体没有真正的粗体字重，会导致"加粗看不出效果"。
+   这里只对正文内的 b/strong 重新允许合成粗体，让加粗可见；标题不受影响。 */
+.msc-form__word-editor b,
+.msc-form__word-editor strong,
+.msc-md-split__preview b,
+.msc-md-split__preview strong {
+  font-synthesis: weight;
+  font-weight: 700;
+}
+
 /* 粘贴内容的排版 */
 .msc-form__word-editor h1,
 .msc-form__word-editor h2,
