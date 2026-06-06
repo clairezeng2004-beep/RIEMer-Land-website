@@ -19,6 +19,16 @@
 .msc-cols--3 { grid-template-columns: 1fr 1fr 1fr; }
 .msc-cols--4 { grid-template-columns: repeat(4, 1fr); }
 
+/* 编辑器内：给分栏块一个明显的彩色高亮（绿色底纹 + 实色边框），
+   替代原先"只有细细虚线"的弱提示，让用户清楚这里是一个分栏块。
+   仅在可编辑状态（contenteditable）下显示，发布后的正文/预览不受影响。 */
+[contenteditable="true"] .msc-cols {
+  padding: 8px;
+  border-radius: var(--radius-md, 8px);
+  background: rgba(91, 140, 62, 0.07);
+  box-shadow: inset 0 0 0 1.5px rgba(91, 140, 62, 0.45);
+}
+
 .msc-col {
   display: flex;
   align-items: center;
