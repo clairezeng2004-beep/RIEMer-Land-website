@@ -168,6 +168,20 @@
   scroll-behavior: auto;
 }
 
+/* 内层容器：宽度撑到所有卡片的总宽度，作为横线的定位参照。
+   之前横线直接放在 .timeline__track 里，绝对定位的 left:0/right:0 只会
+   贴合轨道的"可视区宽度"，导致横线只铺满第一屏（约 3 张卡片）、滚动后消失。
+   现在让横线以"内容总宽度"为参照，就能随滚动内容一路延伸到最后一张卡片。 */
+.timeline__track-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  flex: 0 0 auto;
+  width: max-content;
+  min-width: 100%;
+}
+
 /* 横线 */
 .timeline__line {
   position: absolute;

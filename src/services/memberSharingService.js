@@ -31,6 +31,7 @@ function dbToFrontend(row) {
   return {
     id: row.id,
     title: row.title || '',
+    summary: row.summary || '',
     category: row.category || 'experience',
     format: row.format || 'word',
     content: row.content || '',
@@ -49,6 +50,7 @@ function frontendToDbInsert(post) {
   return {
     id: post.id,
     title: post.title || '',
+    summary: post.summary || '',
     category: post.category || 'experience',
     format: post.format || 'word',
     content: post.content || '',
@@ -65,6 +67,7 @@ function frontendToDbInsert(post) {
 function frontendToDbUpdate(updates) {
   const u = {};
   if (updates.title !== undefined) u.title = updates.title;
+  if (updates.summary !== undefined) u.summary = updates.summary || '';
   if (updates.category !== undefined) u.category = updates.category;
   if (updates.format !== undefined) u.format = updates.format;
   if (updates.content !== undefined) u.content = updates.content;
@@ -77,6 +80,15 @@ function frontendToDbUpdate(updates) {
   if (updates.likes !== undefined) u.likes = Array.isArray(updates.likes) ? updates.likes : [];
   u.updated_at = new Date().toISOString();
   return u;
+}
+
+function stripSummaryField(row) {
+  const { summary, ...rest } = row;
+  return rest;
+}
+
+function isMissingSummaryColumnError(error) {
+  return /summary/i.test(error?.message || '') && /column|schema|cache/i.test(error?.message || '');
 }
 
 function getFileExt(name = '') {
@@ -272,7 +284,7 @@ async function syncSharingToCloud(post) {
       '成员分享附件上传',
     );
     const row = frontendToDbInsert(cloudPost);
-    const { data, error } = await withTimeout(
+    let { data, error } = await withTimeout(
       supabase
         .from('member_sharing')
         .insert(row)
@@ -281,6 +293,19 @@ async function syncSharingToCloud(post) {
       MEMBER_SHARING_CLOUD_TIMEOUT_MS,
       '成员分享云端保存',
     );
+    if (error && isMissingSummaryColumnError(error)) {
+      const retry = await withTimeout(
+        supabase
+          .from('member_sharing')
+          .insert(stripSummaryField(row))
+          .select()
+          .single(),
+        MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+        '成员分享云端保存',
+      );
+      data = retry.data;
+      error = retry.error;
+    }
     if (error) {
       console.warn('[MemberSharingDB] 新增分享失败（仅保存本地）:', error.message);
       return { ...post, _localOnly: true, _saveError: error.message };
@@ -339,10 +364,17 @@ export async function updateSharing(id, updates) {
       updateLocalSharing(id, { attachments: cloudUpdates.attachments });
     }
     const dbUpdates = frontendToDbUpdate(cloudUpdates);
-    const { error } = await supabase
+    let { error } = await supabase
       .from('member_sharing')
       .update(dbUpdates)
       .eq('id', String(id));
+    if (error && isMissingSummaryColumnError(error)) {
+      const retry = await supabase
+        .from('member_sharing')
+        .update(stripSummaryField(dbUpdates))
+        .eq('id', String(id));
+      error = retry.error;
+    }
     if (error) {
       console.warn('[MemberSharingDB] 更新分享失败:', error.message);
     }

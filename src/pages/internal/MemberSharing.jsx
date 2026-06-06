@@ -419,6 +419,11 @@ export default function MemberSharing() {
 
   // 获取文本的纯文摘要（前 120 字）
   const getExcerpt = (post) => {
+    const manualSummary = String(post.summary || '').replace(/[\s\u00A0]+/g, ' ').trim();
+    if (manualSummary) {
+      return manualSummary.length > 120 ? manualSummary.slice(0, 120) + '…' : manualSummary;
+    }
+
     let text = String(post.content || '');
     if (post.format === 'word') {
       // 用 DOMParser 同时完成"剥标签 + 解码 HTML 实体（&amp; &nbsp; 等）"

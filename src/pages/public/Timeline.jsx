@@ -297,6 +297,9 @@ export default function Timeline() {
             onMouseLeave={handleMouseUp}
             onWheel={handleWheel}
           >
+            {/* 内层容器：宽度撑到所有卡片的总宽，让横线随滚动内容一起延伸
+                （修复横线超过约 3 张卡片后消失的问题） */}
+            <div className="timeline__track-inner">
             {/* 横线 */}
             <div className="timeline__line" />
 
@@ -325,6 +328,7 @@ export default function Timeline() {
                 </div>
               </div>
             ))}
+            </div>
           </div>
 
           {/* 右箭头 */}
