@@ -76,6 +76,16 @@
   gap: var(--space-sm, 8px);
 }
 
+/* 云端自动保存状态提示 */
+.msc-topbar__save-state {
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-muted, #9ca3af);
+  white-space: nowrap;
+  margin-right: 2px;
+}
+.msc-topbar__save-state--saved { color: var(--color-primary, #5B8C3E); }
+.msc-topbar__save-state--error { color: var(--color-danger, #dc2626); }
+
 /* ============ Content Area — Full Width ============ */
 .msc-content {
   flex: 1;

@@ -516,6 +516,13 @@ export default function MemberSharingCreate() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
 
+  // 云端自动保存：savedIdRef 记录云端记录 id（首次自动/手动保存后填上，避免重复插入）；
+  // cloudSaveState 用于顶栏展示"保存中…/已保存到云端/保存失败"。
+  const savedIdRef = useRef(null);
+  const [cloudSaveState, setCloudSaveState] = useState(null); // 'saving' | 'saved' | 'error' | null
+  const [lastCloudSaveAt, setLastCloudSaveAt] = useState(null);
+  const autosaveTimerRef = useRef(null);
+
   useEffect(() => {
     if (!editId || !isAuthenticated) return;
     let cancelled = false;
@@ -735,32 +742,44 @@ export default function MemberSharingCreate() {
     }
   }, [newPost.format, newPost.content]);
 
+  // 自动云端保存：内容变化后防抖 2.5s 保存（标题与正文/附件齐全才会真正写云端）。
+  useEffect(() => {
+    if (!isAuthenticated) return undefined;
+    if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = setTimeout(() => {
+      saveToCloud({ silent: true });
+    }, 2500);
+    return () => { if (autosaveTimerRef.current) clearTimeout(autosaveTimerRef.current); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newPost, isAuthenticated]);
+
+  // Ctrl/Cmd+S：保存到当前云端，并阻止浏览器"保存网页到本地"对话框。
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && (e.key === 's' || e.key === 'S')) {
+        e.preventDefault();
+        if (!isAuthenticated) return;
+        saveToCloud({ silent: false });
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newPost, isAuthenticated]);
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
-  const handleCreate = async (e) => {
-    e?.preventDefault?.();
-    if (isPublishing) return;
-
+  // 构建要保存的 post 对象；标题缺失或正文/附件都为空时返回 null（用于自动保存时静默跳过）
+  const buildPost = () => {
     const currentContent = newPost.format === 'word' && wordEditorRef.current
       ? wordEditorRef.current.innerHTML
       : newPost.content;
     const normalizedContent = stripUnderline(currentContent || '');
     const hasContent = normalizedContent.trim().length > 0;
     const hasAttachments = newPost.attachments.length > 0;
-    if (!newPost.title.trim() || (!hasContent && !hasAttachments)) {
-      alert('请填写标题，并提供正文内容或上传至少一个附件');
-      return;
-    }
+    if (!newPost.title.trim() || (!hasContent && !hasAttachments)) return null;
 
-    setIsPublishing(true);
-
-    // 构建时间段字符串（如果有填写）
-    // 规则：
-    //   - category === 'history'   → 单个时间点 "YYYY.MM" 或 "YYYY"
-    //     （UI 上只有一组年/月选择，endYear/endMonth 永远为 null）
-    //   - category === 'experience' → 区间 "YYYY.MM - YYYY.MM"
-    //     （任一端缺失时退化为单端；两端全空则不输出）
-    //   - 其它分类（不显示时间段 UI）→ 强制不带 period，避免切分类时残留旧值
+    // 构建时间段字符串：history=单点；experience=区间；其它分类不带 period
     const { startYear, startMonth, endYear, endMonth } = newPost.period || {};
     let periodStr = '';
     if (newPost.category === 'history') {
@@ -774,19 +793,13 @@ export default function MemberSharingCreate() {
         periodStr = start && end ? `${start} - ${end}` : start || end;
       }
     }
-    // 其它分类：periodStr 保持空字符串，post.period 最终会是 null
 
-    // 附件元信息（保留 dataUrl 以支持下载）
     const attachments = newPost.attachments.map((f) => ({
-      id: f.id,
-      name: f.name,
-      size: f.size,
-      type: f.type,
-      dataUrl: f.dataUrl,
+      id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl,
     }));
 
-    const post = {
-      id: editingSource?.id || `sharing-${Date.now()}`,
+    return {
+      id: savedIdRef.current || editingSource?.id || `sharing-${Date.now()}`,
       title: newPost.title.trim(),
       summary: newPost.summary.trim(),
       category: newPost.category,
@@ -799,42 +812,62 @@ export default function MemberSharingCreate() {
       createdAt: editingSource?.createdAt || new Date().toISOString().split('T')[0],
       likes: editingSource?.likes || [],
     };
+  };
 
+  // 保存到云端但不跳转（供自动保存 + Ctrl+S 复用）。
+  // 首次保存用 addSharing 建记录并记下 id，之后用 updateSharing 更新，避免重复插入。
+  const saveToCloud = ({ silent = true } = {}) => {
+    const post = buildPost();
+    if (!post) {
+      if (!silent) alert('请先填写标题，并提供正文内容或上传至少一个附件');
+      return false;
+    }
+    const fields = {
+      title: post.title, summary: post.summary, category: post.category,
+      format: post.format, content: post.content, period: post.period, attachments: post.attachments,
+    };
+    const onOk = () => { setCloudSaveState('saved'); setLastCloudSaveAt(new Date()); };
+    const onErr = (err) => { console.warn('[MemberSharingCreate] 云端保存失败:', err?.message || err); setCloudSaveState('error'); };
+    setCloudSaveState('saving');
+    const existingId = isEditingPost ? post.id : savedIdRef.current;
+    if (existingId) {
+      updateSharing(existingId, fields).then(onOk).catch(onErr);
+    } else {
+      savedIdRef.current = post.id; // 先记下，避免快速连续保存重复插入
+      addSharing(post).then(onOk).catch(onErr);
+    }
+    return true;
+  };
+
+  const handleCreate = async (e) => {
+    e?.preventDefault?.();
+    if (isPublishing) return;
+    const post = buildPost();
+    if (!post) {
+      alert('请填写标题，并提供正文内容或上传至少一个附件');
+      return;
+    }
+    setIsPublishing(true);
     try {
-      if (isEditingPost) {
-        // updateSharing 内部会先同步更新本地缓存，云端在后台同步。
-        // 不再 await 云端，避免"保存后长时间无反应"。
-        updateSharing(post.id, {
-          title: post.title,
-          summary: post.summary,
-          category: post.category,
-          format: post.format,
-          content: post.content,
-          period: post.period,
-          attachments: post.attachments,
+      const existingId = isEditingPost ? post.id : savedIdRef.current;
+      if (existingId) {
+        // 编辑，或自动保存已创建过云端记录 → 走更新，避免重复插入。
+        updateSharing(existingId, {
+          title: post.title, summary: post.summary, category: post.category,
+          format: post.format, content: post.content, period: post.period, attachments: post.attachments,
         }).catch((err) => console.warn('[MemberSharingCreate] 云端更新失败（已写本地）:', err?.message || err));
       } else {
-        // addSharing 在调用瞬间已同步写入本地缓存（列表页用缓存可立即显示），
-        // 云端同步放到后台进行。不再 await 云端附件上传/插入，
-        // 避免移动端冷启动/弱网下"点了发布要等很久、其实已发布却没反应"。
         addSharing(post).catch((err) => console.warn('[MemberSharingCreate] 云端发布失败（已写本地）:', err?.message || err));
-
-        // 发送"新成员分享"通知（由规则引擎按用户自定义规则触发）
+        savedIdRef.current = post.id;
         try {
-          const categoryLabel =
-            cats.find((c) => c.key === post.category)?.label || '';
+          const categoryLabel = cats.find((c) => c.key === post.category)?.label || '';
           emitNotificationEvent('sharing.new', {
-            operator: post.author,
-            operatorUserId: user?.id,
-            title: post.title,
-            categoryLabel,
+            operator: post.author, operatorUserId: user?.id, title: post.title, categoryLabel,
           });
         } catch (err) {
           console.warn('[MemberSharingCreate] 发送通知失败:', err?.message || err);
         }
       }
-
-      // 本地已写入，立即跳转回列表页（列表用缓存秒显；云端后台同步 + Realtime 兜底）
       navigate('/internal/member-sharing');
     } finally {
       setIsPublishing(false);
@@ -849,6 +882,13 @@ export default function MemberSharingCreate() {
           <ChevronLeft size={20} /> 返回列表
         </button>
         <div className="msc-topbar__actions">
+          {cloudSaveState && (
+            <span className={`msc-topbar__save-state msc-topbar__save-state--${cloudSaveState}`}>
+              {cloudSaveState === 'saving' && '保存中…'}
+              {cloudSaveState === 'saved' && '已保存到云端'}
+              {cloudSaveState === 'error' && '云端保存失败，请稍后重试'}
+            </span>
+          )}
           <button
             type="button"
             className="btn btn-secondary"
