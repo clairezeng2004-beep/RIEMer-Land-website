@@ -898,7 +898,7 @@ export default function MemberSharingCreate() {
                 className="msc-form__textarea msc-form__textarea--summary"
                 value={newPost.summary}
                 onChange={(e) => setNewPost({ ...newPost, summary: e.target.value })}
-                placeholder="此内容将显示在分享卡片上。可以在此处填写推荐理由、资料使用指南、本文概览等"
+                placeholder="此内容将显示在分享卡片上。可以在此处填写推荐理由、资料使用指南、本文概览等；若不填写，将默认抓取正文开头的部分文字作为简介。"
                 rows={3}
               />
             </div>
