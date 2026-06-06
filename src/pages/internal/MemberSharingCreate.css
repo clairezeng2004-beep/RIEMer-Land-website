@@ -1184,6 +1184,16 @@
     grid-template-columns: 1fr;
   }
 
+  .msc-period {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-sm, 8px);
+  }
+}
+
+/* Markdown 分屏：尽量保持「左编辑 / 右预览」两栏，
+   只有屏幕真的很窄（≤560px）时才上下堆叠，避免两栏过于拥挤。 */
+@media (max-width: 560px) {
   .msc-md-split {
     grid-template-columns: 1fr;
     height: auto; /* 单列下每块自己给高度 */
@@ -1193,12 +1203,6 @@
   .msc-md-split__preview {
     height: 360px;
     min-height: 240px;
-  }
-
-  .msc-period {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--space-sm, 8px);
   }
 }
 

@@ -861,6 +861,8 @@ export default function ProcessTemplateCreate() {
                       }}
                     />
                   </div>
+                  {/* Markdown 目录：扫描右侧预览里的标题，与 Word 模式一样可点击跳转 */}
+                  <EditorToc editorRef={mdPreviewRef} content={markdownPreview} />
                 </div>
               ) : (
                 <div className="msc-form__word-editor-wrapper">
