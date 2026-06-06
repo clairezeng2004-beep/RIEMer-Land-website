@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
 import './FloatingTextToolbar.css';
 
 /**
@@ -67,6 +67,7 @@ export default function FloatingTextToolbar({
   const detectActiveRich = useCallback(() => {
     const next = {
       bold: document.queryCommandState('bold'),
+      paragraph: false,
       h1: false,
       h2: false,
       h3: false,
@@ -119,6 +120,8 @@ export default function FloatingTextToolbar({
         }
       }
     }
+    // 正文：既不是标题也不是引用时视为正文（用于"正文 T"按钮的高亮态）
+    next.paragraph = !next.h1 && !next.h2 && !next.h3 && !next.blockquote;
     setActive(next);
   }, [editorRef]);
 
@@ -469,6 +472,9 @@ export default function FloatingTextToolbar({
 
     const nextLines = lines.map((line) => {
       switch (kind) {
+        case 'p':
+          // 正文：去掉任意标题/引用/列表前缀，回到纯文本
+          return stripMd(line);
         case 'h1':
           return line.startsWith('# ') ? line.substring(2) : `# ${stripMd(line)}`;
         case 'h2':
@@ -516,6 +522,7 @@ export default function FloatingTextToolbar({
   );
 
   // —— 操作分发 ——
+  const onParagraph = isMarkdown ? () => applyLinePrefixV2('p') : () => applyBlockRich('p');
   const onH1 = isMarkdown ? () => applyLinePrefixV2('h1') : () => applyBlockRich('h1');
   const onH2 = isMarkdown ? () => applyLinePrefixV2('h2') : () => applyBlockRich('h2');
   const onH3 = isMarkdown ? () => applyLinePrefixV2('h3') : () => applyBlockRich('h3');
@@ -534,14 +541,20 @@ export default function FloatingTextToolbar({
       style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
       onMouseDown={stop}
     >
+      {/* 正文：把当前块转回普通段落 <p>（去掉标题/引用等块级格式） */}
+      <Btn onClick={onParagraph} title="正文" activeFlag={active.paragraph}>
+        <Type size={18} />
+      </Btn>
+      {/* Heading1/2/3 图标里的「H1/H2/H3」字形在 24×24 画布里占比偏小，
+          同样 size=16 时视觉上比实心的「加粗 B」小一圈，这里放大到 19 视觉对齐。 */}
       <Btn onClick={onH1} title="一级标题" activeFlag={active.h1}>
-        <Heading1 size={16} />
+        <Heading1 size={19} />
       </Btn>
       <Btn onClick={onH2} title="二级标题" activeFlag={active.h2}>
-        <Heading2 size={16} />
+        <Heading2 size={19} />
       </Btn>
       <Btn onClick={onH3} title="三级标题" activeFlag={active.h3}>
-        <Heading3 size={16} />
+        <Heading3 size={19} />
       </Btn>
       <span className="ftt__sep" />
 
