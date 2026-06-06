@@ -37,6 +37,7 @@ import TextAnnotation from '../../components/TextAnnotation';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import WordBlockHandle from '../../components/WordBlockHandle';
+import EditorToc from '../../components/EditorToc';
 import { handleEditorTabIndent } from '../../utils/editorTabIndent';
 import {
   fetchAllFromCloud,
@@ -1607,6 +1608,7 @@ export default function ProcessTemplateDetail() {
                         editorRef={ptdWordEditorRef}
                         onChange={(html) => setEditContent(stripUnderline(html))}
                       />
+                      <EditorToc editorRef={ptdWordEditorRef} content={editContent} />
                     </div>
                   )}
                 </div>

@@ -32,6 +32,7 @@ import {
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import WordBlockHandle from '../../components/WordBlockHandle';
+import EditorToc from '../../components/EditorToc';
 import { handleEditorTabIndent } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
@@ -1096,6 +1097,7 @@ export default function MemberSharingCreate() {
                     editorRef={wordEditorRef}
                     onChange={(html) => setNewPost((prev) => ({ ...prev, content: html }))}
                   />
+                  <EditorToc editorRef={wordEditorRef} content={newPost.content} />
                 </div>
               )}
             </div>

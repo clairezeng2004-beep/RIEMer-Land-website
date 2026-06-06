@@ -1,0 +1,142 @@
+/* ============ 编辑器浮动目录 ============ */
+.etoc {
+  position: fixed;
+  right: 16px;
+  top: 120px;
+  z-index: 80; /* 低于全站 Navbar(1000) 与块手柄菜单 */
+}
+
+/* 展开面板 */
+.etoc__panel {
+  width: 220px;
+  max-height: min(60vh, 460px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-card, #fff);
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.12));
+  overflow: hidden;
+}
+
+.etoc__header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-border-light, #eef0f2);
+  color: var(--color-text-light, #6b7280);
+  font-size: var(--text-sm, 13px);
+  font-weight: 600;
+}
+
+.etoc__title {
+  flex: 1;
+}
+
+.etoc__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-text-muted, #9ca3af);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.etoc__close:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: var(--color-text, #374151);
+}
+
+.etoc__list {
+  overflow-y: auto;
+  padding: 4px;
+}
+
+.etoc__item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 0.35rem 0.5rem;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: transparent;
+  color: var(--color-text-light, #6b7280);
+  font-size: var(--text-sm, 13px);
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.etoc__item:hover {
+  background: color-mix(in srgb, var(--color-primary, #5B8C3E) 8%, transparent);
+  color: var(--color-text, #374151);
+}
+
+.etoc__item--active {
+  color: var(--color-primary, #5B8C3E);
+  font-weight: 600;
+  background: color-mix(in srgb, var(--color-primary, #5B8C3E) 10%, transparent);
+}
+
+/* 不同层级缩进 */
+.etoc__item--l1 { padding-left: 0.5rem; }
+.etoc__item--l2 { padding-left: 1.25rem; }
+.etoc__item--l3 { padding-left: 2rem; }
+
+.etoc__dot {
+  flex-shrink: 0;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.5;
+}
+
+.etoc__text {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 收起态：一个小圆按钮 */
+.etoc__fab {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: 50%;
+  background: var(--color-bg-card, #fff);
+  color: var(--color-primary, #5B8C3E);
+  box-shadow: var(--shadow-md, 0 4px 14px rgba(0, 0, 0, 0.1));
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.etoc__fab:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.14));
+}
+
+/* 窄屏：面板更窄，且默认靠右下，避免遮挡编辑区 */
+@media (max-width: 900px) {
+  .etoc {
+    right: 12px;
+    top: auto;
+    bottom: 20px;
+  }
+  .etoc__panel {
+    width: 180px;
+    max-height: 50vh;
+  }
+}

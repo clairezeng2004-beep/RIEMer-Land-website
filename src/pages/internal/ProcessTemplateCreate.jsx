@@ -33,6 +33,7 @@ import {
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import WordBlockHandle from '../../components/WordBlockHandle';
+import EditorToc from '../../components/EditorToc';
 import { handleEditorTabIndent } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
@@ -890,6 +891,7 @@ export default function ProcessTemplateCreate() {
                     editorRef={wordEditorRef}
                     onChange={(html) => setNewDoc((prev) => ({ ...prev, content: html }))}
                   />
+                  <EditorToc editorRef={wordEditorRef} content={newDoc.content} />
                 </div>
               )}
             </div>
