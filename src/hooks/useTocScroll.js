@@ -61,8 +61,12 @@ export default function useTocScroll({
       } else {
         slugCount[slug] = 1;
       }
-      el.id = slug;
-      if (anchorClassName) el.classList.add(anchorClassName);
+      // 只在确有变化时才写 DOM：在编辑器（contentEditable）里反复改写
+      // id 会扰动光标/滚动；read 页静态内容也无谓重复写。
+      if (el.id !== slug) el.id = slug;
+      if (anchorClassName && !el.classList.contains(anchorClassName)) {
+        el.classList.add(anchorClassName);
+      }
       items.push({ id: slug, text: raw, level: Number(el.tagName.substring(1)) });
     });
     setToc(items);

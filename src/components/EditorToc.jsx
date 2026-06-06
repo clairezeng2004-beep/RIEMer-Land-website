@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { List, X } from 'lucide-react';
 import useTocScroll from '../hooks/useTocScroll';
 import './EditorToc.css';
@@ -19,9 +19,18 @@ import './EditorToc.css';
  *   scrollOffset — 顶部 sticky 顶栏的高度补偿，默认 64
  */
 export default function EditorToc({ editorRef, content, scrollOffset = 64 }) {
+  // 防抖：编辑过程中不要每个按键都重新扫描标题并往编辑器 DOM 写 id，
+  // 否则在 contentEditable 里会扰动光标/滚动，表现为"每次输入窗口往上跳一下"。
+  // 停止输入 ~400ms 后再扫描一次目录即可。
+  const [debouncedContent, setDebouncedContent] = useState(content);
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedContent(content), 400);
+    return () => clearTimeout(t);
+  }, [content]);
+
   const { toc, activeTocId, handleTocClick } = useTocScroll({
     contentRef: editorRef,
-    renderedContent: content,
+    renderedContent: debouncedContent,
     headingSelector: 'h1, h2, h3',
     anchorClassName: 'msc-doc-anchor',
     scrollOffset,
