@@ -1000,6 +1000,9 @@
   font-size: var(--text-xs);
   color: var(--color-text-muted);
   line-height: 1.4;
+  /* 点赞按钮与点赞人名字的间距收紧到 --space-sm，与流程模板文件卡片一致
+     （meta-row 默认 gap 是 --space-md，这里往左收回差值）。 */
+  margin-left: calc(var(--space-sm) - var(--space-md));
 }
 
 .ms-card__action-icon {
