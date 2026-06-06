@@ -337,6 +337,24 @@ export default function ProcessTemplateCreate() {
   const cleanWordHtml = useCallback((html) => {
     const doc = new DOMParser().parseFromString(html, 'text/html');
     doc.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
+
+    // 先把"行内样式表达的加粗/斜体"（Word / Google Docs 常用 <span style="font-weight:700">）
+    // 转成 <strong>/<em>，再做后面的剥属性 / 剥 <span>，否则加粗会被一并清掉、丢失格式。
+    doc.querySelectorAll('[style]').forEach((el) => {
+      const t = el.tagName.toLowerCase();
+      if (['strong', 'b', 'em', 'i'].includes(t) || /^h[1-6]$/.test(t)) return;
+      const fw = (el.style.fontWeight || '').toLowerCase();
+      const isBold = fw === 'bold' || fw === 'bolder' || (/^\d+$/.test(fw) && parseInt(fw, 10) >= 600);
+      const isItalic = (el.style.fontStyle || '').toLowerCase() === 'italic';
+      if (!isBold && !isItalic) return;
+      const frag = doc.createDocumentFragment();
+      while (el.firstChild) frag.appendChild(el.firstChild);
+      let wrapper = frag;
+      if (isItalic) { const em = doc.createElement('em'); em.appendChild(wrapper); wrapper = em; }
+      if (isBold) { const st = doc.createElement('strong'); st.appendChild(wrapper); wrapper = st; }
+      el.appendChild(wrapper);
+    });
+
     doc.querySelectorAll('*').forEach((el) => {
       const attrs = [...el.attributes];
       const tag = el.tagName.toLowerCase();
