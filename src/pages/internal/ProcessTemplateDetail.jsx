@@ -1475,15 +1475,6 @@ export default function ProcessTemplateDetail() {
               >
                 {finalTypeLabel}
               </span>
-              {doc.format && (
-                <span className="ptd-article__format-tag">
-                  {doc.format === 'markdown' ? (
-                    <><Code2 size={12} /> Markdown</>
-                  ) : (
-                    <><FileText size={12} /> Word</>
-                  )}
-                </span>
-              )}
 
               {isEditing ? (
                 <input

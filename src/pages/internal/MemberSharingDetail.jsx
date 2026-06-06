@@ -9,7 +9,6 @@ import {
   User,
   Eye,
   ThumbsUp,
-  Code2,
   FileText,
   Share2,
   Paperclip,
@@ -370,9 +369,6 @@ export default function MemberSharingDetail() {
                 }}
               >
                 {categoryLabels[post.category] || post.category}
-              </span>
-              <span className="msd-article__format-tag">
-                {post.format === 'markdown' ? <><Code2 size={12} /> Markdown</> : <><FileText size={12} /> Word</>}
               </span>
 
               <h1 className="msd-article__title">{post.title}</h1>
