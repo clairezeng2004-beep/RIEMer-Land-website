@@ -215,12 +215,18 @@
   margin-top: 0;
 }
 
-.internal-layout__content .msc-topbar__actions .btn-primary {
+.internal-layout__content .msc-topbar__actions .btn {
   inline-size: 118px;
   block-size: 38px;
   padding: 0 1.1rem;
   line-height: 1.2;
   gap: 6px;
+  margin-top: 0;
+  flex-shrink: 0;
+}
+
+.internal-layout__content .msc-topbar__actions .btn-primary {
+  inline-size: 118px;
 }
 
 .internal-layout__content .documents-page__header .btn-primary svg,

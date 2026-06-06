@@ -20,6 +20,7 @@
 CREATE TABLE IF NOT EXISTS member_sharing (
   id TEXT PRIMARY KEY,                          -- 保持与前端现有 id 结构一致（sharing-<timestamp>）
   title TEXT NOT NULL,
+  summary TEXT NOT NULL DEFAULT '',             -- 分享卡片简介 / 推荐理由 / 使用指南 / 概览
   category TEXT NOT NULL DEFAULT 'experience',  -- 分类 key
   format TEXT NOT NULL DEFAULT 'word',          -- 'word' | 'markdown'
   content TEXT NOT NULL DEFAULT '',             -- 正文（HTML 或 Markdown）
@@ -31,6 +32,9 @@ CREATE TABLE IF NOT EXISTS member_sharing (
   created_at DATE NOT NULL DEFAULT CURRENT_DATE,
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE member_sharing
+  ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';
 
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_member_sharing_created_at ON member_sharing(created_at DESC);
