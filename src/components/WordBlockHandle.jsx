@@ -1,28 +1,42 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Type, Heading1, Heading2, Heading3, Quote } from 'lucide-react';
+import { Plus, Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon } from 'lucide-react';
 import './WordBlockHandle.css';
 
 /**
  * WordBlockHandle —— 飞书式「块手柄」
  *
  * 在 contentEditable（Word 富文本）编辑器里，光标所在的那一块（段落/标题等）
- * 左侧会浮出一个小图标；点击展开格式菜单，把当前块切换成：
- *   正文 / 一级标题 / 二级标题 / 三级标题 / 引用
- * 复用编辑器既有的 document.execCommand('formatBlock', ...) 能力，
- * 与 FloatingTextToolbar 的块级格式保持一致。
+ * 左侧会浮出一个小图标；点击展开格式菜单。
+ * 菜单提供的格式与「选中文字后上方的浮动工具栏」保持一致：
+ *   正文 / 一级~三级标题 / 引用 / 无序列表 / 有序列表 / 加粗 / 链接
+ * 复用编辑器既有的 document.execCommand 能力。
  *
  * Props:
  *   editorRef — 目标 contentEditable 容器 ref
  *   onChange  — (html) => void，应用格式后把最新 innerHTML 回写
  */
 
+// cmd：execCommand 命令；value：命令参数；selectAll：是否需要先选中整块文字
+//（加粗/链接这类行内格式要作用在整块文字上，而不是仅一个折叠光标）；
+// prompt：是否需要先弹框输入（链接 URL）。
 const BLOCK_OPTIONS = [
-  { key: 'p', label: '正文', icon: Type, tag: '<p>' },
-  { key: 'h1', label: '一级标题', icon: Heading1, tag: '<h1>' },
-  { key: 'h2', label: '二级标题', icon: Heading2, tag: '<h2>' },
-  { key: 'h3', label: '三级标题', icon: Heading3, tag: '<h3>' },
-  { key: 'blockquote', label: '引用', icon: Quote, tag: '<blockquote>' },
+  { key: 'p', label: '正文', icon: Type, cmd: 'formatBlock', value: '<p>' },
+  { key: 'h1', label: '一级标题', icon: Heading1, cmd: 'formatBlock', value: '<h1>' },
+  { key: 'h2', label: '二级标题', icon: Heading2, cmd: 'formatBlock', value: '<h2>' },
+  { key: 'h3', label: '三级标题', icon: Heading3, cmd: 'formatBlock', value: '<h3>' },
+  { key: 'blockquote', label: '引用', icon: Quote, cmd: 'formatBlock', value: '<blockquote>' },
+  { key: 'ul', label: '无序列表', icon: List, cmd: 'insertUnorderedList' },
+  { key: 'ol', label: '有序列表', icon: ListOrdered, cmd: 'insertOrderedList' },
+  { key: 'bold', label: '加粗', icon: Bold, cmd: 'bold', selectAll: true },
+  { key: 'link', label: '链接', icon: LinkIcon, cmd: 'createLink', selectAll: true, prompt: true },
 ];
+
+function normalizeUrl(raw) {
+  const v = (raw || '').trim();
+  if (!v) return '';
+  if (/^(https?:|mailto:|tel:|ftp:|\/|#)/i.test(v)) return v;
+  return `https://${v}`;
+}
 
 /** 从当前选区往上找「编辑器的直接子块」 */
 function getCurrentBlock(editor) {
@@ -108,15 +122,17 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
-  /** 把光标放回当前块（点菜单会让编辑器失焦，先恢复光标再执行命令） */
-  const restoreCaret = useCallback(() => {
+  /** 把光标放回当前块（点菜单会让编辑器失焦，先恢复光标再执行命令）。
+   *  selectAll=true 时选中整块文字（加粗/链接等行内格式需要选区）；
+   *  否则收到块末尾（formatBlock / 列表命令对折叠光标即可生效）。 */
+  const restoreCaret = useCallback((selectAll) => {
     const block = blockRef.current;
     const editor = editorRef?.current;
     if (!block || !editor || !editor.contains(block)) return false;
     try {
       const range = document.createRange();
       range.selectNodeContents(block);
-      range.collapse(false); // 收到块末尾
+      if (!selectAll) range.collapse(false);
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
@@ -127,16 +143,40 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     }
   }, [editorRef]);
 
-  const applyBlock = useCallback((tag) => {
-    if (!restoreCaret()) { setMenuOpen(false); return; }
+  const applyOption = useCallback((opt) => {
+    if (!restoreCaret(opt.selectAll)) { setMenuOpen(false); return; }
+    let value = opt.value || null;
+    if (opt.prompt) {
+      // 链接：弹框输入 URL
+      // eslint-disable-next-line no-alert
+      const input = window.prompt('插入链接 URL', 'https://');
+      if (input === null) { setMenuOpen(false); return; }
+      value = normalizeUrl(input);
+      if (!value) { setMenuOpen(false); return; }
+    }
     try {
-      document.execCommand('formatBlock', false, tag);
+      document.execCommand(opt.cmd, false, value);
+      // 链接补 target，安全打开
+      if (opt.key === 'link' && value) {
+        const editor = editorRef?.current;
+        const sel = window.getSelection();
+        let n = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).commonAncestorContainer : null;
+        n = n && n.nodeType === 1 ? n : n?.parentElement;
+        while (n && editor && n !== editor) {
+          if (n.tagName === 'A') {
+            n.setAttribute('target', '_blank');
+            n.setAttribute('rel', 'noopener noreferrer');
+            break;
+          }
+          n = n.parentElement;
+        }
+      }
     } catch { /* 个别浏览器不支持，忽略 */ }
     fireChange();
     setMenuOpen(false);
     // 下一帧重算手柄位置（块标签变了，高度可能变化）
     requestAnimationFrame(() => refresh());
-  }, [restoreCaret, fireChange, refresh]);
+  }, [restoreCaret, fireChange, refresh, editorRef]);
 
   if (!pos) return null;
 
@@ -162,7 +202,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
               type="button"
               className="wbh__menu-item"
               onMouseDown={stop}
-              onClick={() => applyBlock(opt.tag)}
+              onClick={() => applyOption(opt)}
             >
               <opt.icon size={15} className="wbh__menu-icon" />
               <span>{opt.label}</span>
