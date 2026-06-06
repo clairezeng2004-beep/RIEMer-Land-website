@@ -191,6 +191,14 @@ main {
   min-height: calc(100vh - 72px);
 }
 
+/* 全屏页（成员分享/流程模板的新建/查看编辑）没有全站 Navbar，
+   不需要给它让出 72px 顶部空间——否则编辑页顶栏上方会多出一大块留白，
+   且会把右侧浮动目录顶到与顶栏重叠。这里清零。 */
+main.app-main--fullscreen {
+  padding-top: 0;
+  min-height: 100vh;
+}
+
 h1, h2 {
   font-family: var(--font-display);
   line-height: 1.3;

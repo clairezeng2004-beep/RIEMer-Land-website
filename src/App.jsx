@@ -211,7 +211,7 @@ function AppShell() {
     <>
       <ScrollToTop />
       {!isFullscreen && <Navbar />}
-      <main>
+      <main className={isFullscreen ? 'app-main--fullscreen' : undefined}>
         <Suspense fallback={<RouteSkeleton isInternal={isInternal} />}>
           {isInternal ? (
             <NotificationRulesProvider>{routes}</NotificationRulesProvider>
