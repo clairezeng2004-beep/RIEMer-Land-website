@@ -1082,30 +1082,45 @@
     padding: var(--space-md);
   }
 
+  /* ① 标题/正文左端对齐到正文左边缘（与"经验时间段"一致）：
+        去掉之前额外的左缩进；右侧只给图标留必要的位置，正文尽量宽。 */
   .ms-card__body .ms-card__title,
   .ms-card__body .ms-card__excerpt {
-    padding-left: var(--space-md);
-    padding-right: calc(32px + var(--space-md) + var(--space-sm));
+    padding-left: 0;
+    padding-right: calc(32px + var(--space-xs));
   }
 
+  /* ② 编辑/删除图标更靠右（贴近卡片右边），给正文腾出更多宽度。 */
+  .ms-card__edit-btn,
+  .ms-card__delete-btn {
+    right: var(--space-sm);
+  }
+
+  /* ③ 作者 / 日期 / 浏览量 / 点赞 拉到同一行均匀分布；类型标签单独占一行。
+        用 display:contents 让两个 meta-row 的子项直接参与 .ms-card__meta 的弹性布局。 */
   .ms-card__meta {
-    align-items: stretch;
-    gap: var(--space-xs);
-  }
-
-  .ms-card__meta-row {
-    width: 100%;
-    gap: var(--space-sm);
-    padding-inline: var(--space-md);
-  }
-
-  .ms-card__meta-row--secondary {
+    display: flex;
+    flex-wrap: wrap;
     align-items: center;
+    justify-content: space-between;
+    gap: var(--space-xs) var(--space-sm);
+    padding-inline: 0;
   }
 
-  .ms-card__meta-row--secondary .ms-card__badge {
-    margin-left: 0;
+  .ms-card__meta-row--primary,
+  .ms-card__meta-row--secondary {
+    display: contents;
   }
+
+  .ms-card__author { order: 1; }
+  .ms-card__date { order: 2; }
+  .ms-card__views { order: 3; }
+  .ms-card__like-btn { order: 4; }
+  /* 点赞人名单独换行，避免挤压上面一行的均分 */
+  .ms-card__like-names { order: 5; flex-basis: 100%; }
+  /* 类型标签单独占一整行 */
+  .ms-card__badge { order: 6; flex-basis: 100%; margin-left: 0; }
+  .ms-card__format-tag { order: 7; flex-basis: 100%; }
 }
 
 @media (max-width: 480px) {
