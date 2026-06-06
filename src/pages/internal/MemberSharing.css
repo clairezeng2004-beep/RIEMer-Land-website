@@ -792,9 +792,10 @@
 
 .ms-card__body .ms-card__title,
 .ms-card__body .ms-card__excerpt {
-  /* 给右上角浮动的编辑/删除图标让位。图标右缘对齐到 --space-xl，
-     图标宽 32px，故文字需在 (--space-xl + 32 + 间隙) 处收住，避免压到图标下面。 */
-  padding-right: calc(var(--space-xl) + 40px);
+  /* 给右上角浮动的编辑/删除图标让位。正文区本身已有 --space-xl 右内边距，
+     图标宽 32px、紧贴该内边距，故文字只需再额外让出 图标宽(32) + 约8px 间隙 ≈ 40px，
+     即可既不压到图标、又不至于留出过大空白。 */
+  padding-right: 40px;
 }
 
 .ms-card__top {
