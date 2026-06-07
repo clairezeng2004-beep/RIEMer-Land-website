@@ -34,7 +34,7 @@ import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import WordBlockHandle from '../../components/WordBlockHandle';
 import EditorToc from '../../components/EditorToc';
-import { handleEditorTabIndent } from '../../utils/editorTabIndent';
+import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
@@ -896,7 +896,7 @@ export default function ProcessTemplateCreate() {
                     ref={wordEditorRef}
                     className="msc-form__word-editor"
                     contentEditable
-                    onKeyDown={handleEditorTabIndent}
+                    onKeyDown={handleEditorKeyDown}
                     onPaste={handleWordPaste}
                     onInput={() => {
                       if (wordEditorRef.current) {

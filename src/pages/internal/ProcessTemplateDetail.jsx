@@ -39,7 +39,7 @@ import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import WordBlockHandle from '../../components/WordBlockHandle';
 import EditorToc from '../../components/EditorToc';
-import { handleEditorTabIndent } from '../../utils/editorTabIndent';
+import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
@@ -1719,7 +1719,7 @@ export default function ProcessTemplateDetail() {
                         ref={ptdWordEditorRef}
                         className="msc-form__word-editor ptd-edit__word-editor"
                         contentEditable
-                        onKeyDown={handleEditorTabIndent}
+                        onKeyDown={handleEditorKeyDown}
                         onPaste={handleWordPaste}
                         onInput={() => {
                           if (ptdWordEditorRef.current) {
