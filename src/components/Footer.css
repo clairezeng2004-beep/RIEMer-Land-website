@@ -14,13 +14,19 @@
    容纳桌面端 4 列横排，会出现文字重合；强制走单列堆叠布局（与手机端一致），
    每个模块独占一行。 */
 @media (max-width: 1024px) {
+  /* 单列堆叠时，把整列居中（justify-content/justify-items: center），
+     并给每个模块一个统一宽度（min(100%, 360px)），这样四个模块共用同一条
+     居中竖线、标题与内容都对齐，不再各自按自身宽度错位成"阶梯状"。
+     做法与手机端（≤768px）的居中堆叠保持一致。 */
   .footer--internal .footer__grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, max-content);
     grid-template-rows: none;
     grid-template-areas: none;
     row-gap: var(--space-lg);
     column-gap: 0;
     text-align: center;
+    justify-content: center;
+    justify-items: center;
   }
 
   .footer--internal .footer__grid > .footer__nav,
@@ -36,12 +42,14 @@
     flex-direction: column;
     align-items: center;
     gap: var(--space-xs);
+    width: min(100%, 360px);
   }
 
   .footer--internal .footer__nav-links-row,
   .footer--internal .footer__about-texts,
   .footer--internal .footer__contact-list {
     align-items: center;
+    width: 100%;
   }
 
   .footer--internal .footer__contact-item {

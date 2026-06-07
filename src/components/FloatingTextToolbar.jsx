@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import './FloatingTextToolbar.css';
 
 /**
@@ -119,6 +119,17 @@ export default function FloatingTextToolbar({
           n = n.parentElement;
         }
       }
+    }
+    // 对齐方式：浏览器对未显式设置对齐的块会把 justifyLeft 也判为 true，
+    // 这里以「居中 / 右对齐」优先，二者都不命中时回落为左对齐（默认态）。
+    try {
+      next.alignCenter = document.queryCommandState('justifyCenter');
+      next.alignRight = document.queryCommandState('justifyRight');
+      next.alignLeft = !next.alignCenter && !next.alignRight;
+    } catch {
+      next.alignLeft = true;
+      next.alignCenter = false;
+      next.alignRight = false;
     }
     // 正文：既不是标题也不是引用时视为正文（用于"正文 T"按钮的高亮态）
     next.paragraph = !next.h1 && !next.h2 && !next.h3 && !next.blockquote;
@@ -326,6 +337,13 @@ export default function FloatingTextToolbar({
     fireChangeRich();
   }, [detectActiveRich, fireChangeRich]);
 
+  // 对齐（富文本）：justifyLeft / justifyCenter / justifyRight，作用在当前块上。
+  const applyAlignRich = useCallback((cmd) => {
+    document.execCommand(cmd, false, null);
+    detectActiveRich();
+    fireChangeRich();
+  }, [detectActiveRich, fireChangeRich]);
+
   /* -----------------------------------------------------------------
    * 链接：富文本模式
    *   - 当选中已是 <a>：弹框预填当前 href；用户留空 → 解除链接（unlink）；
@@ -502,6 +520,43 @@ export default function FloatingTextToolbar({
     });
   }, [editorRef, onChange]);
 
+  // 对齐（Markdown）：Markdown 没有原生对齐语法，这里给选中块包一层
+  // <div align="x"> … </div>。预览用 marked 解析时会原样输出该 HTML，
+  // 块内外留空行让内部仍按 Markdown 渲染。再次点同一对齐 → 解除；点不同对齐 → 改向。
+  const applyAlignMarkdown = useCallback((dir) => {
+    const ta = editorRef.current;
+    if (!ta) return;
+    const start = ta.selectionStart;
+    const end = ta.selectionEnd;
+    const value = ta.value;
+    const lineStart = value.lastIndexOf('\n', Math.max(0, start - 1)) + 1;
+    const lineEndRaw = value.indexOf('\n', end);
+    const lineEnd = lineEndRaw === -1 ? value.length : lineEndRaw;
+
+    const block = value.substring(lineStart, lineEnd);
+    const before = value.substring(0, lineStart);
+    const after = value.substring(lineEnd);
+
+    const wrapRe = /^<div align="(left|center|right)">\n\n([\s\S]*?)\n\n<\/div>$/;
+    const m = block.match(wrapRe);
+    let nextBlock;
+    if (m) {
+      // 已有对齐包裹：同方向 → 解除；不同方向 → 改向
+      nextBlock = m[1] === dir ? m[2] : `<div align="${dir}">\n\n${m[2]}\n\n</div>`;
+    } else {
+      nextBlock = `<div align="${dir}">\n\n${block}\n\n</div>`;
+    }
+
+    const nextValue = before + nextBlock + after;
+    const nextStart = lineStart;
+    const nextEnd = lineStart + nextBlock.length;
+    if (onChange) onChange(nextValue, { start: nextStart, end: nextEnd });
+    requestAnimationFrame(() => {
+      ta.focus();
+      try { ta.setSelectionRange(nextStart, nextEnd); } catch { /* noop */ }
+    });
+  }, [editorRef, onChange]);
+
   /* =================================================================
    * 渲染
    * ================================================================= */
@@ -533,6 +588,9 @@ export default function FloatingTextToolbar({
   const onLink = isMarkdown ? applyLinkMarkdown : applyLinkRich;
   const onUL = isMarkdown ? () => applyLinePrefixV2('ul') : () => applyListRich('insertUnorderedList');
   const onOL = isMarkdown ? () => applyLinePrefixV2('ol') : () => applyListRich('insertOrderedList');
+  const onAlignLeft = isMarkdown ? () => applyAlignMarkdown('left') : () => applyAlignRich('justifyLeft');
+  const onAlignCenter = isMarkdown ? () => applyAlignMarkdown('center') : () => applyAlignRich('justifyCenter');
+  const onAlignRight = isMarkdown ? () => applyAlignMarkdown('right') : () => applyAlignRich('justifyRight');
 
   return (
     <div
@@ -576,6 +634,19 @@ export default function FloatingTextToolbar({
         activeFlag={active.link}
       >
         <LinkIcon size={16} />
+      </Btn>
+      <span className="ftt__sep" />
+
+      {/* 对齐：左 / 居中 / 右。富文本走 execCommand，Markdown 包 <div align>。
+          Markdown 模式下无法可靠回读对齐态，故仅富文本模式高亮当前对齐。 */}
+      <Btn onClick={onAlignLeft} title="左对齐" activeFlag={!isMarkdown && active.alignLeft}>
+        <AlignLeft size={16} />
+      </Btn>
+      <Btn onClick={onAlignCenter} title="居中" activeFlag={!isMarkdown && active.alignCenter}>
+        <AlignCenter size={16} />
+      </Btn>
+      <Btn onClick={onAlignRight} title="右对齐" activeFlag={!isMarkdown && active.alignRight}>
+        <AlignRight size={16} />
       </Btn>
     </div>
   );
