@@ -1,3 +1,16 @@
+.article-detail,
+.article-detail__title,
+.article-detail__content,
+.article-detail__h2,
+.article-detail__h3,
+.article-detail__paragraph,
+.article-detail__related,
+.article-detail__related-card,
+.article-detail__related-card h4,
+.article-detail__related-card p {
+  font-family: 'Lora', 'Lora Fallback', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+}
+
 .article-detail-page {
   padding-top: 120px;
   padding-bottom: var(--space-4xl);
