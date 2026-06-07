@@ -195,13 +195,17 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  width: 100%;
   padding: 8px 10px;
   background: var(--color-bg-card);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-md);
   text-decoration: none;
+  text-align: left;
   color: var(--color-text);
+  font-family: inherit;
   font-size: var(--text-xs);
+  cursor: pointer;
   transition: all var(--transition-fast);
 }
 
@@ -406,13 +410,23 @@
   }
 
   .article-chat__panel {
+    /* 升起半屏：底部贴边、左右等距居中、接近全宽（不再只占 2/3 宽） */
     bottom: 12px;
+    left: 12px;
     right: 12px;
-    left: auto;
-    width: 66vw;
-    max-width: 360px;
-    /* 手机端同样用固定高度，保持弹窗高度稳定 */
-    height: 70vh;
+    width: auto;
+    max-width: none;
+    height: 60vh;
     border-radius: var(--radius-xl);
+  }
+
+  /* 减小小R(助手)气泡与弹窗右边的留白：气泡可用更宽的横向空间 */
+  .article-chat__msg {
+    max-width: 94%;
+  }
+
+  /* 输入框/占位符在手机端字号偏大，统一收小 */
+  .article-chat__input {
+    font-size: var(--text-xs);
   }
 }
