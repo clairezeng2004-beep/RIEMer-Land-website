@@ -178,11 +178,18 @@ html, body {
    注：不用 viewport 的 maximum-scale=1，因为那会禁止用户双指缩放整个
    页面，影响可访问性。
 */
+/* 取舍说明（按用户反馈调整）：
+   之前为规避 iOS 聚焦缩放，把所有输入控件强制成 16px。但这会让
+   手机端各个页面（内容管理、个人主页、各类弹窗等）的输入文字明显比
+   周围 14px 的界面文字大一截，到处显得"字号偏大、不协调"。
+   现统一改成与界面一致的 var(--text-sm)（14px），从根上解决"字号偏大"，
+   不再逐个页面打补丁。代价：iOS Safari 聚焦时可能轻微放大页面——
+   相比"全站输入框都偏大"，用户更希望字号统一，故采用此方案。 */
 @media (pointer: coarse) {
   input:not([type='checkbox']):not([type='radio']):not([type='range']):not([type='color']):not([type='file']),
   textarea,
   select {
-    font-size: 16px;
+    font-size: var(--text-sm);
   }
 }
 
