@@ -660,12 +660,15 @@
     display: flex;
     flex-direction: column;
   }
-  .featured__card-body { padding: var(--space-lg); gap: var(--space-sm); }
+  .featured__card-body { padding: var(--space-lg) var(--space-lg) var(--space-md); gap: var(--space-sm); }
   .featured__title { font-size: var(--text-base); min-height: auto; }
   .featured__excerpt { font-size: var(--text-sm); -webkit-line-clamp: 3; min-height: auto; }
+  /* 减少卡片底部日期下方的空白：去掉 meta 的额外最小高度与底部内边距 */
+  .featured__meta { min-height: 0; padding: 0.6rem 0 0; }
   .featured__meta-item { font-size: var(--text-sm); }
   .featured__read-more { font-size: var(--text-sm); }
-  .featured__more { margin-top: var(--space-md); }
+  /* 绿色"查看全部"按钮与上方白色卡片拉开一点距离 */
+  .featured__more { margin-top: var(--space-lg); }
   .featured.section:has(.featured__more) { padding-bottom: var(--space-md); }
   .section--compact { padding-top: var(--space-sm); }
   .stats__grid { grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); }
@@ -707,7 +710,7 @@
   .featured .section-title { margin-bottom: var(--space-md); }
   .featured .section-title::after { margin-top: 6px; }
   .featured__grid { grid-template-columns: 1fr; }
-  .featured__more { margin-top: var(--space-sm); }
+  .featured__more { margin-top: var(--space-md); }
   .featured.section:has(.featured__more) { padding-bottom: var(--space-lg); }
   .stats__grid { grid-template-columns: repeat(2, 1fr); gap: var(--space-sm); }
   .stats__item { padding: var(--space-md) var(--space-sm); }
