@@ -123,8 +123,9 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     }
     if (active !== editor && !editor.contains(active) && !selInEditor) { setPos(null); return; }
 
-    const block = getCurrentBlock(editor);
+    const block = getCurrentBlock(editor) || blockRef.current;
     if (!block) { setPos(null); return; }
+    if (!editor.contains(block)) { setPos(null); blockRef.current = null; return; }
     blockRef.current = block; // 仍记录所在块，供格式命令使用
 
     // 位置以「光标当前所在行」为准：跟随换行、滚动，并与该行垂直居中。
@@ -150,8 +151,11 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       });
     };
     document.addEventListener('selectionchange', onSel);
+    document.addEventListener('scroll', onScrollResize, true);
     window.addEventListener('scroll', onScrollResize, true);
     window.addEventListener('resize', onScrollResize);
+    window.visualViewport?.addEventListener('scroll', onScrollResize);
+    window.visualViewport?.addEventListener('resize', onScrollResize);
     const editor = editorRef?.current;
     if (editor) {
       editor.addEventListener('keyup', onSel);
@@ -162,8 +166,11 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     return () => {
       if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener('selectionchange', onSel);
+      document.removeEventListener('scroll', onScrollResize, true);
       window.removeEventListener('scroll', onScrollResize, true);
       window.removeEventListener('resize', onScrollResize);
+      window.visualViewport?.removeEventListener('scroll', onScrollResize);
+      window.visualViewport?.removeEventListener('resize', onScrollResize);
       if (editor) {
         editor.removeEventListener('keyup', onSel);
         editor.removeEventListener('mouseup', onSel);
