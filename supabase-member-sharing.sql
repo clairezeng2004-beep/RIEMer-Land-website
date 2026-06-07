@@ -36,6 +36,17 @@ CREATE TABLE IF NOT EXISTS member_sharing (
 ALTER TABLE member_sharing
   ADD COLUMN IF NOT EXISTS summary TEXT NOT NULL DEFAULT '';
 
+-- 多贡献者支持：发布者 ≠ 贡献者时允许多人作为贡献者（与 documents.contributor_ids 一致）。
+-- 前端发布/编辑时写入 contributor_ids（uuid 数组）；兼容旧数据：若此列缺失或为空，
+-- 前端回退到 [author_id]。下面的 DO 块负责加列并为历史数据回填。
+ALTER TABLE member_sharing
+  ADD COLUMN IF NOT EXISTS contributor_ids UUID[] NOT NULL DEFAULT ARRAY[]::UUID[];
+
+UPDATE member_sharing
+  SET contributor_ids = ARRAY[author_id]::UUID[]
+  WHERE author_id IS NOT NULL
+    AND (contributor_ids IS NULL OR array_length(contributor_ids, 1) IS NULL);
+
 -- 索引
 CREATE INDEX IF NOT EXISTS idx_member_sharing_created_at ON member_sharing(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_member_sharing_category ON member_sharing(category);

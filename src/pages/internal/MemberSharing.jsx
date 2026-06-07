@@ -414,6 +414,9 @@ export default function MemberSharing() {
   const canModify = (post) => {
     if (isAdmin) return true;
     if (post.authorId && post.authorId === user?.id) return true;
+    // 任一贡献者本人也可编辑/删除（与流程模板文件一致）
+    if (Array.isArray(post.contributorIds)
+      && post.contributorIds.map(String).includes(String(user?.id))) return true;
     return false;
   };
 

@@ -18,6 +18,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { initialTasks, documentsData, articlesData, teamMembers as defaultTeamMembers } from '../../data/siteData';
+import { getCachedSharings, fetchSharings } from '../../services/memberSharingService';
 import './MemberContributions.css';
 
 const CUSTOM_CONTRIBUTIONS_KEY = 'riemer_custom_contributions';
@@ -95,6 +96,17 @@ export default function MemberContributions() {
       syncTeamMembersFromDB(getAllUsers, supabaseOk).catch(() => {});
     }
   }, [isAuthenticated, getAllUsers, supabaseOk, syncTeamMembersFromDB]);
+
+  // 成员内部分享：先用本地缓存当首屏，再异步拉云端真实数据。
+  // 「内部分享」列会把这些分享帖按贡献者计入对应成员。
+  const [sharings, setSharings] = useState(() => getCachedSharings());
+  useEffect(() => {
+    let cancelled = false;
+    fetchSharings()
+      .then((list) => { if (!cancelled && Array.isArray(list)) setSharings(list); })
+      .catch(() => { /* ignore，保留本地缓存 */ });
+    return () => { cancelled = true; };
+  }, []);
 
   // ============================================================
   // 自定义贡献（"其他"栏位）—— 跨设备同步
@@ -214,9 +226,10 @@ export default function MemberContributions() {
           isInPeriod(t.createdAt, currentPeriod)
       ).length;
 
-      // 4. 内部分享次数：documents 中 contributorIds 包含该成员 id
-      //    或（旧数据兼容）uploadedById / uploadedBy 匹配
-      const uploadCount = documentsData.filter((d) => {
+      // 4. 内部分享次数：包含两部分，都按"贡献者"口径统计
+      //    (a) 流程模板文件 documents：contributorIds 包含该成员 id，或旧数据 uploadedById/uploadedBy 匹配
+      //    (b) 成员内部分享 member_sharing：contributorIds 包含该成员 id，或旧数据 authorId/author 匹配
+      const docUploadCount = documentsData.filter((d) => {
         if (!isInPeriod(d.date, currentPeriod)) return false;
         if (Array.isArray(d.contributorIds) && d.contributorIds.length > 0) {
           return d.contributorIds.includes(member.id);
@@ -226,6 +239,17 @@ export default function MemberContributions() {
           d.uploadedBy === member.name
         );
       }).length;
+      const sharingUploadCount = sharings.filter((s) => {
+        if (!isInPeriod(s.createdAt, currentPeriod)) return false;
+        if (Array.isArray(s.contributorIds) && s.contributorIds.length > 0) {
+          return s.contributorIds.map(String).includes(String(member.id));
+        }
+        return (
+          (s.authorId && String(s.authorId) === String(member.id)) ||
+          s.author === member.name
+        );
+      }).length;
+      const uploadCount = docUploadCount + sharingUploadCount;
 
       // 5. 其他贡献（自定义文本）
       const periodKey = selectedPeriod;
@@ -245,7 +269,7 @@ export default function MemberContributions() {
         total,
       };
     });
-  }, [members, allArticles, currentPeriod, selectedPeriod, customContributions]);
+  }, [members, allArticles, sharings, currentPeriod, selectedPeriod, customContributions]);
 
   // 按总贡献排序
   const sortedStats = useMemo(
@@ -594,7 +618,7 @@ export default function MemberContributions() {
               as="span"
             /></li>
             <li><strong>{cc.labelUploadCount || '资料上传'}</strong>：<EditableText
-              value={cc.noteUploadCount || '统计文档管理中该成员上传的文档数量'}
+              value={cc.noteUploadCount || '统计流程模板文件与成员内部分享中，该成员作为贡献者的数量（按贡献者计，可多选）'}
               onChange={(v) => updateContribs('noteUploadCount', v)}
               configKey="contributions.noteUploadCount"
               as="span"

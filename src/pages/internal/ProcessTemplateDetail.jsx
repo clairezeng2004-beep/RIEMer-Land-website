@@ -30,6 +30,7 @@ import {
   ChevronDown,
   ChevronUp,
   RotateCcw,
+  Loader2,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
@@ -63,6 +64,7 @@ import useTocScroll from '../../hooks/useTocScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
+import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -127,6 +129,30 @@ function downloadFile({ dataUrl, url, name }) {
 function cleanWordHtml(html) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   parsed.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
+
+  parsed.querySelectorAll('[style]').forEach((el) => {
+    const tag = el.tagName.toLowerCase();
+    if (['strong', 'b', 'em', 'i'].includes(tag) || /^h[1-6]$/.test(tag)) return;
+    const fw = (el.style.fontWeight || '').toLowerCase();
+    const isBold = fw === 'bold' || fw === 'bolder' || (/^\d+$/.test(fw) && parseInt(fw, 10) >= 600);
+    const isItalic = (el.style.fontStyle || '').toLowerCase() === 'italic';
+    if (!isBold && !isItalic) return;
+    const frag = parsed.createDocumentFragment();
+    while (el.firstChild) frag.appendChild(el.firstChild);
+    let wrapper = frag;
+    if (isItalic) {
+      const em = parsed.createElement('em');
+      em.appendChild(wrapper);
+      wrapper = em;
+    }
+    if (isBold) {
+      const strong = parsed.createElement('strong');
+      strong.appendChild(wrapper);
+      wrapper = strong;
+    }
+    el.appendChild(wrapper);
+  });
+
   parsed.querySelectorAll('*').forEach((el) => {
     const attrs = [...el.attributes];
     const tag = el.tagName.toLowerCase();
@@ -418,6 +444,42 @@ function isUserDoc(doc) {
   return String(doc?.id || '').startsWith('doc-');
 }
 
+function DetailLoadingState({ onBack }) {
+  return (
+    <div className="ptd-page">
+      <div className="ptd-topbar">
+        <button className="ptd-topbar__back" onClick={onBack}>
+          <ChevronLeft size={20} /> 返回列表
+        </button>
+      </div>
+      <div className="ptd-content">
+        <div className="ptd-loading" aria-label="文档加载中" aria-busy="true">
+          <div className="ptd-loading__status">
+            <Loader2 size={18} className="ptd-loading__spinner" />
+            <span>正在加载文档内容…</span>
+          </div>
+          <p>刷新后需要重新确认登录状态、同步云端文档，并恢复目录、评论和编辑历史。</p>
+          <div className="ptd-loading__layout" aria-hidden="true">
+            <aside className="ptd-loading__toc">
+              {Array.from({ length: 5 }).map((_, index) => (
+                <span key={index} className="ptd-loading__line ptd-loading__shimmer" />
+              ))}
+            </aside>
+            <article className="ptd-loading__article">
+              <span className="ptd-loading__badge ptd-loading__shimmer" />
+              <span className="ptd-loading__title ptd-loading__shimmer" />
+              <span className="ptd-loading__meta ptd-loading__shimmer" />
+              {Array.from({ length: 8 }).map((_, index) => (
+                <span key={index} className="ptd-loading__line ptd-loading__shimmer" />
+              ))}
+            </article>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /* ========== 主组件 ========== */
 export default function ProcessTemplateDetail() {
   const { isAuthenticated, user, isAdmin, getAllUsers } = useAuth();
@@ -518,22 +580,30 @@ export default function ProcessTemplateDetail() {
   // - cloudData 存放云端返回的快照（包含用户文档 + 已删除默认 id）
   const [docsVersion, setDocsVersion] = useState(0);
   const [cloudData, setCloudData] = useState(null); // { userDocs, deletedIds } | null
+  const [cloudLoading, setCloudLoading] = useState(() => canUseSupabase());
 
   // 挂载时从云端拉一次 + 浏览计数
   useEffect(() => {
-    if (!canUseSupabase()) return;
+    if (!canUseSupabase()) {
+      setCloudLoading(false);
+      return;
+    }
     let cancelled = false;
     (async () => {
-      const cloud = await fetchAllFromCloud();
-      if (cancelled || !cloud) return;
-      // 云端 documents 表可能包含两类记录：
-      // - 用户发布的新文档（id 以 doc- 开头）
-      // - 内置示例被管理员编辑后写入的"覆盖层"（id 与 siteData.documentsData 中一致，如 '1'、'5'）
-      // 两类都需要进入本地渲染集合。
-      const userDocs = cloud.docs;
-      setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
-      // 浏览计数合并
-      await fetchViewsFromCloud();
+      try {
+        const cloud = await fetchAllFromCloud();
+        if (cancelled || !cloud) return;
+        // 云端 documents 表可能包含两类记录：
+        // - 用户发布的新文档（id 以 doc- 开头）
+        // - 内置示例被管理员编辑后写入的"覆盖层"（id 与 siteData.documentsData 中一致，如 '1'、'5'）
+        // 两类都需要进入本地渲染集合。
+        const userDocs = cloud.docs;
+        setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
+        // 浏览计数合并
+        await fetchViewsFromCloud();
+      } finally {
+        if (!cancelled) setCloudLoading(false);
+      }
     })();
     return () => { cancelled = true; };
   }, []);
@@ -904,6 +974,7 @@ export default function ProcessTemplateDetail() {
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editContent, setEditContent] = useState('');
+  const [editFormat, setEditFormat] = useState('word');
   const [saving, setSaving] = useState(false);
   // 保存结果的轻提示：'saved' | 'cloud-failed' | null
   // 'saved'：本地已保存、云端同步已发起/完成
@@ -926,18 +997,18 @@ export default function ProcessTemplateDetail() {
   /* 编辑态文本框：高度随内容自动增长，不再限制高度。 */
   const ptdWordEditorRef = useRef(null);
   const ptdWordImageApiRef = useRef(null);
-  useAutoResizeTextarea(mdSyncEditorRef, editContent, { minHeight: 480 });
+  useAutoResizeTextarea(mdSyncEditorRef, editContent, { minHeight: 360 });
 
   useEffect(() => {
-    if (!isEditing || doc?.format !== 'word' || !ptdWordEditorRef.current) return;
+    if (!isEditing || editFormat !== 'word' || !ptdWordEditorRef.current) return;
     const editor = ptdWordEditorRef.current;
     if (editor.innerHTML !== editContent) {
       editor.innerHTML = editContent || '';
     }
-  }, [isEditing, doc?.id, doc?.format]);
+  }, [isEditing, doc?.id, editFormat]);
 
   useEffect(() => {
-    if (!isEditing || doc?.format !== 'word') {
+    if (!isEditing || editFormat !== 'word') {
       ptdWordImageApiRef.current?.destroy?.();
       ptdWordImageApiRef.current = null;
       return undefined;
@@ -959,7 +1030,7 @@ export default function ProcessTemplateDetail() {
       api.destroy();
       ptdWordImageApiRef.current = null;
     };
-  }, [isEditing, doc?.format]);
+  }, [isEditing, editFormat]);
 
   /* ========== 编辑草稿自动保存 ========== */
   const editDraftKey = doc?.id && user?.id
@@ -1006,8 +1077,21 @@ export default function ProcessTemplateDetail() {
     setEditTitle(originalTitle);
     setEditDescription(originalDescription);
     setEditContent(originalContent);
+    setEditFormat(doc.format || 'word');
     setIsEditing(true);
   }, [doc, editDraft]);
+
+  const handleEditFormatChange = useCallback((format) => {
+    setEditFormat((prevFormat) => {
+      if (prevFormat === format) return prevFormat;
+      setEditContent((prevContent) => (
+        format === 'markdown'
+          ? htmlToMarkdown(prevContent)
+          : stripUnderline(markdownToHtml(prevContent))
+      ));
+      return format;
+    });
+  }, []);
 
   const cancelEdit = useCallback(() => {
     setIsEditing(false);
@@ -1024,14 +1108,14 @@ export default function ProcessTemplateDetail() {
       if (typeof v.editDescription === 'string') setEditDescription(v.editDescription);
       if (typeof v.editContent === 'string') {
         setEditContent(v.editContent);
-        if (ptdWordEditorRef.current && doc?.format === 'word') {
+        if (ptdWordEditorRef.current && editFormat === 'word') {
           ptdWordEditorRef.current.innerHTML = v.editContent;
         }
       }
     }
     setShowEditDraftPrompt(false);
     setPendingDraft(null);
-  }, [pendingDraft, doc?.format]);
+  }, [pendingDraft, editFormat]);
 
   const handleWordPaste = useCallback((e) => {
     const items = e.clipboardData?.items;
@@ -1106,10 +1190,10 @@ export default function ProcessTemplateDetail() {
 
   /* Markdown 编辑态的实时预览（仅当 doc.format === 'markdown' 时使用） */
   const editMarkdownPreview = useMemo(() => {
-    if (!doc || doc.format !== 'markdown') return '';
+    if (!doc || editFormat !== 'markdown') return '';
     if (!editContent || !editContent.trim()) return '';
     return stripUnderline(marked.parse(stripUnderline(editContent), { breaks: true, gfm: true }));
-  }, [editContent, doc?.format, doc]);
+  }, [editContent, editFormat, doc]);
 
   /* ========== 目录（TOC） ==========
    * 下沉到 useTocScroll 公共 hook。这里支持两种场景：
@@ -1131,7 +1215,7 @@ export default function ProcessTemplateDetail() {
     // 编辑 Markdown 态使用实时预览 HTML 作为重扫描触发；
     // 阅读态使用 renderedContent。其它情况传空串避免无意义扫描。
     renderedContent:
-      isEditing && doc?.format === 'markdown' ? editMarkdownPreview : renderedContent,
+      isEditing && editFormat === 'markdown' ? editMarkdownPreview : renderedContent,
     headingSelector: 'h1, h2, h3, h4',
     anchorClassName: 'ptd-heading-anchor',
     // navbar(72) + 详情页 fixed topbar(~60) + 视觉缓冲(~12)。
@@ -1192,6 +1276,7 @@ export default function ProcessTemplateDetail() {
         title,
         description: editDescription,
         content: cleanContent,
+        format: editFormat,
       });
 
       const updated = {
@@ -1199,6 +1284,7 @@ export default function ProcessTemplateDetail() {
         title,
         description: editDescription,
         content: cleanContent,
+        format: editFormat,
         lastEditedAt: nowDate,
         lastEditedBy: editor,
       };
@@ -1245,6 +1331,7 @@ export default function ProcessTemplateDetail() {
               title,
               description: editDescription,
               content: cleanContent,
+              format: editFormat,
               lastEditedAt: nowDate,
               lastEditedBy: editor,
             });
@@ -1265,7 +1352,7 @@ export default function ProcessTemplateDetail() {
                 const nextUserDocs = existsInCloud
                   ? prev.userDocs.map((d) =>
                       String(d.id) === String(doc.id)
-                        ? { ...d, title, description: editDescription, content: cleanContent, lastEditedAt: nowDate, lastEditedBy: editor }
+                        ? { ...d, title, description: editDescription, content: cleanContent, format: editFormat, lastEditedAt: nowDate, lastEditedBy: editor }
                         : d
                     )
                   : [updated, ...prev.userDocs]; // 首次覆盖，追加到云端快照
@@ -1286,7 +1373,7 @@ export default function ProcessTemplateDetail() {
       alert('保存失败，请重试');
       setSaving(false);
     }
-  }, [doc, editTitle, editDescription, editContent, user, editDraft]);
+  }, [doc, editTitle, editDescription, editContent, editFormat, user, editDraft]);
 
   /* ========== 上一篇 / 下一篇 ==========
    * - 列表序来自 allDocs（与 Documents.jsx 的"用户发布在前"一致）；
@@ -1307,6 +1394,10 @@ export default function ProcessTemplateDetail() {
   });
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+
+  if (!doc && cloudLoading) {
+    return <DetailLoadingState onBack={() => navigate('/internal/process-templates')} />;
+  }
 
   if (!doc) {
     return (
@@ -1351,7 +1442,7 @@ export default function ProcessTemplateDetail() {
     (doc.format === 'markdown' || doc.format === 'word') &&
     // 编辑 Word 态是纯 textarea、没有可跳的 DOM，不给目录；
     // 编辑 Markdown 态有实时预览，目录基于预览 DOM 工作。
-    (!isEditing || doc.format === 'markdown');
+    (!isEditing || editFormat === 'markdown');
 
   /* ========== 编辑权限 ==========
      允许编辑的情况：
@@ -1477,27 +1568,36 @@ export default function ProcessTemplateDetail() {
               </span>
 
               {isEditing ? (
-                <input
-                  type="text"
-                  className="ptd-edit__title-input"
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  placeholder="文档标题"
-                  maxLength={120}
-                />
+                <div className="msc-form__field">
+                  <label>文档标题</label>
+                  <input
+                    type="text"
+                    className="msc-form__input"
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    placeholder="请输入文档标题"
+                    maxLength={120}
+                  />
+                </div>
               ) : (
                 <h1 className="ptd-article__title">{doc.title}</h1>
               )}
 
               {isEditing ? (
-                <textarea
-                  className="ptd-edit__desc-input"
-                  value={editDescription}
-                  onChange={(e) => setEditDescription(e.target.value)}
-                  placeholder="简介（可选，支持多行）"
-                  rows={2}
-                  maxLength={300}
-                />
+                <div className="msc-form__field">
+                  <label>
+                    简介
+                    <span className="msc-form__hint">选填，简要说明文档用途，会显示在列表卡片上</span>
+                  </label>
+                  <input
+                    type="text"
+                    className="msc-form__input"
+                    value={editDescription}
+                    onChange={(e) => setEditDescription(e.target.value)}
+                    placeholder="一句话描述文档用途"
+                    maxLength={300}
+                  />
+                </div>
               ) : (
                 doc.description && (
                   <p className="ptd-article__desc">{doc.description}</p>
@@ -1529,8 +1629,38 @@ export default function ProcessTemplateDetail() {
             {/* 正文（Markdown / Word-HTML）—— 编辑模式下显示 textarea；非编辑态按原渲染 */}
             {isEditing ? (
               hasTextContent || doc.format === 'markdown' || doc.format === 'word' ? (
-                <div className="ptd-edit__content">
-                  {doc.format === 'markdown' ? (
+                <div className="msc-form ptd-edit__content">
+                  <div className="msc-form__field">
+                    <label>内容格式</label>
+                    <div className="msc-form__format-toggle">
+                      <button
+                        type="button"
+                        className={`msc-form__format-btn ${editFormat === 'word' ? 'msc-form__format-btn--active' : ''}`}
+                        onClick={() => handleEditFormatChange('word')}
+                      >
+                        <FileText size={14} /> Word (HTML)
+                      </button>
+                      <button
+                        type="button"
+                        className={`msc-form__format-btn ${editFormat === 'markdown' ? 'msc-form__format-btn--active' : ''}`}
+                        onClick={() => handleEditFormatChange('markdown')}
+                      >
+                        <Code2 size={14} /> Markdown
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="msc-form__field msc-form__field--editor">
+                    <label>
+                      正文内容
+                      <span className="msc-form__hint">
+                        {editFormat === 'markdown'
+                          ? '支持 Markdown 语法：# 标题、**加粗**、- 列表、```代码块```'
+                          : '支持从 Word/网页直接粘贴，自动保留段落和标题层级'}
+                      </span>
+                    </label>
+                  {editFormat === 'markdown' ? (
+                    <>
                     <div className="msc-md-split ptd-edit__md-split">
                       <div className="msc-md-split__pane">
                         <div className="msc-md-split__label">
@@ -1543,8 +1673,14 @@ export default function ProcessTemplateDetail() {
                           value={editContent}
                           onChange={(e) => setEditContent(e.target.value)}
                           onScroll={handleMdEditorScroll}
-                          placeholder={'# 文档标题\n\n## 一、xxx\n\n正文内容…'}
+                          placeholder={'# 文档标题\n\n## 适用范围\n\n说明文档用途...\n\n## 操作步骤\n\n1. 第一步\n2. 第二步'}
                           spellCheck={false}
+                        />
+                        <FloatingTextToolbar
+                          mode="markdown"
+                          editorRef={mdSyncEditorRef}
+                          value={editContent}
+                          onChange={(nextValue) => setEditContent(nextValue)}
                         />
                       </div>
                       <div className="msc-md-split__pane">
@@ -1570,6 +1706,8 @@ export default function ProcessTemplateDetail() {
                         />
                       </div>
                     </div>
+                    <EditorToc editorRef={mdSyncPreviewRef} content={editMarkdownPreview} defaultOpen={false} />
+                    </>
                   ) : (
                     <div className="msc-form__word-editor-wrapper ptd-edit__word-editor-wrapper">
                       <WordEditorToolbar
@@ -1588,7 +1726,7 @@ export default function ProcessTemplateDetail() {
                             setEditContent(stripUnderline(ptdWordEditorRef.current.innerHTML));
                           }
                         }}
-                        data-placeholder="正文内容…"
+                        data-placeholder="从 Word / 网页复制内容后，直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
                         suppressContentEditableWarning
                       />
                       <FloatingTextToolbar
@@ -1602,6 +1740,7 @@ export default function ProcessTemplateDetail() {
                       <EditorToc editorRef={ptdWordEditorRef} content={editContent} />
                     </div>
                   )}
+                  </div>
                 </div>
               ) : (
                 <div className="ptd-edit__content-empty">

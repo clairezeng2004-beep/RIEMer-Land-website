@@ -128,6 +128,29 @@ export default function MemberSharingDetail() {
     [userNameMap, user],
   );
 
+  // 多贡献者展示：优先读 post.contributorIds，缺省回退到旧的单作者字段（与流程模板文件一致）
+  const resolveContributorName = useCallback(
+    (uid, fallback) => {
+      if (uid && userNameMap[uid]) return userNameMap[uid];
+      if (uid && user?.id === uid && (user.name || user.nickname)) {
+        return user.name || user.nickname;
+      }
+      return fallback || 'Unknown';
+    },
+    [userNameMap, user],
+  );
+  const resolveContributors = useCallback(
+    (p) => {
+      const ids = Array.isArray(p?.contributorIds) ? p.contributorIds : [];
+      if (ids.length > 0) {
+        return ids.map((uid) => resolveContributorName(uid, null)).filter(Boolean).join('、')
+          || (p?.author || 'Unknown');
+      }
+      return resolveContributorName(p?.authorId, p?.author);
+    },
+    [resolveContributorName],
+  );
+
   const resolveLikeUserName = useCallback(
     (like) => {
       const uid = like?.userId;
@@ -382,7 +405,7 @@ export default function MemberSharingDetail() {
               )}
 
               <div className="msd-article__meta">
-                <span><User size={14} /> {post.author}</span>
+                <span><User size={14} /> {resolveContributors(post)}</span>
                 <span><Clock size={14} /> {post.createdAt}</span>
                 <button
                   type="button"

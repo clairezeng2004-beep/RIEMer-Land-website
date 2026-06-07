@@ -76,6 +76,41 @@
   gap: var(--space-sm, 8px);
 }
 
+/* 编辑模式加载遮罩 */
+.msc-loading-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 200; /* 盖住编辑区，低于全站弹层 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  background: var(--color-bg, #f9fafb);
+  color: var(--color-text-light, #6b7280);
+}
+
+.msc-loading-overlay__spinner {
+  color: var(--color-primary, #5B8C3E);
+  animation: mscSpin 0.9s linear infinite;
+}
+
+@keyframes mscSpin {
+  to { transform: rotate(360deg); }
+}
+
+.msc-loading-overlay__text {
+  margin: 0.25rem 0 0;
+  font-size: var(--text-md, 16px);
+  color: var(--color-text, #374151);
+}
+
+.msc-loading-overlay__hint {
+  margin: 0;
+  font-size: var(--text-xs, 12px);
+  color: var(--color-text-muted, #9ca3af);
+}
+
 /* 云端自动保存状态提示 */
 .msc-topbar__save-state {
   font-size: var(--text-xs, 12px);

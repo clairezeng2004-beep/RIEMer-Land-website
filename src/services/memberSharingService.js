@@ -39,6 +39,12 @@ function dbToFrontend(row) {
     attachments,
     author: row.author || 'Unknown',
     authorId: row.author_id || null,
+    /* 多贡献者支持：若云端列缺失（旧表结构），回退到 [author_id] */
+    contributorIds: Array.isArray(row.contributor_ids)
+      ? row.contributor_ids
+      : row.author_id
+        ? [row.author_id]
+        : [],
     createdAt: row.created_at || new Date().toISOString().split('T')[0],
     likes: Array.isArray(row.likes) ? row.likes : [],
     _fromDb: true,
@@ -58,6 +64,11 @@ function frontendToDbInsert(post) {
     attachments: normaliseAttachmentsForDb(post.attachments),
     author: post.author || 'Unknown',
     author_id: post.authorId || null,
+    /* 多贡献者：若表未添加该列，后端会报错，此时前端走降级（剥掉该列重试，仅本地保留）。
+       升级 SQL 见 supabase-member-sharing.sql。 */
+    contributor_ids: Array.isArray(post.contributorIds) && post.contributorIds.length > 0
+      ? post.contributorIds
+      : post.authorId ? [post.authorId] : [],
     likes: Array.isArray(post.likes) ? post.likes : [],
     created_at: post.createdAt || new Date().toISOString().split('T')[0],
   };
@@ -77,6 +88,9 @@ function frontendToDbUpdate(updates) {
   }
   if (updates.author !== undefined) u.author = updates.author;
   if (updates.authorId !== undefined) u.author_id = updates.authorId;
+  if (updates.contributorIds !== undefined) {
+    u.contributor_ids = Array.isArray(updates.contributorIds) ? updates.contributorIds : [];
+  }
   if (updates.likes !== undefined) u.likes = Array.isArray(updates.likes) ? updates.likes : [];
   u.updated_at = new Date().toISOString();
   return u;
@@ -89,6 +103,16 @@ function stripSummaryField(row) {
 
 function isMissingSummaryColumnError(error) {
   return /summary/i.test(error?.message || '') && /column|schema|cache/i.test(error?.message || '');
+}
+
+function stripContributorIdsField(row) {
+  const { contributor_ids, ...rest } = row;
+  return rest;
+}
+
+function isMissingContributorColumnError(error) {
+  return /contributor_ids/i.test(error?.message || '')
+    && /column|schema|cache/i.test(error?.message || '');
 }
 
 function getFileExt(name = '') {
@@ -293,11 +317,16 @@ async function syncSharingToCloud(post) {
       MEMBER_SHARING_CLOUD_TIMEOUT_MS,
       '成员分享云端保存',
     );
-    if (error && isMissingSummaryColumnError(error)) {
+    if (error && (isMissingSummaryColumnError(error) || isMissingContributorColumnError(error))) {
+      // 旧表结构可能缺 summary 或 contributor_ids 列：剥掉缺失列后重试，
+      // 保证云端至少能存下主体内容（缺失列仅本地保留，跑完迁移即恢复）。
+      let retryRow = row;
+      if (isMissingSummaryColumnError(error)) retryRow = stripSummaryField(retryRow);
+      if (isMissingContributorColumnError(error)) retryRow = stripContributorIdsField(retryRow);
       const retry = await withTimeout(
         supabase
           .from('member_sharing')
-          .insert(stripSummaryField(row))
+          .insert(retryRow)
           .select()
           .single(),
         MEMBER_SHARING_CLOUD_TIMEOUT_MS,
@@ -368,10 +397,13 @@ export async function updateSharing(id, updates) {
       .from('member_sharing')
       .update(dbUpdates)
       .eq('id', String(id));
-    if (error && isMissingSummaryColumnError(error)) {
+    if (error && (isMissingSummaryColumnError(error) || isMissingContributorColumnError(error))) {
+      let retryUpdates = dbUpdates;
+      if (isMissingSummaryColumnError(error)) retryUpdates = stripSummaryField(retryUpdates);
+      if (isMissingContributorColumnError(error)) retryUpdates = stripContributorIdsField(retryUpdates);
       const retry = await supabase
         .from('member_sharing')
-        .update(stripSummaryField(dbUpdates))
+        .update(retryUpdates)
         .eq('id', String(id));
       error = retry.error;
     }

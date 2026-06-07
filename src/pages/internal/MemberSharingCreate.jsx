@@ -22,6 +22,7 @@ import {
   Image,
   FileSpreadsheet,
   FileArchive,
+  Loader2,
 } from 'lucide-react';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
@@ -39,6 +40,7 @@ import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
+import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import {
   addSharing,
   updateSharing,
@@ -453,7 +455,7 @@ function AttachmentUploader({ attachments, onChange }) {
 
 /* ====== 主组件 ====== */
 export default function MemberSharingCreate() {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
@@ -516,6 +518,40 @@ export default function MemberSharingCreate() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
 
+  /* ============ 贡献者多选 ============
+     和流程模板文件一致：支持「分享迁移」——发布者本人不一定是贡献者，可多选。
+     新建时默认选中当前用户本人；编辑时载入已有 contributorIds（缺省回退 [authorId]）。 */
+  const [contributorIds, setContributorIds] = useState(() => (user?.id ? [user.id] : []));
+  // 用户 async 登录完成后若仍为空则补一次（仅新建场景，编辑场景由载入逻辑覆盖）
+  useEffect(() => {
+    if (!isEditingPost && user?.id && contributorIds.length === 0) {
+      setContributorIds([user.id]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+  // 贡献者可选列表：走模块级 30s 缓存，和详情页 / 评论区共用同一份 profiles 查询。
+  const [allUsers, setAllUsers] = useState([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const list = (await getCachedAllUsers(getAllUsers)) || [];
+        if (!cancelled) setAllUsers(list);
+      } catch { /* ignore */ }
+    })();
+    return () => { cancelled = true; };
+  }, [getAllUsers]);
+
+  const userNameMap = useMemo(() => {
+    const map = {};
+    allUsers.forEach((u) => {
+      if (u?.id) map[u.id] = u.name || u.nickname || '';
+    });
+    return map;
+  }, [allUsers]);
+  // 编辑模式刷新后需从云端拉取这篇内容，期间显示"加载中"避免空屏让人以为内容丢了
+  const [editLoading, setEditLoading] = useState(isEditingPost);
+
   // 云端自动保存：savedIdRef 记录云端记录 id（首次自动/手动保存后填上，避免重复插入）；
   // cloudSaveState 用于顶栏展示"保存中…/已保存到云端/保存失败"。
   const savedIdRef = useRef(null);
@@ -534,13 +570,20 @@ export default function MemberSharingCreate() {
           navigate('/internal/member-sharing', { replace: true });
           return;
         }
-        const canEdit = isAdmin || (post.authorId && String(post.authorId) === String(user?.id));
+        // 编辑权限：管理员 / 原作者 / 任一贡献者本人（与流程模板文件一致）
+        const editContributorIds = Array.isArray(post.contributorIds) && post.contributorIds.length > 0
+          ? post.contributorIds
+          : post.authorId ? [post.authorId] : [];
+        const canEdit = isAdmin
+          || (post.authorId && String(post.authorId) === String(user?.id))
+          || editContributorIds.map(String).includes(String(user?.id));
         if (!canEdit) {
           alert('你没有权限编辑这篇分享');
           navigate('/internal/member-sharing', { replace: true });
           return;
         }
         setEditingSource(post);
+        setContributorIds(editContributorIds);
         setNewPost({
           title: post.title || '',
           summary: post.summary || '',
@@ -555,6 +598,9 @@ export default function MemberSharingCreate() {
         if (cancelled) return;
         alert('加载分享内容失败，请稍后再试');
         navigate('/internal/member-sharing', { replace: true });
+      })
+      .finally(() => {
+        if (!cancelled) setEditLoading(false);
       });
     return () => {
       cancelled = true;
@@ -816,6 +862,18 @@ export default function MemberSharingCreate() {
       id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl,
     }));
 
+    // 贡献者：主贡献者 = contributorIds[0]（默认当前用户）。
+    // author/authorId 跟随主贡献者，保持「作者」展示与权限判断一致；
+    // contributorIds 完整保存，详情页会展示全部贡献者。
+    const finalContributorIds = contributorIds.length > 0
+      ? contributorIds
+      : user?.id ? [user.id] : [];
+    const primaryId = finalContributorIds[0] || editingSource?.authorId || user?.id || null;
+    const primaryName = (primaryId && userNameMap[primaryId])
+      || (primaryId && primaryId === user?.id ? (user?.name || user?.nickname) : null)
+      || editingSource?.author
+      || user?.name || user?.nickname || 'Unknown';
+
     return {
       id: savedIdRef.current || editingSource?.id || `sharing-${Date.now()}`,
       title: newPost.title.trim(),
@@ -825,8 +883,9 @@ export default function MemberSharingCreate() {
       content: normalizedContent,
       period: periodStr || null,
       attachments: attachments.length > 0 ? attachments : null,
-      author: editingSource?.author || user?.name || user?.nickname || 'Unknown',
-      authorId: editingSource?.authorId || user?.id || null,
+      author: primaryName,
+      authorId: primaryId,
+      contributorIds: finalContributorIds,
       createdAt: editingSource?.createdAt || new Date().toISOString().split('T')[0],
       likes: editingSource?.likes || [],
     };
@@ -843,6 +902,7 @@ export default function MemberSharingCreate() {
     const fields = {
       title: post.title, summary: post.summary, category: post.category,
       format: post.format, content: post.content, period: post.period, attachments: post.attachments,
+      author: post.author, authorId: post.authorId, contributorIds: post.contributorIds,
     };
     const onOk = () => { setCloudSaveState('saved'); setLastCloudSaveAt(new Date()); };
     const onErr = (err) => { console.warn('[MemberSharingCreate] 云端保存失败:', err?.message || err); setCloudSaveState('error'); };
@@ -873,6 +933,7 @@ export default function MemberSharingCreate() {
         updateSharing(existingId, {
           title: post.title, summary: post.summary, category: post.category,
           format: post.format, content: post.content, period: post.period, attachments: post.attachments,
+          author: post.author, authorId: post.authorId, contributorIds: post.contributorIds,
         }).catch((err) => console.warn('[MemberSharingCreate] 云端更新失败（已写本地）:', err?.message || err));
       } else {
         addSharing(post).catch((err) => console.warn('[MemberSharingCreate] 云端发布失败（已写本地）:', err?.message || err));
@@ -894,6 +955,14 @@ export default function MemberSharingCreate() {
 
   return (
     <div className="msc-page">
+      {/* 编辑模式刷新后，云端内容拉取期间显示加载遮罩，避免空屏被误以为内容丢失 */}
+      {editLoading && (
+        <div className="msc-loading-overlay">
+          <Loader2 size={30} className="msc-loading-overlay__spinner" />
+          <p className="msc-loading-overlay__text">正在加载分享内容…</p>
+          <p className="msc-loading-overlay__hint">首次打开或弱网时会稍慢，请稍候</p>
+        </div>
+      )}
       {/* 顶部导航栏 */}
       <div className="msc-topbar">
         <button className="msc-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
@@ -949,6 +1018,39 @@ export default function MemberSharingCreate() {
                   onAddCategory={handleAddCategory}
                 />
               </div>
+            </div>
+
+            {/* 贡献者（可多选）——支持分享迁移场景：发布者 ≠ 贡献者 */}
+            <div className="msc-form__field">
+              <label>
+                贡献者
+                <span className="msc-form__hint">可多选，默认为本人；列表第一位作为主贡献者</span>
+              </label>
+              <CustomSelect
+                multiple
+                searchable
+                searchPlaceholder="搜索成员（支持中文/拼音/首字母）"
+                value={contributorIds}
+                onChange={(vals) => setContributorIds(vals)}
+                placeholder="请选择贡献者"
+                options={(() => {
+                  // 候选项 = 所有注册成员 ∪ 当前用户本人（兜底）。不按 authorized 过滤，
+                  // 与流程模板文件保持一致（登录权限由 UserManagement 负责，两者解耦）。
+                  const seen = new Set();
+                  const opts = [];
+                  const pushUser = (u) => {
+                    if (!u?.id || seen.has(u.id)) return;
+                    seen.add(u.id);
+                    opts.push({
+                      value: u.id,
+                      label: u.name || u.nickname || u.email || u.id,
+                    });
+                  };
+                  if (user) pushUser(user);
+                  allUsers.forEach(pushUser);
+                  return opts;
+                })()}
+              />
             </div>
 
             <div className="msc-form__field">
