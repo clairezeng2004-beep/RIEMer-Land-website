@@ -328,7 +328,6 @@ function AttachmentUploader({ attachments, onChange }) {
   const fileInputRef = useRef(null);
   const dragCounterRef = useRef(0);
 
-  const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB（localStorage 限制）
   const MAX_FILES = 10;
 
   const handleFiles = useCallback(async (files) => {
@@ -337,10 +336,6 @@ function AttachmentUploader({ attachments, onChange }) {
       if (attachments.length + newFiles.length >= MAX_FILES) {
         alert(`最多只能上传 ${MAX_FILES} 个附件`);
         break;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        alert(`文件 "${file.name}" 超过 5MB 限制，已跳过`);
-        continue;
       }
       try {
         const dataUrl = await fileToDataUrl(file);
@@ -425,7 +420,7 @@ function AttachmentUploader({ attachments, onChange }) {
             <span className="msc-attach__dropzone-link">点击浏览</span>
           </span>
           <span className="msc-attach__dropzone-hint">
-            支持任意文件格式，单文件最大 5MB，最多 {MAX_FILES} 个附件
+            支持任意文件格式，最多 {MAX_FILES} 个附件
           </span>
         </div>
       </div>
@@ -1146,17 +1141,12 @@ export default function MemberSharingCreate() {
                     const files = Array.from(e.target.files);
                     if (files.length > 0) {
                       const processFiles = async () => {
-                        const MAX_FILE_SIZE = 5 * 1024 * 1024;
                         const MAX_FILES = 10;
                         const newFiles = [];
                         for (const file of files) {
                           if (newPost.attachments.length + newFiles.length >= MAX_FILES) {
                             alert(`最多只能上传 ${MAX_FILES} 个附件`);
                             break;
-                          }
-                          if (file.size > MAX_FILE_SIZE) {
-                            alert(`文件 "${file.name}" 超过 5MB 限制，已跳过`);
-                            continue;
                           }
                           try {
                             const dataUrl = await fileToDataUrl(file);

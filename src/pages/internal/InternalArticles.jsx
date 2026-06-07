@@ -63,8 +63,6 @@ function saveArticleCategories(data) {
 
 // ---- 封面图片上传 ----
 // 封面直接存 base64 Data URL，随文章的 coverImage/cover_image 字段一起保存。
-// 限制 2MB，避免单条记录过大撑爆 localStorage / 云端字段。
-const COVER_MAX_SIZE = 2 * 1024 * 1024;
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -80,10 +78,6 @@ async function readCoverImage(file) {
   if (!file) return null;
   if (!file.type || !file.type.startsWith('image/')) {
     alert('请选择图片文件（jpg / png / webp 等）');
-    return null;
-  }
-  if (file.size > COVER_MAX_SIZE) {
-    alert('封面图片需小于 2MB，请压缩后再上传');
     return null;
   }
   try {
@@ -2019,7 +2013,7 @@ export default function InternalArticles() {
                         />
                         <ImagePlus size={22} />
                         <span>点击上传封面图片</span>
-                        <span className="ia-cover-uploader__hint">支持 jpg / png / webp，小于 2MB</span>
+                        <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
                       </label>
                     )}
                   </div>
@@ -2287,7 +2281,7 @@ export default function InternalArticles() {
                       />
                       <ImagePlus size={22} />
                       <span>点击上传封面图片</span>
-                      <span className="ia-cover-uploader__hint">支持 jpg / png / webp，小于 2MB</span>
+                      <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
                     </label>
                   )}
                 </div>

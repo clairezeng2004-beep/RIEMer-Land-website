@@ -196,7 +196,6 @@ export default function ProcessTemplateCreate() {
   const fileInputRef = useRef(null);
   const dragCounterRef = useRef(0);
 
-  const MAX_FILE_SIZE = 5 * 1024 * 1024;
   const MAX_FILES = 10;
 
   /* ============ 草稿自动保存 ============ */
@@ -256,10 +255,6 @@ export default function ProcessTemplateCreate() {
       if (newDoc.attachments.length + newFiles.length >= MAX_FILES) {
         alert(`最多只能上传 ${MAX_FILES} 个附件`);
         break;
-      }
-      if (file.size > MAX_FILE_SIZE) {
-        alert(`文件 "${file.name}" 超过 5MB 限制，已跳过`);
-        continue;
       }
       try {
         const dataUrl = await fileToDataUrl(file);
@@ -772,7 +767,7 @@ export default function ProcessTemplateCreate() {
               <label>
                 <Upload size={14} /> 附件拖拽上传
                 <span className="msc-form__hint">
-                  支持任意格式，单文件 ≤ 5MB，最多 {MAX_FILES} 个；首个附件将作为主文件用于列表预览
+                  支持任意格式，最多 {MAX_FILES} 个；首个附件将作为主文件用于列表预览
                 </span>
               </label>
               <div

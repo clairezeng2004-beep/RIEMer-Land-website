@@ -138,12 +138,6 @@ export default function Profile() {
     setShowAvatarActions(false);
     if (!file) return;
 
-    // 限制文件大小 2MB
-    if (file.size > 2 * 1024 * 1024) {
-      setMessage({ type: 'error', text: '图片大小不能超过 2MB' });
-      return;
-    }
-
     // 读取为 DataURL 后传给裁剪器，用户确认后再写入 avatarPreview / avatarFile
     const reader = new FileReader();
     reader.onload = (ev) => {
@@ -326,7 +320,7 @@ export default function Profile() {
               className="profile-page__avatar-input"
             />
             <div className="profile-page__avatar-hint">
-              点击头像更换，支持 JPG/PNG，不超过 2MB
+              点击头像更换，支持 JPG/PNG
             </div>
           </div>
 
