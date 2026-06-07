@@ -55,11 +55,7 @@
 .prev-next__slot--same-author {
   /* 同作者推荐用浅色描边强化识别，不抢主视觉 */
   border-color: rgba(94, 173, 140, 0.45);
-  background: linear-gradient(
-    135deg,
-    rgba(94, 173, 140, 0.06) 0%,
-    rgba(94, 173, 140, 0) 60%
-  );
+  background: rgba(94, 173, 140, 0.04);
 }
 
 .prev-next__slot--same-author:hover {
