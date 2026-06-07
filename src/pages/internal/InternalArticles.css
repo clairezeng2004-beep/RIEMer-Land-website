@@ -839,6 +839,10 @@
   padding: var(--space-xl);
   overflow-y: auto;
   flex: 1;
+  /* flex 列里子项默认 min-height:auto 不会收缩，导致 overflow 不生效、
+     内容被 modal 的 max-height + overflow:hidden 裁掉（只显示部分行）。
+     设为 0 后 body 才能正常内部滚动，完整显示所有字段。 */
+  min-height: 0;
 }
 
 .ia-modal__footer {
