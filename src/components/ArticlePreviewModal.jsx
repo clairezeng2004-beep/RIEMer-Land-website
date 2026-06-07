@@ -101,7 +101,7 @@ export default function ArticlePreviewModal({ article, onClose, onOpen }) {
               </Link>
             )}
             <button type="button" className="btn btn-ghost" onClick={onClose}>
-              先不打开
+              返回
             </button>
           </div>
         </div>

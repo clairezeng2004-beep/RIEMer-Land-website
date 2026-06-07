@@ -397,7 +397,7 @@ export default function Home() {
                 className="btn btn-ghost"
                 onClick={() => setEventPreview(null)}
               >
-                先不打开
+                返回
               </button>
             </div>
           </div>
