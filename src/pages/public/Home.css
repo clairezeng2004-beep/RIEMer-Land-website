@@ -665,6 +665,29 @@
   .stats__grid { grid-template-columns: repeat(4, 1fr); gap: var(--space-sm); }
   .stats__item { padding: var(--space-md) var(--space-xs); }
   .stats__value { font-size: var(--text-lg); }
+
+  /* 活动推文预览弹窗：整体缩小，争取单屏放下整张卡片 */
+  .replay-modal--event-preview { padding: var(--space-xl) var(--space-lg); }
+  .replay-modal--event-preview .replay-modal__icon {
+    width: 44px;
+    height: 44px;
+    margin-bottom: var(--space-md);
+  }
+  .replay-modal--event-preview .replay-modal__title {
+    font-size: var(--text-base);
+    line-height: 1.4;
+  }
+  .replay-modal--event-preview .event-preview__meta { margin-bottom: var(--space-sm); }
+  .replay-modal--event-preview .event-preview__meta-item { font-size: var(--text-xs); }
+  /* 简介缩小字号、收紧行距与底部留白；过长时限高滚动只显示前几行 */
+  .replay-modal--event-preview .event-preview__desc {
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    margin-bottom: var(--space-md);
+    max-height: 7.5em;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
 }
 
 @media (max-width: 480px) {

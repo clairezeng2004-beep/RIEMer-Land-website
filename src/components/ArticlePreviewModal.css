@@ -152,11 +152,48 @@
   }
 
   .article-preview {
-    max-height: 90vh;
+    max-height: 88vh;
   }
 
+  /* 封面收矮，给正文卡片让出更多空间，争取单屏放下整张卡片 */
   .article-preview__cover {
-    aspect-ratio: 3 / 2;
+    aspect-ratio: 3 / 1.35;
+  }
+
+  /* 整体收紧内边距 */
+  .article-preview__body {
+    padding: 0.85rem 1rem 1rem;
+  }
+
+  .article-preview__meta {
+    margin-bottom: 0.4rem;
+  }
+
+  .article-preview__meta-item {
+    font-size: var(--text-xs);
+  }
+
+  /* 标题字号明显缩小 */
+  .article-preview__title {
+    font-size: var(--text-base);
+    line-height: 1.4;
+    margin-bottom: 0.5rem;
+  }
+
+  /* 简介缩小字号、收紧行距；过长时限高并支持上下滑动，只缩略显示前几行 */
+  .article-preview__excerpt {
+    font-size: var(--text-sm);
+    line-height: 1.6;
+    margin-bottom: 0.6rem;
+    max-height: 7.5em; /* 约 4-5 行，超出可滚动 */
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 简介与标签之间留白再小一点 */
+  .article-preview__tags {
+    gap: 0.4rem;
+    margin-bottom: 0.7rem;
   }
 
   .article-preview__actions .btn {
