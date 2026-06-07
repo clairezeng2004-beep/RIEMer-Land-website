@@ -893,13 +893,16 @@
     line-height: 1.4;
   }
 
-  .tasks-table__inline-input--title {
-    font-size: var(--text-xs);
+  /* 触屏设备上 index.css 的 @media (pointer: coarse) 会把所有 input 强制成
+     16px（高优先级），导致标题列字号比其它列大。这里用同等更高的特异性 +
+     !important 把标题字号拉回与其它列一致（text-sm），描述用更小的 text-xs。 */
+  .tasks-table input.tasks-table__inline-input--title {
+    font-size: var(--text-sm) !important;
     line-height: 1.35;
   }
 
-  .tasks-table__inline-input--desc {
-    font-size: 11px;
+  .tasks-table input.tasks-table__inline-input--desc {
+    font-size: var(--text-xs) !important;
     line-height: 1.35;
   }
 
