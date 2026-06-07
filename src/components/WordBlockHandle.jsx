@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon } from 'lucide-react';
+import { Plus, Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import './WordBlockHandle.css';
 
 /**
@@ -29,6 +29,10 @@ const BLOCK_OPTIONS = [
   { key: 'ol', label: '有序列表', icon: ListOrdered, cmd: 'insertOrderedList' },
   { key: 'bold', label: '加粗', icon: Bold, cmd: 'bold', selectAll: true },
   { key: 'link', label: '链接', icon: LinkIcon, cmd: 'createLink', selectAll: true, prompt: true },
+  // 对齐：作用在整块上，折叠光标即可生效，无需 selectAll
+  { key: 'alignLeft', label: '左对齐', icon: AlignLeft, cmd: 'justifyLeft' },
+  { key: 'alignCenter', label: '居中', icon: AlignCenter, cmd: 'justifyCenter' },
+  { key: 'alignRight', label: '右对齐', icon: AlignRight, cmd: 'justifyRight' },
 ];
 
 function normalizeUrl(raw) {
@@ -91,10 +95,19 @@ export default function WordBlockHandle({ editorRef, onChange }) {
   const refresh = useCallback(() => {
     const editor = editorRef?.current;
     if (!editor) { setPos(null); return; }
-    // 焦点不在编辑器里、或菜单打开时不重算（避免点菜单时手柄乱跳）
+    // 菜单打开时不重算（避免点菜单时手柄乱跳）
     if (menuOpen) return;
+    // 是否仍在编辑这篇文档：焦点在编辑器内 ——或—— 选区仍落在编辑器内。
+    // 仅靠 activeElement 在滚动时可能短暂失焦（拖滚动条/滚轮），导致手柄消失或不更新；
+    // 这里再用选区兜底，保证滚动过程中只要光标还在文中，手柄就持续跟随。
     const active = document.activeElement;
-    if (active !== editor && !editor.contains(active)) { setPos(null); return; }
+    let selInEditor = false;
+    const sel = window.getSelection();
+    if (sel && sel.rangeCount > 0) {
+      const n = sel.anchorNode;
+      selInEditor = !!n && editor.contains(n);
+    }
+    if (active !== editor && !editor.contains(active) && !selInEditor) { setPos(null); return; }
 
     const block = getCurrentBlock(editor);
     if (!block) { setPos(null); return; }
@@ -111,7 +124,17 @@ export default function WordBlockHandle({ editorRef, onChange }) {
 
   useEffect(() => {
     const onSel = () => refresh();
-    const onScrollResize = () => { if (!menuOpen) refresh(); };
+    // 滚动/缩放用 rAF 合批，避免高频触发卡顿；capture=true 让内层滚动容器
+    // （若编辑器放在 overflow:auto 的祖先里）的滚动也能被捕获，手柄随之跟随。
+    let rafId = null;
+    const onScrollResize = () => {
+      if (menuOpen) return;
+      if (rafId) return;
+      rafId = requestAnimationFrame(() => {
+        rafId = null;
+        refresh();
+      });
+    };
     document.addEventListener('selectionchange', onSel);
     window.addEventListener('scroll', onScrollResize, true);
     window.addEventListener('resize', onScrollResize);
@@ -120,8 +143,10 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       editor.addEventListener('keyup', onSel);
       editor.addEventListener('mouseup', onSel);
       editor.addEventListener('input', onSel);
+      editor.addEventListener('scroll', onScrollResize);
     }
     return () => {
+      if (rafId) cancelAnimationFrame(rafId);
       document.removeEventListener('selectionchange', onSel);
       window.removeEventListener('scroll', onScrollResize, true);
       window.removeEventListener('resize', onScrollResize);
@@ -129,6 +154,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
         editor.removeEventListener('keyup', onSel);
         editor.removeEventListener('mouseup', onSel);
         editor.removeEventListener('input', onSel);
+        editor.removeEventListener('scroll', onScrollResize);
       }
     };
   }, [editorRef, refresh, menuOpen]);
