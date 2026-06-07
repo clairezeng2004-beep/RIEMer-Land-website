@@ -126,6 +126,21 @@ function downloadFile({ dataUrl, url, name }) {
   document.body.removeChild(a);
 }
 
+function getPreviewableAttachmentType(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  const href = file?.dataUrl || file?.url;
+  if (!href) return null;
+  if (type.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
+  if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)) return 'image';
+  if (
+    type.includes('wordprocessingml') ||
+    type.includes('msword') ||
+    /\.(docx|doc)$/i.test(name)
+  ) return 'word';
+  return null;
+}
+
 function cleanWordHtml(html) {
   const parsed = new DOMParser().parseFromString(html, 'text/html');
   parsed.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
@@ -557,6 +572,7 @@ export default function ProcessTemplateDetail() {
 
   // 访问记录弹层：点击浏览数小眼睛时打开，展示谁在什么时候看过这篇文档
   const [viewLogOpen, setViewLogOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
 
   // 编辑历史：每次保存会写一条 { editorId, editorName, editedAt, changes[] }
   // 在目录下方的小矩形里展示，支持折叠 / 展开更多
@@ -1805,21 +1821,39 @@ export default function ProcessTemplateDetail() {
                 <div className="ptd-attachments__list">
                   {doc.attachments.map((f) => {
                     const IconComp = getFileIcon(f.name);
+                    const previewType = getPreviewableAttachmentType(f);
                     return (
-                      <button
+                      <div
                         key={f.id || f.name}
-                        type="button"
                         className="ptd-attachments__item"
-                        onClick={() => downloadFile(f)}
-                        title={`下载 ${f.name}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => (previewType ? setPreviewAttachment({ ...f, previewType }) : downloadFile(f))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            previewType ? setPreviewAttachment({ ...f, previewType }) : downloadFile(f);
+                          }
+                        }}
+                        title={previewType ? `预览 ${f.name}` : `下载 ${f.name}`}
                       >
                         <IconComp size={20} className="ptd-attachments__item-icon" />
                         <div className="ptd-attachments__item-info">
                           <span className="ptd-attachments__item-name">{f.name}</span>
                           <span className="ptd-attachments__item-size">{formatFileSize(f.size)}</span>
                         </div>
-                        <Download size={16} className="ptd-attachments__item-dl" />
-                      </button>
+                        <button
+                          type="button"
+                          className="ptd-attachments__item-dl"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadFile(f);
+                          }}
+                          title={`下载 ${f.name}`}
+                        >
+                          <Download size={16} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -1940,6 +1974,47 @@ export default function ProcessTemplateDetail() {
         fetchLog={() => fetchViewLog(String(doc.id))}
         resolveName={resolveContributorName}
       />
+
+      {previewAttachment && (
+        <div className="ptd-file-preview-overlay" onClick={() => setPreviewAttachment(null)}>
+          <div className="ptd-file-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ptd-file-preview-modal__header">
+              <h3>{previewAttachment.name || '附件预览'}</h3>
+              <div className="ptd-file-preview-modal__actions">
+                <button type="button" onClick={() => downloadFile(previewAttachment)}>
+                  <Download size={16} /> 下载
+                </button>
+                <button type="button" onClick={() => setPreviewAttachment(null)} aria-label="关闭预览">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="ptd-file-preview-modal__body">
+              {previewAttachment.previewType === 'pdf' && (
+                <iframe
+                  src={previewAttachment.dataUrl || previewAttachment.url}
+                  title={previewAttachment.name}
+                  className="ptd-file-preview-modal__frame"
+                />
+              )}
+              {previewAttachment.previewType === 'image' && (
+                <img
+                  src={previewAttachment.dataUrl || previewAttachment.url}
+                  alt={previewAttachment.name}
+                  className="ptd-file-preview-modal__image"
+                />
+              )}
+              {previewAttachment.previewType === 'word' && (
+                <WordPreview
+                  fileUrl={previewAttachment.dataUrl || previewAttachment.url}
+                  docId={`${doc.id}-${previewAttachment.id || previewAttachment.name || 'attachment'}`}
+                  title={previewAttachment.name || doc.title}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

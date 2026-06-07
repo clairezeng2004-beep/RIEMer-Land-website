@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
+import WordPreview from '../../components/WordPreview';
 import ViewLogPopover from '../../components/ViewLogPopover';
 import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useTocScroll from '../../hooks/useTocScroll';
@@ -76,6 +77,21 @@ function downloadFile(attachment) {
   document.body.removeChild(a);
 }
 
+function getPreviewableAttachmentType(file) {
+  const name = String(file?.name || '').toLowerCase();
+  const type = String(file?.type || '').toLowerCase();
+  const href = file?.dataUrl || file?.url;
+  if (!href) return null;
+  if (type.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
+  if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(name)) return 'image';
+  if (
+    type.includes('wordprocessingml') ||
+    type.includes('msword') ||
+    /\.(docx|doc)$/i.test(name)
+  ) return 'word';
+  return null;
+}
+
 function loadViews() {
   try {
     const stored = localStorage.getItem(SHARING_VIEWS_KEY);
@@ -96,6 +112,7 @@ export default function MemberSharingDetail() {
 
   // 访问记录弹层开关
   const [viewLogOpen, setViewLogOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
 
   // 成员真名映射（用于弹层里把历史数据存的 userName 还原到真名）
   const [userNameMap, setUserNameMap] = useState({});
@@ -435,20 +452,39 @@ export default function MemberSharingDetail() {
                 <div className="msd-attachments__list">
                   {post.attachments.map((file) => {
                     const IconComp = getFileIcon(file?.name);
+                    const previewType = getPreviewableAttachmentType(file);
                     return (
-                      <button
+                      <div
                         key={file?.id || file?.name}
                         className="msd-attachments__item"
-                        onClick={() => downloadFile(file)}
-                        title={`下载 ${file?.name || '附件'}`}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => (previewType ? setPreviewAttachment({ ...file, previewType }) : downloadFile(file))}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            previewType ? setPreviewAttachment({ ...file, previewType }) : downloadFile(file);
+                          }
+                        }}
+                        title={previewType ? `预览 ${file?.name || '附件'}` : `下载 ${file?.name || '附件'}`}
                       >
                         <IconComp size={20} className="msd-attachments__item-icon" />
                         <div className="msd-attachments__item-info">
                           <span className="msd-attachments__item-name">{file?.name || '未命名附件'}</span>
                           <span className="msd-attachments__item-size">{formatFileSize(file?.size)}</span>
                         </div>
-                        <Download size={16} className="msd-attachments__item-dl" />
-                      </button>
+                        <button
+                          type="button"
+                          className="msd-attachments__item-dl"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            downloadFile(file);
+                          }}
+                          title={`下载 ${file?.name || '附件'}`}
+                        >
+                          <Download size={16} />
+                        </button>
+                      </div>
                     );
                   })}
                 </div>
@@ -565,6 +601,47 @@ export default function MemberSharingDetail() {
         fetchLog={() => fetchViewLog(String(post.id))}
         resolveName={resolveVisitorName}
       />
+
+      {previewAttachment && (
+        <div className="msd-file-preview-overlay" onClick={() => setPreviewAttachment(null)}>
+          <div className="msd-file-preview-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="msd-file-preview-modal__header">
+              <h3>{previewAttachment.name || '附件预览'}</h3>
+              <div className="msd-file-preview-modal__actions">
+                <button type="button" onClick={() => downloadFile(previewAttachment)}>
+                  <Download size={16} /> 下载
+                </button>
+                <button type="button" onClick={() => setPreviewAttachment(null)} aria-label="关闭预览">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <div className="msd-file-preview-modal__body">
+              {previewAttachment.previewType === 'pdf' && (
+                <iframe
+                  src={previewAttachment.dataUrl || previewAttachment.url}
+                  title={previewAttachment.name}
+                  className="msd-file-preview-modal__frame"
+                />
+              )}
+              {previewAttachment.previewType === 'image' && (
+                <img
+                  src={previewAttachment.dataUrl || previewAttachment.url}
+                  alt={previewAttachment.name}
+                  className="msd-file-preview-modal__image"
+                />
+              )}
+              {previewAttachment.previewType === 'word' && (
+                <WordPreview
+                  fileUrl={previewAttachment.dataUrl || previewAttachment.url}
+                  docId={`${post.id}-${previewAttachment.id || previewAttachment.name || 'attachment'}`}
+                  title={previewAttachment.name || post.title}
+                />
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 划线评论 — 无目录时（短文档无标题）回退为浮动按钮 + 右侧抽屉；
           有目录时已在上方以 inline 侧栏形式呈现，与流程模板文件详情页一致。 */}

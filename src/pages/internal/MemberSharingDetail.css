@@ -658,13 +658,109 @@
 }
 
 .msd-attachments__item-dl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
   color: var(--color-text-muted);
   flex-shrink: 0;
-  transition: color 0.15s;
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
 }
 
-.msd-attachments__item:hover .msd-attachments__item-dl {
+.msd-attachments__item:hover .msd-attachments__item-dl,
+.msd-attachments__item-dl:hover {
   color: var(--color-primary);
+  background: rgba(91, 140, 62, 0.08);
+}
+
+.msd-file-preview-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(17, 24, 39, 0.58);
+}
+
+.msd-file-preview-modal {
+  width: min(1080px, 96vw);
+  height: min(760px, 92vh);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 24px 80px rgba(17, 24, 39, 0.28);
+}
+
+.msd-file-preview-modal__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 18px;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.msd-file-preview-modal__header h3 {
+  margin: 0;
+  font-size: var(--text-base, 16px);
+  font-weight: 650;
+  color: var(--color-text, #1f2937);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.msd-file-preview-modal__actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.msd-file-preview-modal__actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-text, #1f2937);
+  cursor: pointer;
+}
+
+.msd-file-preview-modal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  background: #f8fafc;
+}
+
+.msd-file-preview-modal__frame {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #fff;
+}
+
+.msd-file-preview-modal__image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  margin: auto;
+  object-fit: contain;
 }
 
 /* Article Footer — 点赞区 */
