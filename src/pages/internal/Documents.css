@@ -1340,6 +1340,9 @@
   }
   .doc-card__body {
     padding: var(--space-lg);
+    /* 底部留白交给日期行自身的对称内边距（与电脑端一致），
+       否则 body 的底部 padding 会让"日期行"和下面"点赞行"之间空太多 */
+    padding-bottom: 0;
     gap: var(--space-sm);
   }
   .doc-card__title {
@@ -1355,8 +1358,9 @@
     padding-bottom: 4px;
     margin-top: 0;
   }
+  /* 分类有色标签靠右对齐（与上一行浏览数右对齐），保留 margin-left:auto */
   .doc-card__meta .doc-card__type-badge {
-    margin-left: 0;
+    margin-left: auto;
   }
   .doc-card__bottom {
     padding: 4px var(--space-lg);
