@@ -1,9 +1,35 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { Link } from 'react-router-dom';
 import { MessageCircle, X, Send, ArrowRight, Loader2, Mic, MicOff } from 'lucide-react';
 import { sendMessage } from '../services/chatService';
 import { useSiteContent } from '../contexts/SiteContentContext';
+import ArticlePreviewModal from './ArticlePreviewModal';
 import './ArticleChat.css';
+
+// 把小 R 回复里的 **加粗** 和 [文字](链接) 渲染成真正的样式，
+// 而不是把星号 / 方括号直接显示成纯文本。
+function renderRichText(text) {
+  if (!text) return null;
+  const nodes = [];
+  const regex = /\*\*([^*]+)\*\*|\[([^\]]+)\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let key = 0;
+  let m;
+  while ((m = regex.exec(text)) !== null) {
+    if (m.index > lastIndex) nodes.push(text.slice(lastIndex, m.index));
+    if (m[1] !== undefined) {
+      nodes.push(<strong key={key++}>{m[1]}</strong>);
+    } else {
+      nodes.push(
+        <a key={key++} href={m[3]} target="_blank" rel="noopener noreferrer">
+          {m[2]}
+        </a>
+      );
+    }
+    lastIndex = regex.lastIndex;
+  }
+  if (lastIndex < text.length) nodes.push(text.slice(lastIndex));
+  return nodes;
+}
 
 // 浏览器 SpeechRecognition 兼容处理
 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -80,6 +106,8 @@ export default function ArticleChat() {
   ]);
   const [loading, setLoading] = useState(false);
   const [isListening, setIsListening] = useState(false);
+  // 点击推荐文章时弹出的中间预览卡片（与首页卡片一致）
+  const [previewArticle, setPreviewArticle] = useState(null);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -259,23 +287,23 @@ export default function ArticleChat() {
               }`}
             >
               <div className="article-chat__msg-bubble">
-                <div className="article-chat__msg-text">{msg.content}</div>
-                {/* 推荐文章卡片 */}
+                <div className="article-chat__msg-text">{renderRichText(msg.content)}</div>
+                {/* 推荐文章卡片：点击弹出中间预览卡片（与首页一致），由弹窗给出链接 */}
                 {msg.articles && msg.articles.length > 0 && (
                   <div className="article-chat__recommendations">
                     {msg.articles.map((article) => (
-                      <Link
+                      <button
                         key={article.id}
-                        to={`/article/${article.id}`}
+                        type="button"
                         className="article-chat__rec-card"
-                        onClick={() => setIsOpen(false)}
+                        onClick={() => setPreviewArticle(article)}
                       >
                         <span className="article-chat__rec-category">
                           {article.category}
                         </span>
                         <span className="article-chat__rec-title">{article.title}</span>
                         <ArrowRight size={14} className="article-chat__rec-arrow" />
-                      </Link>
+                      </button>
                     ))}
                   </div>
                 )}
@@ -345,6 +373,14 @@ export default function ArticleChat() {
           </button>
         </div>
       </div>
+
+      {/* 推荐文章中间预览弹窗：点击推荐卡片后弹出，由弹窗内按钮给出超链接 */}
+      {previewArticle && (
+        <ArticlePreviewModal
+          article={previewArticle}
+          onClose={() => setPreviewArticle(null)}
+        />
+      )}
     </div>
   );
 }

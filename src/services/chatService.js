@@ -319,18 +319,16 @@ function localSearch(query, articles = articlesData) {
     };
   }
 
-  // 根据匹配数量和关键词生成更自然的引导语
+  // 根据匹配数量和关键词生成更自然的引导语。
+  // 注意：不再把每篇文章的标题/摘要在文字里铺开（避免对文章内容的复述与评论），
+  // 文章统一以下方可点击的卡片/链接形式呈现，用户点开链接自己看。
   const topicHint = keywords.slice(0, 2).join('、');
   const introText = matches.length === 1
-    ? `找到 1 篇和"${topicHint}"相关的文章，来看看吧：`
-    : `为你找到了 ${matches.length} 篇和"${topicHint}"相关的文章：`;
-
-  const lines = matches.map(
-    (m, i) => `${i + 1}. ${m.article.title}（${m.article.category}）\n   ${m.article.excerpt}`
-  );
+    ? `找到 1 篇和"${topicHint}"相关的，点开看看吧 👇`
+    : `帮你找到 ${matches.length} 篇和"${topicHint}"相关的，点开看看吧 👇`;
 
   return {
-    text: `${introText}\n\n${lines.join('\n\n')}`,
+    text: introText,
     articles: matches.map((m) => m.article),
   };
 }
