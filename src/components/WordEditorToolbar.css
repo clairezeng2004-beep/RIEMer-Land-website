@@ -226,7 +226,7 @@
 /* ============ 编辑器内的分栏块视觉标记 ============ */
 .msc-form__word-editor .msc-cols {
   border: 1px dashed var(--color-border-light, #e5e7eb);
-  padding: 6px;
+  padding: 26px 8px 8px;
   border-radius: var(--radius-sm, 4px);
 }
 
@@ -238,6 +238,12 @@
 .msc-form__word-editor .msc-col:hover {
   border-color: var(--color-primary, #5B8C3E);
   background: rgba(91, 140, 62, 0.04);
+}
+
+.msc-form__word-editor .msc-col--selected,
+.msc-form__word-editor .msc-col--selected:hover {
+  border-color: rgba(91, 140, 62, 0.75);
+  background: rgba(91, 140, 62, 0.13);
 }
 
 .msc-form__word-editor .msc-col__placeholder:hover {

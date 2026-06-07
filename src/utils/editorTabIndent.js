@@ -84,7 +84,7 @@ function caretAtStartOfLi(li) {
     return false;
   }
   const frag = probe.cloneContents();
-  if ((frag.textContent || '').replace(/​/g, '').length > 0) return false;
+  if ((frag.textContent || '').replace(/\u200b/g, '').length > 0) return false;
   if (frag.querySelector && frag.querySelector('img, br, hr, table')) return false;
   return true;
 }

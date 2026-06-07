@@ -98,6 +98,53 @@ function buildEmptyColumnContent() {
   return frag;
 }
 
+function getColumns(container) {
+  return [...container.children].filter((el) => el.classList?.contains('msc-col'));
+}
+
+function ensureColumnMeta(container) {
+  if (!container) return [];
+  const cols = getColumns(container);
+  const n = cols.length;
+  container.setAttribute('data-cols', String(n));
+  container.setAttribute('data-cols-label', `${n}栏`);
+  cols.forEach((col, index) => {
+    col.setAttribute('data-col-label', `${index + 1}/${n}`);
+  });
+  return cols;
+}
+
+function ensureColumnResizers(container) {
+  if (!container) return;
+  const cols = ensureColumnMeta(container);
+  container.querySelectorAll(':scope > .msc-col-resizer').forEach((el) => el.remove());
+  for (let i = 0; i < cols.length - 1; i += 1) {
+    const handle = document.createElement('span');
+    handle.className = 'msc-col-resizer';
+    handle.setAttribute('contenteditable', 'false');
+    handle.setAttribute('data-resizer-index', String(i));
+    handle.setAttribute('title', '拖拽调整相邻两栏宽度');
+    container.appendChild(handle);
+  }
+}
+
+function layoutColumnResizers(container) {
+  if (!container) return;
+  const cols = getColumns(container);
+  const handles = [...container.querySelectorAll(':scope > .msc-col-resizer')];
+  if (cols.length < 2 || handles.length === 0) return;
+  const base = container.getBoundingClientRect();
+  handles.forEach((handle, index) => {
+    const leftCol = cols[index];
+    const rightCol = cols[index + 1];
+    if (!leftCol || !rightCol) return;
+    const a = leftCol.getBoundingClientRect();
+    const b = rightCol.getBoundingClientRect();
+    const x = ((a.right + b.left) / 2) - base.left;
+    handle.style.left = `${x}px`;
+  });
+}
+
 /** 文件 → dataURL */
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -152,8 +199,10 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     }
     container.appendChild(col);
   }
+  ensureColumnResizers(container);
 
   insertBlockAtCaret(editor, container);
+  requestAnimationFrame(() => layoutColumnResizers(container));
 }
 
 /**
@@ -167,6 +216,14 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
  */
 export function attachColumnPlaceholderHandler(editor, onChange) {
   if (!editor) return () => {};
+  let dragState = null;
+
+  const refreshAll = () => {
+    editor.querySelectorAll('.msc-cols').forEach((container) => {
+      ensureColumnResizers(container);
+      layoutColumnResizers(container);
+    });
+  };
 
   /** 把指定 col 的内容替换为一张图片（通过文件选择器） */
   const pickAndInsertImage = (col) => {
@@ -184,6 +241,9 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       img.setAttribute('draggable', 'false');
       img.alt = '';
       col.appendChild(img);
+      const container = col.closest('.msc-cols');
+      ensureColumnMeta(container);
+      requestAnimationFrame(() => layoutColumnResizers(container));
       onChange?.();
     };
     input.click();
@@ -204,12 +264,27 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       sel?.removeAllRanges();
       sel?.addRange(range);
     } catch { /* ignore */ }
+    const container = col.closest('.msc-cols');
+    ensureColumnMeta(container);
+    requestAnimationFrame(() => layoutColumnResizers(container));
     onChange?.();
+  };
+
+  const selectColumn = (col) => {
+    const container = col.closest('.msc-cols');
+    if (!container || !editor.contains(container)) return;
+    getColumns(container).forEach((item) => item.classList.toggle('msc-col--selected', item === col));
   };
 
   const handler = (e) => {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
+
+    const col = t.closest('.msc-col');
+    if (col && editor.contains(col)) {
+      selectColumn(col);
+      requestAnimationFrame(() => layoutColumnResizers(col.closest('.msc-cols')));
+    }
 
     // 1) 历史文档里的「输入文字」按钮
     const textBtn = t.closest('.msc-col__act--text');
@@ -242,8 +317,115 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       pickAndInsertImage(col);
     }
   };
+
+  const onMouseOver = (e) => {
+    const t = e.target;
+    if (!(t instanceof HTMLElement)) return;
+    const container = t.closest('.msc-cols');
+    if (!container || !editor.contains(container)) return;
+    ensureColumnResizers(container);
+    layoutColumnResizers(container);
+  };
+
+  const onPointerDown = (e) => {
+    const handle = e.target instanceof HTMLElement ? e.target.closest('.msc-col-resizer') : null;
+    if (!handle || !editor.contains(handle)) return;
+    const container = handle.closest('.msc-cols');
+    if (!container) return;
+    const cols = getColumns(container);
+    const index = Number(handle.getAttribute('data-resizer-index'));
+    const left = cols[index];
+    const right = cols[index + 1];
+    if (!left || !right) return;
+
+    e.preventDefault();
+    e.stopPropagation();
+
+    const leftRect = left.getBoundingClientRect();
+    const rightRect = right.getBoundingClientRect();
+    const pairLeft = leftRect.left;
+    const pairWidth = rightRect.right - leftRect.left;
+    const startLeftWidth = leftRect.width;
+    const startRightWidth = rightRect.width;
+    const colWidths = cols.map((col) => col.getBoundingClientRect().width);
+
+    dragState = {
+      container,
+      cols,
+      index,
+      pairLeft,
+      pairWidth,
+      startLeftWidth,
+      startRightWidth,
+      colWidths,
+    };
+    container.classList.add('msc-cols--resizing');
+    handle.classList.add('msc-col-resizer--active');
+    handle.setPointerCapture?.(e.pointerId);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragState) return;
+    const {
+      container,
+      cols,
+      index,
+      pairLeft,
+      pairWidth,
+      startLeftWidth,
+      startRightWidth,
+      colWidths,
+    } = dragState;
+    const pairTotal = startLeftWidth + startRightWidth;
+    const minWidth = Math.min(160, Math.max(72, pairTotal * 0.18));
+    const rawLeft = e.clientX - pairLeft;
+    const nextLeft = Math.max(minWidth, Math.min(pairWidth - minWidth, rawLeft));
+    const nextRight = pairTotal - nextLeft;
+    const next = [...colWidths];
+    next[index] = nextLeft;
+    next[index + 1] = nextRight;
+    const total = next.reduce((sum, width) => sum + width, 0) || 1;
+    container.style.gridTemplateColumns = next
+      .map((width) => `${((width / total) * 100).toFixed(3)}%`)
+      .join(' ');
+    cols[index]?.classList.add('msc-col--selected');
+    cols[index + 1]?.classList.add('msc-col--selected');
+    layoutColumnResizers(container);
+  };
+
+  const finishDrag = () => {
+    if (!dragState) return;
+    dragState.container.classList.remove('msc-cols--resizing');
+    dragState.container.querySelectorAll('.msc-col-resizer--active').forEach((el) => {
+      el.classList.remove('msc-col-resizer--active');
+    });
+    layoutColumnResizers(dragState.container);
+    dragState = null;
+    onChange?.();
+  };
+
+  const onScrollOrResize = () => refreshAll();
+
+  refreshAll();
   editor.addEventListener('click', handler);
-  return () => editor.removeEventListener('click', handler);
+  editor.addEventListener('mouseover', onMouseOver);
+  editor.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', finishDrag);
+  window.addEventListener('resize', onScrollOrResize);
+  editor.addEventListener('scroll', onScrollOrResize);
+  editor.parentElement?.addEventListener('scroll', onScrollOrResize);
+
+  return () => {
+    editor.removeEventListener('click', handler);
+    editor.removeEventListener('mouseover', onMouseOver);
+    editor.removeEventListener('pointerdown', onPointerDown);
+    window.removeEventListener('pointermove', onPointerMove);
+    window.removeEventListener('pointerup', finishDrag);
+    window.removeEventListener('resize', onScrollOrResize);
+    editor.removeEventListener('scroll', onScrollOrResize);
+    editor.parentElement?.removeEventListener('scroll', onScrollOrResize);
+  };
 }
 
 /* =========================================================================

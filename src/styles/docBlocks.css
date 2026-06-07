@@ -13,6 +13,7 @@
   gap: 12px;
   margin: 0.8em 0;
   align-items: start;
+  position: relative;
 }
 
 .msc-cols--2 { grid-template-columns: 1fr 1fr; }
@@ -23,13 +24,33 @@
    替代原先"只有细细虚线"的弱提示，让用户清楚这里是一个分栏块。
    仅在可编辑状态（contenteditable）下显示，发布后的正文/预览不受影响。 */
 [contenteditable="true"] .msc-cols {
-  padding: 8px;
+  padding: 26px 8px 8px;
   border-radius: var(--radius-md, 8px);
   background: rgba(91, 140, 62, 0.07);
   box-shadow: inset 0 0 0 1.5px rgba(91, 140, 62, 0.45);
 }
 
+[contenteditable="true"] .msc-cols::before {
+  content: attr(data-cols-label);
+  position: absolute;
+  top: 6px;
+  left: 8px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: rgba(91, 140, 62, 0.14);
+  color: var(--color-primary, #5B8C3E);
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  pointer-events: none;
+}
+
 .msc-col {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -37,6 +58,80 @@
   padding: 4px;
   border-radius: var(--radius-sm, 4px);
   background: transparent;
+}
+
+[contenteditable="true"] .msc-col::before {
+  content: attr(data-col-label);
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+  color: var(--color-text-muted, #6b7280);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  box-shadow: 0 0 0 1px rgba(91, 140, 62, 0.18);
+  pointer-events: none;
+}
+
+[contenteditable="true"] .msc-col--selected {
+  background: rgba(91, 140, 62, 0.13);
+  box-shadow: inset 0 0 0 1.5px rgba(91, 140, 62, 0.55);
+}
+
+[contenteditable="true"] .msc-col--selected::before {
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+}
+
+.msc-col-resizer {
+  display: none;
+}
+
+[contenteditable="true"] .msc-col-resizer {
+  position: absolute;
+  top: 26px;
+  bottom: 8px;
+  z-index: 4;
+  display: block;
+  width: 12px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+[contenteditable="true"] .msc-col-resizer::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(91, 140, 62, 0.34);
+  transition: width 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+[contenteditable="true"] .msc-col-resizer:hover::before,
+[contenteditable="true"] .msc-col-resizer--active::before,
+[contenteditable="true"] .msc-cols--resizing .msc-col-resizer::before {
+  width: 4px;
+  background: var(--color-primary, #5B8C3E);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.14);
+}
+
+[contenteditable="true"] .msc-cols--resizing {
+  cursor: col-resize;
 }
 
 .msc-col > img,
