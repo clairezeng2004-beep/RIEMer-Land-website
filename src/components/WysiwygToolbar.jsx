@@ -82,7 +82,7 @@ export default function WysiwygToolbar() {
           title="进入管理者编辑模式"
         >
           <Pencil size={20} />
-          <span className="wysiwyg-fab__label">进入管理者编辑模式</span>
+          <span className="wysiwyg-fab__label">管理者编辑模式</span>
         </button>
         {saved && (
           <div className="wysiwyg-toast">
