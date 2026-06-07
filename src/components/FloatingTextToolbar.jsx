@@ -18,6 +18,38 @@ import './FloatingTextToolbar.css';
  *   onChange    — rich: (html) => void；markdown: (nextValue, selection) => void
  */
 
+function getSelectedTextBlocks(editor) {
+  const sel = window.getSelection();
+  if (!editor || !sel || sel.rangeCount === 0) return [];
+  const range = sel.getRangeAt(0);
+  const blockTags = 'p,h1,h2,h3,h4,h5,h6,blockquote,li,div';
+  const blocks = [];
+  const addBlock = (node) => {
+    if (!node || !editor.contains(node) || node === editor) return;
+    const el = node.nodeType === 1 ? node : node.parentElement;
+    const block = el?.closest?.(blockTags);
+    if (block && editor.contains(block) && !blocks.includes(block)) blocks.push(block);
+  };
+  addBlock(range.startContainer);
+  addBlock(range.endContainer);
+  editor.querySelectorAll(blockTags).forEach((block) => {
+    try {
+      if (range.intersectsNode(block) && !blocks.includes(block)) blocks.push(block);
+    } catch {
+      /* ignore detached nodes */
+    }
+  });
+  return blocks;
+}
+
+function applyTextAlignToSelection(editor, cmd) {
+  const align = cmd === 'justifyCenter' ? 'center' : cmd === 'justifyRight' ? 'right' : 'left';
+  getSelectedTextBlocks(editor).forEach((block) => {
+    block.style.textAlign = align;
+    block.setAttribute('align', align);
+  });
+}
+
 export default function FloatingTextToolbar({
   editorRef,
   onChange,
@@ -339,10 +371,12 @@ export default function FloatingTextToolbar({
 
   // 对齐（富文本）：justifyLeft / justifyCenter / justifyRight，作用在当前块上。
   const applyAlignRich = useCallback((cmd) => {
+    const editor = editorRef.current;
     document.execCommand(cmd, false, null);
+    applyTextAlignToSelection(editor, cmd);
     detectActiveRich();
     fireChangeRich();
-  }, [detectActiveRich, fireChangeRich]);
+  }, [detectActiveRich, editorRef, fireChangeRich]);
 
   /* -----------------------------------------------------------------
    * 链接：富文本模式

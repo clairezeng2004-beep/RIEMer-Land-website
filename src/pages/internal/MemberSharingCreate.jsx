@@ -651,13 +651,18 @@ export default function MemberSharingCreate() {
     doc.querySelectorAll('*').forEach((el) => {
       const attrs = [...el.attributes];
       const tag = el.tagName.toLowerCase();
-      // 保留 <img> 的 src/alt/width/height/style/class，其它元素只保留 href
+      const textAlign = (el.style.textAlign || '').toLowerCase();
+      const hasTextAlign = ['left', 'center', 'right', 'justify'].includes(textAlign);
       const keepAttrs = tag === 'img'
         ? new Set(['src', 'alt', 'width', 'height', 'style', 'class'])
-        : new Set(['href']);
+        : new Set(['href', ...(hasTextAlign ? ['style'] : [])]);
       attrs.forEach((attr) => {
         if (!keepAttrs.has(attr.name)) el.removeAttribute(attr.name);
       });
+      if (hasTextAlign) {
+        el.setAttribute('style', `text-align: ${textAlign}`);
+        el.setAttribute('align', textAlign);
+      }
     });
     // 对粘贴进来的 <img>：没 class 的补上 msc-img 类并包到居中段落里
     doc.querySelectorAll('img').forEach((img) => {

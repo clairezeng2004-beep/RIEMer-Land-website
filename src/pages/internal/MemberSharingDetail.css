@@ -480,6 +480,18 @@
   text-align: justify;
 }
 
+.msd-article__content [align="center"] {
+  text-align: center;
+}
+
+.msd-article__content [align="right"] {
+  text-align: right;
+}
+
+.msd-article__content [align="left"] {
+  text-align: left;
+}
+
 .msd-article__content ul,
 .msd-article__content ol {
   margin: 10px 0;

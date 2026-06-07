@@ -80,6 +80,20 @@ function getCurrentBlock(editor) {
   return null;
 }
 
+function applyTextAlignToBlock(block, key) {
+  if (!block) return;
+  if (key === 'alignCenter') {
+    block.style.textAlign = 'center';
+    block.setAttribute('align', 'center');
+  } else if (key === 'alignRight') {
+    block.style.textAlign = 'right';
+    block.setAttribute('align', 'right');
+  } else if (key === 'alignLeft') {
+    block.style.textAlign = 'left';
+    block.setAttribute('align', 'left');
+  }
+}
+
 export default function WordBlockHandle({ editorRef, onChange }) {
   const [pos, setPos] = useState(null); // { top, left } 视口坐标
   const [menuOpen, setMenuOpen] = useState(false);
@@ -205,6 +219,9 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     }
     try {
       document.execCommand(opt.cmd, false, value);
+      if (opt.key === 'alignLeft' || opt.key === 'alignCenter' || opt.key === 'alignRight') {
+        applyTextAlignToBlock(blockRef.current, opt.key);
+      }
       // 链接补 target，安全打开
       if (opt.key === 'link' && value) {
         const editor = editorRef?.current;

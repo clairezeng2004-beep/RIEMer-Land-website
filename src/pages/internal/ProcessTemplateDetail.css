@@ -622,6 +622,18 @@
   text-align: justify;
 }
 
+.ptd-article__content [align="center"] {
+  text-align: center;
+}
+
+.ptd-article__content [align="right"] {
+  text-align: right;
+}
+
+.ptd-article__content [align="left"] {
+  text-align: left;
+}
+
 .ptd-article__content ul,
 .ptd-article__content ol {
   margin: 10px 0;

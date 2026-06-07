@@ -1133,9 +1133,17 @@
   .ms-card__like-btn { order: 4; }
   /* 点赞人名单独换行，避免挤压上面一行的均分 */
   .ms-card__like-names { order: 5; flex-basis: 100%; }
-  /* 类型标签单独占一整行 */
-  .ms-card__badge { order: 6; flex-basis: 100%; margin-left: 0; }
-  .ms-card__format-tag { order: 7; flex-basis: 100%; }
+  /* 类型/附件格式标签靠左自然宽度，不撑满整行 */
+  .ms-card__badge,
+  .ms-card__format-tag {
+    flex: 0 1 auto;
+    width: fit-content;
+    max-width: 100%;
+    margin-left: 0;
+  }
+
+  .ms-card__badge { order: 6; }
+  .ms-card__format-tag { order: 7; }
 }
 
 @media (max-width: 480px) {
@@ -1157,7 +1165,7 @@
 
   .ms-card__body .ms-card__title,
   .ms-card__body .ms-card__excerpt {
-    padding-left: var(--space-md);
-    padding-right: calc(32px + var(--space-md) + var(--space-sm));
+    padding-left: 0;
+    padding-right: calc(32px + var(--space-xs));
   }
 }
