@@ -17,7 +17,6 @@ const MEMBER_SHARING_CLOUD_TIMEOUT_MS = 25000;
 // 默认分类（与原页面保持一致）
 export const DEFAULT_CATEGORIES = [
   { key: 'course', label: '课程资料', color: '#5EAD8C' },
-  { key: 'history', label: '历史会议', color: '#4FBFC4' },
   { key: 'experience', label: '成员经验分享', color: '#EC4899' },
 ];
 

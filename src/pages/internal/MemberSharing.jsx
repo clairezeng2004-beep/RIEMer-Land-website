@@ -43,6 +43,7 @@ import {
 import './MemberSharing.css';
 
 const SHARING_VIEWS_KEY = 'riemer_sharing_views';
+const HIDDEN_CATEGORY_KEYS = new Set(['history']);
 
 // 预设颜色供选择
 const PRESET_COLORS = [
@@ -60,6 +61,10 @@ function buildCategoryMaps(cats) {
     colors[c.key] = c.color;
   });
   return { labels, colors };
+}
+
+function getVisibleCategories(cats) {
+  return (Array.isArray(cats) ? cats : []).filter((cat) => !HIDDEN_CATEGORY_KEYS.has(cat.key));
 }
 
 function loadViews() {
@@ -196,7 +201,7 @@ export default function MemberSharing() {
         // ⚠️ 必须兼容"空数组"—— 若只有云端可用且用户已在另一设备把分类全删光，
         // fetchCategories 会返回 []，直接同步给 UI；若 cats 为 null/undefined
         // （服务层意外分支）才保留默认列表不动。
-        if (Array.isArray(cats)) setCategoryList(cats);
+        if (Array.isArray(cats)) setCategoryList(getVisibleCategories(cats));
       } catch (err) {
         console.warn('[MemberSharing] 初次加载失败:', err);
       } finally {
@@ -230,7 +235,7 @@ export default function MemberSharing() {
     const unsubscribe = subscribeCategories(() => {
       fetchCategories().then((cats) => {
         // 同上：cats 可能是空数组（别的设备把所有分类都删了），原样应用
-        if (Array.isArray(cats)) setCategoryList(cats);
+        if (Array.isArray(cats)) setCategoryList(getVisibleCategories(cats));
       }).catch(() => { /* ignore */ });
     });
     return () => unsubscribe();

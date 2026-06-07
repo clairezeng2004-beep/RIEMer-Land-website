@@ -51,6 +51,12 @@ import {
 } from '../../services/memberSharingService';
 import './MemberSharingCreate.css';
 
+const HIDDEN_CATEGORY_KEYS = new Set(['history']);
+
+function getVisibleCategories(cats) {
+  return (Array.isArray(cats) ? cats : []).filter((cat) => !HIDDEN_CATEGORY_KEYS.has(cat.key));
+}
+
 // 生成年份列表：从「当前年份」开始往前 10 年（不含未来年份）。
 // 这样下拉默认定位到当前年份，而不是之前从 cur+2 起头、顶部停在未来年份
 // （例如 2026 年时停在 2028）。选项数 > 6，CustomSelect 会自动显示搜索框，
@@ -500,7 +506,7 @@ export default function MemberSharingCreate() {
         if (cancelled) return;
         // 允许云端空数组（用户可能已在其它设备把所有分类都删了），
         // 直接应用；若服务层意外返回 null/undefined 则保留当前 cats。
-        if (Array.isArray(list)) setCats(list);
+        if (Array.isArray(list)) setCats(getVisibleCategories(list));
       })
       .catch(() => { /* ignore */ });
     return () => { cancelled = true; };

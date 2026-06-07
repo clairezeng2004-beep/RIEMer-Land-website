@@ -260,7 +260,7 @@ const getDefaultInternalConfig = () => ({
   // 同样必须登记进 defaults，否则云端的 pageTitle/pageDesc 会被合并逻辑丢弃。
   memberSharing: {
     pageTitle: '成员内部分享',
-    pageDesc: '浏览课程资料、历史会议记录及成员经验分享，支持 Word 与 Markdown 格式',
+    pageDesc: '浏览课程资料及成员经验分享，支持 Word 与 Markdown 格式',
   },
 });
 

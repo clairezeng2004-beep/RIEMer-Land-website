@@ -38,8 +38,8 @@ import './MemberSharingDetail.css';
 const SHARING_VIEWS_KEY = 'riemer_sharing_views';
 
 function buildCategoryMaps(cats) {
-  const labels = {};
-  const colors = {};
+  const labels = { history: '历史会议' };
+  const colors = { history: '#4FBFC4' };
   cats.forEach((c) => {
     labels[c.key] = c.label;
     colors[c.key] = c.color;
