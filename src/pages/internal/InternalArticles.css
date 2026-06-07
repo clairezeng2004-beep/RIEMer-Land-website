@@ -1167,6 +1167,12 @@
   box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.1);
 }
 
+/* 日期输入框文字左对齐（部分浏览器 / 移动端 date 控件默认居中，
+   导致活动日期看起来居中，这里统一改成偏左） */
+.ia-modal__text-input[type='date'] {
+  text-align: left;
+}
+
 .ia-modal__category-select {
   width: 100%;
 }
