@@ -1461,6 +1461,22 @@
     border-radius: var(--radius-lg, 12px);
   }
 
+  /* 触屏设备上 index.css 的 @media (pointer: coarse) 会把所有输入框强制成 16px
+     （高优先级），导致弹窗里标题/系列/日期/原文链接/摘要等字号偏大、不协调。
+     这里统一用 !important 拉回 text-sm，保证字号一致。 */
+  .ia-modal__text-input,
+  .ia-modal__textarea,
+  .ia-modal__url-input,
+  .ia-modal__tag-input,
+  .ia-modal__outline-input {
+    font-size: var(--text-sm) !important;
+  }
+
+  /* 发布日期 / 系列两列在窄屏下并排会过窄（日期框长度偏小），改为单列各自占满 */
+  .ia-modal__field-row {
+    grid-template-columns: 1fr;
+  }
+
   .ia-modal__url-row {
     flex-direction: column;
     align-items: stretch;
