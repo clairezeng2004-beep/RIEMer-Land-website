@@ -637,7 +637,13 @@
 @media (max-width: 768px) {
   .hero { padding: 48px 0 40px; }
   .hero__title { font-size: var(--text-2xl); }
-  .hero__subtitle { font-size: var(--text-base); }
+  .hero__subtitle {
+    font-size: var(--text-base);
+    /* 手机端放松断行限制：窄屏下 keep-all 会让整段中文词语整体换行，
+       导致很多行字数过少。改回 normal 允许中文在任意字间自然断行，
+       配合 text-wrap: balance 让每行字数尽量均匀。 */
+    word-break: normal;
+  }
   .hero-actions { padding: var(--space-xl) 0 var(--space-2xl); }
   .stats { padding-top: var(--space-md); padding-bottom: var(--space-sm); }
   .featured.section { padding-top: var(--space-2xl); }
