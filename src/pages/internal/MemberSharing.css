@@ -318,6 +318,10 @@
 }
 
 .ms-filters__cat {
+  /* 宽度跟随文字内容，绝不被弹性布局拉伸（修复"最后一行类别过宽"） */
+  flex: 0 0 auto;
+  width: auto;
+  white-space: nowrap;
   padding: 0.35rem 0.85rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-full);
@@ -1098,6 +1102,13 @@
   .ms-card__edit-btn,
   .ms-card__delete-btn {
     right: var(--space-sm);
+  }
+
+  /* ①b "经验时间段"小标签：胶囊有左内边距，会让里面的图标/文字比
+        标题、简介的左端缩进一点，看起来没对齐。用负的左外边距把胶囊
+        往左拉回，使其图标与标题/简介首字左对齐（胶囊底色仍在卡片内）。 */
+  .ms-card__period {
+    margin-left: -0.55rem;
   }
 
   /* ③ 作者 / 日期 / 浏览量 / 点赞 拉到同一行均匀分布；类型标签单独占一行。
