@@ -456,7 +456,7 @@ function AttachmentUploader({ attachments, onChange }) {
 
 /* ====== 主组件 ====== */
 export default function MemberSharingCreate() {
-  const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
+  const { isAuthenticated, user, getAllUsers } = useAuth();
   const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
@@ -571,12 +571,11 @@ export default function MemberSharingCreate() {
           navigate('/internal/member-sharing', { replace: true });
           return;
         }
-        // 编辑权限：管理员 / 原作者 / 任一贡献者本人（与流程模板文件一致）
+        // 编辑权限：仅该篇发布者 / 任一贡献者本人。
         const editContributorIds = Array.isArray(post.contributorIds) && post.contributorIds.length > 0
           ? post.contributorIds
           : post.authorId ? [post.authorId] : [];
-        const canEdit = isAdmin
-          || (post.authorId && String(post.authorId) === String(user?.id))
+        const canEdit = (post.authorId && String(post.authorId) === String(user?.id))
           || editContributorIds.map(String).includes(String(user?.id));
         if (!canEdit) {
           alert('你没有权限编辑这篇分享');
@@ -606,7 +605,7 @@ export default function MemberSharingCreate() {
     return () => {
       cancelled = true;
     };
-  }, [editId, isAuthenticated, isAdmin, navigate, user?.id]);
+  }, [editId, isAuthenticated, navigate, user?.id]);
 
   // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
   useAutoResizeTextarea(mdEditorRef, newPost.content, { minHeight: 360 });

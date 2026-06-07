@@ -416,14 +416,16 @@ export default function MemberSharing() {
     return post.likes.some((l) => l.userId === user.id);
   };
 
-  const canModify = (post) => {
-    if (isAdmin) return true;
-    if (post.authorId && post.authorId === user?.id) return true;
-    // 任一贡献者本人也可编辑/删除（与流程模板文件一致）
+  const isPostPublisherOrContributor = (post) => {
+    if (!user?.id) return false;
+    if (post.authorId && String(post.authorId) === String(user.id)) return true;
     if (Array.isArray(post.contributorIds)
-      && post.contributorIds.map(String).includes(String(user?.id))) return true;
+      && post.contributorIds.map(String).includes(String(user.id))) return true;
     return false;
   };
+
+  const canEditPost = (post) => isPostPublisherOrContributor(post);
+  const canDeletePost = (post) => isAdmin || isPostPublisherOrContributor(post);
 
   // 获取文本的纯文摘要（前 120 字）
   const getExcerpt = (post) => {
@@ -783,7 +785,7 @@ export default function MemberSharing() {
           {filtered.map((post) => (
             <div key={post.id} className="ms-card card">
               <div className="ms-card__accent" style={{ background: categoryColors[post.category] || '#6B7280' }} />
-              {canModify(post) && (
+              {canEditPost(post) && (
                 <a
                   href={`/internal/member-sharing/create?edit=${encodeURIComponent(post.id)}`}
                   target="_blank"
@@ -795,7 +797,7 @@ export default function MemberSharing() {
                   <Pencil size={14} />
                 </a>
               )}
-              {canModify(post) && (
+              {canDeletePost(post) && (
                 <button
                   type="button"
                   className="ms-card__edit-btn ms-card__delete-btn"
