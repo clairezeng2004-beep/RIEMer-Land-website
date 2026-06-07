@@ -465,6 +465,18 @@ export default function MemberSharingDetail() {
               getAuthor={(s) => s.author || ''}
             />
           </article>
+
+          {/* 右侧：所有用户可划线 / 整体评论（与流程模板文件详情页一致） */}
+          {showToc && (
+            <aside className="msd-comments" aria-label="划线评论">
+              <TextAnnotation
+                targetType="sharing"
+                targetId={post.id}
+                contentRef={contentRef}
+                inline
+              />
+            </aside>
+          )}
         </div>
       </div>
 
@@ -531,12 +543,15 @@ export default function MemberSharingDetail() {
         resolveName={resolveVisitorName}
       />
 
-      {/* 划线评论 — 对 Markdown / Word 正文都生效（浮动按钮 + 右侧抽屉） */}
-      <TextAnnotation
-        targetType="sharing"
-        targetId={post.id}
-        contentRef={contentRef}
-      />
+      {/* 划线评论 — 无目录时（短文档无标题）回退为浮动按钮 + 右侧抽屉；
+          有目录时已在上方以 inline 侧栏形式呈现，与流程模板文件详情页一致。 */}
+      {!showToc && (
+        <TextAnnotation
+          targetType="sharing"
+          targetId={post.id}
+          contentRef={contentRef}
+        />
+      )}
     </div>
   );
 }

@@ -61,13 +61,13 @@
   max-width: none;
 }
 
-/* 当存在目录时，内容区采用两栏布局：左目录 + 文章 */
+/* 当存在目录时，内容区采用三栏布局：左目录 + 文章 + 右评论
+   与流程模板文件详情页保持一致。 */
 .msd-content__inner--with-toc {
   display: grid;
-  /* 目录列宽从 220px 提升到 260px；max-width 同步提升以保留正文空间 */
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
   gap: var(--space-xl, 24px);
-  max-width: 1240px;
+  max-width: 1520px;
   margin: 0 auto;
   align-items: start;
 }
@@ -404,14 +404,42 @@
   align-items: center;
   gap: var(--space-lg);
   flex-wrap: wrap;
+  /* 统一设置在父级，让 span / button(.views-trigger) 都能继承，
+     避免 button 元素默认字号 / 黑色文字导致"浏览次数"突兀。 */
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
 }
 
-.msd-article__meta span {
-  display: flex;
+.msd-article__meta span,
+.msd-article__meta .views-trigger {
+  display: inline-flex;
   align-items: center;
   gap: 4px;
   font-size: var(--text-sm);
   color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+/* 访问记录按钮：与其他 meta 项视觉一致，仅在 hover 时给出轻微交互反馈 */
+.msd-article__meta .views-trigger {
+  padding: 2px 6px;
+  margin: -2px -6px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.msd-article__meta .views-trigger:hover {
+  background: rgba(99, 102, 241, 0.08);
+  color: var(--color-primary, #4f46e5);
+}
+
+.msd-article__meta .views-trigger:focus-visible {
+  outline: 2px solid var(--color-primary, #6366f1);
+  outline-offset: 1px;
 }
 
 /* Article Content — 通用排版 */
