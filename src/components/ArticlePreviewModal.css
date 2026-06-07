@@ -147,7 +147,8 @@
 
 @media (max-width: 640px) {
   .article-preview__overlay {
-    align-items: flex-end;
+    /* 手机端弹窗居中显示（此前贴底偏下） */
+    align-items: center;
     padding: 0.75rem;
   }
 
