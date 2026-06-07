@@ -1191,20 +1191,23 @@
 
 .ia-modal__textarea-wrap {
   position: relative;
+  /* 计数行与下方字段之间也留出间距 */
+  margin-bottom: var(--space-xs);
 }
 
 .ia-modal__textarea-wrap .ia-modal__textarea {
   width: 100%;
-  padding-bottom: 1.8rem;
 }
 
+/* 字符计数移到文本框下方独立成行，与上方文本框、下方字段都留出间距，
+   避免之前绝对定位时"计数贴着文本框底部"几乎粘在一起 */
 .ia-modal__char-count {
-  position: absolute;
-  right: 0.85rem;
-  bottom: 0.55rem;
+  display: block;
+  margin-top: 8px;
+  text-align: right;
   color: var(--color-text-muted);
   font-size: var(--text-xs);
-  line-height: 1;
+  line-height: 1.4;
   pointer-events: none;
 }
 
