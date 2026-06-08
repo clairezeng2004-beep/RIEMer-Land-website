@@ -98,6 +98,20 @@ function buildEmptyColumnContent() {
   return frag;
 }
 
+function appendColumnImage(col, src) {
+  const img = document.createElement('img');
+  img.src = src;
+  img.className = 'msc-img';
+  img.setAttribute('draggable', 'false');
+  img.alt = '';
+  col.appendChild(img);
+
+  const p = document.createElement('p');
+  p.innerHTML = '<br />';
+  col.appendChild(p);
+  return img;
+}
+
 function getColumns(container) {
   return [...container.children].filter((el) => el.classList?.contains('msc-col'));
 }
@@ -197,12 +211,7 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     const col = document.createElement('div');
     col.className = 'msc-col';
     if (datas[i]) {
-      const img = document.createElement('img');
-      img.src = datas[i];
-      img.className = 'msc-img';
-      img.setAttribute('draggable', 'false');
-      img.alt = '';
-      col.appendChild(img);
+      appendColumnImage(col, datas[i]);
     } else {
       col.appendChild(buildEmptyColumnContent());
     }
@@ -244,12 +253,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       if (!file) return;
       const url = await fileToDataUrl(file);
       col.innerHTML = '';
-      const img = document.createElement('img');
-      img.src = url;
-      img.className = 'msc-img';
-      img.setAttribute('draggable', 'false');
-      img.alt = '';
-      col.appendChild(img);
+      appendColumnImage(col, url);
       const container = col.closest('.msc-cols');
       ensureColumnMeta(container);
       requestAnimationFrame(() => layoutColumnResizers(container));

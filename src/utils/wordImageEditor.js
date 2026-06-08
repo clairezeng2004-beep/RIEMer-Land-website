@@ -50,22 +50,38 @@ function whenImgLoaded(img) {
   });
 }
 
-/** 让 selection 移到节点之后，方便继续输入 */
-function moveCaretAfter(node) {
-  const sel = window.getSelection();
-  if (!sel) return;
-  const range = document.createRange();
-  range.setStartAfter(node);
-  range.collapse(true);
-  sel.removeAllRanges();
-  sel.addRange(range);
+/** 在节点后补一个空段落，并把光标放进去，方便继续输入 */
+function insertTrailingParagraphAfter(node) {
+  const trailer = document.createElement('p');
+  trailer.innerHTML = '<br />';
+  node.parentNode?.insertBefore(trailer, node.nextSibling);
+
+  try {
+    const sel = window.getSelection();
+    if (!sel) return trailer;
+    const range = document.createRange();
+    range.selectNodeContents(trailer);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+  } catch { /* ignore */ }
+
+  return trailer;
+}
+
+function getImageContainerWidth(editor, img) {
+  const col = img.closest('.msc-col');
+  const container = col || editor;
+  const rectWidth = container.getBoundingClientRect?.().width || 0;
+  const clientWidth = container.clientWidth || rectWidth || editor.clientWidth;
+  return Math.max(32, Math.round(clientWidth - 8));
 }
 
 /**
  * 在当前光标处（或编辑器末尾）插入一张图片段落
  * 返回插入的 <img> 元素
  */
-async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 0.6 } = {}) {
+async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 } = {}) {
   // 构造要插入的节点
   const wrap = document.createElement('p');
   wrap.className = 'msc-img-wrap';
@@ -94,18 +110,23 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 0.6
     editor.appendChild(wrap);
   }
 
-  // 图片加载后按编辑器宽度的 60% 初始化宽度
+  // 图片加载后默认撑满当前输入区域：普通正文撑满编辑器，分栏内撑满当前栏。
   await whenImgLoaded(img);
   try {
-    const maxW = editor.clientWidth - 32; // 留一点 padding
-    const natural = img.naturalWidth || maxW;
-    const targetW = Math.min(natural, Math.round(maxW * initialWidthRatio));
+    if (img.closest('.msc-col')) {
+      img.style.width = '100%';
+      img.style.height = 'auto';
+      insertTrailingParagraphAfter(wrap);
+      return img;
+    }
+    const maxW = getImageContainerWidth(editor, img);
+    const targetW = Math.round(maxW * initialWidthRatio);
     img.style.width = `${targetW}px`;
     img.style.height = 'auto';
   } catch { /* noop */ }
 
-  // 让光标出现在图片段落之后，便于继续输入
-  moveCaretAfter(wrap);
+  // 插入图片后默认另起一个空段落，同栏文字只能从图片下方继续输入。
+  insertTrailingParagraphAfter(wrap);
 
   return img;
 }
@@ -196,7 +217,7 @@ function createResizer(editor, getImg, onResizeChange) {
     }
 
     // 限制范围
-    const maxW = editor.clientWidth - 32;
+    const maxW = getImageContainerWidth(editor, img);
     w = Math.max(32, Math.min(w, maxW));
     h = Math.max(24, h);
 
