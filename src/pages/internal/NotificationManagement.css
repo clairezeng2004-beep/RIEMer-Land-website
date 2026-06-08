@@ -923,6 +923,36 @@
   .nre-row {
     grid-template-columns: 1fr;
   }
+
+  /* 手机端：规则弹窗里所有输入控件统一为整行宽度 + 同一字号，
+     避免下拉框/数字框/条件框忽大忽小、长度不一 */
+  .nre-field input[type='text'],
+  .nre-field input[type='number'],
+  .nre-field textarea,
+  .nre-select,
+  .nre-select--sm,
+  .nre-num,
+  .nre-cond-val {
+    width: 100% !important;
+    min-width: 0 !important;
+    font-size: var(--text-sm);
+    box-sizing: border-box;
+  }
+
+  /* 附加条件每行的「字段 / 运算符 / 对比值 / 删除」改为纵向堆叠，
+     各控件整行对齐，删除按钮靠右 */
+  .nre-condition {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    padding: 10px;
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-sm);
+  }
+
+  .nre-cond-remove {
+    align-self: flex-end;
+  }
 }
 
 .nre-vars {
@@ -982,10 +1012,12 @@
 .nre-cond-val {
   flex: 1;
   min-width: 150px;
-  padding: 7px 10px;
+  padding: 8px 12px;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-sm);
   font-size: var(--text-sm);
+  font-family: inherit;
+  color: var(--color-text);
   background: #fff;
 }
 
