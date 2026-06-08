@@ -987,10 +987,16 @@
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
 
-.ia-cover-uploader__drop:hover {
+.ia-cover-uploader__drop:hover,
+.ia-cover-uploader__drop.is-dragover {
   border-color: var(--color-primary);
   color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg-card));
+}
+
+/* 拖拽悬停时实线高亮，提示可以松手放下 */
+.ia-cover-uploader__drop.is-dragover {
+  border-style: solid;
 }
 
 .ia-cover-uploader__gallery-btn {
@@ -1095,10 +1101,16 @@
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
 
-.ia-cover-gallery__upload:hover {
+.ia-cover-gallery__upload:hover,
+.ia-cover-gallery__upload.is-dragover {
   border-color: var(--color-primary);
   color: var(--color-primary);
   background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg-card));
+}
+
+/* 拖拽悬停时实线高亮，提示可以松手放下 */
+.ia-cover-gallery__upload.is-dragover {
+  border-style: solid;
 }
 
 .ia-cover-gallery__grid {

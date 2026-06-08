@@ -103,6 +103,24 @@ async function readCoverImage(file) {
   }
 }
 
+// 拖拽上传：为上传区生成统一的拖放事件处理器。
+// onFile 收到被拖入的第一个文件；校验/读取由调用方决定（与点击上传共用同一逻辑）。
+// 通过给当前元素加/去 is-dragover class 提供拖拽高亮，无需额外 React state。
+function makeImageDropHandlers(onFile) {
+  const stop = (e) => { e.preventDefault(); e.stopPropagation(); };
+  return {
+    onDragOver: (e) => { stop(e); e.currentTarget.classList.add('is-dragover'); },
+    onDragEnter: (e) => { stop(e); e.currentTarget.classList.add('is-dragover'); },
+    onDragLeave: (e) => { stop(e); e.currentTarget.classList.remove('is-dragover'); },
+    onDrop: (e) => {
+      stop(e);
+      e.currentTarget.classList.remove('is-dragover');
+      const file = e.dataTransfer?.files?.[0];
+      if (file) onFile(file);
+    },
+  };
+}
+
 function makeCoverGalleryItem(file, dataUrl) {
   const now = new Date().toISOString();
   return {
@@ -802,7 +820,13 @@ export default function InternalArticles() {
         </div>
       ) : (
         <div className="ia-cover-uploader__choices">
-          <label className="ia-cover-uploader__drop">
+          <label
+            className="ia-cover-uploader__drop"
+            {...makeImageDropHandlers(async (file) => {
+              const dataUrl = await readCoverImage(file);
+              if (dataUrl) onChange(dataUrl);
+            })}
+          >
             <input
               type="file"
               accept="image/*"
@@ -814,7 +838,7 @@ export default function InternalArticles() {
               }}
             />
             <ImagePlus size={20} />
-            <span>点击上传封面图片</span>
+            <span>点击或拖拽上传封面图片</span>
             <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
           </label>
           <button
@@ -2461,7 +2485,10 @@ export default function InternalArticles() {
             </div>
 
             <div className="ia-modal__body">
-              <label className="ia-cover-gallery__upload">
+              <label
+                className="ia-cover-gallery__upload"
+                {...makeImageDropHandlers((file) => handleAddGalleryCover(file))}
+              >
                 <input
                   type="file"
                   accept="image/*"
@@ -2472,7 +2499,7 @@ export default function InternalArticles() {
                   }}
                 />
                 <ImagePlus size={20} />
-                <span>上传图片到封面图库</span>
+                <span>点击或拖拽上传图片到封面图库</span>
               </label>
 
               {coverGallery.length > 0 ? (
