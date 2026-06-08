@@ -434,6 +434,7 @@ export default function NotificationManagement() {
                   <h4>通知已发送！</h4>
                 </div>
               ) : (
+                <>
                 <div className="notif-mgmt__modal-body">
                   <div className="notif-mgmt__form-group">
                     <label>通知标题 <span className="notif-mgmt__required">*</span></label>
@@ -512,6 +513,7 @@ export default function NotificationManagement() {
                       </div>
                     </div>
                   </div>
+                </div>
 
                   <div className="notif-mgmt__modal-footer">
                     <button
@@ -533,7 +535,7 @@ export default function NotificationManagement() {
                       )}
                     </button>
                   </div>
-                </div>
+                </>
               )}
             </div>
           </div>

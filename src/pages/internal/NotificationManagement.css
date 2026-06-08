@@ -516,6 +516,9 @@
   border-radius: var(--radius-xl);
   width: 90%;
   max-width: 520px;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
   box-shadow: var(--shadow-lg);
   animation: modal-slide-in 0.2s ease;
   overflow: hidden;
@@ -532,6 +535,7 @@
   justify-content: space-between;
   padding: var(--space-lg) var(--space-xl);
   border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
 }
 
 .notif-mgmt__modal-header h3 {
@@ -565,7 +569,11 @@
   padding: var(--space-xl);
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: var(--space-md);
+  overflow-y: auto;
+  flex: 1;
+  /* min-height:0 让 flex 列里的 body 真正能内部滚动，而不是把弹窗整体撑高 */
+  min-height: 0;
 }
 
 .notif-mgmt__modal-success {
@@ -655,7 +663,9 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-sm);
-  padding-top: var(--space-sm);
+  padding: var(--space-md) var(--space-xl);
+  border-top: 1px solid var(--color-border-light);
+  flex-shrink: 0;
 }
 
 /* ============ Responsive ============ */
@@ -830,21 +840,24 @@
   width: 92%;
 }
 
+/* nre 表单：body 自身已用 gap 控制段落间距，section 只保留分隔线和较小的内边距，
+   避免 gap + margin + padding 叠加导致文本框之间留白过多 */
 .nre .nre-section {
-  margin-bottom: var(--space-lg);
-  padding-bottom: var(--space-md);
+  margin-bottom: 0;
+  padding-bottom: var(--space-sm);
   border-bottom: 1px dashed var(--color-border-light);
 }
 
 .nre .nre-section:last-child {
   border-bottom: none;
+  padding-bottom: 0;
 }
 
 .nre-section-title {
   font-size: var(--text-sm);
   font-weight: 600;
   color: var(--color-text);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
   display: flex;
   align-items: baseline;
   gap: 8px;
