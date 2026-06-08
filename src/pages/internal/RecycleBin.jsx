@@ -16,7 +16,6 @@ import {
   fetchRecycleBin,
   subscribeRecycleBin,
   restoreItem,
-  purgeItem,
   RECYCLE_TYPE_LABELS,
 } from '../../services/recycleBinService';
 // 复用「活动发布 / 公众号归档」的卡片样式（ia-card / ep-card），保持视觉一致
@@ -116,22 +115,6 @@ export default function RecycleBin() {
     setBusyId(null);
   }, [busyId]);
 
-  const handlePurge = useCallback(async (entry) => {
-    if (busyId) return;
-    const label = RECYCLE_TYPE_LABELS[entry.itemType] || '内容';
-    if (!window.confirm(`彻底删除「${entry.title}」（${label}）？此操作不可恢复。`)) return;
-    setBusyId(entry.id);
-    setEntries((prev) => prev.filter((e) => String(e.id) !== String(entry.id)));
-    const res = await purgeItem(entry);
-    if (!res?.success) {
-      setEntries((prev) => (
-        prev.some((e) => String(e.id) === String(entry.id)) ? prev : [entry, ...prev]
-      ));
-      alert(`删除失败：${res?.error || '未知错误'}。`);
-    }
-    setBusyId(null);
-  }, [busyId]);
-
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   const typeChips = ['all', ...Object.keys(RECYCLE_TYPE_LABELS)];
@@ -142,7 +125,7 @@ export default function RecycleBin() {
         <div className="rb-page__header">
           <div>
             <h1><Trash2 size={28} /> 回收站</h1>
-            <p>这里暂存各模块删除的资料与分享，可恢复到原处，或彻底删除。</p>
+            <p>这里暂存各模块删除的资料与分享，可恢复到原处。</p>
           </div>
         </div>
 
@@ -206,14 +189,6 @@ export default function RecycleBin() {
                       disabled={busyId === entry.id}
                     >
                       <RotateCcw size={14} /> 恢复
-                    </button>
-                    <button
-                      type="button"
-                      className="rb-card__btn rb-card__btn--purge"
-                      onClick={() => handlePurge(entry)}
-                      disabled={busyId === entry.id}
-                    >
-                      <Trash2 size={14} /> 彻底删除
                     </button>
                   </div>
                 </div>

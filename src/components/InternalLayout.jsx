@@ -11,6 +11,7 @@ import {
   Bell, BellRing, FolderOpen, Share2, BookOpen, CheckSquare,
   Camera, BarChart3, MessageSquarePlus, MessageCircle, UserCircle, Contact,
   Users, Settings, CalendarRange, Activity,
+  Trash2,
 } from 'lucide-react';
 import './InternalLayout.css';
 
@@ -70,6 +71,7 @@ function MobileInternalNav() {
     { to: '/internal/users', icon: Users, label: sc.labelUsers },
     { to: '/internal/content', icon: Settings, label: sc.labelContent },
     { to: '/internal/notification-management', icon: BellRing, label: sc.labelNotificationMgmt },
+    { to: '/internal/recycle-bin', icon: Trash2, label: '回收站' },
     // 同步诊断：仅管理员可见
     ...(isAdmin ? [
       { to: '/internal/sync-diagnostic', icon: Activity, label: '同步诊断' },
