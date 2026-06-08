@@ -168,6 +168,129 @@ function layoutColumnResizers(container) {
   });
 }
 
+/** 某一栏是否为空（无图片、无非空白文字） */
+function isEmptyColumn(col) {
+  if (!col) return true;
+  if (col.querySelector('img')) return false;
+  return (col.textContent || '').replace(/​/g, '').trim() === '';
+}
+
+/** 把光标放到某节点内容末尾 */
+function placeCaretAtEnd(node) {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch { /* ignore */ }
+}
+
+/** 删栏后：把剩余栏还原为等分，并刷新栏数标签/分隔手柄 */
+function redistributeColumns(container) {
+  const cols = getColumns(container);
+  const n = cols.length;
+  container.classList.remove('msc-cols--2', 'msc-cols--3', 'msc-cols--4');
+  container.classList.add(`msc-cols--${n}`);
+  // 清掉拖拽时写入的内联宽度，交回 .msc-cols--N 的等分规则
+  container.style.gridTemplateColumns = '';
+  ensureColumnMeta(container);
+  ensureColumnResizers(container);
+  ensureColumnAdders(container);
+  requestAnimationFrame(() => {
+    layoutColumnResizers(container);
+    layoutColumnAdders(container);
+  });
+}
+
+/** 只剩一栏时：取消分栏，把该栏内容平铺回正文（图片居中），返回首个块 */
+function unwrapSingleColumn(container, col) {
+  const parent = container.parentNode;
+  if (!parent) return null;
+  const frag = document.createDocumentFragment();
+  let firstBlock = null;
+  [...col.childNodes].forEach((node) => {
+    let out = node;
+    if (node.nodeType === 1 && (node.matches?.('img') || node.tagName === 'IMG')) {
+      const p = document.createElement('p');
+      p.className = 'msc-img-wrap';
+      p.style.textAlign = 'center';
+      p.appendChild(node);
+      out = p;
+    }
+    if (!firstBlock) firstBlock = out;
+    frag.appendChild(out);
+  });
+  if (!frag.childNodes.length) {
+    const p = document.createElement('p');
+    p.innerHTML = '<br />';
+    frag.appendChild(p);
+    firstBlock = p;
+  }
+  parent.insertBefore(frag, container);
+  container.remove();
+  return firstBlock;
+}
+
+/** 生成/校正「新增一栏」加号按钮：左端、各栏之间、右端各一个（最多 4 栏） */
+function ensureColumnAdders(container) {
+  if (!container) return;
+  container.querySelectorAll(':scope > .msc-col-adder').forEach((el) => el.remove());
+  const cols = getColumns(container);
+  if (cols.length >= 4) return; // 最多 4 栏
+  for (let i = 0; i <= cols.length; i += 1) {
+    const adder = document.createElement('span');
+    adder.className = 'msc-col-adder';
+    adder.setAttribute('contenteditable', 'false');
+    adder.setAttribute('data-adder-index', String(i));
+    adder.setAttribute('title', '在此处新增一栏');
+    adder.textContent = '+';
+    container.appendChild(adder);
+  }
+}
+
+/** 把加号按钮定位到对应栏的左/右边界 */
+function layoutColumnAdders(container) {
+  if (!container) return;
+  const cols = getColumns(container);
+  const adders = [...container.querySelectorAll(':scope > .msc-col-adder')];
+  if (cols.length === 0 || adders.length === 0) return;
+  const base = container.getBoundingClientRect();
+  adders.forEach((adder) => {
+    const i = Number(adder.getAttribute('data-adder-index'));
+    let x;
+    if (i <= 0) {
+      x = cols[0].getBoundingClientRect().left - base.left;
+    } else if (i >= cols.length) {
+      x = cols[cols.length - 1].getBoundingClientRect().right - base.left;
+    } else {
+      const a = cols[i - 1].getBoundingClientRect();
+      const b = cols[i].getBoundingClientRect();
+      x = ((a.right + b.left) / 2) - base.left;
+    }
+    adder.style.left = `${x}px`;
+  });
+}
+
+/** 在第 index 个位置插入一个空栏（index===栏数时追加到末尾） */
+function insertEmptyColumnAt(container, index) {
+  const cols = getColumns(container);
+  if (cols.length >= 4) return;
+  const col = document.createElement('div');
+  col.className = 'msc-col';
+  col.appendChild(buildEmptyColumnContent());
+  const ref = cols[index];
+  if (ref) {
+    container.insertBefore(col, ref);
+  } else {
+    // 追加：插到所有 .msc-col 之后、辅助元素（resizer/adder）之前
+    const firstAux = container.querySelector(':scope > .msc-col-resizer, :scope > .msc-col-adder');
+    if (firstAux) container.insertBefore(col, firstAux);
+    else container.appendChild(col);
+  }
+}
+
 /** 文件 → dataURL */
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -218,9 +341,13 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     container.appendChild(col);
   }
   ensureColumnResizers(container);
+  ensureColumnAdders(container);
 
   insertBlockAtCaret(editor, container);
-  requestAnimationFrame(() => layoutColumnResizers(container));
+  requestAnimationFrame(() => {
+    layoutColumnResizers(container);
+    layoutColumnAdders(container);
+  });
 }
 
 /**
@@ -239,7 +366,9 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
   const refreshAll = () => {
     editor.querySelectorAll('.msc-cols').forEach((container) => {
       ensureColumnResizers(container);
+      ensureColumnAdders(container);
       layoutColumnResizers(container);
+      layoutColumnAdders(container);
     });
   };
 
@@ -293,6 +422,20 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
 
+    // 0) 点击「+」加号 → 在对应位置新增一栏并重排
+    const adder = t.closest('.msc-col-adder');
+    if (adder && editor.contains(adder)) {
+      e.preventDefault();
+      e.stopPropagation();
+      const container = adder.closest('.msc-cols');
+      if (!container) return;
+      const index = Number(adder.getAttribute('data-adder-index'));
+      insertEmptyColumnAt(container, index);
+      redistributeColumns(container);
+      onChange?.();
+      return;
+    }
+
     const col = t.closest('.msc-col');
     if (col && editor.contains(col)) {
       selectColumn(col);
@@ -338,7 +481,9 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const container = t.closest('.msc-cols');
     if (!container || !editor.contains(container)) return;
     ensureColumnResizers(container);
+    ensureColumnAdders(container);
     layoutColumnResizers(container);
+    layoutColumnAdders(container);
   };
 
   const onPointerDown = (e) => {
@@ -418,10 +563,53 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     onChange?.();
   };
 
+  // 退格删除：分栏全空 → 一次退格删整块；当前栏空 → 删该栏并按新栏数重排
+  const onKeyDown = (e) => {
+    if (e.key !== 'Backspace' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
+    const anchor =
+      sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+    const container = anchor?.closest?.('.msc-cols');
+    if (!container || !editor.contains(container)) return;
+
+    const cols = getColumns(container);
+    const currentCol = anchor.closest('.msc-col');
+    const allEmpty = cols.length > 0 && cols.every(isEmptyColumn);
+
+    // 整个分栏为空 → 一次退格删除整块
+    if (allEmpty) {
+      e.preventDefault();
+      const prev = container.previousElementSibling;
+      const next = container.nextElementSibling;
+      container.remove();
+      if (prev) placeCaretAtEnd(prev);
+      else if (next) placeCaretAtStart(next);
+      onChange?.();
+      return;
+    }
+
+    // 当前栏为空（其余栏有内容）→ 删除该栏并重排
+    if (currentCol && isEmptyColumn(currentCol)) {
+      e.preventDefault();
+      currentCol.remove();
+      const remaining = getColumns(container);
+      if (remaining.length >= 2) {
+        redistributeColumns(container);
+        placeCaretAtStart(remaining[0]);
+      } else if (remaining.length === 1) {
+        const block = unwrapSingleColumn(container, remaining[0]);
+        if (block) placeCaretAtStart(block);
+      }
+      onChange?.();
+    }
+  };
+
   const onScrollOrResize = () => refreshAll();
 
   refreshAll();
   editor.addEventListener('click', handler);
+  editor.addEventListener('keydown', onKeyDown);
   editor.addEventListener('mouseover', onMouseOver);
   editor.addEventListener('pointerdown', onPointerDown);
   window.addEventListener('pointermove', onPointerMove);
@@ -432,6 +620,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
 
   return () => {
     editor.removeEventListener('click', handler);
+    editor.removeEventListener('keydown', onKeyDown);
     editor.removeEventListener('mouseover', onMouseOver);
     editor.removeEventListener('pointerdown', onPointerDown);
     window.removeEventListener('pointermove', onPointerMove);
