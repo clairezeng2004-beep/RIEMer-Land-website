@@ -90,7 +90,8 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
   const img = document.createElement('img');
   img.src = dataUrl;
   img.className = 'msc-img';
-  img.setAttribute('draggable', 'false');
+  // 允许选中后随光标拖拽移动（编辑器内）
+  img.setAttribute('draggable', 'true');
   img.alt = '';
 
   wrap.appendChild(img);
@@ -272,6 +273,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   }
 
   let selectedImg = null;
+  // 正在被拖拽移动的编辑器内图片（用于和「文件拖入」区分）
+  let draggingImg = null;
 
   // 触发 onChange：把 editor.innerHTML 回写到 state
   const fireChange = () => {
@@ -324,10 +327,48 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     })();
   }
 
-  // 拖拽：拦截文件拖放
+  // 落点 → caret Range（兼容不同浏览器 API）
+  function caretRangeFromPoint(x, y) {
+    if (document.caretRangeFromPoint) return document.caretRangeFromPoint(x, y);
+    if (document.caretPositionFromPoint) {
+      const p = document.caretPositionFromPoint(x, y);
+      if (!p) return null;
+      const r = document.createRange();
+      r.setStart(p.offsetNode, p.offset);
+      r.collapse(true);
+      return r;
+    }
+    return null;
+  }
+
+  // 开始拖拽编辑器内的图片
+  function onDragStart(e) {
+    const t = e.target;
+    if (t instanceof HTMLImageElement && t.classList.contains('msc-img')) {
+      draggingImg = t;
+      selectImage(null); // 拖动时先隐藏 resize 手柄
+      try {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', ''); // 某些浏览器需要有 data 才能拖
+      } catch { /* ignore */ }
+    } else {
+      draggingImg = null;
+    }
+  }
+  function onDragEnd() {
+    draggingImg = null;
+    editor.classList.remove('msc-form__word-editor--drag');
+  }
+
+  // 拖拽经过：图片移动允许放置；文件拖入显示高亮
   function onDragOver(e) {
     const dt = e.dataTransfer;
     if (!dt) return;
+    if (draggingImg) {
+      e.preventDefault();
+      dt.dropEffect = 'move';
+      return;
+    }
     const hasFile = Array.from(dt.items || []).some((it) => it.kind === 'file');
     if (hasFile) {
       e.preventDefault();
@@ -342,29 +383,52 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   function onDrop(e) {
     const dt = e.dataTransfer;
     if (!dt) return;
+
+    // 1) 编辑器内图片移动：把图片所在块移动到落点光标处
+    if (draggingImg) {
+      e.preventDefault();
+      e.stopPropagation();
+      const img = draggingImg;
+      draggingImg = null;
+      editor.classList.remove('msc-form__word-editor--drag');
+      const range = caretRangeFromPoint(e.clientX, e.clientY);
+      if (!range) return;
+      // 要移动的块：正文图片用 .msc-img-wrap；分栏内裸图则包成居中段落一起搬出
+      let node = img.closest('.msc-img-wrap');
+      if (!node) {
+        const wrap = document.createElement('p');
+        wrap.className = 'msc-img-wrap';
+        wrap.style.textAlign = 'center';
+        wrap.appendChild(img);
+        node = wrap;
+      }
+      // 落点若在被拖块内部则放弃，避免把块塞进自己
+      if (node.contains(range.startContainer)) return;
+      try {
+        range.insertNode(node); // 节点已在文档中时会被移动到此处
+        const after = document.createRange();
+        after.setStartAfter(node);
+        after.collapse(true);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(after);
+      } catch { /* ignore */ }
+      fireChange();
+      return;
+    }
+
+    // 2) 从系统拖入图片文件
     const files = Array.from(dt.files || []).filter((f) => f.type.startsWith('image/'));
     if (files.length === 0) return; // 非图片交给默认
     e.preventDefault();
     e.stopPropagation();
     editor.classList.remove('msc-form__word-editor--drag');
-    // 把光标移到 drop 位置
-    try {
-      const range =
-        document.caretRangeFromPoint?.(e.clientX, e.clientY) ||
-        (document.caretPositionFromPoint && (() => {
-          const p = document.caretPositionFromPoint(e.clientX, e.clientY);
-          if (!p) return null;
-          const r = document.createRange();
-          r.setStart(p.offsetNode, p.offset);
-          r.collapse(true);
-          return r;
-        })());
-      if (range) {
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      }
-    } catch { /* ignore */ }
+    const range = caretRangeFromPoint(e.clientX, e.clientY);
+    if (range) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
     (async () => {
       for (const f of files) {
         const dataUrl = await fileToDataUrl(f);
@@ -428,6 +492,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
 
   editor.addEventListener('click', onEditorClick);
   editor.addEventListener('paste', onEditorPaste, true /* capture：优先处理图片 */);
+  editor.addEventListener('dragstart', onDragStart);
+  editor.addEventListener('dragend', onDragEnd);
   editor.addEventListener('dragover', onDragOver);
   editor.addEventListener('dragleave', onDragLeave);
   editor.addEventListener('drop', onDrop);
@@ -461,6 +527,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     destroy() {
       editor.removeEventListener('click', onEditorClick);
       editor.removeEventListener('paste', onEditorPaste, true);
+      editor.removeEventListener('dragstart', onDragStart);
+      editor.removeEventListener('dragend', onDragEnd);
       editor.removeEventListener('dragover', onDragOver);
       editor.removeEventListener('dragleave', onDragLeave);
       editor.removeEventListener('drop', onDrop);

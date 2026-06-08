@@ -369,7 +369,7 @@ export default function ProcessTemplateCreate() {
         return;
       }
       if (!img.classList.contains('msc-img')) img.classList.add('msc-img');
-      img.setAttribute('draggable', 'false');
+      img.setAttribute('draggable', 'true');
       // 若没包在 msc-img-wrap 段落里，则包一个
       const parent = img.parentElement;
       if (!parent || !parent.classList.contains('msc-img-wrap')) {

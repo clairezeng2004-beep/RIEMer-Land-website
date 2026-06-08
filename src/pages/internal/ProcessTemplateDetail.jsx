@@ -184,7 +184,7 @@ function cleanWordHtml(html) {
       return;
     }
     if (!img.classList.contains('msc-img')) img.classList.add('msc-img');
-    img.setAttribute('draggable', 'false');
+    img.setAttribute('draggable', 'true');
     const parent = img.parentElement;
     if (!parent || !parent.classList.contains('msc-img-wrap')) {
       const wrap = parsed.createElement('p');
