@@ -35,6 +35,33 @@ export default function WordEditorToolbar({
     }
   };
 
+  /* ===================== 光标位置保存/恢复 =====================
+     打开下拉菜单 / 点击菜单项会让 contentEditable 失焦，若插入前再 focus()
+     会把光标重置到文首，导致分栏/表格被插到正文最前面。这里在交互开始前
+     （mousedown，早于失焦）保存编辑器内的 Range，插入时再恢复。 */
+  const savedRangeRef = useRef(null);
+  const saveSelection = () => {
+    const editor = editorRef?.current;
+    if (!editor) return;
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+    const range = sel.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) {
+      savedRangeRef.current = range.cloneRange();
+    }
+  };
+  const restoreSelection = () => {
+    const editor = editorRef?.current;
+    if (!editor) return;
+    editor.focus();
+    const range = savedRangeRef.current;
+    if (range && editor.contains(range.commonAncestorContainer)) {
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    }
+  };
+
   /* ===================== 分栏下拉 ===================== */
   const [colOpen, setColOpen] = useState(false);
   const colBtnRef = useRef(null);
@@ -55,27 +82,13 @@ export default function WordEditorToolbar({
     return () => document.removeEventListener('mousedown', onDoc);
   }, [colOpen]);
 
-  const handleInsertColumns = async (count, withFiles) => {
+  const handleInsertColumns = async (count) => {
     setColOpen(false);
     if (!editorRef?.current) return;
-    // 保证焦点落在编辑器里（否则光标不在内部，会追加到末尾）
-    editorRef.current.focus();
-
-    if (withFiles) {
-      const input = document.createElement('input');
-      input.type = 'file';
-      input.accept = 'image/*';
-      input.multiple = true;
-      input.onchange = async () => {
-        const files = Array.from(input.files || []).slice(0, count);
-        await insertColumnsIntoEditor(editorRef.current, { count, files });
-        fireChange();
-      };
-      input.click();
-    } else {
-      await insertColumnsIntoEditor(editorRef.current, { count });
-      fireChange();
-    }
+    // 恢复打开菜单前的光标位置，分栏将插在光标处而非正文最前
+    restoreSelection();
+    await insertColumnsIntoEditor(editorRef.current, { count });
+    fireChange();
   };
 
   /* ===================== 表格网格选择器 ===================== */
@@ -107,7 +120,8 @@ export default function WordEditorToolbar({
     setTableOpen(false);
     setGrid({ r: 0, c: 0 });
     if (!editorRef?.current || rows < 1 || cols < 1) return;
-    editorRef.current.focus();
+    // 恢复光标位置，表格插在光标处而非正文最前
+    restoreSelection();
     insertTableIntoEditor(editorRef.current, { rows, cols });
     fireChange();
   };
@@ -130,6 +144,7 @@ export default function WordEditorToolbar({
           ref={colBtnRef}
           type="button"
           className="msc-form__paste-btn msc-form__paste-btn--ghost"
+          onMouseDown={saveSelection}
           onClick={() => setColOpen((v) => !v)}
           title="插入多栏并排布局（类似飞书），常用于图片左右排版"
         >
@@ -139,32 +154,22 @@ export default function WordEditorToolbar({
         {colOpen && (
           <div ref={colMenuRef} className="wet__menu">
             <div className="wet__menu-title">选择栏数</div>
-            {[2, 3, 4].map((n) => (
-              <div key={n} className="wet__menu-group">
-                <div className="wet__menu-row">
-                  <span className="wet__menu-row-label">{n} 栏</span>
-                  <div className="wet__menu-row-actions">
-                    <button
-                      type="button"
-                      className="wet__menu-btn"
-                      onClick={() => handleInsertColumns(n, true)}
-                      title={`选择 ${n} 张图片，一键插入 ${n} 栏布局`}
-                    >
-                      选图插入
-                    </button>
-                    <button
-                      type="button"
-                      className="wet__menu-btn wet__menu-btn--ghost"
-                      onClick={() => handleInsertColumns(n, false)}
-                      title="先插入空分栏，稍后点击各栏补图"
-                    >
-                      空分栏
-                    </button>
-                  </div>
-                </div>
-              </div>
-            ))}
-            <div className="wet__menu-tip">提示：空分栏中每一栏可点击「点此添加图片」补图，或点「输入文字」改为文字栏</div>
+            <div className="wet__menu-cols">
+              {[2, 3, 4].map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  className="wet__menu-col-btn"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleInsertColumns(n)}
+                  title={`插入 ${n} 栏并排布局`}
+                >
+                  <Columns size={16} />
+                  {n} 栏
+                </button>
+              ))}
+            </div>
+            <div className="wet__menu-tip">提示：插入后点击各栏「点此添加图片」补图，或点「输入文字」改为文字栏</div>
           </div>
         )}
       </div>
@@ -175,6 +180,7 @@ export default function WordEditorToolbar({
           ref={tableBtnRef}
           type="button"
           className="msc-form__paste-btn msc-form__paste-btn--ghost"
+          onMouseDown={saveSelection}
           onClick={() => setTableOpen((v) => !v)}
           title="插入表格（类似飞书）"
         >

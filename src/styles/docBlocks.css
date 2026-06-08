@@ -12,7 +12,9 @@
   display: grid;
   gap: 12px;
   margin: 0.8em 0;
-  align-items: start;
+  /* stretch：同一行的各栏高度自动拉齐 —— 某一栏插入/调整图片变高后，
+     相邻栏会跟随到同样高度，不再出现一高一矮 */
+  align-items: stretch;
   position: relative;
 }
 
@@ -137,9 +139,11 @@
 
 .msc-col > img,
 .msc-col .msc-img {
-  width: 100%;
+  /* 不再撑满整栏宽度：两侧各留约 7% 留白并居中，避免图片顶到分栏边缘 */
+  width: 86%;
   height: auto;
   display: block;
+  margin: 0 auto;
   border-radius: var(--radius-sm, 4px);
   max-width: 100%;
 }

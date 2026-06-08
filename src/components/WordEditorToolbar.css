@@ -89,6 +89,36 @@
   color: var(--color-primary-dark, #4a7332);
 }
 
+/* ---- 直接选择栏数（2/3/4 栏）---- */
+.wet__menu-cols {
+  display: flex;
+  gap: 6px;
+}
+
+.wet__menu-col-btn {
+  flex: 1;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 10px 6px;
+  border-radius: var(--radius-sm, 4px);
+  border: 1px solid var(--color-border, #e5e7eb);
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text, #1f2937);
+  font-size: var(--text-xs, 12px);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wet__menu-col-btn:hover {
+  border-color: var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.08);
+  color: var(--color-primary, #5B8C3E);
+}
+
 .wet__menu-tip {
   margin-top: 6px;
   padding-top: 6px;
