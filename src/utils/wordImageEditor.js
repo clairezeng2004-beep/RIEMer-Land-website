@@ -378,11 +378,39 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   function onKeyDown(e) {
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImg) {
       e.preventDefault();
-      const wrap = selectedImg.closest('.msc-img-wrap') || selectedImg.parentElement;
+      // 阻止同一编辑器上后挂载的「分栏退格」处理器接着把空栏/整块删掉
+      e.stopImmediatePropagation();
       const img = selectedImg;
+      const col = img.closest('.msc-col');
+      const wrap = img.closest('.msc-img-wrap');
       selectImage(null);
-      // 删除段落容器，让整行随之消失
-      if (wrap && wrap.parentElement) wrap.parentElement.removeChild(wrap);
+
+      if (col && !wrap) {
+        // 分栏内的图片：只删图片，保留这一栏（变回可编辑空栏），不删整栏
+        img.remove();
+        // 若删图后这一栏没有可落脚的块，补一个空段落，保证仍可编辑/再插图
+        if (!col.querySelector('img') && !col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote')) {
+          const p = document.createElement('p');
+          p.innerHTML = '<br />';
+          col.appendChild(p);
+        }
+        // 光标落到该栏，方便继续输入或重新插图
+        try {
+          const target = col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote') || col;
+          const range = document.createRange();
+          range.selectNodeContents(target);
+          range.collapse(true);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        } catch { /* ignore */ }
+        fireChange();
+        return;
+      }
+
+      // 普通正文图片：删除整段容器，让整行随之消失
+      const block = wrap || img.parentElement;
+      if (block && block.parentElement) block.parentElement.removeChild(block);
       else if (img.parentElement) img.parentElement.removeChild(img);
       fireChange();
     }
