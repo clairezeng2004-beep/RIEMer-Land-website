@@ -8,6 +8,53 @@ import './Timeline.css';
 // localStorage keys
 const USERS_DB_KEY = 'riemer_users';
 const MEMBER_PROFILES_KEY = 'riemer_member_profiles';
+// 成员展示数据缓存：上一次成功加载的成员列表（已格式化、已排序）。
+// 采用与时间轴一致的 SWR（stale-while-revalidate）策略 —— 进入页面时
+// 先用这份缓存立即渲染，后台再向 Supabase 拉取最新数据覆盖，避免
+// 每次打开「关于我们」都阻塞在网络查询上、出现空白与卡顿。
+const MEMBERS_CACHE_KEY = 'riemer_timeline_members_cache';
+
+// 按 joined_at 升序（旧 → 新）排序；未填写 joined_at 的排到最后，其次按昵称稳定排序
+const sortByJoinedAt = (list) => {
+  return [...list].sort((a, b) => {
+    const aHas = !!a.joined_at;
+    const bHas = !!b.joined_at;
+    if (aHas && bHas) {
+      const ta = new Date(a.joined_at).getTime();
+      const tb = new Date(b.joined_at).getTime();
+      if (ta !== tb) return ta - tb;
+    } else if (aHas !== bHas) {
+      return aHas ? -1 : 1; // 有 joined_at 的排前面
+    }
+    return (a.nickname || '').localeCompare(b.nickname || '', 'zh');
+  });
+};
+
+// 从 siteData 默认成员构造兜底列表（首次访问、无任何缓存时使用）
+const buildFallbackMembers = () =>
+  sortByJoinedAt(
+    membersData.map((m) => ({
+      id: m.id,
+      nickname: m.name || '匿名成员',
+      avatar: m.avatar || null,
+      signature: m.bio || '',
+      enrollment_year: '',
+      joined_at: null,
+    }))
+  );
+
+// 初始成员状态：优先用上次缓存的成员列表 → 退回 siteData 默认成员。
+// 二者都能让组件在挂载瞬间就有内容可渲染，把网络请求降级为后台刷新。
+const getInitialMembers = () => {
+  try {
+    const raw = localStorage.getItem(MEMBERS_CACHE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return sortByJoinedAt(parsed);
+    }
+  } catch { /* ignore：缓存损坏/隐私模式时走兜底 */ }
+  return buildFallbackMembers();
+};
 
 export default function Timeline() {
   const { timeline: timelineData } = useSiteContent();
@@ -16,23 +63,17 @@ export default function Timeline() {
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const dragState = useRef({ startX: 0, scrollLeft: 0 });
-  const [members, setMembers] = useState([]);
+  // 惰性初始化：挂载时立即拿到缓存/默认成员，避免空白等待
+  const [members, setMembers] = useState(getInitialMembers);
 
-  // 按 joined_at 升序（旧 → 新）排序；未填写 joined_at 的排到最后，其次按昵称稳定排序
-  const sortByJoinedAt = (list) => {
-    return [...list].sort((a, b) => {
-      const aHas = !!a.joined_at;
-      const bHas = !!b.joined_at;
-      if (aHas && bHas) {
-        const ta = new Date(a.joined_at).getTime();
-        const tb = new Date(b.joined_at).getTime();
-        if (ta !== tb) return ta - tb;
-      } else if (aHas !== bHas) {
-        return aHas ? -1 : 1; // 有 joined_at 的排前面
-      }
-      return (a.nickname || '').localeCompare(b.nickname || '', 'zh');
-    });
-  };
+  // 成功加载后统一写回缓存，供下次进入页面即时显示
+  const applyMembers = useCallback((list) => {
+    const sorted = sortByJoinedAt(list);
+    setMembers(sorted);
+    try {
+      localStorage.setItem(MEMBERS_CACHE_KEY, JSON.stringify(sorted));
+    } catch { /* ignore quota/隐私模式 */ }
+  }, []);
 
   // ---- 从本地 localStorage 加载成员 ----
   const loadLocalMembers = useCallback(() => {
@@ -60,33 +101,17 @@ export default function Timeline() {
           enrollment_year: enrollmentMap[u.id] || '',
           joined_at: joinedAtMap[u.id] || null,
         }));
-        setMembers(sortByJoinedAt(formatted));
+        applyMembers(formatted);
       } else {
         // 本地也没有已授权用户 → 使用 siteData 默认成员数据兜底
         console.info('[Timeline] 本地无已授权用户，使用默认成员数据');
-        const fallback = membersData.map((m) => ({
-          id: m.id,
-          nickname: m.name || '匿名成员',
-          avatar: m.avatar || null,
-          signature: m.bio || '',
-          enrollment_year: '',
-          joined_at: null,
-        }));
-        setMembers(sortByJoinedAt(fallback));
+        applyMembers(buildFallbackMembers());
       }
     } catch {
       // 解析异常时也使用默认数据
-      const fallback = membersData.map((m) => ({
-        id: m.id,
-        nickname: m.name || '匿名成员',
-        avatar: m.avatar || null,
-        signature: m.bio || '',
-        enrollment_year: '',
-        joined_at: null,
-      }));
-      setMembers(sortByJoinedAt(fallback));
+      applyMembers(buildFallbackMembers());
     }
-  }, []);
+  }, [applyMembers]);
 
   // ---- 加载成员数据（Supabase 优先，本地兜底） ----
   const loadMembers = useCallback(async () => {
@@ -136,7 +161,7 @@ export default function Timeline() {
             enrollment_year: enrollmentMap[p.id] || '',
             joined_at: joinedAtMap[p.id] || null,
           }));
-          setMembers(sortByJoinedAt(formatted));
+          applyMembers(formatted);
           return;
         }
         // Supabase 返回空数组 → 回退本地
@@ -147,7 +172,7 @@ export default function Timeline() {
 
     // 本地模式
     loadLocalMembers();
-  }, [loadLocalMembers]);
+  }, [loadLocalMembers, applyMembers]);
 
   // ---- 初始加载 ----
   useEffect(() => {
@@ -155,6 +180,10 @@ export default function Timeline() {
   }, [loadMembers]);
 
   // ---- 监听 localStorage 变化（其他标签页更新了用户数据） ----
+  // 仅在本地用户数据真正发生变化时才重新加载；不再监听 visibilitychange，
+  // 避免每次切回标签页都重新发起 Supabase 查询（即此前"每次都重新提取、
+  // 太慢"的根源）。挂载时的那次后台刷新已足够保证数据最终一致，期间页面
+  // 始终展示缓存内容、不会空白。
   useEffect(() => {
     const handleStorageChange = (e) => {
       if (e.key === USERS_DB_KEY || e.key === MEMBER_PROFILES_KEY) {
@@ -162,19 +191,10 @@ export default function Timeline() {
       }
     };
 
-    // 用户切回此标签页时重新加载（覆盖跨设备 Supabase 同步场景）
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        loadMembers();
-      }
-    };
-
     window.addEventListener('storage', handleStorageChange);
-    document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
       window.removeEventListener('storage', handleStorageChange);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [loadMembers]);
 
