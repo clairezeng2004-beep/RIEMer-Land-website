@@ -117,8 +117,17 @@ function ensureColumnMeta(container) {
 function ensureColumnResizers(container) {
   if (!container) return;
   const cols = ensureColumnMeta(container);
-  container.querySelectorAll(':scope > .msc-col-resizer').forEach((el) => el.remove());
-  for (let i = 0; i < cols.length - 1; i += 1) {
+  const needed = Math.max(0, cols.length - 1);
+  const existing = [...container.querySelectorAll(':scope > .msc-col-resizer')];
+  // 幂等：手柄数量正确时直接复用（仅校正索引），不再每次 hover 都销毁重建。
+  // 旧实现会在鼠标移到分栏上时反复删除/重建手柄，导致用户正要按住分隔线拖动时，
+  // 手柄被从指针下移除 → pointerdown 落空 → 分隔线“拖不动”。
+  if (existing.length === needed) {
+    existing.forEach((handle, i) => handle.setAttribute('data-resizer-index', String(i)));
+    return;
+  }
+  existing.forEach((el) => el.remove());
+  for (let i = 0; i < needed; i += 1) {
     const handle = document.createElement('span');
     handle.className = 'msc-col-resizer';
     handle.setAttribute('contenteditable', 'false');
@@ -319,6 +328,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
   };
 
   const onMouseOver = (e) => {
+    if (dragState) return; // 拖拽进行中不要重建手柄，避免打断拖动
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
     const container = t.closest('.msc-cols');

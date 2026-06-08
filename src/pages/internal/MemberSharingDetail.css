@@ -344,7 +344,9 @@
 .msd-article__content p,
 .msd-article__content li,
 .msd-article__content blockquote {
-  font-family: 'Lora', 'Lora Fallback', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans SC', 'Microsoft YaHei', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  /* 统一使用全站 --font-body（英文 Lora + 中文霞鹜文楷），
+     之前漏掉 LXGW WenKai，中文回退到 PingFang 呈现黑体观感，与其他页面不一致 */
+  font-family: var(--font-body);
 }
 
 /* Article Header */
