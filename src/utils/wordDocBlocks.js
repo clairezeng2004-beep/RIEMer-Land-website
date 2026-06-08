@@ -102,7 +102,8 @@ function appendColumnImage(col, src) {
   const img = document.createElement('img');
   img.src = src;
   img.className = 'msc-img';
-  img.setAttribute('draggable', 'false');
+  // 允许选中后随光标拖拽移动（编辑器内）
+  img.setAttribute('draggable', 'true');
   img.alt = '';
   col.appendChild(img);
 
@@ -238,10 +239,17 @@ function unwrapSingleColumn(container, col) {
 /** 生成/校正「新增一栏」加号按钮：左端、各栏之间、右端各一个（最多 4 栏） */
 function ensureColumnAdders(container) {
   if (!container) return;
-  container.querySelectorAll(':scope > .msc-col-adder').forEach((el) => el.remove());
   const cols = getColumns(container);
-  if (cols.length >= 4) return; // 最多 4 栏
-  for (let i = 0; i <= cols.length; i += 1) {
+  const needed = cols.length >= 4 ? 0 : cols.length + 1; // 最多 4 栏
+  const existing = [...container.querySelectorAll(':scope > .msc-col-adder')];
+  // 幂等：数量正确就复用（仅校正索引），不每次 hover 都销毁重建。
+  // 否则鼠标移动到加号上时按钮被重建，click 落在已脱离 DOM 的旧节点上 → 点击无效。
+  if (existing.length === needed) {
+    existing.forEach((adder, i) => adder.setAttribute('data-adder-index', String(i)));
+    return;
+  }
+  existing.forEach((el) => el.remove());
+  for (let i = 0; i < needed; i += 1) {
     const adder = document.createElement('span');
     adder.className = 'msc-col-adder';
     adder.setAttribute('contenteditable', 'false');
@@ -385,6 +393,9 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       const url = await fileToDataUrl(file);
       col.innerHTML = '';
       appendColumnImage(col, url);
+      // 光标默认落到图片下方的文字行（而不是图片右侧）
+      const trailingP = col.querySelector('p');
+      if (trailingP) placeCaretAtStart(trailingP);
       const container = col.closest('.msc-cols');
       ensureColumnMeta(container);
       requestAnimationFrame(() => layoutColumnResizers(container));

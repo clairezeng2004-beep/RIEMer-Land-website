@@ -195,19 +195,28 @@
 
 .msc-col > img,
 .msc-col .msc-img {
-  /* 不再撑满整栏宽度：两侧各留约 7% 留白并居中，避免图片顶到分栏边缘 */
-  width: 86%;
+  /* 图片铺满栏的内容宽度（两侧留白改由栏的内边距实现），这样图片右侧不会
+     留出可放光标的空白 —— 光标只会落到图片下方的文字行，而不是图片右方。
+     底部 margin 让图片与下方文字行拉开一点距离。 */
+  width: 100%;
   height: auto;
   display: block;
-  margin: 0 auto;
+  margin: 0 0 0.55em;
   border-radius: var(--radius-sm, 4px);
   max-width: 100%;
+}
+
+/* 含图片的栏：用左右内边距做两侧留白，图片本身铺满内容宽度 */
+.msc-col:has(> img),
+.msc-col:has(.msc-img) {
+  padding-left: 7%;
+  padding-right: 7%;
 }
 
 .msc-col .msc-img-wrap {
   display: block;
   width: 100%;
-  margin: 0.25em 0;
+  margin: 0.25em 0 0.6em;
   line-height: 1;
   text-align: center;
 }
