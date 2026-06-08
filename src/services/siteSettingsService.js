@@ -25,6 +25,7 @@ export const SITE_KEYS = {
   EVENTS: 'events',                   // 活动管理
   TIMELINE: 'timeline',               // 时间轴
   ARTICLE_CATEGORIES: 'article_categories', // 公众号归档的筛选分类（所有成员可新增）
+  ARTICLE_COVER_GALLERY: 'article_cover_gallery', // 公众号归档封面图库
   EVENT_CATEGORIES: 'event_categories',     // 活动发布页的筛选分类（所有成员可新增）
 };
 

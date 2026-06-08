@@ -35,6 +35,7 @@ import {
 
 // ---- 系列管理 ----
 const ARTICLE_CATEGORIES_KEY = 'riemer_article_categories';
+const ARTICLE_COVER_GALLERY_KEY = 'riemer_article_cover_gallery';
 
 const PRESET_COLORS = [
   '#5EAD8C', '#4FBFC4', '#EC4899', '#F59E0B', '#8B5CF6',
@@ -59,6 +60,19 @@ function loadArticleCategories() {
 
 function saveArticleCategories(data) {
   localStorage.setItem(ARTICLE_CATEGORIES_KEY, JSON.stringify(data));
+}
+
+function loadCoverGallery() {
+  try {
+    const stored = localStorage.getItem(ARTICLE_COVER_GALLERY_KEY);
+    const parsed = stored ? JSON.parse(stored) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { /* ignore */ }
+  return [];
+}
+
+function saveCoverGallery(data) {
+  localStorage.setItem(ARTICLE_COVER_GALLERY_KEY, JSON.stringify(data));
 }
 
 // ---- 封面图片上传 ----
@@ -88,6 +102,16 @@ async function readCoverImage(file) {
   }
 }
 
+function makeCoverGalleryItem(file, dataUrl) {
+  const now = new Date().toISOString();
+  return {
+    id: `cover_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name: file?.name || '未命名封面',
+    src: dataUrl,
+    createdAt: now,
+  };
+}
+
 // 双写：本地 + 云端（site_settings.article_categories），便于跨设备同步
 // lastSyncRef 用于记录最近一次自己 push 的 updated_at，订阅回流时可据此跳过
 //
@@ -114,6 +138,24 @@ async function persistCategories(data, lastSyncRef) {
         `改动已保存到本设备本地，但其它设备暂时看不到，请检查网络后重试。`,
       );
     } catch { /* SSR 或无 window 环境下忽略 */ }
+  }
+  return res;
+}
+
+async function persistCoverGallery(data, lastSyncRef) {
+  saveCoverGallery(data);
+  if (!isSupabaseConfigured) return { success: true, offline: true };
+  const res = await saveSetting(SITE_KEYS.ARTICLE_COVER_GALLERY, data);
+  if (res.success && lastSyncRef) {
+    lastSyncRef.current = res.updatedAt;
+  } else if (!res.success) {
+    console.warn('[InternalArticles] 封面图库云端同步失败:', res.error);
+    try {
+      alert(
+        `封面图库保存到云端失败：${res.error || '未知错误'}\n` +
+        `改动已保存到本设备本地，但其它设备暂时看不到，请检查网络后重试。`,
+      );
+    } catch { /* ignore */ }
   }
   return res;
 }
@@ -263,6 +305,10 @@ export default function InternalArticles() {
 
   // 记录本设备最近一次 push 的 updated_at，避免 realtime 回流覆盖自己
   const lastCatSyncRef = useRef(null);
+  const lastCoverGallerySyncRef = useRef(null);
+  const [coverGallery, setCoverGallery] = useState(loadCoverGallery);
+  const [showCoverGallery, setShowCoverGallery] = useState(false);
+  const [coverPickerTarget, setCoverPickerTarget] = useState(null); // null | 'draft' | 'archive'
 
   // 挂载时从云端拉取一次，并订阅变更（跨设备同步）
   useEffect(() => {
@@ -290,6 +336,33 @@ export default function InternalArticles() {
       lastCatSyncRef.current = updatedAt;
       setCategoryList(value);
       saveArticleCategories(value);
+    });
+
+    return () => {
+      cancelled = true;
+      unsub();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured) return;
+    let cancelled = false;
+
+    fetchSetting(SITE_KEYS.ARTICLE_COVER_GALLERY).then(({ value, updatedAt, error }) => {
+      if (cancelled || error) return;
+      if (Array.isArray(value)) {
+        lastCoverGallerySyncRef.current = updatedAt;
+        setCoverGallery(value);
+        saveCoverGallery(value);
+      }
+    });
+
+    const unsub = subscribeSetting(SITE_KEYS.ARTICLE_COVER_GALLERY, (value, updatedAt) => {
+      if (updatedAt && lastCoverGallerySyncRef.current === updatedAt) return;
+      if (!Array.isArray(value)) return;
+      lastCoverGallerySyncRef.current = updatedAt;
+      setCoverGallery(value);
+      saveCoverGallery(value);
     });
 
     return () => {
@@ -663,6 +736,97 @@ export default function InternalArticles() {
     setSelectedCategories((prev) => (prev.includes(label) ? prev : [...prev, label])); // 新增后自动选中
     closeAddCatModal();
   };
+
+  const openCoverGallery = (target = null) => {
+    setCoverPickerTarget(target);
+    setShowCoverGallery(true);
+  };
+
+  const closeCoverGallery = () => {
+    setShowCoverGallery(false);
+    setCoverPickerTarget(null);
+  };
+
+  const handleAddGalleryCover = async (file) => {
+    const dataUrl = await readCoverImage(file);
+    if (!dataUrl) return;
+    const item = makeCoverGalleryItem(file, dataUrl);
+    const updated = [item, ...coverGallery];
+    setCoverGallery(updated);
+    persistCoverGallery(updated, lastCoverGallerySyncRef);
+  };
+
+  const handleDeleteGalleryCover = (id) => {
+    const item = coverGallery.find((cover) => cover.id === id);
+    if (!item) return;
+    if (!window.confirm(`确定从封面图库删除「${item.name || '这张图片'}」吗？已使用它的文章封面不会受影响。`)) return;
+    const updated = coverGallery.filter((cover) => cover.id !== id);
+    setCoverGallery(updated);
+    persistCoverGallery(updated, lastCoverGallerySyncRef);
+  };
+
+  const handlePickGalleryCover = (src) => {
+    if (!src || !coverPickerTarget) return;
+    if (coverPickerTarget === 'draft') {
+      setDraft((prev) => (prev ? { ...prev, coverImage: src } : prev));
+    } else if (coverPickerTarget === 'archive') {
+      setEditingArchive((prev) => (prev ? { ...prev, coverImage: src } : prev));
+    }
+    closeCoverGallery();
+  };
+
+  const renderCoverPicker = ({ value, onChange, target }) => (
+    <div className="ia-cover-uploader">
+      {value ? (
+        <div className="ia-cover-uploader__preview">
+          <img src={value} alt="封面预览" />
+          <div className="ia-cover-uploader__actions">
+            <button
+              type="button"
+              className="ia-cover-uploader__action"
+              onClick={() => openCoverGallery(target)}
+            >
+              从图库选择
+            </button>
+            <button
+              type="button"
+              className="ia-cover-uploader__action ia-cover-uploader__action--dark"
+              onClick={() => onChange('')}
+            >
+              <X size={14} /> 移除
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="ia-cover-uploader__choices">
+          <label className="ia-cover-uploader__drop">
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              onChange={async (e) => {
+                const dataUrl = await readCoverImage(e.target.files?.[0]);
+                if (dataUrl) onChange(dataUrl);
+                e.target.value = '';
+              }}
+            />
+            <ImagePlus size={22} />
+            <span>点击上传封面图片</span>
+            <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
+          </label>
+          <button
+            type="button"
+            className="ia-cover-uploader__gallery-btn"
+            onClick={() => openCoverGallery(target)}
+          >
+            <ImagePlus size={18} />
+            <span>从封面图库选择</span>
+            <span className="ia-cover-uploader__hint">{coverGallery.length} 张可用</span>
+          </button>
+        </div>
+      )}
+    </div>
+  );
 
   const filtered = useMemo(() => {
     return allArticles.filter((a) => {
@@ -1594,6 +1758,23 @@ export default function InternalArticles() {
 
         {/* 文章列表 */}
         <div className="ia-list__grid">
+          <article
+            className="ia-card ia-card--cover-gallery card"
+            onClick={() => openCoverGallery(null)}
+          >
+            <div className="ia-card__body ia-cover-gallery-card__body">
+              <div className="ia-cover-gallery-card__icon">
+                <ImagePlus size={24} />
+              </div>
+              <h3 className="ia-card__title">封面图库</h3>
+              <p className="ia-card__excerpt">
+                上传常用公众号封面，在归档文章选择封面时直接复用。
+              </p>
+              <div className="ia-card__footer">
+                <span className="ia-card__meta">{coverGallery.length} 张图片</span>
+              </div>
+            </div>
+          </article>
           {filtered.map((article) => {
             const commentCount = getCommentCount('article', article.id);
             // 归档文章卡片：优先跳转公众号原链接；如无原链接则回退站内详情页
@@ -1988,34 +2169,11 @@ export default function InternalArticles() {
                     <label className="ia-modal__label">
                       <ImagePlus size={16} /> 封面图片
                     </label>
-                    {draft.coverImage ? (
-                      <div className="ia-cover-uploader__preview">
-                        <img src={draft.coverImage} alt="封面预览" />
-                        <button
-                          type="button"
-                          className="ia-cover-uploader__remove"
-                          onClick={() => setDraft((prev) => ({ ...prev, coverImage: '' }))}
-                        >
-                          <X size={14} /> 移除
-                        </button>
-                      </div>
-                    ) : (
-                      <label className="ia-cover-uploader__drop">
-                        <input
-                          type="file"
-                          accept="image/*"
-                          hidden
-                          onChange={async (e) => {
-                            const dataUrl = await readCoverImage(e.target.files?.[0]);
-                            if (dataUrl) setDraft((prev) => ({ ...prev, coverImage: dataUrl }));
-                            e.target.value = '';
-                          }}
-                        />
-                        <ImagePlus size={22} />
-                        <span>点击上传封面图片</span>
-                        <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
-                      </label>
-                    )}
+                    {renderCoverPicker({
+                      value: draft.coverImage,
+                      target: 'draft',
+                      onChange: (coverImage) => setDraft((prev) => ({ ...prev, coverImage })),
+                    })}
                   </div>
 
                   {/* 元信息 */}
@@ -2256,34 +2414,11 @@ export default function InternalArticles() {
                   <label className="ia-modal__label">
                     <ImagePlus size={14} /> 封面图片
                   </label>
-                  {editingArchive.coverImage ? (
-                    <div className="ia-cover-uploader__preview">
-                      <img src={editingArchive.coverImage} alt="封面预览" />
-                      <button
-                        type="button"
-                        className="ia-cover-uploader__remove"
-                        onClick={() => setEditingArchive({ ...editingArchive, coverImage: '' })}
-                      >
-                        <X size={14} /> 移除
-                      </button>
-                    </div>
-                  ) : (
-                    <label className="ia-cover-uploader__drop">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        hidden
-                        onChange={async (e) => {
-                          const dataUrl = await readCoverImage(e.target.files?.[0]);
-                          if (dataUrl) setEditingArchive((prev) => ({ ...prev, coverImage: dataUrl }));
-                          e.target.value = '';
-                        }}
-                      />
-                      <ImagePlus size={22} />
-                      <span>点击上传封面图片</span>
-                      <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
-                    </label>
-                  )}
+                  {renderCoverPicker({
+                    value: editingArchive.coverImage,
+                    target: 'archive',
+                    onChange: (coverImage) => setEditingArchive((prev) => ({ ...prev, coverImage })),
+                  })}
                 </div>
               </div>
             </div>
@@ -2299,6 +2434,72 @@ export default function InternalArticles() {
               >
                 <Check size={16} /> 保存修改
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 封面图库弹窗 ========== */}
+      {showCoverGallery && (
+        <div className="ia-modal-overlay" onClick={closeCoverGallery}>
+          <div className="ia-modal ia-modal--cover-gallery" onClick={(e) => e.stopPropagation()}>
+            <div className="ia-modal__header">
+              <h2>
+                <ImagePlus size={20} /> 封面图库
+              </h2>
+              <button className="ia-modal__close" onClick={closeCoverGallery}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ia-modal__body">
+              <label className="ia-cover-gallery__upload">
+                <input
+                  type="file"
+                  accept="image/*"
+                  hidden
+                  onChange={async (e) => {
+                    await handleAddGalleryCover(e.target.files?.[0]);
+                    e.target.value = '';
+                  }}
+                />
+                <ImagePlus size={20} />
+                <span>上传图片到封面图库</span>
+              </label>
+
+              {coverGallery.length > 0 ? (
+                <div className="ia-cover-gallery__grid">
+                  {coverGallery.map((cover) => (
+                    <div key={cover.id} className="ia-cover-gallery__item">
+                      <button
+                        type="button"
+                        className="ia-cover-gallery__image-btn"
+                        onClick={() => handlePickGalleryCover(cover.src)}
+                        title={coverPickerTarget ? '选择这张封面' : cover.name}
+                      >
+                        <img src={cover.src} alt={cover.name || '封面图片'} />
+                      </button>
+                      <div className="ia-cover-gallery__item-footer">
+                        <span title={cover.name}>{cover.name || '未命名封面'}</span>
+                        <button
+                          type="button"
+                          className="ia-cover-gallery__delete"
+                          onClick={() => handleDeleteGalleryCover(cover.id)}
+                          title="从图库删除"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="ia-cover-gallery__empty">
+                  <ImagePlus size={40} />
+                  <h3>还没有封面图片</h3>
+                  <p>上传后，新增或编辑公众号归档时就可以直接选择。</p>
+                </div>
+              )}
             </div>
           </div>
         </div>
