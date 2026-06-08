@@ -30,8 +30,9 @@ const sortByJoinedAt = (list) => {
   });
 };
 
-// 从 siteData 默认成员构造兜底列表（首次访问、无任何缓存时使用）
-const buildFallbackMembers = () =>
+// siteData 默认成员（仅作为"完全没有真实数据"时的最后兜底显示，
+// 属于最原始的种子数据，绝不写入缓存、也不作为权威来源）。
+const buildSeedMembers = () =>
   sortByJoinedAt(
     membersData.map((m) => ({
       id: m.id,
@@ -43,17 +44,19 @@ const buildFallbackMembers = () =>
     }))
   );
 
-// 初始成员状态：优先用上次缓存的成员列表 → 退回 siteData 默认成员。
-// 二者都能让组件在挂载瞬间就有内容可渲染，把网络请求降级为后台刷新。
-const getInitialMembers = () => {
+// 初始成员状态：只读取"上一次真正加载成功的真实数据"缓存，让页面挂载瞬间
+// 就能展示最近一次的真实成员；随后 loadMembers 会向 Supabase 拉取最新数据覆盖。
+// 没有任何真实缓存时返回空数组（不预填种子数据），交给 loadMembers 拉取最新结果，
+// 确保展示的始终是最新数据而不是最原始的种子数据。
+const getCachedMembers = () => {
   try {
     const raw = localStorage.getItem(MEMBERS_CACHE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return sortByJoinedAt(parsed);
     }
-  } catch { /* ignore：缓存损坏/隐私模式时走兜底 */ }
-  return buildFallbackMembers();
+  } catch { /* ignore：缓存损坏/隐私模式 */ }
+  return [];
 };
 
 export default function Timeline() {
@@ -63,16 +66,23 @@ export default function Timeline() {
   const [canScrollRight, setCanScrollRight] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const dragState = useRef({ startX: 0, scrollLeft: 0 });
-  // 惰性初始化：挂载时立即拿到缓存/默认成员，避免空白等待
-  const [members, setMembers] = useState(getInitialMembers);
+  // 惰性初始化：挂载时立即拿到上一次的真实数据缓存（没有则为空），避免空白等待；
+  // 真正的最新数据由 loadMembers 异步拉取后覆盖。
+  const [members, setMembers] = useState(getCachedMembers);
 
-  // 成功加载后统一写回缓存，供下次进入页面即时显示
+  // 应用真实成员数据：更新视图并写回缓存，供下次进入页面即时显示。
+  // 仅用于"来自 Supabase / 本地已授权用户"的真实数据。
   const applyMembers = useCallback((list) => {
     const sorted = sortByJoinedAt(list);
     setMembers(sorted);
     try {
       localStorage.setItem(MEMBERS_CACHE_KEY, JSON.stringify(sorted));
     } catch { /* ignore quota/隐私模式 */ }
+  }, []);
+
+  // 仅显示种子兜底数据：不写缓存，避免把最原始数据固化成"缓存的真实数据"。
+  const showSeedMembers = useCallback(() => {
+    setMembers(buildSeedMembers());
   }, []);
 
   // ---- 从本地 localStorage 加载成员 ----
@@ -103,15 +113,15 @@ export default function Timeline() {
         }));
         applyMembers(formatted);
       } else {
-        // 本地也没有已授权用户 → 使用 siteData 默认成员数据兜底
+        // 本地也没有已授权用户 → 显示 siteData 种子数据（不写缓存）
         console.info('[Timeline] 本地无已授权用户，使用默认成员数据');
-        applyMembers(buildFallbackMembers());
+        showSeedMembers();
       }
     } catch {
-      // 解析异常时也使用默认数据
-      applyMembers(buildFallbackMembers());
+      // 解析异常时也只做种子兜底显示，不污染缓存
+      showSeedMembers();
     }
-  }, [applyMembers]);
+  }, [applyMembers, showSeedMembers]);
 
   // ---- 加载成员数据（Supabase 优先，本地兜底） ----
   const loadMembers = useCallback(async () => {
