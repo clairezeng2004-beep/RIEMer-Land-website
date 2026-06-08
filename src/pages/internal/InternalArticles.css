@@ -979,7 +979,8 @@
   border: 1px dashed var(--color-border);
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
-  background: var(--color-bg);
+  /* 与「从封面图库选择」底色统一 */
+  background: var(--color-bg-card);
   /* 与「从封面图库选择」按钮字号统一（以图库按钮为准，和弹窗整体更协调） */
   font-size: var(--text-sm);
   cursor: pointer;
@@ -989,7 +990,7 @@
 .ia-cover-uploader__drop:hover {
   border-color: var(--color-primary);
   color: var(--color-primary);
-  background: color-mix(in srgb, var(--color-primary) 6%, var(--color-bg));
+  background: color-mix(in srgb, var(--color-primary) 5%, var(--color-bg-card));
 }
 
 .ia-cover-uploader__gallery-btn {

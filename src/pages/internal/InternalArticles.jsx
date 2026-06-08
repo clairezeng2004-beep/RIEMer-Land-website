@@ -810,7 +810,7 @@ export default function InternalArticles() {
                 e.target.value = '';
               }}
             />
-            <ImagePlus size={22} />
+            <ImagePlus size={20} />
             <span>点击上传封面图片</span>
             <span className="ia-cover-uploader__hint">支持 jpg / png / webp</span>
           </label>
@@ -819,7 +819,7 @@ export default function InternalArticles() {
             className="ia-cover-uploader__gallery-btn"
             onClick={() => openCoverGallery(target)}
           >
-            <ImagePlus size={18} />
+            <ImagePlus size={20} />
             <span>从封面图库选择</span>
             <span className="ia-cover-uploader__hint">{coverGallery.length} 张可用</span>
           </button>
