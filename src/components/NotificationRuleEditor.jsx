@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Info, Eye } from 'lucide-react';
 import {
   EVENT_CATALOG,
@@ -11,6 +11,111 @@ import {
   validateRule,
   createEmptyRule,
 } from '../lib/notificationRuleDSL';
+
+function escapeHtml(value) {
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+function templateToEditorHtml(template, variables) {
+  if (!template) return '';
+  const byKey = new Map((variables || []).map((v) => [v.key, v]));
+  return String(template).replace(/\{(\w+)\}/g, (match, key) => {
+    const variable = byKey.get(key);
+    if (!variable) return escapeHtml(match);
+    return `<span class="nre-token" data-var="${escapeHtml(key)}" contenteditable="false">${escapeHtml(variable.label)}</span>`;
+  });
+}
+
+function serializeTemplateEditor(root) {
+  const walk = (node) => {
+    if (node.nodeType === Node.TEXT_NODE) return node.textContent || '';
+    if (node.nodeType !== Node.ELEMENT_NODE) return '';
+    if (node.dataset?.var) return `{${node.dataset.var}}`;
+    if (node.tagName === 'BR') return '\n';
+    return Array.from(node.childNodes).map(walk).join('');
+  };
+  return Array.from(root.childNodes).map(walk).join('');
+}
+
+function placeCaretAtEnd(el) {
+  const selection = window.getSelection();
+  if (!selection) return;
+  const range = document.createRange();
+  range.selectNodeContents(el);
+  range.collapse(false);
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function NotificationTemplateEditor({ value, variables, onChange }) {
+  const editorRef = useRef(null);
+  const lastHtmlRef = useRef('');
+
+  useEffect(() => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const html = templateToEditorHtml(value, variables);
+    if (html === lastHtmlRef.current) return;
+    editor.innerHTML = html;
+    lastHtmlRef.current = html;
+  }, [value, variables]);
+
+  const handleInput = () => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    lastHtmlRef.current = editor.innerHTML;
+    onChange(serializeTemplateEditor(editor));
+  };
+
+  const insertVariable = (variable) => {
+    const editor = editorRef.current;
+    if (!editor) return;
+    const token = document.createElement('span');
+    token.className = 'nre-token';
+    token.dataset.var = variable.key;
+    token.contentEditable = 'false';
+    token.textContent = variable.label;
+    editor.appendChild(token);
+    editor.appendChild(document.createTextNode(''));
+    lastHtmlRef.current = editor.innerHTML;
+    onChange(serializeTemplateEditor(editor));
+    editor.focus();
+    placeCaretAtEnd(editor);
+  };
+
+  return (
+    <>
+      <div className="nre-vars nre-vars--above">
+        <span className="nre-vars-label">可用变量：</span>
+        {variables.map((v) => (
+          <button
+            key={v.key}
+            type="button"
+            className="nre-var-btn"
+            onClick={() => insertVariable(v)}
+            title={`点击把“${v.label}”插入通知内容模板`}
+          >
+            {v.label}
+          </button>
+        ))}
+      </div>
+      <div
+        ref={editorRef}
+        className="nre-template-editor"
+        contentEditable
+        role="textbox"
+        aria-label="通知内容模板"
+        data-placeholder="例：上传者昵称 上传了文档「文档标题」（文档类型）"
+        onInput={handleInput}
+        suppressContentEditableWarning
+      />
+    </>
+  );
+}
 
 // 规则编辑器弹窗 —— 供 NotificationManagement 页面使用
 // 核心体验：
@@ -128,7 +233,7 @@ export default function NotificationRuleEditor({
         <div className="notif-mgmt__modal-body nre">
           {/* 1. 触发事件 */}
           <div className="nre-section">
-            <div className="nre-section-title">
+            <div className="nre-section-title nre-section-title--content">
               1. 什么情况下触发这条通知？
               <span className="nre-hint">（选择后系统会自动监听这个事件）</span>
             </div>
@@ -149,20 +254,13 @@ export default function NotificationRuleEditor({
           <div className="nre-section">
             <div className="nre-section-title">
               2. 通知要显示什么？
-              <span className="nre-hint">（点击右侧变量按钮可直接插入占位符）</span>
+              <span className="nre-hint">（点击变量胶囊可直接插入模板）</span>
             </div>
 
             <div className="nre-field">
               <label>通知标题</label>
-              <input
-                type="text"
-                value={draft.title}
-                onChange={(e) => handleChange({ title: e.target.value })}
-                placeholder="例：新内部分享"
-                maxLength={100}
-              />
               {eventMeta && (
-                <div className="nre-vars">
+                <div className="nre-vars nre-vars--above">
                   <span className="nre-vars-label">可用变量：</span>
                   {eventMeta.variables.map((v) => (
                     <button
@@ -170,37 +268,30 @@ export default function NotificationRuleEditor({
                       type="button"
                       className="nre-var-btn"
                       onClick={() => insertVariable('title', v.key)}
-                      title={`点击把 {${v.key}} 插入标题`}
+                      title={`点击把“${v.label}”插入标题`}
                     >
                       {v.label}
                     </button>
                   ))}
                 </div>
               )}
+              <input
+                type="text"
+                value={draft.title}
+                onChange={(e) => handleChange({ title: e.target.value })}
+                placeholder="例：新内部分享"
+                maxLength={100}
+              />
             </div>
 
             <div className="nre-field">
               <label>通知内容模板</label>
-              <textarea
-                rows={2}
-                value={draft.messageTemplate}
-                onChange={(e) => handleChange({ messageTemplate: e.target.value })}
-                placeholder="例：{operator} 上传了文档「{title}」（{typeLabel}）"
-              />
               {eventMeta && (
-                <div className="nre-vars">
-                  <span className="nre-vars-label">可用变量：</span>
-                  {eventMeta.variables.map((v) => (
-                    <button
-                      key={v.key}
-                      type="button"
-                      className="nre-var-btn"
-                      onClick={() => insertVariable('messageTemplate', v.key)}
-                    >
-                      {v.label}
-                    </button>
-                  ))}
-                </div>
+                <NotificationTemplateEditor
+                  value={draft.messageTemplate}
+                  variables={eventMeta.variables}
+                  onChange={(messageTemplate) => handleChange({ messageTemplate })}
+                />
               )}
               {messagePreview && (
                 <div className="nre-preview">
