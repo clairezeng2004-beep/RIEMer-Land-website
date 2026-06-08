@@ -99,8 +99,10 @@
 
 /* 第二段：内容标签筛选 */
 .ia-list__filter-bar--tags {
-  margin-top: var(--space-sm);
-  padding-top: var(--space-sm);
+  /* 父级 .ia-list__filters 的 gap(space-md) 已提供两段筛选之间的间距，
+     这里不再叠加 margin-top；padding-top 只留出虚线分隔与标签之间的小呼吸位，
+     避免「系列」与「内容标签」之间留白过大 */
+  padding-top: var(--space-xs);
   border-top: 1px dashed var(--color-border-light);
 }
 
@@ -735,10 +737,9 @@
 }
 
 .ia-card--cover-gallery {
+  /* 与其他卡片颜色保持一致：去掉绿/金渐变底色，仅用虚线边框表示这是「图库」入口卡 */
   border-style: dashed;
-  background:
-    linear-gradient(135deg, rgba(91, 140, 62, 0.08), rgba(212, 164, 76, 0.08)),
-    var(--color-bg-card);
+  background: var(--color-bg-card);
 }
 
 .ia-cover-gallery-card__body {
@@ -979,6 +980,8 @@
   border-radius: var(--radius-md);
   color: var(--color-text-muted);
   background: var(--color-bg);
+  /* 与「从封面图库选择」按钮字号统一（以图库按钮为准，和弹窗整体更协调） */
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
@@ -1001,6 +1004,7 @@
   background: var(--color-bg-card);
   color: var(--color-text-light);
   font-family: inherit;
+  font-size: var(--text-sm);
   cursor: pointer;
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }

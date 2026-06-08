@@ -343,6 +343,17 @@ function mergeInternalConfig(value) {
   }
   // 侧边栏旧标签一次性迁移
   if (merged.sidebar) merged.sidebar = migrateSidebarLegacyLabels(merged.sidebar);
+  // 公众号长文分享归档：页面标题旧默认值 → 新默认值（仅当用户未自定义时升级），
+  // 与侧边栏 Tab 名保持一致。
+  if (merged.internalArticles && typeof merged.internalArticles === 'object') {
+    const legacyTitles = ['公众号历史文章归档', '公众号文字分享归档'];
+    if (legacyTitles.includes(merged.internalArticles.pageTitle)) {
+      merged.internalArticles = {
+        ...merged.internalArticles,
+        pageTitle: '公众号长文分享归档',
+      };
+    }
+  }
   return merged;
 }
 
