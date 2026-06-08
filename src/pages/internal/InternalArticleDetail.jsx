@@ -1,4 +1,4 @@
-import { useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Tag, Clock, ExternalLink } from 'lucide-react';
 import { articlesData } from '../../data/siteData';
@@ -26,6 +26,13 @@ export default function InternalArticleDetail() {
   );
 
   const article = allArticles.find((a) => a.id === id);
+
+  useEffect(() => {
+    if (!article?.title) return undefined;
+    const prev = document.title;
+    document.title = article.title;
+    return () => { document.title = prev; };
+  }, [article?.title]);
 
   // 上/下一篇：按列表顺序取，优先推荐同作者（InternalArticle 目前只有 author 字符串，
   // 没有 authorId，这里按作者名做归一化匹配即可）

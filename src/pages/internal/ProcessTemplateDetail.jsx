@@ -976,17 +976,6 @@ export default function ProcessTemplateDetail() {
 
   /* ========== 编辑模式 ========== */
   const [isEditing, setIsEditing] = useState(false);
-  // 同步 isEditing 到 ref，realtime 订阅回调需要读最新值（避免闭包陷阱）
-  useEffect(() => {
-    isEditingRef.current = isEditing;
-  }, [isEditing]);
-
-  // 浏览器标签页标题：新窗口里直观显示是流程模板文档，并区分查看/编辑
-  useEffect(() => {
-    const prev = document.title;
-    document.title = isEditing ? '流程模板文件 - 文档编辑' : '流程模板文件 - 文档查看';
-    return () => { document.title = prev; };
-  }, [isEditing]);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editContent, setEditContent] = useState('');
@@ -996,6 +985,20 @@ export default function ProcessTemplateDetail() {
   // 'saved'：本地已保存、云端同步已发起/完成
   // 'cloud-failed'：本地已保存但云端同步失败（不阻塞，提示用户）
   const [saveHint, setSaveHint] = useState(null);
+  // 同步 isEditing 到 ref，realtime 订阅回调需要读最新值（避免闭包陷阱）
+  useEffect(() => {
+    isEditingRef.current = isEditing;
+  }, [isEditing]);
+
+  // 浏览器标签页标题：阅读态直接显示当前文档名，编辑态保留编辑状态提示
+  useEffect(() => {
+    const prev = document.title;
+    const docTitle = (isEditing ? editTitle : doc?.title)?.trim();
+    document.title = isEditing
+      ? `${docTitle || '流程模板文件'} - 文档编辑`
+      : (docTitle || '流程模板文件');
+    return () => { document.title = prev; };
+  }, [doc?.title, editTitle, isEditing]);
 
   /* ========== Markdown 编辑态同步滚动 ==========
    * 与 MemberSharingCreate / ProcessTemplateCreate 行为完全一致：
