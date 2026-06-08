@@ -233,7 +233,7 @@ export default function NotificationRuleEditor({
         <div className="notif-mgmt__modal-body nre">
           {/* 1. 触发事件 */}
           <div className="nre-section">
-            <div className="nre-section-title nre-section-title--content">
+            <div className="nre-section-title">
               1. 什么情况下触发这条通知？
               <span className="nre-hint">（选择后系统会自动监听这个事件）</span>
             </div>
@@ -252,7 +252,7 @@ export default function NotificationRuleEditor({
 
           {/* 2. 通知内容 */}
           <div className="nre-section">
-            <div className="nre-section-title">
+            <div className="nre-section-title nre-section-title--content">
               2. 通知要显示什么？
               <span className="nre-hint">（点击变量胶囊可直接插入模板）</span>
             </div>

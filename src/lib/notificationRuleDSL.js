@@ -216,6 +216,15 @@ export function renderTemplate(tpl, variables) {
   });
 }
 
+export function renderTemplateLabels(tpl, eventMeta) {
+  if (!tpl) return '';
+  const variables = eventMeta?.variables || [];
+  return String(tpl).replace(/\{(\w+)\}/g, (match, key) => {
+    const variable = variables.find((v) => v.key === key);
+    return variable ? `「${variable.label}」` : match;
+  });
+}
+
 // ====== 条件判断：rule.conditions 全部满足才触发 ======
 export function evaluateConditions(conditions, variables) {
   if (!Array.isArray(conditions) || conditions.length === 0) return true;
@@ -255,8 +264,8 @@ export function describeRule(rule) {
   const parts = [];
   parts.push(`每当【${eventLabel}】时`);
   parts.push(`向【${audience}】发送一条【${typeLabel}】类型的通知`);
-  if (rule.title) parts.push(`标题：「${rule.title}」`);
-  if (rule.messageTemplate) parts.push(`内容：「${rule.messageTemplate}」`);
+  if (rule.title) parts.push(`标题：「${renderTemplateLabels(rule.title, ev)}」`);
+  if (rule.messageTemplate) parts.push(`内容：「${renderTemplateLabels(rule.messageTemplate, ev)}」`);
   if (Array.isArray(rule.conditions) && rule.conditions.length > 0) {
     const condTxt = rule.conditions
       .map((c) => {
