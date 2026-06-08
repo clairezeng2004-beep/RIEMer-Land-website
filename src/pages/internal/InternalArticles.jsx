@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -7,6 +7,7 @@ import { useNotifications } from '../../contexts/NotificationContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
+import ArticlePreviewModal from '../../components/ArticlePreviewModal';
 import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
 import {
@@ -307,6 +308,8 @@ export default function InternalArticles() {
   const lastCatSyncRef = useRef(null);
   const lastCoverGallerySyncRef = useRef(null);
   const [coverGallery, setCoverGallery] = useState(loadCoverGallery);
+  // 归档卡片「中间卡片」预览（点击卡片先衔接，不直接跳原文）
+  const [previewArticle, setPreviewArticle] = useState(null);
   const [showCoverGallery, setShowCoverGallery] = useState(false);
   const [coverPickerTarget, setCoverPickerTarget] = useState(null); // null | 'draft' | 'archive'
 
@@ -1777,8 +1780,6 @@ export default function InternalArticles() {
           </article>
           {filtered.map((article) => {
             const commentCount = getCommentCount('article', article.id);
-            // 归档文章卡片：优先跳转公众号原链接；如无原链接则回退站内详情页
-            const hasExternal = !!(article.url && /^https?:\/\//i.test(article.url));
             const canEditArchive = archivedArticleIds.has(article.id);
             const canManageArchive = canEditArchive && (
               isAdmin || (article.archivedById && String(article.archivedById) === String(user?.id))
@@ -1835,23 +1836,23 @@ export default function InternalArticles() {
                     <Trash2 size={14} />
                   </button>
                 )}
-                {hasExternal ? (
-                  <a
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="ia-card__link"
-                  >
-                    {commonInner}
-                  </a>
-                ) : (
-                  <Link
-                    to={`/internal/article/${article.id}`}
-                    className="ia-card__link"
-                  >
-                    {commonInner}
-                  </Link>
-                )}
+                {/* 点击卡片先弹出「中间卡片」预览，由预览卡片再决定打开原文 / 站内详情，
+                    与首页访客访问的衔接体验一致，而不是直接跳转原文链接 */}
+                <div
+                  className="ia-card__link"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => setPreviewArticle(article)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setPreviewArticle(article);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
+                  {commonInner}
+                </div>
               </article>
             );
           })}
@@ -2438,6 +2439,13 @@ export default function InternalArticles() {
           </div>
         </div>
       )}
+
+      {/* ========== 归档卡片「中间卡片」预览弹窗 ========== */}
+      <ArticlePreviewModal
+        article={previewArticle}
+        onClose={() => setPreviewArticle(null)}
+        detailTo={previewArticle ? `/internal/article/${previewArticle.id}` : undefined}
+      />
 
       {/* ========== 封面图库弹窗 ========== */}
       {showCoverGallery && (

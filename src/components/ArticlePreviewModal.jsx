@@ -3,8 +3,11 @@ import { ArrowRight, Clock, ExternalLink, FileText, Tag, X } from 'lucide-react'
 import CoverImage from './CoverImage';
 import './ArticlePreviewModal.css';
 
-export default function ArticlePreviewModal({ article, onClose, onOpen }) {
+export default function ArticlePreviewModal({ article, onClose, onOpen, detailTo }) {
   if (!article) return null;
+
+  // 站内详情链接：默认走公开路由 /article/:id，内部空间可传 /internal/article/:id
+  const detailPath = detailTo || `/article/${article.id}`;
 
   const hasUrl = Boolean(article.url);
   const tags = Array.isArray(article.tags) ? article.tags.filter(Boolean) : [];
@@ -90,7 +93,7 @@ export default function ArticlePreviewModal({ article, onClose, onOpen }) {
               </button>
             ) : (
               <Link
-                to={`/article/${article.id}`}
+                to={detailPath}
                 className="btn btn-primary article-preview__primary"
                 onClick={() => {
                   onOpen?.(article, 'detail');

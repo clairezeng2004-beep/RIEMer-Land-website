@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
+import EventPreviewModal from '../../components/EventPreviewModal';
 // 把"其他"沉到筛选列表最末，符合产品"所有筛选中'其他'永远最后一位"的约定
 import { sortWithOtherLast } from '../../utils/sortWithOtherLast';
 import {
@@ -313,7 +314,9 @@ export default function EventPublish() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // ---- 回放密码弹窗（点击有回放的卡片）----
+  // ---- 活动「中间卡片」预览弹窗（点击卡片先衔接，不直接跳原文）----
+  const [eventPreview, setEventPreview] = useState(null);
+  // ---- 回放密码弹窗（从预览卡片点「查看活动回放」后）----
   const [replayModal, setReplayModal] = useState(null);
   const [passwordInput, setPasswordInput] = useState('');
   const [passwordError, setPasswordError] = useState('');
@@ -775,16 +778,24 @@ export default function EventPublish() {
     deleteEvent(event.id);
   };
 
-  // ---- 卡片点击：
-  //   1. 优先跳转公众号推文链接（officialUrl）
-  //   2. 其次：如果有回放 → 弹密码框
-  //   3. 否则不响应
+  // ---- 卡片点击：先弹出「中间卡片」预览，由用户在卡片里选择
+  //   「打开公众号推文」或「查看活动回放」，不再直接跳转原文链接。
   const handleCardClick = (event) => {
-    if (event.officialUrl && /^https?:\/\//i.test(event.officialUrl)) {
+    setEventPreview(event);
+  };
+
+  // 预览卡片 →「打开公众号推文」
+  const handleOpenOfficial = (event) => {
+    if (event?.officialUrl && /^https?:\/\//i.test(event.officialUrl)) {
       window.open(event.officialUrl, '_blank', 'noopener,noreferrer');
-      return;
     }
-    if (event.hasReplay && event.replayUrl) {
+    setEventPreview(null);
+  };
+
+  // 预览卡片 →「查看活动回放」→ 弹密码框
+  const handleReplayRequest = (event) => {
+    if (event?.hasReplay && event.replayUrl) {
+      setEventPreview(null);
       setReplayModal(event);
       setPasswordInput('');
       setPasswordError('');
@@ -1120,8 +1131,8 @@ export default function EventPublish() {
         <div className="ia-list__grid">
           {filtered.map((event) => {
             const countdownDays = getCountdownDays(event.date);
-            const hasOfficial = !!(event.officialUrl && /^https?:\/\//i.test(event.officialUrl));
-            const clickable = hasOfficial || (event.hasReplay && event.replayUrl);
+            // 所有活动卡片都先弹出「中间卡片」预览，统一交互
+            const clickable = true;
             const canManageEvent = isAdmin || (
               event.createdById && String(event.createdById) === String(user?.id)
             );
@@ -1702,6 +1713,14 @@ export default function EventPublish() {
           </div>
         </div>
       )}
+
+      {/* 活动「中间卡片」预览弹窗（点击卡片先衔接） */}
+      <EventPreviewModal
+        event={eventPreview}
+        onClose={() => setEventPreview(null)}
+        onOpenOfficial={handleOpenOfficial}
+        onReplay={handleReplayRequest}
+      />
 
       {/* 回放密码弹窗 */}
       {replayModal && (
