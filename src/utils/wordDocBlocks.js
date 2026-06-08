@@ -172,7 +172,9 @@ function layoutColumnResizers(container) {
 function isEmptyColumn(col) {
   if (!col) return true;
   if (col.querySelector('img')) return false;
-  return (col.textContent || '').replace(/​/g, '').trim() === '';
+  // 去掉零宽空格(U+200B)后再判断是否只剩空白
+  const ZERO_WIDTH = new RegExp(String.fromCharCode(0x200B), 'g');
+  return (col.textContent || '').replace(ZERO_WIDTH, '').trim() === '';
 }
 
 /** 把光标放到某节点内容末尾 */
