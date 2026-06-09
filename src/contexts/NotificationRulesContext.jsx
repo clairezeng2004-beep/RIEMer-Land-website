@@ -12,6 +12,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -23,7 +24,26 @@ import {
 import { describeRule } from '../lib/notificationRuleDSL';
 
 const STORAGE_KEY = 'riemer_notification_rules';
+// 一次性迁移标记：把所有现存规则的通知范围统一改为「所有人」
+const AUDIENCE_ALL_MIGRATION_KEY = 'riemer_notif_rules_audience_all_v1';
 const RulesContext = createContext(null);
+
+// 规则对象 → 云端表行
+function ruleToRow(r) {
+  return {
+    id: r.id,
+    event: r.event,
+    title: r.title,
+    message_template: r.messageTemplate,
+    type: r.type,
+    audience: r.audience,
+    auto_read_for_operator: r.autoReadForOperator,
+    conditions: r.conditions,
+    throttle: r.throttle,
+    enabled: r.enabled,
+    description: r.description,
+  };
+}
 
 // 生成一个不依赖 crypto 的短 id（localStorage 场景足够）
 function makeId() {
@@ -38,7 +58,7 @@ const DEFAULT_RULES = [
     title: '新内部分享',
     messageTemplate: '{operator} 上传了文档「{title}」（{typeLabel}）',
     type: 'sharing',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -46,7 +66,7 @@ const DEFAULT_RULES = [
     title: '文档已删除',
     messageTemplate: '{operator} 删除了文档「{title}」（{typeLabel}）',
     type: 'other',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -54,7 +74,7 @@ const DEFAULT_RULES = [
     title: '新建设建议',
     messageTemplate: '{operator} 提出了建议：{summary}',
     type: 'progress',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -62,7 +82,7 @@ const DEFAULT_RULES = [
     title: '建设建议状态变更',
     messageTemplate: '建议「{summary}」状态：{from} → {to}',
     type: 'progress',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -70,7 +90,7 @@ const DEFAULT_RULES = [
     title: '新事项创建',
     messageTemplate: '{operator} 新建了事项「{title}」（{category}）',
     type: 'progress',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -78,7 +98,7 @@ const DEFAULT_RULES = [
     title: '事项状态变更',
     messageTemplate: '{operator} 将事项「{title}」状态：{from} → {to}',
     type: 'progress',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -86,7 +106,7 @@ const DEFAULT_RULES = [
     title: '新成员分享',
     messageTemplate: '{operator} 发布了新分享「{title}」（{categoryLabel}）',
     type: 'sharing',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -94,7 +114,7 @@ const DEFAULT_RULES = [
     title: '公众号文章归档',
     messageTemplate: '{operator} 归档了公众号文章「{title}」（{category}）',
     type: 'sharing',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
   {
@@ -102,7 +122,7 @@ const DEFAULT_RULES = [
     title: '相册新增照片',
     messageTemplate: '{operator} 向相册「{albumTitle}」上传了 {count} 张照片',
     type: 'sharing',
-    audience: 'operator_exclude',
+    audience: 'all',
     autoReadForOperator: true,
   },
 ];
@@ -268,6 +288,40 @@ export function NotificationRulesProvider({ children }) {
   useEffect(() => {
     loadRules();
   }, [loadRules]);
+
+  // ---- 一次性迁移：把所有现存规则的通知范围统一改为「所有人」----
+  // 仅运行一次（localStorage 标记）；云端可用时回写云端，失败则下次会话重试。
+  const audienceMigratedRef = useRef(false);
+  useEffect(() => {
+    if (loading || audienceMigratedRef.current) return;
+    audienceMigratedRef.current = true; // 本次会话只尝试一次
+    if (localStorage.getItem(AUDIENCE_ALL_MIGRATION_KEY)) return;
+    const needsMigration = rules.some((r) => r.audience !== 'all');
+    if (!needsMigration) {
+      localStorage.setItem(AUDIENCE_ALL_MIGRATION_KEY, '1');
+      return;
+    }
+    const migrated = rules.map((r) => {
+      const next = { ...r, audience: 'all' };
+      return { ...next, description: describeRule(next) };
+    });
+    setRules(migrated);
+    writeLocal(migrated);
+    if (useCloud && cloudAvailable) {
+      (async () => {
+        try {
+          await supabase
+            .from('notification_rules')
+            .upsert(migrated.map(ruleToRow), { onConflict: 'id' });
+          localStorage.setItem(AUDIENCE_ALL_MIGRATION_KEY, '1');
+        } catch (err) {
+          console.warn('[NotifRules] 通知范围迁移云端同步失败，下次会话重试:', err?.message || err);
+        }
+      })();
+    } else {
+      localStorage.setItem(AUDIENCE_ALL_MIGRATION_KEY, '1');
+    }
+  }, [loading, rules, useCloud, cloudAvailable]);
 
   // ---- 同步到规则引擎（让 emitNotificationEvent 拿到最新规则）----
   useEffect(() => {
