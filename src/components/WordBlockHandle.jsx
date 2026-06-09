@@ -1,6 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Plus, Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { createPortal } from 'react-dom';
+import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
 import './WordBlockHandle.css';
+
+/** 四个点（正方形四顶点）图标 —— 块手柄的抓取标识 */
+function FourDotsIcon({ size = 14 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="5" cy="5" r="1.6" />
+      <circle cx="11" cy="5" r="1.6" />
+      <circle cx="5" cy="11" r="1.6" />
+      <circle cx="11" cy="11" r="1.6" />
+    </svg>
+  );
+}
 
 /**
  * WordBlockHandle —— 飞书式「块手柄」
@@ -255,7 +268,9 @@ export default function WordBlockHandle({ editorRef, onChange }) {
 
   const stop = (e) => e.preventDefault(); // 防止 mousedown 抢走编辑器选区
 
-  return (
+  // 用 portal 渲染到 body：避免被带 transform/filter 的祖先元素改变 position:fixed
+  // 的包含块，从而保证手柄能按视口坐标随光标行滚动跟随，而不是停在原处。
+  return createPortal(
     <div ref={rootRef} className="wbh" style={{ top: `${pos.top}px`, left: `${pos.left}px` }}>
       <button
         type="button"
@@ -264,7 +279,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
         onClick={() => setMenuOpen((v) => !v)}
         title="插入/切换格式（标题层级、引用等）"
       >
-        <Plus size={16} />
+        <FourDotsIcon size={14} />
       </button>
 
       {menuOpen && (
@@ -283,6 +298,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
           ))}
         </div>
       )}
-    </div>
+    </div>,
+    document.body
   );
 }
