@@ -46,7 +46,6 @@ export default function Notifications() {
     markAsRead,
     markAllAsRead,
     deleteNotification,
-    emailReminderSent,
   } = useNotifications();
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
@@ -99,13 +98,13 @@ export default function Notifications() {
           )}
         </div>
 
-        {/* 邮件提醒状态 */}
-        {emailReminderSent && (
+        {/* 邮件提醒说明（真实行为：后端定时任务每周最多给有未读的用户发一封汇总邮件） */}
+        {unreadCount > 0 && (
           <div className="notifications-email-banner">
             <Mail size={18} />
             <div>
-              <strong>本周的邮件提醒已发出</strong>
-              <p>系统发现你有未读消息，已自动给你的邮箱发了一封提醒邮件，帮你汇总本周的消息。</p>
+              <strong>未读消息邮件提醒</strong>
+              <p>当你有未读消息时，系统每周最多会向你的注册邮箱发送一封未读汇总提醒邮件。</p>
             </div>
           </div>
         )}

@@ -103,7 +103,6 @@ export function NotificationProvider({ children }) {
   const { internalConfig } = useSiteContent();
   const [notifications, setNotifications] = useState(getStoredNotifications);
   const [reads, setReads] = useState(new Set()); // 当前用户已读的通知 ID 集合
-  const [emailReminderSent, setEmailReminderSent] = useState(false);
   const [loaded, setLoaded] = useState(() => getStoredNotifications().length > 0);
   const pollRef = useRef(null);
   // 并发去重：请求序号 + 当前在途请求，避免"先发后到"的响应覆盖"后发先到"的新状态
@@ -429,23 +428,8 @@ export function NotificationProvider({ children }) {
   // 注意：不直接用 notifications state 覆盖 localStorage，因为 state 是角色过滤后的子集。
   // 持久化由 addLocalNotification 和 deleteNotification 直接操作 localStorage。
 
-  // 检查本周是否需要发邮件提醒
-  useEffect(() => {
-    const lastEmail = localStorage.getItem(LAST_EMAIL_KEY);
-    const weekStart = getWeekStart();
-    const notificationList = normalizeNotificationsList(notifications);
-    const unreadCount = notificationList.filter((n) => !n.read).length;
-
-    if (unreadCount > 0) {
-      if (!lastEmail || new Date(lastEmail) < weekStart) {
-        setEmailReminderSent(true);
-        localStorage.setItem(LAST_EMAIL_KEY, new Date().toISOString());
-        console.log(
-          `[RIEMer Notification] 本周邮件提醒触发：${unreadCount} 条未读消息`
-        );
-      }
-    }
-  }, [notifications]);
+  // 注：未读消息的邮件提醒由后端定时任务（api/send-unread-digest.js）真实发送，
+  // 这里不再做"前端假装已发送"的模拟。
 
   const safeNotifications = normalizeNotificationsList(notifications);
   const unreadCount = safeNotifications.filter((n) => !n.read).length;
@@ -659,7 +643,6 @@ export function NotificationProvider({ children }) {
         markAllAsRead,
         addNotification,
         deleteNotification,
-        emailReminderSent,
         refreshNotifications: () => loadNotifications({ force: true }),
       }}
     >

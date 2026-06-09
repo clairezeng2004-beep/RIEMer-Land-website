@@ -14,12 +14,19 @@
     },
     "api/chat.js": {
       "maxDuration": 60
+    },
+    "api/send-unread-digest.js": {
+      "maxDuration": 60
     }
   },
   "crons": [
     {
       "path": "/api/keep-alive",
       "schedule": "0 8 */3 * *"
+    },
+    {
+      "path": "/api/send-unread-digest",
+      "schedule": "0 1 * * *"
     }
   ]
 }
