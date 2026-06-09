@@ -112,6 +112,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const blockRef = useRef(null); // 当前块 DOM 节点（点菜单时用来恢复光标）
   const rootRef = useRef(null);
+  const closeTimerRef = useRef(null); // 悬浮离开后的延时关闭计时器
 
   const fireChange = useCallback(() => {
     const editor = editorRef?.current;
@@ -221,6 +222,11 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     return () => document.removeEventListener('mousedown', onDoc);
   }, [menuOpen]);
 
+  // 卸载时清掉悬浮关闭计时器
+  useEffect(() => () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+  }, []);
+
   /** 把光标放回当前块（点菜单会让编辑器失焦，先恢复光标再执行命令）。
    *  selectAll=true 时选中整块文字（加粗/链接等行内格式需要选区）；
    *  否则收到块末尾（formatBlock / 列表命令对折叠光标即可生效）。 */
@@ -284,15 +290,35 @@ export default function WordBlockHandle({ editorRef, onChange }) {
 
   const stop = (e) => e.preventDefault(); // 防止 mousedown 抢走编辑器选区
 
+  // 悬浮展开：鼠标移到手柄/菜单上即展开，移开后短暂延时关闭（延时用于跨过
+  // 图标与菜单之间的小间隙，避免一移动就闪退）。
+  const openMenu = () => {
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setMenuOpen(true);
+  };
+  const scheduleClose = () => {
+    if (closeTimerRef.current) clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = setTimeout(() => setMenuOpen(false), 160);
+  };
+
   // 用 portal 渲染到 body：避免被带 transform/filter 的祖先元素改变 position:fixed
   // 的包含块，从而保证手柄能按视口坐标随光标行滚动跟随，而不是停在原处。
   return createPortal(
-    <div ref={rootRef} className="wbh" style={{ top: `${pos.top}px`, left: `${pos.left}px` }}>
+    <div
+      ref={rootRef}
+      className="wbh"
+      style={{ top: `${pos.top}px`, left: `${pos.left}px` }}
+      onMouseEnter={openMenu}
+      onMouseLeave={scheduleClose}
+    >
       <button
         type="button"
         className="wbh__handle"
         onMouseDown={stop}
-        onClick={() => setMenuOpen((v) => !v)}
+        onClick={openMenu}
         title="插入/切换格式（标题层级、引用等）"
       >
         <FourDotsIcon size={14} />
