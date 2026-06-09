@@ -201,7 +201,7 @@
   width: 100%;
   height: auto;
   display: block;
-  margin: 0 0 0.55em;
+  margin: 0 0 1em;
   border-radius: var(--radius-sm, 4px);
   max-width: 100%;
 }
@@ -216,7 +216,7 @@
 .msc-col .msc-img-wrap {
   display: block;
   width: 100%;
-  margin: 0.25em 0 0.6em;
+  margin: 0.25em 0 1em;
   line-height: 1;
   text-align: center;
 }
