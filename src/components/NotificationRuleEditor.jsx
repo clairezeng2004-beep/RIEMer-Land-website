@@ -377,33 +377,7 @@ export default function NotificationRuleEditor({
             )}
           </div>
 
-          {/* 5. 频率控制 */}
-          <div className="nre-section">
-            <div className="nre-section-title">
-              5. 频率限制（可选）
-              <span className="nre-hint">（防止同一类事件短时间刷屏）</span>
-            </div>
-            <div className="nre-field">
-              <label>每天最多触发</label>
-              <input
-                type="number"
-                min="0"
-                className="nre-num"
-                value={draft.throttle?.maxPerDay ?? 0}
-                onChange={(e) =>
-                  handleChange({
-                    throttle: {
-                      ...(draft.throttle || {}),
-                      maxPerDay: Number(e.target.value) || 0,
-                    },
-                  })
-                }
-              />
-              <span className="nre-hint">（0 表示不限，超过后当天剩余事件不再发通知）</span>
-            </div>
-          </div>
-
-          {/* 6. 启用开关 */}
+          {/* 5. 启用开关 */}
           <div className="nre-section">
             <label className="nre-switch">
               <input
