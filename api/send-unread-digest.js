@@ -86,14 +86,19 @@ async function sendDigest({ resendApiKey, fromAddress, to, name, unread, siteUrl
     });
     if (!response.ok) {
       const e = await response.json().catch(() => ({}));
-      console.error('[send-unread-digest] Resend 发送失败:', to, response.status, e);
-      return false;
+      const detail = e?.message || e?.error || `HTTP ${response.status}`;
+      console.error('[send-unread-digest] Resend 发送失败:', to, response.status, detail);
+      return { ok: false, error: detail };
     }
-    return true;
+    return { ok: true };
   } catch (e) {
     console.error('[send-unread-digest] 发送异常:', to, e.message);
-    return false;
+    return { ok: false, error: e.message || '网络异常' };
   }
+}
+
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 export default async function handler(req, res) {
@@ -137,6 +142,8 @@ export default async function handler(req, res) {
     let skipped = 0;
     let failed = 0;
     const logUpserts = [];
+    const errorSamples = []; // 收集去重后的失败原因，直接返回方便排查
+    let firstSend = true;
 
     for (const p of profiles) {
       if (!p.email) { skipped += 1; continue; }
@@ -154,8 +161,15 @@ export default async function handler(req, res) {
       const last = lastSentMap.get(p.id) || 0;
       if (now - last < MIN_INTERVAL_MS) { skipped += 1; continue; }
 
+      // 限流：Resend 免费版约 2 封/秒，这里每封间隔 ~600ms，避免 429 失败
+      if (!firstSend) {
+        // eslint-disable-next-line no-await-in-loop
+        await sleep(600);
+      }
+      firstSend = false;
+
       // eslint-disable-next-line no-await-in-loop
-      const ok = await sendDigest({
+      const result = await sendDigest({
         resendApiKey,
         fromAddress,
         to: p.email,
@@ -163,7 +177,7 @@ export default async function handler(req, res) {
         unread,
         siteUrl,
       });
-      if (ok) {
+      if (result.ok) {
         sent += 1;
         logUpserts.push({
           user_id: p.id,
@@ -172,6 +186,9 @@ export default async function handler(req, res) {
         });
       } else {
         failed += 1;
+        if (result.error && !errorSamples.includes(result.error) && errorSamples.length < 5) {
+          errorSamples.push(result.error);
+        }
       }
     }
 
@@ -189,7 +206,14 @@ export default async function handler(req, res) {
       }).catch((e) => console.warn('[send-unread-digest] 写入发送日志失败:', e.message));
     }
 
-    return res.status(200).json({ ok: true, users: profiles.length, sent, skipped, failed });
+    return res.status(200).json({
+      ok: true,
+      users: profiles.length,
+      sent,
+      skipped,
+      failed,
+      ...(errorSamples.length > 0 ? { errors: errorSamples } : {}),
+    });
   } catch (err) {
     console.error('[send-unread-digest] 失败:', err);
     return res.status(500).json({ error: err.message || '未知错误' });
