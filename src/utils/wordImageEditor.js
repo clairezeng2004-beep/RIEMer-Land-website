@@ -293,6 +293,14 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     selectedImg = img || null;
     if (img) {
       img.classList.add('msc-img--selected');
+      // 让浏览器选区包住这张图：这样 Ctrl+C / Ctrl+X（剪切/复制）以及拖拽都能直接作用于它
+      try {
+        const range = document.createRange();
+        range.selectNode(img);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      } catch { /* ignore */ }
       resizer.layout();
     } else {
       resizer.hide();
@@ -480,6 +488,14 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     }
   }
 
+  // 原生剪切（Ctrl/Cmd+X）选中的图片后，内容已改变 → 同步并清理选中态
+  function onCut() {
+    setTimeout(() => {
+      selectImage(null);
+      fireChange();
+    }, 0);
+  }
+
   // 点击编辑器外 → 取消选中
   function onDocClick(e) {
     if (!editor.contains(e.target) && !resizer) return;
@@ -498,6 +514,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   editor.addEventListener('dragleave', onDragLeave);
   editor.addEventListener('drop', onDrop);
   editor.addEventListener('keydown', onKeyDown);
+  editor.addEventListener('cut', onCut);
   document.addEventListener('mousedown', onDocClick);
 
   return {
@@ -533,6 +550,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       editor.removeEventListener('dragleave', onDragLeave);
       editor.removeEventListener('drop', onDrop);
       editor.removeEventListener('keydown', onKeyDown);
+      editor.removeEventListener('cut', onCut);
       document.removeEventListener('mousedown', onDocClick);
       resizer.destroy();
     },

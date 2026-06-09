@@ -1028,6 +1028,19 @@
   -webkit-user-drag: none;
 }
 
+/* 编辑器内的图片：允许拖拽移动、并可被选中以便复制/剪切
+   （上面的规则为防止预览页图片被拖走而禁用了拖拽/选择，这里在编辑器里放开） */
+.msc-form__word-editor .msc-img {
+  user-select: auto;
+  -webkit-user-select: auto;
+  -webkit-user-drag: element;
+  cursor: grab;
+}
+
+.msc-form__word-editor .msc-img--selected {
+  cursor: grab;
+}
+
 /* 选中的图片 → 蓝色描边，提示可拖动手柄 */
 .msc-form__word-editor .msc-img--selected {
   outline: 2px solid #3b82f6;
