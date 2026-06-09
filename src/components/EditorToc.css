@@ -37,6 +37,13 @@
   flex: 1;
 }
 
+/* 标题栏可拖拽：按住移动整个目录面板 */
+.etoc__header--draggable {
+  cursor: move;
+  user-select: none;
+  touch-action: none;
+}
+
 .etoc__close {
   display: inline-flex;
   align-items: center;

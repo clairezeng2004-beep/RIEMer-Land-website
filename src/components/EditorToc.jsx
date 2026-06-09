@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { List, X } from 'lucide-react';
 import useTocScroll from '../hooks/useTocScroll';
 import './EditorToc.css';
@@ -37,13 +37,58 @@ export default function EditorToc({ editorRef, content, scrollOffset = 64, defau
   });
   const [open, setOpen] = useState(defaultOpen);
 
+  // 拖拽：从标题栏按住可把整个目录面板移动到任意位置
+  const rootRef = useRef(null);
+  const [pos, setPos] = useState(null); // 拖拽后的 {top, left}；null 表示用 CSS 默认位置
+
+  const handleDragStart = (e) => {
+    // 从关闭按钮上按下不触发拖拽
+    if (e.target.closest?.('.etoc__close')) return;
+    const el = rootRef.current;
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    const start = {
+      x: e.clientX,
+      y: e.clientY,
+      top: rect.top,
+      left: rect.left,
+      w: rect.width,
+      h: rect.height,
+    };
+    e.preventDefault();
+    const move = (ev) => {
+      let top = start.top + (ev.clientY - start.y);
+      let left = start.left + (ev.clientX - start.x);
+      left = Math.max(4, Math.min(left, window.innerWidth - start.w - 4));
+      top = Math.max(4, Math.min(top, window.innerHeight - start.h - 4));
+      setPos({ top, left });
+    };
+    const up = () => {
+      window.removeEventListener('pointermove', move);
+      window.removeEventListener('pointerup', up);
+    };
+    window.addEventListener('pointermove', move);
+    window.addEventListener('pointerup', up);
+  };
+
   if (!toc.length) return null;
 
+  const posStyle = pos
+    ? { top: pos.top, left: pos.left, right: 'auto', bottom: 'auto' }
+    : undefined;
+
   return (
-    <div className={`etoc ${open ? 'etoc--open' : 'etoc--collapsed'}`}>
+    <div
+      ref={rootRef}
+      className={`etoc ${open ? 'etoc--open' : 'etoc--collapsed'}`}
+      style={posStyle}
+    >
       {open ? (
         <nav className="etoc__panel" aria-label="文档目录">
-          <div className="etoc__header">
+          <div
+            className="etoc__header etoc__header--draggable"
+            onPointerDown={handleDragStart}
+          >
             <List size={14} />
             <span className="etoc__title">目录</span>
             <button
