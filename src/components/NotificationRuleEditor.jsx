@@ -171,7 +171,7 @@ export default function NotificationRuleEditor({
       title: meta.defaults.title,
       messageTemplate: meta.defaults.messageTemplate,
       type: meta.defaults.type,
-      audience: meta.defaults.autoReadForOperator ? 'operator_exclude' : 'all',
+      audience: 'all', // 默认通知范围：所有人
       autoReadForOperator: meta.defaults.autoReadForOperator,
       conditions: [], // 清空条件，因为变量不一样
     }));

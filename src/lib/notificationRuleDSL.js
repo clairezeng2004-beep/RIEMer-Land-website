@@ -293,7 +293,7 @@ export function createEmptyRule(eventKey = 'doc.upload') {
     title: ev.defaults.title,
     messageTemplate: ev.defaults.messageTemplate,
     type: ev.defaults.type,
-    audience: ev.defaults.autoReadForOperator ? 'operator_exclude' : 'all',
+    audience: 'all', // 默认通知范围：所有人
     autoReadForOperator: ev.defaults.autoReadForOperator,
     conditions: [],
     throttle: { maxPerDay: 0 },
