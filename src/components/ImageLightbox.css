@@ -1,0 +1,63 @@
+/* 文章详情页图片放大查看 */
+
+/* 正文里的图片：提示可点击放大 */
+.imglb-scope img {
+  cursor: zoom-in;
+}
+
+.imglb__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10000;
+  background: rgba(0, 0, 0, 0.82);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  animation: imglbFadeIn 0.18s ease;
+  cursor: zoom-out;
+}
+
+@keyframes imglbFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.imglb__img {
+  max-width: 92vw;
+  max-height: 92vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  cursor: default;
+  animation: imglbZoomIn 0.18s ease;
+}
+
+@keyframes imglbZoomIn {
+  from { opacity: 0; transform: scale(0.96); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.imglb__close {
+  position: fixed;
+  top: 18px;
+  right: 18px;
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.imglb__close:hover {
+  background: rgba(255, 255, 255, 0.24);
+}

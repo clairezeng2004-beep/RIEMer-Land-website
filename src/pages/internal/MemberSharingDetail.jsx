@@ -21,6 +21,7 @@ import {
   X,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
+import ImageLightbox from '../../components/ImageLightbox';
 import WordPreview from '../../components/WordPreview';
 import ViewLogPopover from '../../components/ViewLogPopover';
 import PrevNextNavigator from '../../components/PrevNextNavigator';
@@ -441,6 +442,8 @@ export default function MemberSharingDetail() {
               className={`msd-article__content ${post.format === 'word' ? 'msd-article__content--word' : 'msd-article__content--markdown'}`}
               dangerouslySetInnerHTML={{ __html: renderedContent }}
             />
+            {/* 点击正文图片放大查看 */}
+            <ImageLightbox containerRef={contentRef} />
 
             {/* 附件列表 */}
             {Array.isArray(post.attachments) && post.attachments.length > 0 && (

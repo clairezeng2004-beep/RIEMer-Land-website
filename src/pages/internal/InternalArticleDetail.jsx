@@ -5,6 +5,7 @@ import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useAuth } from '../../contexts/AuthContext';
 import TextAnnotation from '../../components/TextAnnotation';
+import ImageLightbox from '../../components/ImageLightbox';
 import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import './InternalArticleDetail.css';
@@ -126,6 +127,8 @@ export default function InternalArticleDetail() {
               <p className="ia-detail__paragraph">{article.excerpt}</p>
             )}
           </div>
+          {/* 点击正文图片放大查看 */}
+          <ImageLightbox containerRef={contentRef} />
 
           {/* 划词评论组件 */}
           <TextAnnotation

@@ -35,6 +35,7 @@ import {
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
 import TextAnnotation from '../../components/TextAnnotation';
+import ImageLightbox from '../../components/ImageLightbox';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
 import WordBlockHandle from '../../components/WordBlockHandle';
@@ -1776,6 +1777,8 @@ export default function ProcessTemplateDetail() {
                 />
               )
             )}
+            {/* 点击正文图片放大查看 */}
+            <ImageLightbox containerRef={contentRef} />
 
             {/* 当没有 content 但有主文件 fileUrl 时：PDF / 图片 / Word 嵌入预览 */}
             {!hasTextContent && hasFileUrl && (
