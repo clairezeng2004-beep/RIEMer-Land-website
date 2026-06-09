@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect, useRef } from 'react';
 import { X, Plus, Trash2, Info, Eye } from 'lucide-react';
+import CustomSelect from './CustomSelect';
 import {
   EVENT_CATALOG,
   AUDIENCE_OPTIONS,
@@ -237,17 +238,16 @@ export default function NotificationRuleEditor({
               1. 什么情况下触发这条通知？
               <span className="nre-hint">（选择后系统会自动监听这个事件）</span>
             </div>
-            <select
-              className="nre-select"
+            <CustomSelect
+              style={{ width: '100%' }}
               value={draft.event}
-              onChange={(e) => handleEventChange(e.target.value)}
-            >
-              {EVENT_CATALOG.map((ev) => (
-                <option key={ev.key} value={ev.key}>
-                  【{ev.source}】{ev.label}
-                </option>
-              ))}
-            </select>
+              onChange={(v) => handleEventChange(v)}
+              placeholder="选择触发事件"
+              options={EVENT_CATALOG.map((ev) => ({
+                value: ev.key,
+                label: `【${ev.source}】${ev.label}`,
+              }))}
+            />
           </div>
 
           {/* 2. 通知内容 */}
@@ -308,31 +308,21 @@ export default function NotificationRuleEditor({
             <div className="nre-row">
               <div className="nre-field">
                 <label>通知范围</label>
-                <select
-                  className="nre-select"
+                <CustomSelect
+                  style={{ width: '100%' }}
                   value={draft.audience}
-                  onChange={(e) => handleChange({ audience: e.target.value })}
-                >
-                  {AUDIENCE_OPTIONS.map((a) => (
-                    <option key={a.value} value={a.value}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleChange({ audience: v })}
+                  options={AUDIENCE_OPTIONS}
+                />
               </div>
               <div className="nre-field">
                 <label>通知类型</label>
-                <select
-                  className="nre-select"
+                <CustomSelect
+                  style={{ width: '100%' }}
                   value={draft.type}
-                  onChange={(e) => handleChange({ type: e.target.value })}
-                >
-                  {TYPE_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  onChange={(v) => handleChange({ type: v })}
+                  options={TYPE_OPTIONS}
+                />
               </div>
             </div>
           </div>
@@ -349,28 +339,20 @@ export default function NotificationRuleEditor({
               <>
                 {(draft.conditions || []).map((c, idx) => (
                   <div key={idx} className="nre-condition">
-                    <select
-                      className="nre-select nre-select--sm"
+                    <CustomSelect
+                      size="sm"
+                      style={{ minWidth: '120px' }}
                       value={c.field}
-                      onChange={(e) => updateCondition(idx, { field: e.target.value })}
-                    >
-                      {eventMeta.variables.map((v) => (
-                        <option key={v.key} value={v.key}>
-                          {v.label}
-                        </option>
-                      ))}
-                    </select>
-                    <select
-                      className="nre-select nre-select--sm"
+                      onChange={(v) => updateCondition(idx, { field: v })}
+                      options={eventMeta.variables.map((v) => ({ value: v.key, label: v.label }))}
+                    />
+                    <CustomSelect
+                      size="sm"
+                      style={{ minWidth: '110px' }}
                       value={c.op}
-                      onChange={(e) => updateCondition(idx, { op: e.target.value })}
-                    >
-                      {CONDITION_OPS.map((o) => (
-                        <option key={o.value} value={o.value}>
-                          {o.label}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(v) => updateCondition(idx, { op: v })}
+                      options={CONDITION_OPS}
+                    />
                     <input
                       type="text"
                       className="nre-cond-val"
