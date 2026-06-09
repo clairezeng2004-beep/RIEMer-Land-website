@@ -150,17 +150,33 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     });
   }, [editorRef, menuOpen]);
 
+  /** 轻量「只挪位置」：滚动/缩放时把手柄（及其菜单）贴回光标当前所在行。
+   *  不重算所在块、不隐藏，因此菜单打开时也能跟随滚动，不会卡在原处。 */
+  const reposition = useCallback(() => {
+    const editor = editorRef?.current;
+    if (!editor) return;
+    const block = blockRef.current;
+    if (!block || !editor.contains(block)) return;
+    const lineRect = getCaretLineRect(editor) || block.getBoundingClientRect();
+    if (!lineRect) return;
+    const editorRect = editor.getBoundingClientRect();
+    setPos({
+      top: lineRect.top + lineRect.height / 2 - HANDLE_SIZE / 2,
+      left: editorRect.left - 30,
+    });
+  }, [editorRef]);
+
   useEffect(() => {
     const onSel = () => refresh();
     // 滚动/缩放用 rAF 合批，避免高频触发卡顿；capture=true 让内层滚动容器
     // （若编辑器放在 overflow:auto 的祖先里）的滚动也能被捕获，手柄随之跟随。
+    // 注意：滚动用 reposition（不受 menuOpen 限制），保证菜单展开时也跟随光标行。
     let rafId = null;
     const onScrollResize = () => {
-      if (menuOpen) return;
       if (rafId) return;
       rafId = requestAnimationFrame(() => {
         rafId = null;
-        refresh();
+        reposition();
       });
     };
     document.addEventListener('selectionchange', onSel);
@@ -191,7 +207,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
         editor.removeEventListener('scroll', onScrollResize);
       }
     };
-  }, [editorRef, refresh, menuOpen]);
+  }, [editorRef, refresh, reposition]);
 
   // 点击外部关闭菜单
   useEffect(() => {
