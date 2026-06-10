@@ -11,7 +11,8 @@
 .msc-cols {
   display: grid;
   gap: 12px;
-  margin: 0.8em 0;
+  /* 上下外边距与普通段落行间距对齐，避免详情页里分栏上下留白过多 */
+  margin: 0.4em 0;
   /* stretch：同一行的各栏高度自动拉齐 —— 某一栏插入/调整图片变高后，
      相邻栏会跟随到同样高度，不再出现一高一矮 */
   align-items: stretch;
@@ -57,12 +58,15 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  /* 无图片的栏（刚插入或图片删空）默认约两行高；有图片的栏由图片决定高度，
-     不受此下限影响。配合 .msc-cols 的 align-items:stretch 让同行各栏自动等高。 */
-  min-height: 3.4em;
   padding: 4px;
   border-radius: var(--radius-sm, 4px);
   background: transparent;
+}
+
+/* 仅编辑器内给空栏一个约两行高的下限（方便点选/输入）；
+   发布后的详情页不强制高度，避免分栏下方出现多余留白。 */
+[contenteditable="true"] .msc-col {
+  min-height: 3.4em;
 }
 
 /* 分栏正下方自动生成的空段落：收紧行高，避免额外光标显得过高 */
@@ -80,20 +84,22 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  min-width: 28px;
-  height: 18px;
-  padding: 0 5px;
+  min-width: 26px;
+  height: 17px;
+  padding: 0 6px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.86);
+  /* 透明胶囊：显示该栏占页面宽度的百分比（如 50%）。半透明、低存在感。 */
+  background: rgba(255, 255, 255, 0.35);
+  -webkit-backdrop-filter: blur(2px);
+  backdrop-filter: blur(2px);
   color: var(--color-text-muted, #6b7280);
-  /* 计数标签（1/2、2/3）使用 UI 无衬线字体 + 等宽数字，
-     不再继承编辑器正文的衬线/手写体，避免与整体 UI 不协调 */
+  /* 百分比用 UI 无衬线字体 + 等宽数字，不继承正文衬线体 */
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
   font-variant-numeric: tabular-nums;
   font-size: 10px;
   font-weight: 700;
   line-height: 1;
-  box-shadow: 0 0 0 1px rgba(91, 140, 62, 0.18);
+  box-shadow: 0 0 0 1px rgba(91, 140, 62, 0.12);
   pointer-events: none;
 }
 

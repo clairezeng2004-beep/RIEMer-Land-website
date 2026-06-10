@@ -89,12 +89,11 @@ function placeCaretAtStart(node) {
 }
 
 function buildEmptyColumnContent() {
+  // 只放一个空段落：避免图片插入后其前/后出现多余空行（栏高度由 CSS min-height 控制）
   const frag = document.createDocumentFragment();
-  for (let i = 0; i < 2; i++) {
-    const p = document.createElement('p');
-    p.innerHTML = '<br />';
-    frag.appendChild(p);
-  }
+  const p = document.createElement('p');
+  p.innerHTML = '<br />';
+  frag.appendChild(p);
   return frag;
 }
 
@@ -123,10 +122,25 @@ function ensureColumnMeta(container) {
   const n = cols.length;
   container.setAttribute('data-cols', String(n));
   container.setAttribute('data-cols-label', `${n}栏`);
-  cols.forEach((col, index) => {
-    col.setAttribute('data-col-label', `${index + 1}/${n}`);
+  // 先给一个等分百分比兜底；布局完成后 updateColumnLabels 会按真实宽度刷新
+  cols.forEach((col) => {
+    if (!col.getAttribute('data-col-label')) {
+      col.setAttribute('data-col-label', `${Math.round(100 / n)}%`);
+    }
   });
   return cols;
+}
+
+/** 按各栏真实宽度刷新右上角"占页面宽度百分比"标签（拖拽/增删栏后实时更新） */
+function updateColumnLabels(container) {
+  if (!container) return;
+  const cols = getColumns(container);
+  if (cols.length === 0) return;
+  const widths = cols.map((c) => c.getBoundingClientRect().width);
+  const total = widths.reduce((s, w) => s + w, 0) || 1;
+  cols.forEach((col, i) => {
+    col.setAttribute('data-col-label', `${Math.round((widths[i] / total) * 100)}%`);
+  });
 }
 
 function ensureColumnResizers(container) {
@@ -154,6 +168,7 @@ function ensureColumnResizers(container) {
 
 function layoutColumnResizers(container) {
   if (!container) return;
+  updateColumnLabels(container); // 顺带刷新各栏百分比标签
   const cols = getColumns(container);
   const handles = [...container.querySelectorAll(':scope > .msc-col-resizer')];
   if (cols.length < 2 || handles.length === 0) return;
@@ -586,24 +601,11 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const container = anchor?.closest?.('.msc-cols');
     if (!container || !editor.contains(container)) return;
 
-    const cols = getColumns(container);
     const currentCol = anchor.closest('.msc-col');
-    const allEmpty = cols.length > 0 && cols.every(isEmptyColumn);
 
-    // 整个分栏为空 → 一次退格删除整块
-    if (allEmpty) {
-      e.preventDefault();
-      const prev = container.previousElementSibling;
-      const next = container.nextElementSibling;
-      container.remove();
-      if (prev) placeCaretAtEnd(prev);
-      else if (next) placeCaretAtStart(next);
-      onChange?.();
-      return;
-    }
-
-    // 当前栏为空（其余栏有内容）→ 删除该栏并重排
-    if (currentCol && isEmptyColumn(currentCol)) {
+    // 当前栏为空 → 退格只删「这一栏」，而不是整个分栏：
+    //   删除后若仍有 ≥2 栏 → 按新栏数等分重排；只剩 1 栏 → 取消分栏并保留内容。
+    if (currentCol && editor.contains(currentCol) && isEmptyColumn(currentCol)) {
       e.preventDefault();
       currentCol.remove();
       const remaining = getColumns(container);
@@ -613,6 +615,13 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       } else if (remaining.length === 1) {
         const block = unwrapSingleColumn(container, remaining[0]);
         if (block) placeCaretAtStart(block);
+      } else {
+        // 理论上不会出现（分栏至少 2 栏），兜底：删空块
+        const prev = container.previousElementSibling;
+        const next = container.nextElementSibling;
+        container.remove();
+        if (prev) placeCaretAtEnd(prev);
+        else if (next) placeCaretAtStart(next);
       }
       onChange?.();
     }
