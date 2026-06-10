@@ -19,6 +19,7 @@ import {
   FileArchive,
   List,
   X,
+  Pencil,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
 import ImageLightbox from '../../components/ImageLightbox';
@@ -106,7 +107,7 @@ function saveViews(data) {
 }
 
 export default function MemberSharingDetail() {
-  const { isAuthenticated, user, getAllUsers } = useAuth();
+  const { isAuthenticated, user, isAdmin, getAllUsers } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const contentRef = useRef(null);
@@ -362,6 +363,13 @@ export default function MemberSharingDetail() {
 
   const showToc = toc.length > 0 && (post.format === 'markdown' || post.format === 'word');
 
+  // 编辑权限：管理员，或本篇分享的作者 / 任一贡献者本人
+  const canEdit = !!(user && (
+    isAdmin ||
+    (post.authorId && String(post.authorId) === String(user.id)) ||
+    (Array.isArray(post.contributorIds) && post.contributorIds.map(String).includes(String(user.id)))
+  ));
+
   return (
     <div className="msd-page">
       {/* 顶部导航栏 — 类似 MemberSharingCreate */}
@@ -369,6 +377,16 @@ export default function MemberSharingDetail() {
         <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
           <ChevronLeft size={20} /> 返回列表
         </button>
+        {canEdit && (
+          <button
+            type="button"
+            className="msd-topbar__back msd-topbar__edit"
+            onClick={() => navigate(`/internal/member-sharing/create?edit=${post.id}`)}
+            title="编辑这篇分享"
+          >
+            <Pencil size={16} /> 编辑
+          </button>
+        )}
       </div>
 
       {/* 全屏内容区域 */}

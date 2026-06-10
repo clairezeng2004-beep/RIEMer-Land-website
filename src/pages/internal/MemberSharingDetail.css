@@ -47,6 +47,18 @@
   color: var(--color-primary, #5B8C3E);
 }
 
+/* 编辑按钮：与返回按钮同一行、同样式，用主色调表明是操作按钮 */
+.msd-topbar__edit {
+  color: var(--color-primary, #5B8C3E);
+  border-color: color-mix(in srgb, var(--color-primary, #5B8C3E) 40%, var(--color-border, #d1d5db));
+}
+
+.msd-topbar__edit:hover {
+  background: rgba(91, 140, 62, 0.08);
+  border-color: var(--color-primary, #5B8C3E);
+  color: var(--color-primary, #5B8C3E);
+}
+
 /* ============ Content Area ============ */
 .msd-content {
   flex: 1;
