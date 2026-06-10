@@ -92,7 +92,24 @@ END $$;
 
 -- ========== 5) document_views 主键已是 document_id，不需要额外索引 ==========
 
--- ========== 6) guestbook_entries 的时间索引 ==========
+-- ========== 6) articles 的发布时间索引 ==========
+-- 热点查询（公开首页 / 文章列表 / 内部文章归档）：
+--   SELECT id,title,date,category,tags,excerpt,url,cover_image,read_num,...
+--   FROM articles
+--   ORDER BY date DESC;
+-- 没有 date 降序索引时，文章增长后需要全表排序。加索引后可以直接按
+-- 时间倒序读取最新文章，配合前端列表字段瘦身一起降低首屏等待。
+DO $$
+BEGIN
+  IF to_regclass('public.articles') IS NOT NULL THEN
+    CREATE INDEX IF NOT EXISTS idx_articles_date
+      ON public.articles (date DESC);
+  ELSE
+    RAISE NOTICE '跳过: public.articles 不存在';
+  END IF;
+END $$;
+
+-- ========== 7) guestbook_entries 的时间索引 ==========
 -- 热点查询（内部留言板页面加载）：
 --   SELECT id,nickname,message,contact,show_contact,created_at
 --   FROM guestbook_entries
@@ -112,7 +129,7 @@ BEGIN
 END $$;
 
 -- ============================================
--- 7) 原子浏览计数 RPC：increment_document_view
+-- 8) 原子浏览计数 RPC：increment_document_view
 -- ============================================
 -- 业务等价于：INSERT ... ON CONFLICT (document_id) DO UPDATE SET view_count = view_count + 1
 -- 一次网络往返、原子 +1，避免前端老实现的 "select 再 upsert" 两次往返

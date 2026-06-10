@@ -313,6 +313,9 @@ CREATE TABLE IF NOT EXISTS public.articles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_articles_date
+  ON public.articles (date DESC);
+
 ALTER TABLE public.articles ENABLE ROW LEVEL SECURITY;
 
 -- 所有认证用户可查看文章

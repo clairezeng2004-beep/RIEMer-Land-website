@@ -388,6 +388,9 @@ CREATE TABLE IF NOT EXISTS articles (
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+CREATE INDEX IF NOT EXISTS idx_articles_date
+  ON articles (date DESC);
+
 -- 19. 启用 articles 的 RLS
 ALTER TABLE articles ENABLE ROW LEVEL SECURITY;
 

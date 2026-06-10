@@ -13,6 +13,13 @@ const INTERNAL_CONFIG_KEY = 'riemer_internal_config';
 const SUGGESTIONS_KEY = 'riemer_site_suggestions';
 const EVENTS_KEY = 'riemer_site_events';
 const TIMELINE_KEY = 'riemer_site_timeline';
+const PUBLIC_REFRESH_INTERVAL_MS = 60 * 1000;
+
+const getCurrentPathname = () => (
+  typeof window === 'undefined' ? '/' : window.location.pathname
+);
+
+const isInternalPath = (pathname) => String(pathname || '').startsWith('/internal');
 
 // 历史上为了防止"旧 fetch 回包覆盖刚 flush 的新值"，曾经把每个 key 本地最近一次
 // 成功推云的 updated_at 写进 localStorage，挂载时读出填进 lastPushedUpdatedAtRef。
@@ -358,6 +365,39 @@ function mergeInternalConfig(value) {
 }
 
 export function SiteContentProvider({ children }) {
+  const [pathname, setPathname] = useState(getCurrentPathname);
+  const isInternalRoute = isInternalPath(pathname);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const notifyRouteChange = () => setPathname(getCurrentPathname());
+    const wrapHistoryMethod = (method) => {
+      const original = window.history[method];
+      return function patchedHistoryMethod(...args) {
+        const result = original.apply(this, args);
+        window.dispatchEvent(new Event('riemer-route-change'));
+        return result;
+      };
+    };
+
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    window.history.pushState = wrapHistoryMethod('pushState');
+    window.history.replaceState = wrapHistoryMethod('replaceState');
+
+    window.addEventListener('popstate', notifyRouteChange);
+    window.addEventListener('riemer-route-change', notifyRouteChange);
+    notifyRouteChange();
+
+    return () => {
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+      window.removeEventListener('popstate', notifyRouteChange);
+      window.removeEventListener('riemer-route-change', notifyRouteChange);
+    };
+  }, []);
+
   const [content, setContent] = useState(() => {
     const stored = localStorage.getItem(CONTENT_KEY);
     if (stored) {
@@ -401,6 +441,7 @@ export function SiteContentProvider({ children }) {
     return [];
   });
   const [articlesLoaded, setArticlesLoaded] = useState(false);
+  const lastArticlesFetchAtRef = useRef(0);
 
   // 内部空间配置持久化开关：true 时暂停自动写 localStorage（编辑模式下使用）
   const [internalConfigPersistPaused, setInternalConfigPersistPaused] = useState(false);
@@ -491,50 +532,48 @@ export function SiteContentProvider({ children }) {
   //   - migrate 仅迁移明显带"本地临时 id"的旧文章（非 UUID、没有 _fromDb 标志）
   //   - 并且：先 migrate，再 fetch + 写入本地缓存；顺序反过来，杜绝"先把云端数据塞进 localStorage、
   //     下一步又把它当作'本地旧文章'上传"的闭环。
-  useEffect(() => {
-    let cancelled = false;
-    const loadArticles = async () => {
+  const loadArticlesFromCloud = useCallback(async ({ migrate = false } = {}) => {
+    let migrated = 0;
+    if (migrate) {
+      const MIGRATE_DONE_KEY = 'riemer_articles_migration_done_v2';
       try {
-        // ① 尝试迁移老的本地临时文章 → Supabase（幂等；跨会话也只运行一次）
-        let migrated = 0;
-        const MIGRATE_DONE_KEY = 'riemer_articles_migration_done_v2';
-        try {
-          const done = localStorage.getItem(MIGRATE_DONE_KEY);
-          if (!done) {
-            migrated = await migrateLocalArticlesToDb();
-            localStorage.setItem(MIGRATE_DONE_KEY, '1');
-          }
-        } catch {
-          // localStorage 不可用就跳过迁移
-        }
-
-        // ② 从云端拉取最新列表（真正的数据源）
-        const articles = await fetchArticlesFromDb();
-        if (!cancelled) {
-          setUserArticles(articles);
-          setArticlesLoaded(true);
-          // ③ 最后一步才写本地缓存 —— 此时迁移已经完成，
-          //    这里写入的内容不会再被 migrate 重新 insert
-          try {
-            localStorage.setItem(ARTICLES_KEY, JSON.stringify(articles));
-          } catch { /* ignore quota/private mode */ }
-          if (migrated > 0) {
-            console.log(`[SiteContent] 迁移本地文章到云端：${migrated} 条`);
-          }
+        const done = localStorage.getItem(MIGRATE_DONE_KEY);
+        if (!done) {
+          migrated = await migrateLocalArticlesToDb();
+          localStorage.setItem(MIGRATE_DONE_KEY, '1');
         }
       } catch {
-        if (!cancelled) {
-          setArticlesLoaded(true);
-        }
+        // localStorage 不可用就跳过迁移
       }
-    };
-    loadArticles();
-    return () => { cancelled = true; };
+    }
+
+    const articles = await fetchArticlesFromDb();
+    lastArticlesFetchAtRef.current = Date.now();
+    return { articles, migrated };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    loadArticlesFromCloud({ migrate: true }).then(({ articles, migrated }) => {
+      if (cancelled) return;
+      setUserArticles(articles);
+      setArticlesLoaded(true);
+      try {
+        localStorage.setItem(ARTICLES_KEY, JSON.stringify(articles));
+      } catch { /* ignore quota/private mode */ }
+      if (migrated > 0) {
+        console.log(`[SiteContent] 迁移本地文章到云端：${migrated} 条`);
+      }
+    }).catch(() => {
+      if (!cancelled) setArticlesLoaded(true);
+    });
+    return () => { cancelled = true; };
+  }, [loadArticlesFromCloud]);
 
   // ---- 订阅 articles 表实时变更：任一设备归档/编辑/删除文章后，所有设备立即同步 ----
   useEffect(() => {
     if (!isSupabaseConfigured) return;
+    if (!isInternalRoute) return;
     const unsubscribe = subscribeArticles(({ type, newItem, oldItem }) => {
       if (type === 'INSERT' && newItem) {
         setUserArticles((prev) => {
@@ -553,7 +592,28 @@ export function SiteContentProvider({ children }) {
       }
     });
     return () => unsubscribe();
-  }, []);
+  }, [isInternalRoute]);
+
+  // 公开访客页不保持 Realtime 连接：重新打开/切回页面时，超过 60 秒才后台刷新一次。
+  useEffect(() => {
+    if (isInternalRoute) return undefined;
+
+    const refreshIfStale = () => {
+      if (document.visibilityState !== 'visible') return;
+      if (Date.now() - lastArticlesFetchAtRef.current < PUBLIC_REFRESH_INTERVAL_MS) return;
+      loadArticlesFromCloud().then(({ articles }) => {
+        setUserArticles(articles);
+        setArticlesLoaded(true);
+      }).catch(() => { /* 保留现有缓存 */ });
+    };
+
+    document.addEventListener('visibilitychange', refreshIfStale);
+    window.addEventListener('focus', refreshIfStale);
+    return () => {
+      document.removeEventListener('visibilitychange', refreshIfStale);
+      window.removeEventListener('focus', refreshIfStale);
+    };
+  }, [isInternalRoute, loadArticlesFromCloud]);
 
   // ---- userArticles 变化时同步写本地缓存，供下次打开即时显示 ----
   // 等首批数据已加载完成（articlesLoaded=true）后再开始写回，
@@ -683,6 +743,7 @@ export function SiteContentProvider({ children }) {
   // ============================================
   // 为每条 state 维护一个 lastSyncedAt，用于避免 realtime 回流被自己覆盖
   const siteSyncRefs = useRef({});
+  const lastSettingsFetchAtRef = useRef(0);
   // 标记该 key 是否已完成首次云端拉取（hydrated）。只有 hydrated 后的本地变更才允许 push 回云端，
   // 否则初始化阶段的本地 mock 会把云端真实数据覆盖掉。
   const hydratedKeysRef = useRef({});
@@ -773,40 +834,67 @@ export function SiteContentProvider({ children }) {
       }
     };
 
-    // 首次拉云：合并为一次请求，减少公开页跨境往返
-    fetchSettings(syncKeys).then(({ settings, error }) => {
-      if (cancelled) return;
-      if (error) {
-        console.warn('[SiteContent] 首次批量拉取站点设置失败（走本地）:', error);
-        syncKeys.forEach((key) => { hydratedKeysRef.current[key] = true; });
+    const hydrateSiteSettings = ({ force = false } = {}) => {
+      if (!force && Date.now() - lastSettingsFetchAtRef.current < PUBLIC_REFRESH_INTERVAL_MS) {
         return;
       }
 
-      syncKeys.forEach((key) => {
-        const row = settings[key];
-        if (!row) {
-          console.log(`[SiteContent] ${key} 云端暂无数据，首次本地变更将推上云`);
-          hydratedKeysRef.current[key] = true;
+      fetchSettings(syncKeys).then(({ settings, error }) => {
+        if (cancelled) return;
+        if (error) {
+          console.warn('[SiteContent] 首次批量拉取站点设置失败（走本地）:', error);
+          syncKeys.forEach((key) => { hydratedKeysRef.current[key] = true; });
           return;
         }
-        applyCloudSetting(key, row.value, row.updatedAt, 'hydrate');
-      });
-    });
 
-    // 订阅变更：合并为一个 channel，按 key 分发
-    const unsubscribe = subscribeSettings(syncKeys, (key, value, updatedAt) => {
-      if (cancelled) return;
-      applyCloudSetting(key, value, updatedAt, 'subscribe');
-    });
+        syncKeys.forEach((key) => {
+          const row = settings[key];
+          if (!row) {
+            console.log(`[SiteContent] ${key} 云端暂无数据，首次本地变更将推上云`);
+            hydratedKeysRef.current[key] = true;
+            return;
+          }
+          applyCloudSetting(key, row.value, row.updatedAt, 'hydrate');
+        });
+        lastSettingsFetchAtRef.current = Date.now();
+      });
+    };
+
+    // 首次拉云：合并为一次请求，减少公开页跨境往返
+    hydrateSiteSettings({ force: true });
+
+    let unsubscribe = () => {};
+    let cleanupPublicRefresh = () => {};
+
+    if (isInternalRoute) {
+      // 内部空间保留实时同步，方便管理员多设备协作编辑。
+      unsubscribe = subscribeSettings(syncKeys, (key, value, updatedAt) => {
+        if (cancelled) return;
+        applyCloudSetting(key, value, updatedAt, 'subscribe');
+      });
+    } else {
+      // 公开访客页不保持 Realtime 连接：页面重新可见时，超过 60 秒才后台刷新。
+      const refreshIfStale = () => {
+        if (document.visibilityState !== 'visible') return;
+        hydrateSiteSettings();
+      };
+      document.addEventListener('visibilitychange', refreshIfStale);
+      window.addEventListener('focus', refreshIfStale);
+      cleanupPublicRefresh = () => {
+        document.removeEventListener('visibilitychange', refreshIfStale);
+        window.removeEventListener('focus', refreshIfStale);
+      };
+    }
 
     return () => {
       cancelled = true;
       unsubscribe();
+      cleanupPublicRefresh();
     };
 
     // 挂载时建立一次，数据流由订阅驱动
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [isInternalRoute]);
 
   // ============================================
   // 云端同步状态（让上层 UI 能真实知道"保存到云"成功还是失败）
