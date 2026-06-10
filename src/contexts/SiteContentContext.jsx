@@ -2,7 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { fetchArticles as fetchArticlesFromDb, addArticleToDb, updateArticleInDb, deleteArticleFromDb, migrateLocalArticlesToDb, subscribeArticles } from '../services/articleDbService';
-import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig, fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../services/siteSettingsService';
+import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig, fetchSettings, saveSetting, subscribeSettings, SITE_KEYS } from '../services/siteSettingsService';
 
 const SiteContentContext = createContext(null);
 
@@ -724,89 +724,86 @@ export function SiteContentProvider({ children }) {
     // 这类陈旧墓碑把真实新值挡在外面（即用户报的"跨设备不同步"根因）。
     purgeLegacyLastPushedAt();
     let cancelled = false;
-    const unsubs = [];
+    const syncDefByKey = new Map(syncDefs.map((def) => [def.key, def]));
+    const syncKeys = syncDefs.map(({ key }) => key);
 
-    syncDefs.forEach(({ key, setter, fallback, kind }) => {
-      // 首次拉云
-      fetchSetting(key).then(({ value, updatedAt, error }) => {
-        if (cancelled) return;
-        if (error) {
-          console.warn(`[SiteContent] 首次拉取 ${key} 失败（走本地）:`, error);
-          // 即便失败也标记 hydrated，避免之后用户编辑永远不能 push
+    const applyCloudSetting = (key, value, updatedAt, source) => {
+      const def = syncDefByKey.get(key);
+      if (!def) return;
+      const { setter, fallback, kind } = def;
+
+      if (value == null) {
+        if (source === 'hydrate') {
+          console.log(`[SiteContent] ${key} 云端暂无数据，首次本地变更将推上云`);
           hydratedKeysRef.current[key] = true;
-          return;
         }
-        if (value == null) {
-          // 云端没有该 key —— 说明还没被写过，允许后续本地变更推上去
+        return;
+      }
+
+      const lastPushed = lastPushedUpdatedAtRef.current[key];
+      if (lastPushed && updatedAt && lastPushed >= updatedAt) {
+        if (source === 'hydrate') hydratedKeysRef.current[key] = true;
+        if (source === 'hydrate') {
+          console.log(
+            `[SiteContent] ${key} hydrate 跳过覆盖：本地最近推云 updatedAt=${lastPushed} ≥ 云端返回 ${updatedAt}`
+          );
+        }
+        return;
+      }
+
+      if (source === 'hydrate' && localDirtyRef.current[key]) {
+        hydratedKeysRef.current[key] = true;
+        console.log(
+          `[SiteContent] ${key} hydrate 跳过覆盖：本地已 dirty，保留用户正在编辑的值`
+        );
+        return;
+      }
+
+      if (source !== 'hydrate' && updatedAt && siteSyncRefs.current[key] === updatedAt) return;
+      siteSyncRefs.current[key] = updatedAt;
+      suppressNextPushRef.current[key] = true;
+      setter((prev) => {
+        if (kind === 'object') return { ...fallback(), ...value };
+        if (Array.isArray(value)) return value;
+        return prev;
+      });
+      if (source === 'hydrate') {
+        hydratedKeysRef.current[key] = true;
+        console.log(`[SiteContent] ${key} 已从云端 hydrate，updatedAt=${updatedAt}`);
+      }
+    };
+
+    // 首次拉云：合并为一次请求，减少公开页跨境往返
+    fetchSettings(syncKeys).then(({ settings, error }) => {
+      if (cancelled) return;
+      if (error) {
+        console.warn('[SiteContent] 首次批量拉取站点设置失败（走本地）:', error);
+        syncKeys.forEach((key) => { hydratedKeysRef.current[key] = true; });
+        return;
+      }
+
+      syncKeys.forEach((key) => {
+        const row = settings[key];
+        if (!row) {
           console.log(`[SiteContent] ${key} 云端暂无数据，首次本地变更将推上云`);
           hydratedKeysRef.current[key] = true;
           return;
         }
-        // 竞态防御：如果在 fetch 发出后、回包之前，用户已经触发过保存/flush，
-        // 那么 lastPushedUpdatedAtRef 会比 fetch 回包的 updatedAt 新（或相等）。
-        // 此时必须放弃覆盖本地 state，否则会把刚保存的新值冲掉，随后 push-effect
-        // 再把旧值写回云端，造成"保存后刷新就没了，跨设备也看不到"。
-        const lastPushed = lastPushedUpdatedAtRef.current[key];
-        if (lastPushed && updatedAt && lastPushed >= updatedAt) {
-          hydratedKeysRef.current[key] = true;
-          console.log(
-            `[SiteContent] ${key} hydrate 跳过覆盖：本地最近推云 updatedAt=${lastPushed} ≥ 云端返回 ${updatedAt}`
-          );
-          return;
-        }
-        // 本地已被用户改过但还没推云成功：同样不能被云端旧值覆盖。
-        // 标 hydrated 为 true，让下次 effect push 真正把本地变更写上去。
-        if (localDirtyRef.current[key]) {
-          hydratedKeysRef.current[key] = true;
-          console.log(
-            `[SiteContent] ${key} hydrate 跳过覆盖：本地已 dirty，保留用户正在编辑的值`
-          );
-          return;
-        }
-        siteSyncRefs.current[key] = updatedAt;
-        // 一次性抑制：紧随其后的 filterOptions useEffect → pushToCloud 将消费并跳过，
-        // 避免本机"收到云端值 → 回推云端 → 对方再收到 → 再回推"的乒乓循环。
-        suppressNextPushRef.current[key] = true;
-        setter((prev) => {
-          if (kind === 'object') {
-            // 对象合并默认值，保证新增字段存在默认
-            return { ...fallback(), ...value };
-          }
-          // 数组直接使用云端值
-          if (Array.isArray(value)) return value;
-          return prev;
-        });
-        // 注意：先完成 setState，再标记 hydrated，保证 push-effect 在这次 state 变化时跳过
-        hydratedKeysRef.current[key] = true;
-        console.log(`[SiteContent] ${key} 已从云端 hydrate，updatedAt=${updatedAt}`);
+        applyCloudSetting(key, row.value, row.updatedAt, 'hydrate');
       });
+    });
 
-      // 订阅变更
-      const unsub = subscribeSetting(key, (value, updatedAt) => {
-        // 本地刚写入的回流，跳过
-        if (updatedAt && siteSyncRefs.current[key] === updatedAt) return;
-        // 同样防竞态：如果订阅回来的 updatedAt 不比我们本地推过的新，就不接受。
-        // 避免用户保存后收到一条"之前的旧版本"订阅事件，把刚保存的值冲掉。
-        const lastPushed = lastPushedUpdatedAtRef.current[key];
-        if (lastPushed && updatedAt && lastPushed >= updatedAt) return;
-        siteSyncRefs.current[key] = updatedAt;
-        // 同 hydrate：抑制紧随其后的 useEffect 回推
-        suppressNextPushRef.current[key] = true;
-        setter((prev) => {
-          if (kind === 'object') {
-            return { ...fallback(), ...value };
-          }
-          if (Array.isArray(value)) return value;
-          return prev;
-        });
-      });
-      unsubs.push(unsub);
+    // 订阅变更：合并为一个 channel，按 key 分发
+    const unsubscribe = subscribeSettings(syncKeys, (key, value, updatedAt) => {
+      if (cancelled) return;
+      applyCloudSetting(key, value, updatedAt, 'subscribe');
     });
 
     return () => {
       cancelled = true;
-      unsubs.forEach((u) => u && u());
+      unsubscribe();
     };
+
     // 挂载时建立一次，数据流由订阅驱动
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

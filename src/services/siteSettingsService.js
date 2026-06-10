@@ -127,6 +127,38 @@ export async function fetchSetting(key) {
 }
 
 /**
+ * 一次读取多个站点设置，避免公开页启动时为每个 key 各打一条跨境请求。
+ * @param {string[]} keys
+ * @returns {{settings: Record<string,{value:any,updatedAt:string|null}>, error: string|null}}
+ */
+export async function fetchSettings(keys) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { settings: {}, error: 'supabase-not-configured' };
+  }
+  const safeKeys = [...new Set((keys || []).filter(Boolean))];
+  if (safeKeys.length === 0) return { settings: {}, error: null };
+
+  try {
+    const { data, error } = await supabase
+      .from(SITE_SETTINGS_TABLE)
+      .select('key, value, updated_at')
+      .in('key', safeKeys);
+    if (error) return { settings: {}, error: error.message };
+
+    const settings = {};
+    (data || []).forEach((row) => {
+      settings[row.key] = {
+        value: row.value ?? null,
+        updatedAt: row.updated_at ?? null,
+      };
+    });
+    return { settings, error: null };
+  } catch (err) {
+    return { settings: {}, error: err.message };
+  }
+}
+
+/**
  * upsert 任意 key 的 value
  * @param {string} key
  * @param {any} value
@@ -175,6 +207,40 @@ export function subscribeSetting(key, onChange) {
       (payload) => {
         const newValue = payload?.new?.value;
         if (newValue !== undefined) onChange(newValue, payload?.new?.updated_at);
+      }
+    )
+    .subscribe();
+  return () => {
+    try { supabase.removeChannel(channel); } catch { /* ignore */ }
+  };
+}
+
+/**
+ * 订阅多个 site_settings key。只建一个 channel，由前端按 key 分发。
+ * @param {string[]} keys
+ * @param {(key:string,value:any,updatedAt:string)=>void} onChange
+ * @returns {()=>void}
+ */
+export function subscribeSettings(keys, onChange) {
+  if (!isSupabaseConfigured || !supabase) return () => {};
+  const keySet = new Set((keys || []).filter(Boolean));
+  if (keySet.size === 0) return () => {};
+
+  const channel = supabase
+    .channel('site_settings_public_bundle')
+    .on(
+      'postgres_changes',
+      {
+        event: '*',
+        schema: 'public',
+        table: SITE_SETTINGS_TABLE,
+      },
+      (payload) => {
+        const key = payload?.new?.key;
+        const newValue = payload?.new?.value;
+        if (keySet.has(key) && newValue !== undefined) {
+          onChange(key, newValue, payload?.new?.updated_at);
+        }
       }
     )
     .subscribe();

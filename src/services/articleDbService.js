@@ -7,6 +7,23 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const LOCAL_ARTICLES_KEY = 'riemer_user_articles';
+const ARTICLE_LIST_COLUMNS = [
+  'id',
+  'title',
+  'raw_title',
+  'author',
+  'date',
+  'category',
+  'tags',
+  'excerpt',
+  'url',
+  'cover_image',
+  'read_num',
+  'archived_by',
+  'archived_by_id',
+  'created_at',
+  'work_item_id',
+].join(', ');
 
 /**
  * 从 Supabase 获取所有文章（按日期倒序）
@@ -19,7 +36,7 @@ export async function fetchArticles() {
   try {
     const { data, error } = await supabase
       .from('articles')
-      .select('*')
+      .select(ARTICLE_LIST_COLUMNS)
       .order('date', { ascending: false });
 
     if (error) {
@@ -32,6 +49,34 @@ export async function fetchArticles() {
   } catch (err) {
     console.warn('[ArticleDB] 获取文章异常，回退本地:', err.message);
     return getLocalArticles();
+  }
+}
+
+/**
+ * 按 id 获取单篇文章详情。列表页不拉正文，详情/站内阅读时再按需补齐。
+ */
+export async function fetchArticleById(id) {
+  if (!id) return null;
+  if (!isSupabaseConfigured || !supabase) {
+    return getLocalArticles().find((article) => String(article.id) === String(id)) || null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('articles')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) {
+      console.warn('[ArticleDB] 获取文章详情失败，回退本地:', error.message);
+      return getLocalArticles().find((article) => String(article.id) === String(id)) || null;
+    }
+
+    return data ? dbToFrontend(data) : null;
+  } catch (err) {
+    console.warn('[ArticleDB] 获取文章详情异常，回退本地:', err.message);
+    return getLocalArticles().find((article) => String(article.id) === String(id)) || null;
   }
 }
 

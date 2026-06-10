@@ -1028,6 +1028,30 @@
   -webkit-user-drag: none;
 }
 
+/* 图片对齐：.msc-img-wrap 里的图片改为 inline-block，
+   这样所在段落的 text-align（左/居中/右）就能控制图片对齐；
+   .msc-img-wrap 默认 text-align:center → 图片默认居中。 */
+.msc-form__word-editor .msc-img-wrap .msc-img,
+.ptd-article__content .msc-img-wrap .msc-img,
+.doc-preview__text .msc-img-wrap .msc-img,
+.msc-md-split__preview .msc-img-wrap .msc-img,
+.msd-article__content .msc-img-wrap .msc-img,
+.ia-detail__content .msc-img-wrap .msc-img {
+  display: inline-block;
+}
+
+/* 图片注释：图片下方一行更小的说明文字（跟随其所在段落的对齐方式） */
+.msc-img-caption {
+  margin: 2px 0 0.6em;
+  font-size: 0.82em;
+  color: var(--color-text-muted, #888);
+  line-height: 1.5;
+}
+.msc-form__word-editor .msc-img-caption:empty::before {
+  content: '图片注释…';
+  color: var(--color-text-muted, #bbb);
+}
+
 /* 编辑器内的图片：允许拖拽移动、并可被选中以便复制/剪切
    （上面的规则为防止预览页图片被拖走而禁用了拖拽/选择，这里在编辑器里放开） */
 .msc-form__word-editor .msc-img {

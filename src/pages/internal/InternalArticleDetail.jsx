@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, Tag, Clock, ExternalLink } from 'lucide-react';
 import { articlesData } from '../../data/siteData';
@@ -8,13 +8,15 @@ import TextAnnotation from '../../components/TextAnnotation';
 import ImageLightbox from '../../components/ImageLightbox';
 import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
+import { fetchArticleById } from '../../services/articleDbService';
 import './InternalArticleDetail.css';
 
 export default function InternalArticleDetail() {
   const { id } = useParams();
-  const { userArticles } = useSiteContent();
+  const { userArticles, articlesLoaded } = useSiteContent();
   const { isAuthenticated } = useAuth();
   const contentRef = useRef(null);
+  const [articleDetail, setArticleDetail] = useState(null);
 
   // ⚠️ 所有 hooks 必须集中在 early return 之前，避免未登录路径命中 Navigate
   // 后下一次渲染 hook 数量不一致（Rules of Hooks）。
@@ -26,7 +28,23 @@ export default function InternalArticleDetail() {
     [userArticles]
   );
 
-  const article = allArticles.find((a) => a.id === id);
+  const article =
+    (String(articleDetail?.id || '') === String(id) ? articleDetail : null) ||
+    allArticles.find((a) => a.id === id);
+
+  useEffect(() => {
+    let cancelled = false;
+    setArticleDetail(null);
+    const summary = allArticles.find((a) => a.id === id);
+    if (summary?.content) {
+      setArticleDetail(summary);
+      return () => { cancelled = true; };
+    }
+    fetchArticleById(id).then((detail) => {
+      if (!cancelled && detail) setArticleDetail(detail);
+    });
+    return () => { cancelled = true; };
+  }, [id, allArticles]);
 
   useEffect(() => {
     if (!article?.title) return undefined;
@@ -46,6 +64,10 @@ export default function InternalArticleDetail() {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
+  }
+
+  if (!article && !articlesLoaded) {
+    return null;
   }
 
   if (!article) {

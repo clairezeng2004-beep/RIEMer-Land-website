@@ -1,20 +1,42 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams, Link, Navigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, User, Tag, Clock, ExternalLink } from 'lucide-react';
-import { articlesData, teamMembers } from '../../data/siteData';
+import { ArrowLeft, Calendar, Tag, Clock, ExternalLink } from 'lucide-react';
+import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
+import { fetchArticleById } from '../../services/articleDbService';
 import './ArticleDetail.css';
 
 export default function ArticleDetail() {
   const { id } = useParams();
-  const { userArticles } = useSiteContent();
+  const { userArticles, articlesLoaded } = useSiteContent();
+  const [articleDetail, setArticleDetail] = useState(null);
 
   const allArticles = useMemo(
     () => [...userArticles, ...articlesData],
     [userArticles]
   );
 
-  const article = allArticles.find((a) => a.id === id);
+  const article =
+    (String(articleDetail?.id || '') === String(id) ? articleDetail : null) ||
+    allArticles.find((a) => a.id === id);
+
+  useEffect(() => {
+    let cancelled = false;
+    setArticleDetail(null);
+    const summary = allArticles.find((a) => a.id === id);
+    if (summary?.content) {
+      setArticleDetail(summary);
+      return () => { cancelled = true; };
+    }
+    fetchArticleById(id).then((detail) => {
+      if (!cancelled && detail) setArticleDetail(detail);
+    });
+    return () => { cancelled = true; };
+  }, [id, allArticles]);
+
+  if (!article && !articlesLoaded) {
+    return null;
+  }
 
   if (!article) {
     return <Navigate to="/articles" replace />;

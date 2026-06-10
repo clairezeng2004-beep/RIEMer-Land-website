@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
 import './WordBlockHandle.css';
 
 /** 四个点（正方形四顶点）图标 —— 块手柄的抓取标识 */
@@ -110,6 +110,7 @@ function applyTextAlignToBlock(block, key) {
 export default function WordBlockHandle({ editorRef, onChange }) {
   const [pos, setPos] = useState(null); // { top, left } 视口坐标
   const [menuOpen, setMenuOpen] = useState(false);
+  const [blockHasImage, setBlockHasImage] = useState(false); // 当前块是否含图片（决定是否显示"添加注释"）
   const blockRef = useRef(null); // 当前块 DOM 节点（点菜单时用来恢复光标）
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null); // 悬浮离开后的延时关闭计时器
@@ -141,6 +142,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     if (!block) { setPos(null); return; }
     if (!editor.contains(block)) { setPos(null); blockRef.current = null; return; }
     blockRef.current = block; // 仍记录所在块，供格式命令使用
+    setBlockHasImage(!!(block.querySelector && block.querySelector('img')));
 
     // 位置以「光标当前所在行」为准：跟随换行、滚动，并与该行垂直居中。
     const lineRect = getCaretLineRect(editor) || block.getBoundingClientRect();
@@ -286,6 +288,36 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     requestAnimationFrame(() => refresh());
   }, [restoreCaret, fireChange, refresh, editorRef]);
 
+  // 给图片添加/聚焦注释：在图片所在段落下方插入一行更小的说明文字
+  const addCaption = useCallback(() => {
+    const editor = editorRef?.current;
+    const block = blockRef.current;
+    if (!editor || !block || !editor.contains(block)) { setMenuOpen(false); return; }
+    const img = block.querySelector('img');
+    const wrap = (img && img.closest('.msc-img-wrap')) || block;
+    let caption = wrap.nextElementSibling;
+    if (!caption || !caption.classList || !caption.classList.contains('msc-img-caption')) {
+      caption = document.createElement('p');
+      caption.className = 'msc-img-caption';
+      caption.textContent = '图片注释';
+      wrap.parentNode.insertBefore(caption, wrap.nextSibling);
+    }
+    // 注释跟随图片所在段落的对齐方式
+    caption.style.textAlign = wrap.style.textAlign || 'center';
+    // 选中注释文字，输入即替换
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(caption);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+      editor.focus();
+    } catch { /* ignore */ }
+    fireChange();
+    setMenuOpen(false);
+    requestAnimationFrame(() => refresh());
+  }, [editorRef, fireChange, refresh]);
+
   if (!pos) return null;
 
   const stop = (e) => e.preventDefault(); // 防止 mousedown 抢走编辑器选区
@@ -338,6 +370,17 @@ export default function WordBlockHandle({ editorRef, onChange }) {
               <span>{opt.label}</span>
             </button>
           ))}
+          {blockHasImage && (
+            <button
+              type="button"
+              className="wbh__menu-item"
+              onMouseDown={stop}
+              onClick={addCaption}
+            >
+              <Captions size={15} className="wbh__menu-icon" />
+              <span>添加注释</span>
+            </button>
+          )}
         </div>
       )}
     </div>,
