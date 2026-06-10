@@ -149,6 +149,57 @@ async function uploadAttachmentAsset({ docId, attachment, userId }) {
   };
 }
 
+// 图片 MIME → 文件后缀
+const INLINE_IMG_EXT = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'image/svg+xml': 'svg',
+};
+
+/**
+ * 把正文里内嵌的 base64 图片上传到 Storage，并把 src 换成公开 URL。
+ * 避免多张大图把内容撑爆（localStorage 配额 / PostgREST 请求体上限），
+ * 解决"刷新后除第一张外图片都变成破图"的问题。上传失败的图片保留原 base64。
+ */
+async function uploadInlineContentImages(content, { docId, userId }) {
+  if (!content || typeof content !== 'string' || !supabase) return content;
+  const re = /(?:src|href)=["'](data:image\/[^"']+)["']/gi;
+  const dataUrls = new Set();
+  let m;
+  while ((m = re.exec(content)) !== null) dataUrls.add(m[1]);
+  if (dataUrls.size === 0) return content;
+
+  let out = content;
+  let idx = 0;
+  for (const dataUrl of dataUrls) {
+    idx += 1;
+    const blob = dataUrlToBlob(dataUrl);
+    if (!blob) continue;
+    const mime = (dataUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
+    const ext = INLINE_IMG_EXT[mime] || 'png';
+    const path = [userId || 'unknown-user', docId || 'no-doc', `inline-${Date.now()}-${idx}.${ext}`].join('/');
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const { error } = await supabase.storage
+        .from(DOCUMENTS_BUCKET)
+        .upload(path, blob, { contentType: mime, upsert: true });
+      if (error) {
+        console.warn('[DocumentsDB] 正文内嵌图片上传失败，保留原图:', error.message);
+        continue;
+      }
+      const { data } = supabase.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path);
+      if (data?.publicUrl) out = out.split(dataUrl).join(data.publicUrl);
+    } catch (err) {
+      console.warn('[DocumentsDB] 正文内嵌图片上传异常，保留原图:', err.message);
+    }
+  }
+  return out;
+}
+
 async function prepareDocForCloud(doc) {
   const { data: auth } = await supabase.auth.getUser().catch(() => ({ data: null }));
   const userId = doc.uploadedById || auth?.user?.id || null;
@@ -164,7 +215,11 @@ async function prepareDocForCloud(doc) {
     doc.fileUrl && !String(doc.fileUrl).startsWith('data:')
       ? doc.fileUrl
       : primary?.url || doc.fileUrl || null;
-  return { ...doc, attachments, fileUrl };
+  // 正文内嵌图片：上传到 Storage，src 换成 URL（避免 base64 撑爆内容）
+  const content = doc.content !== undefined
+    ? await uploadInlineContentImages(doc.content, { docId: doc.id, userId })
+    : doc.content;
+  return { ...doc, content, attachments, fileUrl };
 }
 
 /* ============ 本地 localStorage 读写 ============ */
