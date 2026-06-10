@@ -215,6 +215,65 @@ async function uploadAttachmentAsset({ postId, attachment, userId }) {
   };
 }
 
+// 图片 MIME → 文件后缀
+const INLINE_IMG_EXT = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/jpg': 'jpg',
+  'image/webp': 'webp',
+  'image/gif': 'gif',
+  'image/bmp': 'bmp',
+  'image/svg+xml': 'svg',
+};
+
+/**
+ * 把正文里内嵌的 base64 图片上传到 Storage，并把 src 换成公开 URL。
+ * 这样正文只存短 URL，不会因为多张大图把内容撑爆（localStorage 配额 / PostgREST 请求体上限），
+ * 解决"刷新后除第一张外图片都变成破图"的问题。上传失败的图片保留原 base64，至少不丢图。
+ */
+async function uploadInlineContentImages(content, { postId, userId }) {
+  if (!content || typeof content !== 'string' || !supabase) return content;
+  // 收集去重后的内嵌 dataURL（同一张图只上传一次）
+  const re = /(?:src|href)=["'](data:image\/[^"']+)["']/gi;
+  const dataUrls = new Set();
+  let m;
+  while ((m = re.exec(content)) !== null) dataUrls.add(m[1]);
+  if (dataUrls.size === 0) return content;
+
+  let out = content;
+  let idx = 0;
+  for (const dataUrl of dataUrls) {
+    idx += 1;
+    const blob = dataUrlToBlob(dataUrl);
+    if (!blob) continue;
+    const mime = (dataUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
+    const ext = INLINE_IMG_EXT[mime] || 'png';
+    const path = [
+      userId || 'unknown-user',
+      postId || 'no-post',
+      `inline-${Date.now()}-${idx}.${ext}`,
+    ].join('/');
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const { error } = await supabase.storage
+        .from(MEMBER_SHARING_BUCKET)
+        .upload(path, blob, { contentType: mime, upsert: true });
+      if (error) {
+        console.warn('[MemberSharingDB] 正文内嵌图片上传失败，保留原图:', error.message);
+        continue;
+      }
+      const { data } = supabase.storage.from(MEMBER_SHARING_BUCKET).getPublicUrl(path);
+      if (data?.publicUrl) {
+        // 用整段 dataURL 做分隔做全局替换，避免正则里特殊字符转义问题
+        out = out.split(dataUrl).join(data.publicUrl);
+      }
+    } catch (err) {
+      console.warn('[MemberSharingDB] 正文内嵌图片上传异常，保留原图:', err.message);
+    }
+  }
+  return out;
+}
+
 async function prepareSharingForCloud(post) {
   const { data: auth } = await supabase.auth.getUser().catch(() => ({ data: null }));
   const userId = post.authorId || auth?.user?.id || null;
@@ -225,8 +284,13 @@ async function prepareSharingForCloud(post) {
       userId,
     })))
     : [];
+  // 正文内嵌图片：上传到 Storage，src 换成 URL（避免 base64 撑爆内容）
+  const content = post.content !== undefined
+    ? await uploadInlineContentImages(post.content, { postId: post.id, userId })
+    : post.content;
   return {
     ...post,
+    content,
     attachments: attachments.length > 0 ? attachments : null,
   };
 }
