@@ -822,6 +822,7 @@ export function SiteContentProvider({ children }) {
 
       if (source !== 'hydrate' && updatedAt && siteSyncRefs.current[key] === updatedAt) return;
       siteSyncRefs.current[key] = updatedAt;
+      delete localDirtyRef.current[key];
       suppressNextPushRef.current[key] = true;
       setter((prev) => {
         if (kind === 'object') return { ...fallback(), ...value };
@@ -944,6 +945,7 @@ export function SiteContentProvider({ children }) {
         if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
         // pending 已成功写入，清掉快照
         delete pendingPushValueRef.current[key];
+        delete localDirtyRef.current[key];
         setCloudSyncStatus((prev) => ({
           ...prev,
           [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
@@ -980,8 +982,8 @@ export function SiteContentProvider({ children }) {
       clearTimeout(pushDebouncedRef.current[key]);
       pushDebouncedRef.current[key] = null;
     }
-    // flush 已经立即推送，清掉对应的 pending 值，避免卸载 hook 重复再写一次
-    delete pendingPushValueRef.current[key];
+      // flush 已经立即推送，清掉对应的 pending 值，避免卸载 hook 重复再写一次
+      delete pendingPushValueRef.current[key];
     setCloudSyncStatus((prev) => ({ ...prev, [key]: { status: 'syncing', at: Date.now() } }));
     const res = await saveSetting(key, value);
     if (res.success) {
@@ -990,6 +992,7 @@ export function SiteContentProvider({ children }) {
       // "本设备某次推云时间戳"带给下次挂载，造成另一台设备拿到云端
       // 最新值反被判定为"旧事件"拒绝覆盖，即跨设备不同步的根因。
       if (res.updatedAt) lastPushedUpdatedAtRef.current[key] = res.updatedAt;
+      delete localDirtyRef.current[key];
       setCloudSyncStatus((prev) => ({
         ...prev,
         [key]: { status: 'ok', updatedAt: res.updatedAt, at: Date.now() },
