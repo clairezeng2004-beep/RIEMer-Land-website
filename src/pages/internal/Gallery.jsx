@@ -2,7 +2,6 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
-import { useWysiwyg } from '../../contexts/WysiwygContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import EditableText from '../../components/EditableText';
@@ -106,6 +105,14 @@ const daysInMonth = (year, month) => {
  * 只缓存封面 + 数量（fetchAlbumList 的 _partial 结构），不缓存详情里的全量照片。
  */
 const ALBUM_LIST_CACHE_KEY = 'riemer_album_list_cache_v1';
+const MAX_UPLOAD_FILES = 50;
+const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
+
+const formatFileSize = (bytes) => {
+  if (!Number.isFinite(bytes)) return '';
+  if (bytes >= 1024 * 1024) return `${Math.round(bytes / 1024 / 1024)}MB`;
+  return `${Math.max(1, Math.round(bytes / 1024))}KB`;
+};
 
 const readAlbumListCache = () => {
   try {
@@ -128,7 +135,6 @@ const writeAlbumListCache = (list) => {
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
-  const { editing } = useWysiwyg();
   // useNotifications 保留以确保 NotificationProvider 就绪；
   // 通知派发已统一走规则引擎 emitNotificationEvent。
   useNotifications();
@@ -166,7 +172,6 @@ export default function Gallery() {
   // 拖拽态：标记两个 dropzone 的 hover 高亮
   const [isDraggingCreate, setIsDraggingCreate] = useState(false);
   const [isDraggingAdd, setIsDraggingAdd] = useState(false);
-  const fileInputRef = useRef(null);
   const albumFileInputRef = useRef(null);
   const createAlbumFileRef = useRef(null);
 
@@ -222,6 +227,22 @@ export default function Gallery() {
       setAlbumDetailLoading(false);
     }
   }, []);
+
+  const revokePreviewUrls = (items) => {
+    (items || []).forEach((item) => {
+      if (item?.url) URL.revokeObjectURL(item.url);
+    });
+  };
+
+  const clearCreateAlbumFiles = () => {
+    revokePreviewUrls(createAlbumFiles);
+    setCreateAlbumFiles([]);
+  };
+
+  const clearSelectedFiles = () => {
+    revokePreviewUrls(selectedFiles);
+    setSelectedFiles([]);
+  };
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
@@ -286,9 +307,7 @@ export default function Gallery() {
         month: (resetNow.getMonth() + 1).toString(),
         day: '',
       });
-      // 释放 blob URL
-      createAlbumFiles.forEach((f) => URL.revokeObjectURL(f.url));
-      setCreateAlbumFiles([]);
+      clearCreateAlbumFiles();
       setShowCreateAlbum(false);
     } catch (err) {
       console.error('[Gallery] 创建相册失败：', err);
@@ -300,19 +319,38 @@ export default function Gallery() {
   };
 
   /* ---- 通用：把 File[] 转为预览对象 ---- */
-  const filesToPreviews = (files) =>
-    files
-      .filter((f) => f && f.type && f.type.startsWith('image/'))
-      .map((file) => ({
-        file,
-        url: URL.createObjectURL(file),
-        caption: file.name.replace(/\.[^.]+$/, ''),
-      }));
+  const filesToPreviews = (files, currentCount = 0) => {
+    const imageFiles = files.filter((f) => f && f.type && f.type.startsWith('image/'));
+    const oversized = imageFiles.filter((f) => f.size > MAX_UPLOAD_FILE_SIZE);
+    const validFiles = imageFiles.filter((f) => f.size <= MAX_UPLOAD_FILE_SIZE);
+    const availableSlots = Math.max(0, MAX_UPLOAD_FILES - currentCount);
+    const picked = validFiles.slice(0, availableSlots);
+    const skippedNonImages = files.length - imageFiles.length;
+    const skippedByCount = Math.max(0, validFiles.length - picked.length);
+
+    if (oversized.length > 0 || skippedNonImages > 0 || skippedByCount > 0) {
+      const parts = [];
+      if (skippedNonImages > 0) parts.push(`${skippedNonImages} 个非图片文件已跳过`);
+      if (oversized.length > 0) {
+        parts.push(`${oversized.length} 张超过 ${formatFileSize(MAX_UPLOAD_FILE_SIZE)} 的图片已跳过`);
+      }
+      if (skippedByCount > 0) {
+        parts.push(`单次最多选择 ${MAX_UPLOAD_FILES} 张，超出的 ${skippedByCount} 张已跳过`);
+      }
+      alert(parts.join('，') + '。');
+    }
+
+    return picked.map((file) => ({
+      file,
+      url: URL.createObjectURL(file),
+      caption: file.name.replace(/\.[^.]+$/, ''),
+    }));
+  };
 
   /* ---- 新建相册表单中选择图片（点击） ---- */
   const handleCreateAlbumFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
-    const previews = filesToPreviews(files);
+    const previews = filesToPreviews(files, createAlbumFiles.length);
     setCreateAlbumFiles((prev) => [...prev, ...previews]);
     // 清空 input，避免同一文件无法再次选中
     if (e.target) e.target.value = '';
@@ -321,7 +359,7 @@ export default function Gallery() {
   /* ---- 添加照片到相册（点击） ---- */
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
-    const previews = filesToPreviews(files);
+    const previews = filesToPreviews(files, selectedFiles.length);
     setSelectedFiles((prev) => [...prev, ...previews]);
     if (e.target) e.target.value = '';
   };
@@ -337,7 +375,7 @@ export default function Gallery() {
     preventDragDefault(e);
     setIsDraggingCreate(false);
     const files = Array.from(e.dataTransfer?.files || []);
-    const previews = filesToPreviews(files);
+    const previews = filesToPreviews(files, createAlbumFiles.length);
     if (previews.length > 0) {
       setCreateAlbumFiles((prev) => [...prev, ...previews]);
     }
@@ -348,7 +386,7 @@ export default function Gallery() {
     preventDragDefault(e);
     setIsDraggingAdd(false);
     const files = Array.from(e.dataTransfer?.files || []);
-    const previews = filesToPreviews(files);
+    const previews = filesToPreviews(files, selectedFiles.length);
     if (previews.length > 0) {
       setSelectedFiles((prev) => [...prev, ...previews]);
     }
@@ -397,9 +435,7 @@ export default function Gallery() {
         }
       }
 
-      // 释放 blob URL
-      selectedFiles.forEach((f) => URL.revokeObjectURL(f.url));
-      setSelectedFiles([]);
+      clearSelectedFiles();
       setShowAddPhoto(false);
     } catch (err) {
       console.error('[Gallery] 上传照片失败：', err);
@@ -536,7 +572,7 @@ export default function Gallery() {
                 const next = !showCreateAlbum;
                 if (!next) {
                   // 关闭/取消时清空已选图片
-                  setCreateAlbumFiles([]);
+                  clearCreateAlbumFiles();
                 }
                 setShowCreateAlbum(next);
               }}
@@ -656,6 +692,7 @@ export default function Gallery() {
                       点击<span className="gallery-upload__drag-hint">或拖拽</span>照片到这里上传
                     </p>
                     <span>支持多张同时选择，创建后还能继续添加</span>
+                    <span>单次最多 {MAX_UPLOAD_FILES} 张，单张不超过 {formatFileSize(MAX_UPLOAD_FILE_SIZE)}</span>
                   </div>
                   {createAlbumFiles.length > 0 && (
                     <div className="gallery-upload__preview gallery-create__preview">
@@ -666,9 +703,10 @@ export default function Gallery() {
                             <button
                               type="button"
                               className="gallery-upload__preview-remove"
-                              onClick={() =>
-                                setCreateAlbumFiles((prev) => prev.filter((_, idx) => idx !== i))
-                              }
+                              onClick={() => {
+                                URL.revokeObjectURL(f.url);
+                                setCreateAlbumFiles((prev) => prev.filter((_, idx) => idx !== i));
+                              }}
                             >
                               <X size={14} />
                             </button>
@@ -804,7 +842,7 @@ export default function Gallery() {
             onClick={() => {
               setSelectedAlbum(null);
               setShowAddPhoto(false);
-              setSelectedFiles([]);
+              clearSelectedFiles();
             }}
           >
             <ChevronLeft size={20} /> 返回相册
@@ -820,7 +858,11 @@ export default function Gallery() {
           </div>
           <button
             className="btn btn-primary"
-            onClick={() => setShowAddPhoto(!showAddPhoto)}
+            onClick={() => {
+              const next = !showAddPhoto;
+              if (!next) clearSelectedFiles();
+              setShowAddPhoto(next);
+            }}
           >
             {showAddPhoto ? <X size={18} /> : <Upload size={18} />}
             {showAddPhoto ? '取消' : '上传照片'}
@@ -860,6 +902,7 @@ export default function Gallery() {
                 点击<span className="gallery-upload__drag-hint">或拖拽</span>照片到这里上传
               </p>
               <span>支持多张同时选择，JPG / PNG / WebP 等图片格式</span>
+              <span>单次最多 {MAX_UPLOAD_FILES} 张，单张不超过 {formatFileSize(MAX_UPLOAD_FILE_SIZE)}</span>
             </div>
 
             {selectedFiles.length > 0 && (
@@ -871,9 +914,10 @@ export default function Gallery() {
                         <img src={f.url} alt={f.caption} />
                         <button
                           className="gallery-upload__preview-remove"
-                          onClick={() =>
-                            setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i))
-                          }
+                          onClick={() => {
+                            URL.revokeObjectURL(f.url);
+                            setSelectedFiles((prev) => prev.filter((_, idx) => idx !== i));
+                          }}
                         >
                           <X size={14} />
                         </button>

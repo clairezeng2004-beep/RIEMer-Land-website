@@ -602,6 +602,9 @@ CREATE TABLE IF NOT EXISTS public.album_photos (
   album_id UUID NOT NULL REFERENCES public.albums(id) ON DELETE CASCADE,
   url TEXT NOT NULL,                  -- Storage 公开 URL
   storage_path TEXT,                  -- bucket 内路径，用于删除
+  thumb_url TEXT,                     -- 缩略图公开 URL
+  thumb_path TEXT,                    -- 缩略图 bucket 内路径
+  original_name TEXT,                 -- 上传时的原始文件名
   caption TEXT DEFAULT '',
   sort_index INT DEFAULT 0,
   uploaded_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -610,6 +613,10 @@ CREATE TABLE IF NOT EXISTS public.album_photos (
 
 CREATE INDEX IF NOT EXISTS idx_album_photos_album_id ON public.album_photos(album_id);
 CREATE INDEX IF NOT EXISTS idx_album_photos_sort ON public.album_photos(album_id, sort_index);
+
+ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS thumb_url TEXT;
+ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS thumb_path TEXT;
+ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS original_name TEXT;
 
 ALTER TABLE public.albums ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.album_photos ENABLE ROW LEVEL SECURITY;

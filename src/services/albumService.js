@@ -50,6 +50,31 @@ function rowToPhoto(row) {
   };
 }
 
+function collectStoragePaths(photos = []) {
+  const paths = [];
+  photos.forEach((p) => {
+    if (p?.storagePath) paths.push(p.storagePath);
+    if (p?.thumbPath) paths.push(p.thumbPath);
+  });
+  return paths;
+}
+
+async function removeStoragePaths(paths) {
+  if (!hasRemote() || !Array.isArray(paths) || paths.length === 0) return;
+  const uniquePaths = [...new Set(paths.filter(Boolean))];
+  if (uniquePaths.length === 0) return;
+  const { error } = await supabase.storage.from(BUCKET).remove(uniquePaths);
+  if (error) {
+    console.warn('[AlbumService] Storage 清理失败：', error.message);
+  }
+}
+
+async function cleanupUploaded(uploaded = []) {
+  await removeStoragePaths(
+    uploaded.flatMap((u) => [u?.path, u?.thumbPath]).filter(Boolean)
+  );
+}
+
 /* ============================================
  * 查询所有相册（含照片）
  * ⚠️ 性能注意：只在"本地模式"或需要全量数据时使用。
@@ -184,9 +209,10 @@ export async function fetchAlbumPhotos(albumId) {
 async function generateThumbnail(file) {
   if (!file || !file.type || !file.type.startsWith('image/')) return null;
 
+  let objectUrl = null;
+  let bitmap = null;
   try {
     // 优先用 createImageBitmap（快、无需 DOM）
-    let bitmap = null;
     if (typeof createImageBitmap === 'function') {
       try {
         bitmap = await createImageBitmap(file);
@@ -208,7 +234,8 @@ async function generateThumbnail(file) {
         const el = new Image();
         el.onload = () => resolve(el);
         el.onerror = reject;
-        el.src = URL.createObjectURL(file);
+        objectUrl = URL.createObjectURL(file);
+        el.src = objectUrl;
       });
       width = img.naturalWidth;
       height = img.naturalHeight;
@@ -236,12 +263,13 @@ async function generateThumbnail(file) {
       canvas.toBlob((b) => resolve(b), 'image/jpeg', THUMB_QUALITY);
     });
 
-    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
-
     return blob || null;
   } catch (err) {
     console.warn('[AlbumService] 生成缩略图失败，跳过：', err?.message || err);
     return null;
+  } finally {
+    if (bitmap && typeof bitmap.close === 'function') bitmap.close();
+    if (objectUrl) URL.revokeObjectURL(objectUrl);
   }
 }
 
@@ -410,7 +438,10 @@ export async function createAlbum(meta, files, user, options = {}) {
       })
       .select()
       .single();
-    if (e1) throw e1;
+    if (e1) {
+      await cleanupUploaded(uploaded);
+      throw e1;
+    }
 
     let photoRows = [];
     if (uploaded.length > 0) {
@@ -430,7 +461,11 @@ export async function createAlbum(meta, files, user, options = {}) {
           }))
         )
         .select();
-      if (e2) throw e2;
+      if (e2) {
+        await cleanupUploaded(uploaded);
+        await supabase.from('albums').delete().eq('id', albumRow.id).catch(() => {});
+        throw e2;
+      }
       photoRows = data || [];
     }
 
@@ -452,15 +487,9 @@ export async function deleteAlbum(album) {
   }
 
   try {
-    // 收集所有原图 + 缩略图路径
-    const paths = [];
-    (album.photos || []).forEach((p) => {
-      if (p.storagePath) paths.push(p.storagePath);
-      if (p.thumbPath) paths.push(p.thumbPath);
-    });
-    if (paths.length > 0) {
-      await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
-    }
+    const photos = album._partial ? await fetchAlbumPhotos(album.id) : (album.photos || []);
+    const paths = collectStoragePaths(photos);
+    await removeStoragePaths(paths);
     const { error } = await supabase.from('albums').delete().eq('id', album.id);
     if (error) throw error;
   } catch (err) {
@@ -517,7 +546,10 @@ export async function addPhotosToAlbum(album, files, user, options = {}) {
         }))
       )
       .select();
-    if (error) throw error;
+    if (error) {
+      await cleanupUploaded(uploaded);
+      throw error;
+    }
     return (data || []).map(rowToPhoto);
   } catch (err) {
     console.warn('[AlbumService] 添加照片失败：', err.message);
@@ -540,12 +572,7 @@ export async function deletePhoto(album, photo) {
   }
 
   try {
-    const paths = [];
-    if (photo.storagePath) paths.push(photo.storagePath);
-    if (photo.thumbPath) paths.push(photo.thumbPath);
-    if (paths.length > 0) {
-      await supabase.storage.from(BUCKET).remove(paths).catch(() => {});
-    }
+    await removeStoragePaths(collectStoragePaths([photo]));
     const { error } = await supabase.from('album_photos').delete().eq('id', photo.id);
     if (error) throw error;
   } catch (err) {
