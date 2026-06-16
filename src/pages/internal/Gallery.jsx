@@ -105,7 +105,7 @@ const daysInMonth = (year, month) => {
  * 只缓存封面 + 数量（fetchAlbumList 的 _partial 结构），不缓存详情里的全量照片。
  */
 const ALBUM_LIST_CACHE_KEY = 'riemer_album_list_cache_v1';
-const MAX_UPLOAD_FILES = 50;
+const MAX_UPLOAD_FILES = 200;
 const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
 
 const formatFileSize = (bytes) => {
