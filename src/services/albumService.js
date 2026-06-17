@@ -354,9 +354,8 @@ async function uploadOneWithThumb(file, userId) {
     });
 
   if (errOrig) {
-    console.warn('[AlbumService] 原图上传失败，降级 dataURL：', errOrig.message);
-    const dataUrl = await fileToDataUrl(file);
-    return { url: dataUrl, path: null, thumbUrl: null, thumbPath: null, originalName };
+    console.warn('[AlbumService] 原图上传失败：', errOrig.message);
+    throw errOrig;
   }
 
   const origPublic = supabase.storage.from(BUCKET).getPublicUrl(originalPath).data.publicUrl;
@@ -433,6 +432,12 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
   return results.filter(Boolean);
 }
 
+function ensureUploadSucceeded(uploaded, requestedCount) {
+  if (requestedCount > 0 && uploaded.length === 0) {
+    throw new Error('照片上传超时或失败。请检查网络后重试，或先少量分批上传。');
+  }
+}
+
 /* ============================================
  * 创建相册（可附带初始照片）
  * files: [{ file, caption }]
@@ -443,6 +448,7 @@ export async function createAlbum(meta, files, user, options = {}) {
   const uploaded = files && files.length > 0
     ? await uploadFilesConcurrently(files, user?.id, onProgress)
     : [];
+  ensureUploadSucceeded(uploaded, files?.length || 0);
 
   if (!hasRemote()) {
     const album = {
@@ -553,6 +559,7 @@ export async function addPhotosToAlbum(album, files, user, options = {}) {
   const uploaded = files && files.length > 0
     ? await uploadFilesConcurrently(files, user?.id, onProgress)
     : [];
+  ensureUploadSucceeded(uploaded, files?.length || 0);
 
   if (!hasRemote() || !album._fromDb) {
     const baseIndex = (album.photos || []).length;
