@@ -50,7 +50,7 @@ const fallbackToOriginal = (event, photo) => {
 /* ---------- 工具函数：下载时推断合适的文件名 ----------
  * 优先级：caption(若无扩展名则补 ext) → originalName → storagePath 文件名 → 'photo.jpg'
  */
-const guessDownloadFilename = (photo, blob) => {
+const guessDownloadFilename = (photo) => {
   const pickExt = () => {
     const fromPath = (photo?.storagePath || '').split('/').pop() || '';
     const m1 = fromPath.match(/\.([a-z0-9]+)$/i);
@@ -58,8 +58,6 @@ const guessDownloadFilename = (photo, blob) => {
     const fromName = photo?.originalName || '';
     const m2 = fromName.match(/\.([a-z0-9]+)$/i);
     if (m2) return m2[1].toLowerCase();
-    const m3 = (blob?.type || '').match(/^image\/([a-z0-9+]+)$/i);
-    if (m3) return m3[1].toLowerCase().replace('jpeg', 'jpg');
     return 'jpg';
   };
   const ext = pickExt();
@@ -76,6 +74,16 @@ const guessDownloadFilename = (photo, blob) => {
   if (fromPath) return fromPath;
   // 4) 兜底
   return `photo.${ext}`;
+};
+
+const getDownloadUrl = (url, filename) => {
+  try {
+    const downloadUrl = new URL(url);
+    downloadUrl.searchParams.set('download', filename);
+    return downloadUrl.toString();
+  } catch {
+    return url;
+  }
 };
 
 /* ---------- 工具函数：格式化日期显示 ---------- */
@@ -549,24 +557,17 @@ export default function Gallery() {
   const closeLightbox = () => setLightboxIndex(null);
 
   /* ---- 下载原图 ---- */
-  const handleDownloadOriginal = async (photo) => {
+  const handleDownloadOriginal = (photo) => {
     const originalUrl = getOriginalUrl(photo);
     if (!originalUrl) return;
-    try {
-      const response = await fetch(originalUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = blobUrl;
-      a.download = guessDownloadFilename(photo, blob);
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(blobUrl);
-    } catch {
-      // fallback: 直接在新标签页打开原图
-      window.open(originalUrl, '_blank');
-    }
+    const filename = guessDownloadFilename(photo);
+    const a = document.createElement('a');
+    a.href = getDownloadUrl(originalUrl, filename);
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   const lightboxPrev = () => {
