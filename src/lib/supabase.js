@@ -26,7 +26,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // 用户侧表现就是"保存按钮 loading 很久后失败"。30s 留足余量；
 // 真正的"网络离线"场景由 checkSupabaseHealth() 判定，不靠这里的超时兜底。
 const FETCH_TIMEOUT_MS = 30000;
-const STORAGE_UPLOAD_TIMEOUT_MS = 300000;
+const STORAGE_UPLOAD_TIMEOUT_MS = 600000;
 
 function getSupabaseFetchTimeout(url, options = {}) {
   const rawUrl = typeof url === 'string' ? url : url?.url || '';

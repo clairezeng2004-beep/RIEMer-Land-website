@@ -17,9 +17,13 @@ const LS_ALBUMS_KEY = 'riemer_albums_v1';
 const THUMB_MAX_SIDE = 1280;
 const THUMB_QUALITY = 0.82;
 const DEFAULT_UPLOAD_CONCURRENCY = 5;
+const BULK_UPLOAD_CONCURRENCY = 3;
 const LARGE_UPLOAD_CONCURRENCY = 2;
+const HUGE_UPLOAD_CONCURRENCY = 1;
 const LARGE_UPLOAD_THRESHOLD = 8 * 1024 * 1024;
-const STORAGE_UPLOAD_ATTEMPTS = 3;
+const HUGE_UPLOAD_THRESHOLD = 30 * 1024 * 1024;
+const BULK_UPLOAD_THRESHOLD = 30;
+const STORAGE_UPLOAD_ATTEMPTS = 4;
 
 const hasRemote = () => !!(isSupabaseConfigured && supabase);
 
@@ -128,7 +132,7 @@ async function uploadStorageObject(path, body, options, label) {
     lastError = error;
     console.warn(`[AlbumService] ${label}上传失败（第 ${attempt}/${STORAGE_UPLOAD_ATTEMPTS} 次）：`, error.message);
     if (attempt < STORAGE_UPLOAD_ATTEMPTS) {
-      await wait(800 * attempt);
+      await wait(1000 * attempt * attempt);
     }
   }
   throw lastError;
@@ -435,9 +439,17 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
   let done = 0;
   const results = new Array(total);
   const hasLargeFiles = files.some((f) => (f?.file?.size || 0) >= LARGE_UPLOAD_THRESHOLD);
-  const effectiveConcurrency = hasLargeFiles
-    ? Math.min(concurrency, LARGE_UPLOAD_CONCURRENCY)
-    : concurrency;
+  const hasHugeFiles = files.some((f) => (f?.file?.size || 0) >= HUGE_UPLOAD_THRESHOLD);
+  let effectiveConcurrency = concurrency;
+  if (total >= BULK_UPLOAD_THRESHOLD) {
+    effectiveConcurrency = Math.min(effectiveConcurrency, BULK_UPLOAD_CONCURRENCY);
+  }
+  if (hasLargeFiles) {
+    effectiveConcurrency = Math.min(effectiveConcurrency, LARGE_UPLOAD_CONCURRENCY);
+  }
+  if (hasHugeFiles) {
+    effectiveConcurrency = Math.min(effectiveConcurrency, HUGE_UPLOAD_CONCURRENCY);
+  }
 
   let cursor = 0;
   const workers = Array.from({ length: Math.min(effectiveConcurrency, total) }, async () => {

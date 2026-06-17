@@ -107,7 +107,7 @@ const daysInMonth = (year, month) => {
  */
 const ALBUM_LIST_CACHE_KEY = 'riemer_album_list_cache_v1';
 const MAX_UPLOAD_FILES = 200;
-const MAX_UPLOAD_FILE_SIZE = 50 * 1024 * 1024;
+const MAX_UPLOAD_FILE_SIZE = 100 * 1024 * 1024;
 
 const formatFileSize = (bytes) => {
   if (!Number.isFinite(bytes)) return '';
