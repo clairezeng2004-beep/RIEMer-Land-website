@@ -26,6 +26,7 @@ CREATE TABLE IF NOT EXISTS public.album_photos (
   thumb_url TEXT,
   thumb_path TEXT,
   original_name TEXT,
+  captured_at TIMESTAMPTZ,
   caption TEXT DEFAULT '',
   sort_index INT DEFAULT 0,
   uploaded_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
@@ -33,6 +34,9 @@ CREATE TABLE IF NOT EXISTS public.album_photos (
 );
 CREATE INDEX IF NOT EXISTS idx_album_photos_album_id ON public.album_photos(album_id);
 CREATE INDEX IF NOT EXISTS idx_album_photos_sort ON public.album_photos(album_id, sort_index);
+ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS captured_at TIMESTAMPTZ;
+CREATE INDEX IF NOT EXISTS idx_album_photos_album_uploader_captured
+  ON public.album_photos(album_id, uploaded_by_id, captured_at, sort_index);
 
 ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS thumb_url TEXT;
 ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS thumb_path TEXT;
@@ -134,6 +138,8 @@ CREATE POLICY "album_photos_owner_delete" ON storage.objects
   );
 
 -- 9. 快速相册列表：数据库端一次性返回相册 + 封面 + 数量
+DROP FUNCTION IF EXISTS public.get_album_list_fast();
+
 CREATE OR REPLACE FUNCTION public.get_album_list_fast()
 RETURNS TABLE (
   album_id UUID,
@@ -153,7 +159,8 @@ RETURNS TABLE (
   cover_original_name TEXT,
   cover_caption TEXT,
   cover_sort_index INT,
-  cover_uploaded_by_id UUID
+  cover_uploaded_by_id UUID,
+  cover_captured_at TIMESTAMPTZ
 )
 LANGUAGE sql
 STABLE
@@ -174,7 +181,8 @@ AS $$
       p.original_name,
       p.caption,
       p.sort_index,
-      p.uploaded_by_id
+      p.uploaded_by_id,
+      p.captured_at
     FROM public.album_photos p
     ORDER BY p.album_id, p.sort_index ASC, p.created_at ASC
   )
@@ -196,7 +204,8 @@ AS $$
     cp.original_name AS cover_original_name,
     cp.caption AS cover_caption,
     cp.sort_index AS cover_sort_index,
-    cp.uploaded_by_id AS cover_uploaded_by_id
+    cp.uploaded_by_id AS cover_uploaded_by_id,
+    cp.captured_at AS cover_captured_at
   FROM public.albums a
   LEFT JOIN photo_counts pc ON pc.album_id = a.id
   LEFT JOIN cover_photos cp ON cp.album_id = a.id

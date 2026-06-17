@@ -9,6 +9,10 @@
 ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS thumb_url TEXT;
 ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS thumb_path TEXT;
 ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS original_name TEXT;
+ALTER TABLE public.album_photos ADD COLUMN IF NOT EXISTS captured_at TIMESTAMPTZ;
+
+CREATE INDEX IF NOT EXISTS idx_album_photos_album_uploader_captured
+  ON public.album_photos(album_id, uploaded_by_id, captured_at, sort_index);
 
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('album-photos', 'album-photos', true)
@@ -46,6 +50,8 @@ CREATE POLICY "album_photos_owner_delete" ON storage.objects
     )
   );
 
+DROP FUNCTION IF EXISTS public.get_album_list_fast();
+
 CREATE OR REPLACE FUNCTION public.get_album_list_fast()
 RETURNS TABLE (
   album_id UUID,
@@ -65,7 +71,8 @@ RETURNS TABLE (
   cover_original_name TEXT,
   cover_caption TEXT,
   cover_sort_index INT,
-  cover_uploaded_by_id UUID
+  cover_uploaded_by_id UUID,
+  cover_captured_at TIMESTAMPTZ
 )
 LANGUAGE sql
 STABLE
@@ -86,7 +93,8 @@ AS $$
       p.original_name,
       p.caption,
       p.sort_index,
-      p.uploaded_by_id
+      p.uploaded_by_id,
+      p.captured_at
     FROM public.album_photos p
     ORDER BY p.album_id, p.sort_index ASC, p.created_at ASC
   )
@@ -108,7 +116,8 @@ AS $$
     cp.original_name AS cover_original_name,
     cp.caption AS cover_caption,
     cp.sort_index AS cover_sort_index,
-    cp.uploaded_by_id AS cover_uploaded_by_id
+    cp.uploaded_by_id AS cover_uploaded_by_id,
+    cp.captured_at AS cover_captured_at
   FROM public.albums a
   LEFT JOIN photo_counts pc ON pc.album_id = a.id
   LEFT JOIN cover_photos cp ON cp.album_id = a.id

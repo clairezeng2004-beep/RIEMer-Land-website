@@ -54,6 +54,7 @@ function rowToPhoto(row) {
     caption: row.caption || '',
     sortIndex: typeof row.sort_index === 'number' ? row.sort_index : 0,
     uploadedById: row.uploaded_by_id || null,
+    capturedAt: row.captured_at || null,
     _fromDb: true,
   };
 }
@@ -70,6 +71,7 @@ function rpcRowToAlbum(row) {
         caption: row.cover_caption,
         sort_index: row.cover_sort_index,
         uploaded_by_id: row.cover_uploaded_by_id,
+        captured_at: row.cover_captured_at,
       })
     : null;
 
@@ -218,7 +220,7 @@ export async function fetchAlbumList() {
     //    只取必要字段，减小载荷
     const { data: covers, error: e2 } = await supabase
       .from('album_photos')
-      .select('id,album_id,url,storage_path,thumb_url,thumb_path,original_name,caption,sort_index')
+      .select('id,album_id,url,storage_path,thumb_url,thumb_path,original_name,caption,sort_index,uploaded_by_id')
       .in('album_id', ids)
       .order('sort_index', { ascending: true })
       .order('created_at', { ascending: true });
@@ -429,17 +431,132 @@ function fileToDataUrl(file) {
   });
 }
 
+function parseExifDate(value) {
+  if (!value || typeof value !== 'string') return null;
+  const match = value
+    .trim()
+    .match(/^(\d{4}):(\d{2}):(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!match) return null;
+  const [, year, month, day, hour, minute, second] = match;
+  const date = new Date(
+    Number(year),
+    Number(month) - 1,
+    Number(day),
+    Number(hour),
+    Number(minute),
+    Number(second)
+  );
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function readExifString(view, tiffStart, entryOffset, littleEndian) {
+  if (!entryOffset) return null;
+  const type = view.getUint16(entryOffset + 2, littleEndian);
+  const count = view.getUint32(entryOffset + 4, littleEndian);
+  if (type !== 2 || count <= 0) return null;
+  const valueOffset = count <= 4
+    ? entryOffset + 8
+    : tiffStart + view.getUint32(entryOffset + 8, littleEndian);
+  if (valueOffset < 0 || valueOffset + count > view.byteLength) return null;
+  let text = '';
+  for (let i = 0; i < count; i++) {
+    const code = view.getUint8(valueOffset + i);
+    if (code === 0) break;
+    text += String.fromCharCode(code);
+  }
+  return text;
+}
+
+function findExifTag(view, tiffStart, ifdOffset, tagId, littleEndian) {
+  if (!ifdOffset) return null;
+  const absoluteOffset = tiffStart + ifdOffset;
+  if (absoluteOffset < 0 || absoluteOffset + 2 > view.byteLength) return null;
+  const entryCount = view.getUint16(absoluteOffset, littleEndian);
+  for (let i = 0; i < entryCount; i++) {
+    const entryOffset = absoluteOffset + 2 + i * 12;
+    if (entryOffset + 12 > view.byteLength) return null;
+    const tag = view.getUint16(entryOffset, littleEndian);
+    if (tag === tagId) return entryOffset;
+  }
+  return null;
+}
+
+async function readImageCapturedAt(file) {
+  if (!file || !/^image\/jpe?g$/i.test(file.type || '')) return null;
+  try {
+    const buffer = await file.slice(0, 256 * 1024).arrayBuffer();
+    const view = new DataView(buffer);
+    if (view.getUint16(0, false) !== 0xffd8) return null;
+
+    let offset = 2;
+    while (offset + 4 < view.byteLength) {
+      if (view.getUint8(offset) !== 0xff) break;
+      const marker = view.getUint8(offset + 1);
+      const size = view.getUint16(offset + 2, false);
+      if (marker === 0xe1) {
+        const exifStart = offset + 4;
+        const exifHeader = 'Exif\0\0';
+        for (let i = 0; i < exifHeader.length; i++) {
+          if (view.getUint8(exifStart + i) !== exifHeader.charCodeAt(i)) return null;
+        }
+
+        const tiffStart = exifStart + exifHeader.length;
+        const endian = view.getUint16(tiffStart, false);
+        const littleEndian = endian === 0x4949;
+        if (!littleEndian && endian !== 0x4d4d) return null;
+        const firstIfdOffset = view.getUint32(tiffStart + 4, littleEndian);
+        const exifIfdEntry = findExifTag(view, tiffStart, firstIfdOffset, 0x8769, littleEndian);
+        const exifIfdOffset = exifIfdEntry
+          ? view.getUint32(exifIfdEntry + 8, littleEndian)
+          : null;
+        const dateOriginalEntry = findExifTag(view, tiffStart, exifIfdOffset, 0x9003, littleEndian);
+        const dateEntry = dateOriginalEntry
+          || findExifTag(view, tiffStart, exifIfdOffset, 0x9004, littleEndian)
+          || findExifTag(view, tiffStart, firstIfdOffset, 0x0132, littleEndian);
+        return parseExifDate(readExifString(view, tiffStart, dateEntry, littleEndian));
+      }
+      offset += 2 + size;
+    }
+  } catch (err) {
+    console.warn('[AlbumService] 读取照片拍摄时间失败，使用默认顺序：', err?.message || err);
+  }
+  return null;
+}
+
+async function prepareFilesForUpload(files = []) {
+  const prepared = await Promise.all(
+    files.map(async (item, originalIndex) => {
+      const capturedDate = await readImageCapturedAt(item.file);
+      const fallbackTime = Number.isFinite(item.file?.lastModified) ? item.file.lastModified : 0;
+      return {
+        ...item,
+        originalIndex,
+        capturedAt: capturedDate ? capturedDate.toISOString() : null,
+        sortTime: capturedDate ? capturedDate.getTime() : fallbackTime,
+      };
+    })
+  );
+
+  return prepared.sort((a, b) => {
+    const aTime = Number.isFinite(a.sortTime) ? a.sortTime : 0;
+    const bTime = Number.isFinite(b.sortTime) ? b.sortTime : 0;
+    if (aTime !== bTime) return aTime - bTime;
+    return a.originalIndex - b.originalIndex;
+  });
+}
+
 /* ============================================
  * 并发上传一批文件，保持与入参相同的顺序。
  * onProgress(done, total) 每完成一张回调一次，用于 UI 显示进度。
  * 默认并发 4 张，既能跑满家用带宽，又不至于把浏览器 / Supabase 打爆。
  * ============================================ */
 async function uploadFilesConcurrently(files, userId, onProgress, concurrency = DEFAULT_UPLOAD_CONCURRENCY) {
-  const total = files.length;
+  const sortedFiles = await prepareFilesForUpload(files);
+  const total = sortedFiles.length;
   let done = 0;
   const results = new Array(total);
-  const hasLargeFiles = files.some((f) => (f?.file?.size || 0) >= LARGE_UPLOAD_THRESHOLD);
-  const hasHugeFiles = files.some((f) => (f?.file?.size || 0) >= HUGE_UPLOAD_THRESHOLD);
+  const hasLargeFiles = sortedFiles.some((f) => (f?.file?.size || 0) >= LARGE_UPLOAD_THRESHOLD);
+  const hasHugeFiles = sortedFiles.some((f) => (f?.file?.size || 0) >= HUGE_UPLOAD_THRESHOLD);
   let effectiveConcurrency = concurrency;
   if (total >= BULK_UPLOAD_THRESHOLD) {
     effectiveConcurrency = Math.min(effectiveConcurrency, BULK_UPLOAD_CONCURRENCY);
@@ -456,10 +573,10 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
     while (true) {
       const idx = cursor++;
       if (idx >= total) return;
-      const f = files[idx];
+      const f = sortedFiles[idx];
       try {
         const r = await uploadOneWithThumb(f.file, userId);
-        results[idx] = { ...r, caption: f.caption || '' };
+        results[idx] = { ...r, caption: f.caption || '', capturedAt: f.capturedAt || null };
       } catch (err) {
         console.warn('[AlbumService] 单张上传失败：', err?.message || err);
         results[idx] = null;
@@ -478,6 +595,44 @@ function ensureUploadSucceeded(uploaded, requestedCount) {
   if (requestedCount > 0 && uploaded.length === 0) {
     throw new Error('照片上传超时或失败。请检查网络后重试，或先少量分批上传。');
   }
+}
+
+function buildPhotoRows(albumId, uploaded, userId, baseIndex = 0, includeCapturedAt = true) {
+  return uploaded.map((u, i) => {
+    const row = {
+      album_id: albumId,
+      url: u.url,
+      storage_path: u.path,
+      thumb_url: u.thumbUrl,
+      thumb_path: u.thumbPath,
+      original_name: u.originalName,
+      caption: u.caption,
+      sort_index: baseIndex + i,
+      uploaded_by_id: userId || null,
+    };
+    if (includeCapturedAt) row.captured_at = u.capturedAt;
+    return row;
+  });
+}
+
+const isMissingCapturedAtColumn = (error) =>
+  error?.code === '42703' || /captured_at/i.test(error?.message || '');
+
+async function insertPhotoRows(albumId, uploaded, userId, baseIndex = 0) {
+  let response = await supabase
+    .from('album_photos')
+    .insert(buildPhotoRows(albumId, uploaded, userId, baseIndex, true))
+    .select();
+
+  if (response.error && isMissingCapturedAtColumn(response.error)) {
+    console.warn('[AlbumService] album_photos.captured_at 尚未迁移，已回退为仅按本次上传顺序排序。');
+    response = await supabase
+      .from('album_photos')
+      .insert(buildPhotoRows(albumId, uploaded, userId, baseIndex, false))
+      .select();
+  }
+
+  return response;
 }
 
 /* ============================================
@@ -511,6 +666,7 @@ export async function createAlbum(meta, files, user, options = {}) {
         caption: u.caption,
         sortIndex: i,
         uploadedById: user?.id || null,
+        capturedAt: u.capturedAt || null,
       })),
     };
     const list = getLocalAlbums();
@@ -539,22 +695,7 @@ export async function createAlbum(meta, files, user, options = {}) {
 
     let photoRows = [];
     if (uploaded.length > 0) {
-      const { data, error: e2 } = await supabase
-        .from('album_photos')
-        .insert(
-          uploaded.map((u, i) => ({
-            album_id: albumRow.id,
-            url: u.url,
-            storage_path: u.path,
-            thumb_url: u.thumbUrl,
-            thumb_path: u.thumbPath,
-            original_name: u.originalName,
-            caption: u.caption,
-            sort_index: i,
-            uploaded_by_id: user?.id || null,
-          }))
-        )
-        .select();
+      const { data, error: e2 } = await insertPhotoRows(albumRow.id, uploaded, user?.id, 0);
       if (e2) {
         await cleanupUploaded(uploaded);
         await supabase.from('albums').delete().eq('id', albumRow.id).catch(() => {});
@@ -615,6 +756,7 @@ export async function addPhotosToAlbum(album, files, user, options = {}) {
       caption: u.caption,
       sortIndex: baseIndex + i,
       uploadedById: user?.id || null,
+      capturedAt: u.capturedAt || null,
     }));
     const list = getLocalAlbums().map((a) =>
       a.id === album.id ? { ...a, photos: [...(a.photos || []), ...newPhotos] } : a
@@ -625,22 +767,7 @@ export async function addPhotosToAlbum(album, files, user, options = {}) {
 
   try {
     const baseIndex = (album.photos || []).length;
-    const { data, error } = await supabase
-      .from('album_photos')
-      .insert(
-        uploaded.map((u, i) => ({
-          album_id: album.id,
-          url: u.url,
-          storage_path: u.path,
-          thumb_url: u.thumbUrl,
-          thumb_path: u.thumbPath,
-          original_name: u.originalName,
-          caption: u.caption,
-          sort_index: baseIndex + i,
-          uploaded_by_id: user?.id || null,
-        }))
-      )
-      .select();
+    const { data, error } = await insertPhotoRows(album.id, uploaded, user?.id, baseIndex);
     if (error) {
       await cleanupUploaded(uploaded);
       throw error;
