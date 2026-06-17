@@ -17,6 +17,9 @@ const LS_ALBUMS_KEY = 'riemer_albums_v1';
 const THUMB_MAX_SIDE = 1280;
 const THUMB_QUALITY = 0.82;
 const DEFAULT_UPLOAD_CONCURRENCY = 5;
+const LARGE_UPLOAD_CONCURRENCY = 2;
+const LARGE_UPLOAD_THRESHOLD = 8 * 1024 * 1024;
+const STORAGE_UPLOAD_ATTEMPTS = 3;
 
 const hasRemote = () => !!(isSupabaseConfigured && supabase);
 
@@ -105,6 +108,30 @@ async function cleanupUploaded(uploaded = []) {
   await removeStoragePaths(
     uploaded.flatMap((u) => [u?.path, u?.thumbPath]).filter(Boolean)
   );
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function uploadStorageObject(path, body, options, label) {
+  let lastError = null;
+  for (let attempt = 1; attempt <= STORAGE_UPLOAD_ATTEMPTS; attempt++) {
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, body, {
+        ...options,
+        upsert: true,
+      });
+
+    if (!error) return;
+    lastError = error;
+    console.warn(`[AlbumService] ${label}上传失败（第 ${attempt}/${STORAGE_UPLOAD_ATTEMPTS} 次）：`, error.message);
+    if (attempt < STORAGE_UPLOAD_ATTEMPTS) {
+      await wait(800 * attempt);
+    }
+  }
+  throw lastError;
 }
 
 /* ============================================
@@ -345,18 +372,15 @@ async function uploadOneWithThumb(file, userId) {
   const thumbBlobPromise = generateThumbnail(file);
 
   // 1) 上传原图
-  const { error: errOrig } = await supabase.storage
-    .from(BUCKET)
-    .upload(originalPath, file, {
+  await uploadStorageObject(
+    originalPath,
+    file,
+    {
       cacheControl: '3600',
-      upsert: false,
       contentType: file.type || 'image/jpeg',
-    });
-
-  if (errOrig) {
-    console.warn('[AlbumService] 原图上传失败：', errOrig.message);
-    throw errOrig;
-  }
+    },
+    '原图'
+  );
 
   const origPublic = supabase.storage.from(BUCKET).getPublicUrl(originalPath).data.publicUrl;
 
@@ -366,17 +390,19 @@ async function uploadOneWithThumb(file, userId) {
 
   const thumbBlob = await thumbBlobPromise;
   if (thumbBlob) {
-    const { error: errThumb } = await supabase.storage
-      .from(BUCKET)
-      .upload(thumbPath, thumbBlob, {
-        cacheControl: '3600',
-        upsert: false,
-        contentType: 'image/jpeg',
-      });
-    if (!errThumb) {
+    try {
+      await uploadStorageObject(
+        thumbPath,
+        thumbBlob,
+        {
+          cacheControl: '3600',
+          contentType: 'image/jpeg',
+        },
+        '缩略图'
+      );
       thumbUrl = supabase.storage.from(BUCKET).getPublicUrl(thumbPath).data.publicUrl;
       thumbPathFinal = thumbPath;
-    } else {
+    } catch (errThumb) {
       console.warn('[AlbumService] 缩略图上传失败（已忽略）：', errThumb.message);
     }
   }
@@ -408,9 +434,13 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
   const total = files.length;
   let done = 0;
   const results = new Array(total);
+  const hasLargeFiles = files.some((f) => (f?.file?.size || 0) >= LARGE_UPLOAD_THRESHOLD);
+  const effectiveConcurrency = hasLargeFiles
+    ? Math.min(concurrency, LARGE_UPLOAD_CONCURRENCY)
+    : concurrency;
 
   let cursor = 0;
-  const workers = Array.from({ length: Math.min(concurrency, total) }, async () => {
+  const workers = Array.from({ length: Math.min(effectiveConcurrency, total) }, async () => {
     while (true) {
       const idx = cursor++;
       if (idx >= total) return;
