@@ -1073,7 +1073,7 @@ export default function Gallery() {
         <div className="lightbox" onClick={closeLightbox}>
           <div className="lightbox__content" onClick={(e) => e.stopPropagation()}>
             <img
-              src={getOriginalUrl(selectedAlbum.photos[lightboxIndex]) || getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
+              src={getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
               alt={selectedAlbum.photos[lightboxIndex].caption}
               onError={(e) => fallbackToOriginal(e, selectedAlbum.photos[lightboxIndex])}
             />
