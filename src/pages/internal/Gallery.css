@@ -403,6 +403,11 @@
   font-size: var(--text-xs);
 }
 
+.gallery-upload__dropzone p .gallery-upload__drag-hint {
+  font-size: inherit;
+  font-weight: inherit;
+}
+
 .gallery-upload__preview {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
