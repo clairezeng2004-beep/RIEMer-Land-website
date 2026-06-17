@@ -19,6 +19,8 @@ import {
   Images,
   Download,
   Loader2,
+  CheckSquare,
+  Square,
 } from 'lucide-react';
 import {
   fetchAlbumList,
@@ -174,6 +176,8 @@ export default function Gallery() {
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumDetailLoading, setAlbumDetailLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [multiSelectMode, setMultiSelectMode] = useState(false);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
   const [showAddPhoto, setShowAddPhoto] = useState(false);
   const now = new Date();
@@ -335,6 +339,11 @@ export default function Gallery() {
     setSelectedFiles([]);
   };
 
+  const clearPhotoSelection = () => {
+    setSelectedPhotoIds([]);
+    setMultiSelectMode(false);
+  };
+
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -490,6 +499,39 @@ export default function Gallery() {
     }));
   };
 
+  const handleDeleteSelectedPhotos = async () => {
+    const selectedPhotos = (selectedAlbum?.photos || []).filter((photo) =>
+      selectedPhotoIds.includes(photo.id)
+    );
+    const deletablePhotos = selectedPhotos.filter(canModifyPhoto);
+    if (deletablePhotos.length === 0) return;
+    if (!window.confirm(`确定要删除选中的 ${deletablePhotos.length} 张照片吗？`)) return;
+
+    try {
+      for (const photo of deletablePhotos) {
+        await svcDeletePhoto(selectedAlbum, photo);
+      }
+    } catch (err) {
+      console.error('[Gallery] 批量删除照片失败：', err);
+      alert('删除照片失败：' + (err.message || '未知错误'));
+      return;
+    }
+
+    const deletedIds = new Set(deletablePhotos.map((photo) => photo.id));
+    setAlbums((prev) =>
+      prev.map((a) =>
+        a.id === selectedAlbum.id
+          ? { ...a, photos: a.photos.filter((p) => !deletedIds.has(p.id)) }
+          : a
+      )
+    );
+    setSelectedAlbum((prev) => ({
+      ...prev,
+      photos: prev.photos.filter((p) => !deletedIds.has(p.id)),
+    }));
+    setSelectedPhotoIds((prev) => prev.filter((id) => !deletedIds.has(id)));
+  };
+
   /* ---- 删除相册 ---- */
   const handleDeleteAlbum = async (albumId) => {
     if (!window.confirm('确定要删除整个相册吗？所有照片将一并删除。')) return;
@@ -568,6 +610,31 @@ export default function Gallery() {
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
+  };
+
+  const handleDownloadDisplay = (photo) => {
+    const displayUrl = getDisplayUrl(photo);
+    if (!displayUrl) return;
+    const filename = guessDownloadFilename(photo);
+    const a = document.createElement('a');
+    a.href = getDownloadUrl(displayUrl, filename);
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  };
+
+  const downloadPhotos = (photos, downloader) => {
+    photos.forEach((photo, index) => {
+      window.setTimeout(() => downloader(photo), index * 160);
+    });
+  };
+
+  const togglePhotoSelected = (photoId) => {
+    setSelectedPhotoIds((prev) =>
+      prev.includes(photoId) ? prev.filter((id) => id !== photoId) : [...prev, photoId]
+    );
   };
 
   const lightboxPrev = () => {
@@ -888,6 +955,7 @@ export default function Gallery() {
               setSelectedAlbum(null);
               setShowAddPhoto(false);
               clearSelectedFiles();
+              clearPhotoSelection();
             }}
           >
             <ChevronLeft size={20} /> 返回相册
@@ -901,17 +969,35 @@ export default function Gallery() {
               <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photoCount ?? selectedAlbum.photos.length} 张照片
             </span>
           </div>
-          <button
-            className="btn btn-primary"
-            onClick={() => {
-              const next = !showAddPhoto;
-              if (!next) clearSelectedFiles();
-              setShowAddPhoto(next);
-            }}
-          >
-            {showAddPhoto ? <X size={18} /> : <Upload size={18} />}
-            {showAddPhoto ? '取消' : '上传照片'}
-          </button>
+          <div className="gallery-detail__actions">
+            <button
+              className={`btn ${multiSelectMode ? 'btn-secondary' : 'btn-outline'}`}
+              onClick={() => {
+                const next = !multiSelectMode;
+                setMultiSelectMode(next);
+                setSelectedPhotoIds([]);
+                if (next) {
+                  setShowAddPhoto(false);
+                  clearSelectedFiles();
+                }
+              }}
+            >
+              {multiSelectMode ? <CheckSquare size={18} /> : <Square size={18} />}
+              {multiSelectMode ? '退出多选' : '多选'}
+            </button>
+            <button
+              className="btn btn-primary"
+              onClick={() => {
+                const next = !showAddPhoto;
+                if (!next) clearSelectedFiles();
+                if (next) clearPhotoSelection();
+                setShowAddPhoto(next);
+              }}
+            >
+              {showAddPhoto ? <X size={18} /> : <Upload size={18} />}
+              {showAddPhoto ? '取消' : '上传照片'}
+            </button>
+          </div>
         </div>
         {renderUploadStatus()}
 
@@ -1006,6 +1092,50 @@ export default function Gallery() {
         )}
 
         {/* 照片网格 */}
+        {multiSelectMode && selectedAlbum.photos.length > 0 && (() => {
+          const selectedPhotos = selectedAlbum.photos.filter((photo) =>
+            selectedPhotoIds.includes(photo.id)
+          );
+          const deletableSelectedPhotos = selectedPhotos.filter(canModifyPhoto);
+          return (
+            <div className="gallery-bulkbar">
+              <span>已选择 {selectedPhotos.length} 张</span>
+              <button
+                type="button"
+                onClick={() => setSelectedPhotoIds(selectedAlbum.photos.map((photo) => photo.id))}
+              >
+                全选
+              </button>
+              <button type="button" onClick={() => setSelectedPhotoIds([])}>
+                清空
+              </button>
+              <button
+                type="button"
+                disabled={selectedPhotos.length === 0}
+                onClick={() => downloadPhotos(selectedPhotos, handleDownloadOriginal)}
+              >
+                <Download size={14} /> 下载原图
+              </button>
+              <button
+                type="button"
+                disabled={selectedPhotos.length === 0}
+                onClick={() => downloadPhotos(selectedPhotos, handleDownloadDisplay)}
+              >
+                <Download size={14} /> 下载
+              </button>
+              {deletableSelectedPhotos.length > 0 && (
+                <button
+                  type="button"
+                  className="gallery-bulkbar__danger"
+                  onClick={handleDeleteSelectedPhotos}
+                >
+                  <Trash2 size={14} /> 删除
+                </button>
+              )}
+            </div>
+          );
+        })()}
+
         {albumDetailLoading ? (
           <div className="gallery-loading">
             <Loader2 size={20} className="gallery-loading__spinner" />
@@ -1017,9 +1147,32 @@ export default function Gallery() {
             {selectedAlbum.photos.map((photo, index) => (
               <div
                 key={photo.id}
-                className="photo-card"
-                onClick={() => openLightbox(index)}
+                className={`photo-card${multiSelectMode ? ' is-selecting' : ''}${selectedPhotoIds.includes(photo.id) ? ' is-selected' : ''}`}
+                onClick={() => {
+                  if (multiSelectMode) {
+                    togglePhotoSelected(photo.id);
+                    return;
+                  }
+                  openLightbox(index);
+                }}
               >
+                {multiSelectMode && (
+                  <button
+                    type="button"
+                    className="photo-card__select"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      togglePhotoSelected(photo.id);
+                    }}
+                    aria-label={selectedPhotoIds.includes(photo.id) ? '取消选择' : '选择照片'}
+                  >
+                    {selectedPhotoIds.includes(photo.id) ? (
+                      <CheckSquare size={20} />
+                    ) : (
+                      <Square size={20} />
+                    )}
+                  </button>
+                )}
                 <img
                   src={getDisplayUrl(photo)}
                   alt={photo.caption}
