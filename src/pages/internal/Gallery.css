@@ -980,15 +980,35 @@
   .gallery-detail__actions {
     width: 100%;
     flex-wrap: wrap;
+    align-items: stretch;
   }
 
   .gallery-detail__actions .btn {
-    flex: 1 1 140px;
+    flex: 1 1 calc(50% - var(--space-sm));
+    inline-size: auto;
+    min-inline-size: 0;
+    block-size: 38px;
+    padding: 0 0.9rem;
     justify-content: center;
   }
 
   .gallery-bulkbar {
     margin-top: 0;
+    gap: 8px;
+    padding: 0.7rem;
+  }
+
+  .gallery-bulkbar span {
+    flex: 0 0 100%;
+    margin-right: 0;
+  }
+
+  .gallery-bulkbar button {
+    flex: 1 1 calc(50% - 4px);
+    justify-content: center;
+    min-height: 36px;
+    padding: 0 0.65rem;
+    font-size: var(--text-xs);
   }
 
   .gallery-grid {
