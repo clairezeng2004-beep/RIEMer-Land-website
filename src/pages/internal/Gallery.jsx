@@ -613,6 +613,7 @@ export default function Gallery() {
                       className="gallery-create__select"
                       value={String(newAlbum.year)}
                       onChange={(v) => setNewAlbum({ ...newAlbum, year: v })}
+                      searchable={false}
                       options={Array.from({ length: 10 }, (_, i) => {
                         const y = new Date().getFullYear() - i;
                         return { value: String(y), label: `${y} 年` };
@@ -622,6 +623,7 @@ export default function Gallery() {
                       size="sm"
                       className="gallery-create__select"
                       value={String(newAlbum.month)}
+                      searchable={false}
                       onChange={(v) => {
                         // 切换月份后，如果已选的"日"超出新月天数，则清空
                         const maxDay = daysInMonth(newAlbum.year, v);
@@ -643,6 +645,7 @@ export default function Gallery() {
                       onChange={(v) => setNewAlbum({ ...newAlbum, day: v })}
                       placeholder="日（选填）"
                       allowClear
+                      searchable={false}
                       options={Array.from(
                         { length: daysInMonth(newAlbum.year, newAlbum.month) },
                         (_, i) => ({ value: String(i + 1), label: `${i + 1} 日` })
