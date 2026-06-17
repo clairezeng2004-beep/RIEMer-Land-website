@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useNotifications } from '../../contexts/NotificationContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
+import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
 import {
@@ -131,6 +132,8 @@ const writeAlbumListCache = (list) => {
   } catch { /* quota/private mode 忽略 */ }
 };
 
+const canUseRealtime = () => !!(isSupabaseConfigured && supabase);
+
 
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
@@ -174,6 +177,22 @@ export default function Gallery() {
   const [isDraggingAdd, setIsDraggingAdd] = useState(false);
   const albumFileInputRef = useRef(null);
   const createAlbumFileRef = useRef(null);
+  const refreshTimerRef = useRef(null);
+
+  const refreshAlbumList = useCallback(async ({ quiet = false } = {}) => {
+    if (!quiet) setLoading(true);
+    try {
+      const list = await fetchAlbumList();
+      setAlbums(list);
+      writeAlbumListCache(list);
+      return list;
+    } catch (err) {
+      console.warn('[Gallery] 加载相册失败：', err);
+      return null;
+    } finally {
+      if (!quiet) setLoading(false);
+    }
+  }, []);
 
   /* ---- 初次加载：只拉相册列表 + 封面（不拉全部照片，避免卡顿）
          已有本地缓存时 loading=false，此处的拉取为"后台静默刷新"，
@@ -181,21 +200,61 @@ export default function Gallery() {
   useEffect(() => {
     let alive = true;
     (async () => {
-      try {
-        const list = await fetchAlbumList();
-        if (!alive) return;
+      const list = await fetchAlbumList().catch((err) => {
+        console.warn('[Gallery] 加载相册失败：', err);
+        return null;
+      });
+      if (!alive) return;
+      if (list) {
         setAlbums(list);
         writeAlbumListCache(list);
-      } catch (err) {
-        console.warn('[Gallery] 加载相册失败：', err);
-      } finally {
-        if (alive) setLoading(false);
       }
+      setLoading(false);
     })();
     return () => {
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (!canUseRealtime()) return undefined;
+
+    const scheduleRefresh = (changedAlbumId = null) => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      refreshTimerRef.current = setTimeout(async () => {
+        await refreshAlbumList({ quiet: true });
+        if (changedAlbumId && selectedAlbum?.id === changedAlbumId) {
+          try {
+            const photos = await fetchAlbumPhotos(changedAlbumId);
+            setSelectedAlbum((prev) =>
+              prev && prev.id === changedAlbumId ? { ...prev, photos, _partial: false } : prev
+            );
+          } catch (err) {
+            console.warn('[Gallery] 实时刷新相册详情失败：', err);
+          }
+        }
+      }, 700);
+    };
+
+    const channel = supabase
+      .channel('gallery_realtime')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'albums' },
+        () => scheduleRefresh()
+      )
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'album_photos' },
+        (payload) => scheduleRefresh(payload.new?.album_id || payload.old?.album_id || null)
+      )
+      .subscribe();
+
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+      supabase.removeChannel(channel);
+    };
+  }, [refreshAlbumList, selectedAlbum?.id]);
 
   /* ---- albums 发生任何本地变更（创建/删除/改名/新增照片等）后，
          同步写回本地缓存，保证下次打开首屏即是最新。---- */

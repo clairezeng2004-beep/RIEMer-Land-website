@@ -16,6 +16,7 @@ const LS_ALBUMS_KEY = 'riemer_albums_v1';
 // 缩略图参数：最长边 1280px、JPEG 质量 0.82
 const THUMB_MAX_SIDE = 1280;
 const THUMB_QUALITY = 0.82;
+const DEFAULT_UPLOAD_CONCURRENCY = 5;
 
 const hasRemote = () => !!(isSupabaseConfigured && supabase);
 
@@ -47,6 +48,37 @@ function rowToPhoto(row) {
     sortIndex: typeof row.sort_index === 'number' ? row.sort_index : 0,
     uploadedById: row.uploaded_by_id || null,
     _fromDb: true,
+  };
+}
+
+function rpcRowToAlbum(row) {
+  const cover = row.cover_id
+    ? rowToPhoto({
+        id: row.cover_id,
+        url: row.cover_url,
+        storage_path: row.cover_storage_path,
+        thumb_url: row.cover_thumb_url,
+        thumb_path: row.cover_thumb_path,
+        original_name: row.cover_original_name,
+        caption: row.cover_caption,
+        sort_index: row.cover_sort_index,
+        uploaded_by_id: row.cover_uploaded_by_id,
+      })
+    : null;
+
+  return {
+    id: row.album_id,
+    title: row.title || '',
+    description: row.description || '',
+    date: row.date || '',
+    coverIndex: typeof row.cover_index === 'number' ? row.cover_index : 0,
+    createdById: row.created_by_id || null,
+    createdBy: row.created_by || '',
+    createdAt: row.created_at || null,
+    photos: cover ? [cover] : [],
+    photoCount: Number(row.photo_count || 0),
+    _fromDb: true,
+    _partial: true,
   };
 }
 
@@ -128,6 +160,19 @@ export async function fetchAlbumList() {
   }
 
   try {
+    try {
+      const { data: fastList, error: fastError } = await supabase
+        .rpc('get_album_list_fast');
+      if (!fastError && Array.isArray(fastList)) {
+        return fastList.map(rpcRowToAlbum);
+      }
+      if (fastError) {
+        console.warn('[AlbumService] 快速相册列表 RPC 不可用，回退普通查询：', fastError.message);
+      }
+    } catch (rpcErr) {
+      console.warn('[AlbumService] 快速相册列表 RPC 异常，回退普通查询：', rpcErr?.message || rpcErr);
+    }
+
     const { data: albums, error: e1 } = await supabase
       .from('albums')
       .select('*')
@@ -297,6 +342,7 @@ async function uploadOneWithThumb(file, userId) {
   const baseKey = `${userId || 'anon'}/${Date.now()}-${rand}`;
   const originalPath = `${baseKey}.${ext}`;
   const thumbPath = `${baseKey}_thumb.jpg`;
+  const thumbBlobPromise = generateThumbnail(file);
 
   // 1) 上传原图
   const { error: errOrig } = await supabase.storage
@@ -319,7 +365,7 @@ async function uploadOneWithThumb(file, userId) {
   let thumbUrl = null;
   let thumbPathFinal = null;
 
-  const thumbBlob = await generateThumbnail(file);
+  const thumbBlob = await thumbBlobPromise;
   if (thumbBlob) {
     const { error: errThumb } = await supabase.storage
       .from(BUCKET)
@@ -359,7 +405,7 @@ function fileToDataUrl(file) {
  * onProgress(done, total) 每完成一张回调一次，用于 UI 显示进度。
  * 默认并发 4 张，既能跑满家用带宽，又不至于把浏览器 / Supabase 打爆。
  * ============================================ */
-async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 4) {
+async function uploadFilesConcurrently(files, userId, onProgress, concurrency = DEFAULT_UPLOAD_CONCURRENCY) {
   const total = files.length;
   let done = 0;
   const results = new Array(total);
