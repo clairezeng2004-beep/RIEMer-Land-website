@@ -160,8 +160,8 @@
 /* ============ Album Grid ============ */
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 220px));
-  gap: var(--space-lg);
+  grid-template-columns: repeat(auto-fill, minmax(220px, 280px));
+  gap: var(--space-xl);
   justify-content: start;
 }
 
@@ -180,7 +180,7 @@
 
 .album-card__cover {
   width: 100%;
-  height: 200px;
+  height: 240px;
   overflow: hidden;
   position: relative;
   background: var(--color-bg);
@@ -269,8 +269,8 @@
    内部空间有左侧导航，实际内容区会比 viewport 更窄；只等 768px 才切换会太晚。 */
 @media (max-width: 1100px) {
   .gallery-grid {
-    grid-template-columns: repeat(auto-fill, minmax(150px, 180px));
-    gap: var(--space-sm);
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: var(--space-md);
   }
 
   .album-card {
@@ -305,10 +305,18 @@
   .album-card__title {
     font-size: var(--text-sm);
     line-height: 1.35;
+    color: white;
     display: -webkit-box;
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+  }
+
+  .album-card__body,
+  .album-card__body svg,
+  .album-card__photo-count,
+  .album-card__photo-count svg {
+    color: white;
   }
 
   .album-card__desc {
@@ -320,7 +328,7 @@
   }
 
   .album-card__meta span {
-    color: rgba(255, 255, 255, 0.86);
+    color: rgba(255, 255, 255, 0.92);
   }
 }
 
@@ -959,6 +967,7 @@
 
   .gallery-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-sm);
   }
 }
 
