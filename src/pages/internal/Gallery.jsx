@@ -1,9 +1,7 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
-import { useNotifications } from '../../contexts/NotificationContext';
-import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
@@ -25,11 +23,16 @@ import {
 import {
   fetchAlbumList,
   fetchAlbumPhotos,
-  createAlbum as svcCreateAlbum,
   deleteAlbum as svcDeleteAlbum,
-  addPhotosToAlbum as svcAddPhotos,
   deletePhoto as svcDeletePhoto,
 } from '../../services/albumService';
+import {
+  clearFinishedAlbumUploadTasks,
+  getAlbumUploadQueueSnapshot,
+  startAddPhotosUpload,
+  startCreateAlbumUpload,
+  subscribeAlbumUploadQueue,
+} from '../../services/albumUploadQueue';
 import './Gallery.css';
 
 /* ---------- 工具函数：选择缩略图 / 原图 URL ---------- */
@@ -138,10 +141,13 @@ const canUseRealtime = () => !!(isSupabaseConfigured && supabase);
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
-  // useNotifications 保留以确保 NotificationProvider 就绪；
-  // 通知派发已统一走规则引擎 emitNotificationEvent。
-  useNotifications();
   const gc = internalConfig.gallery || {};
+  const uploadTasks = useSyncExternalStore(
+    subscribeAlbumUploadQueue,
+    getAlbumUploadQueueSnapshot,
+    getAlbumUploadQueueSnapshot
+  );
+  const activeUploadTask = uploadTasks.find((task) => task.status === 'running') || null;
 
   const updateGallery = useCallback(
     (key, val) => updateInternalConfig({ gallery: { [key]: val } }),
@@ -153,9 +159,10 @@ export default function Gallery() {
     const cached = readAlbumListCache();
     return !cached || cached.length === 0;
   });
-  const [submitting, setSubmitting] = useState(false);
-  // 上传进度：{ done, total }，total=0 表示无进度条（如纯元信息创建）
-  const [uploadProgress, setUploadProgress] = useState({ done: 0, total: 0 });
+  const submitting = !!activeUploadTask;
+  const uploadProgress = activeUploadTask
+    ? { done: activeUploadTask.done, total: activeUploadTask.total }
+    : { done: 0, total: 0 };
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumDetailLoading, setAlbumDetailLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -263,6 +270,23 @@ export default function Gallery() {
     writeAlbumListCache(albums);
   }, [albums, loading]);
 
+  useEffect(() => {
+    const latestFinished = uploadTasks.find((task) => task.status !== 'running');
+    if (!latestFinished) return;
+    refreshAlbumList({ quiet: true });
+    if (latestFinished.albumId && selectedAlbum?.id === latestFinished.albumId) {
+      fetchAlbumPhotos(latestFinished.albumId)
+        .then((photos) => {
+          setSelectedAlbum((prev) =>
+            prev && prev.id === latestFinished.albumId
+              ? { ...prev, photos, photoCount: photos.length, _partial: false }
+              : prev
+          );
+        })
+        .catch((err) => console.warn('[Gallery] 上传完成后刷新相册详情失败：', err));
+    }
+  }, [refreshAlbumList, selectedAlbum?.id, uploadTasks]);
+
   /* ---- 打开相册详情：若当前是 _partial 数据，懒加载全部照片 ---- */
   const openAlbum = useCallback(async (album) => {
     setSelectedAlbum(album);
@@ -316,65 +340,33 @@ export default function Gallery() {
     const d = newAlbum.day ? String(newAlbum.day).padStart(2, '0') : '';
     const albumDate = d ? `${y}-${m}-${d}` : `${y}-${m}`;
 
-    // 关键：立即进入提交态并初始化进度，让按钮第一时间给出反馈，
-    // 而不是等上传完才改 UI，避免"点击无反应"的错觉。
-    setSubmitting(true);
-    setUploadProgress({ done: 0, total: createAlbumFiles.length });
-    try {
-      const filesPayload = createAlbumFiles.map((f) => {
-        const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
-        return {
-          file: f.file,
-          caption: f.caption === defaultCaption ? '' : f.caption,
-        };
-      });
-      const album = await svcCreateAlbum(
-        {
-          title: newAlbum.title,
-          description: newAlbum.description,
-          date: albumDate,
-        },
-        filesPayload,
-        user,
-        {
-          onProgress: (done, total) => setUploadProgress({ done, total }),
-        }
-      );
-      setAlbums((prev) => [album, ...prev]);
+    const filesPayload = createAlbumFiles.map((f) => {
+      const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
+      return {
+        file: f.file,
+        caption: f.caption === defaultCaption ? '' : f.caption,
+      };
+    });
+    startCreateAlbumUpload({
+      meta: {
+        title: newAlbum.title,
+        description: newAlbum.description,
+        date: albumDate,
+      },
+      files: filesPayload,
+      user,
+    });
 
-      // 发送"相册新增照片"通知：统一走规则引擎，由用户自定义规则决定是否收到。
-      // 仅当本次创建确实带了照片时才发，纯建空相册不打扰其他人。
-      if (filesPayload.length > 0) {
-        try {
-          const uploader = user?.nickname || user?.name || '某成员';
-          emitNotificationEvent('gallery.upload', {
-            operator: uploader,
-            operatorUserId: user?.id,
-            albumTitle: album.title,
-            count: filesPayload.length,
-          });
-        } catch (err) {
-          console.warn('[Gallery] 发送上传通知失败:', err?.message || err);
-        }
-      }
-
-      const resetNow = new Date();
-      setNewAlbum({
-        title: '',
-        description: '',
-        year: resetNow.getFullYear().toString(),
-        month: (resetNow.getMonth() + 1).toString(),
-        day: '',
-      });
-      clearCreateAlbumFiles();
-      setShowCreateAlbum(false);
-    } catch (err) {
-      console.error('[Gallery] 创建相册失败：', err);
-      alert('创建相册失败：' + (err.message || '未知错误'));
-    } finally {
-      setSubmitting(false);
-      setUploadProgress({ done: 0, total: 0 });
-    }
+    const resetNow = new Date();
+    setNewAlbum({
+      title: '',
+      description: '',
+      year: resetNow.getFullYear().toString(),
+      month: (resetNow.getMonth() + 1).toString(),
+      day: '',
+    });
+    clearCreateAlbumFiles();
+    setShowCreateAlbum(false);
   };
 
   /* ---- 通用：把 File[] 转为预览对象 ---- */
@@ -453,56 +445,16 @@ export default function Gallery() {
 
   const handleAddPhotos = async () => {
     if (!selectedAlbum || selectedFiles.length === 0 || submitting) return;
-    setSubmitting(true);
-    setUploadProgress({ done: 0, total: selectedFiles.length });
-    try {
-      const filesPayload = selectedFiles.map((f) => {
-        const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
-        return {
-          file: f.file,
-          caption: f.caption === defaultCaption ? '' : f.caption,
-        };
-      });
-      const newPhotos = await svcAddPhotos(selectedAlbum, filesPayload, user, {
-        onProgress: (done, total) => setUploadProgress({ done, total }),
-      });
-      setAlbums((prev) =>
-        prev.map((a) =>
-          a.id === selectedAlbum.id
-            ? { ...a, photos: [...a.photos, ...newPhotos] }
-            : a
-        )
-      );
-      setSelectedAlbum((prev) => ({
-        ...prev,
-        photos: [...prev.photos, ...newPhotos],
-      }));
-
-      // 发送"相册新增照片"通知（由规则引擎按用户自定义规则触发）。
-      // 以实际成功写入的 newPhotos 数量为准，避免中途失败时数字对不上。
-      if (Array.isArray(newPhotos) && newPhotos.length > 0) {
-        try {
-          const uploader = user?.nickname || user?.name || '某成员';
-          emitNotificationEvent('gallery.upload', {
-            operator: uploader,
-            operatorUserId: user?.id,
-            albumTitle: selectedAlbum.title,
-            count: newPhotos.length,
-          });
-        } catch (err) {
-          console.warn('[Gallery] 发送上传通知失败:', err?.message || err);
-        }
-      }
-
-      clearSelectedFiles();
-      setShowAddPhoto(false);
-    } catch (err) {
-      console.error('[Gallery] 上传照片失败：', err);
-      alert('上传照片失败：' + (err.message || '未知错误'));
-    } finally {
-      setSubmitting(false);
-      setUploadProgress({ done: 0, total: 0 });
-    }
+    const filesPayload = selectedFiles.map((f) => {
+      const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
+      return {
+        file: f.file,
+        caption: f.caption === defaultCaption ? '' : f.caption,
+      };
+    });
+    startAddPhotosUpload({ album: selectedAlbum, files: filesPayload, user });
+    clearSelectedFiles();
+    setShowAddPhoto(false);
   };
 
   /* ---- 删除照片 ---- */
@@ -561,6 +513,35 @@ export default function Gallery() {
     // 相册创建者也可删除相册内的照片
     if (selectedAlbum?.createdById && selectedAlbum.createdById === user?.id) return true;
     return false;
+  };
+
+  const renderUploadStatus = () => {
+    if (uploadTasks.length === 0) return null;
+    const task = uploadTasks[0];
+    const isRunning = task.status === 'running';
+    const isSuccess = task.status === 'success';
+    return (
+      <div className={`gallery-upload-status gallery-upload-status--${task.status}`}>
+        <div className="gallery-upload-status__main">
+          {isRunning && <Loader2 size={16} className="gallery-spin" />}
+          <span>
+            {isRunning
+              ? `后台上传中：${task.albumTitle} ${task.done}/${task.total || 0}`
+              : isSuccess
+                ? `上传完成：${task.albumTitle}`
+                : `上传失败：${task.albumTitle}`}
+          </span>
+        </div>
+        {!isRunning && task.error && (
+          <span className="gallery-upload-status__error">{task.error}</span>
+        )}
+        {!isRunning && (
+          <button type="button" onClick={clearFinishedAlbumUploadTasks}>
+            关闭
+          </button>
+        )}
+      </div>
+    );
   };
 
   /* ---- Lightbox ---- */
@@ -645,6 +626,7 @@ export default function Gallery() {
               />}
             </button>
           </div>
+          {renderUploadStatus()}
 
           {/* 新建相册表单 */}
           {showCreateAlbum && (
@@ -930,6 +912,7 @@ export default function Gallery() {
             {showAddPhoto ? '取消' : '上传照片'}
           </button>
         </div>
+        {renderUploadStatus()}
 
         {/* 上传照片区域 */}
         {showAddPhoto && (

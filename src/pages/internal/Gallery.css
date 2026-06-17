@@ -25,6 +25,55 @@
   font-size: var(--text-sm);
 }
 
+.gallery-upload-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin: calc(var(--space-xl) * -1) 0 var(--space-xl);
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(91, 140, 62, 0.22);
+  border-radius: var(--radius-md);
+  background: rgba(91, 140, 62, 0.08);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+}
+
+.gallery-upload-status__main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  min-width: 0;
+}
+
+.gallery-upload-status__error {
+  flex: 1;
+  min-width: 0;
+  color: #9b2c2c;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-upload-status button {
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gallery-upload-status--error {
+  border-color: rgba(155, 44, 44, 0.22);
+  background: rgba(155, 44, 44, 0.08);
+}
+
+.gallery-upload-status--success {
+  border-color: rgba(91, 140, 62, 0.28);
+  background: rgba(91, 140, 62, 0.1);
+}
+
 /* ============ Create Album Form ============ */
 .gallery-create {
   padding: var(--space-xl);
