@@ -157,8 +157,6 @@ export default function Gallery() {
     getAlbumUploadQueueSnapshot,
     getAlbumUploadQueueSnapshot
   );
-  const activeUploadTask = uploadTasks.find((task) => task.status === 'running') || null;
-
   const updateGallery = useCallback(
     (key, val) => updateInternalConfig({ gallery: { [key]: val } }),
     [updateInternalConfig]
@@ -169,10 +167,6 @@ export default function Gallery() {
     const cached = readAlbumListCache();
     return !cached || cached.length === 0;
   });
-  const submitting = !!activeUploadTask;
-  const uploadProgress = activeUploadTask
-    ? { done: activeUploadTask.done, total: activeUploadTask.total }
-    : { done: 0, total: 0 };
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumDetailLoading, setAlbumDetailLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
@@ -351,7 +345,8 @@ export default function Gallery() {
   /* ---- 创建相册（上传到 Storage + 写入 DB） ---- */
   const handleCreateAlbum = async (e) => {
     e.preventDefault();
-    if (!newAlbum.title.trim() || submitting) return;
+    // 不再因为"已有上传任务在进行"而阻塞：后台队列支持多组并发上传。
+    if (!newAlbum.title.trim()) return;
     const y = newAlbum.year || now.getFullYear().toString();
     const m = (newAlbum.month || '1').padStart(2, '0');
     const d = newAlbum.day ? String(newAlbum.day).padStart(2, '0') : '';
@@ -461,7 +456,8 @@ export default function Gallery() {
   };
 
   const handleAddPhotos = async () => {
-    if (!selectedAlbum || selectedFiles.length === 0 || submitting) return;
+    // 允许并发：即使上一组还在后台上传，也能立刻提交新一组。
+    if (!selectedAlbum || selectedFiles.length === 0) return;
     const filesPayload = selectedFiles.map((f) => {
       const defaultCaption = f.file.name.replace(/\.[^.]+$/, '');
       return {
@@ -567,27 +563,40 @@ export default function Gallery() {
 
   const renderUploadStatus = () => {
     if (uploadTasks.length === 0) return null;
-    const task = uploadTasks[0];
-    const isRunning = task.status === 'running';
-    const isSuccess = task.status === 'success';
+    const hasFinished = uploadTasks.some((task) => task.status !== 'running');
     return (
-      <div className={`gallery-upload-status gallery-upload-status--${task.status}`}>
-        <div className="gallery-upload-status__main">
-          {isRunning && <Loader2 size={16} className="gallery-spin" />}
-          <span>
-            {isRunning
-              ? `后台上传中：${task.albumTitle} ${task.done}/${task.total || 0}`
-              : isSuccess
-                ? `上传完成：${task.albumTitle}`
-                : `上传失败：${task.albumTitle}`}
-          </span>
-        </div>
-        {!isRunning && task.error && (
-          <span className="gallery-upload-status__error">{task.error}</span>
-        )}
-        {!isRunning && (
-          <button type="button" onClick={clearFinishedAlbumUploadTasks}>
-            关闭
+      <div className="gallery-upload-status-list">
+        {uploadTasks.map((task) => {
+          const isRunning = task.status === 'running';
+          const isSuccess = task.status === 'success';
+          return (
+            <div
+              key={task.id}
+              className={`gallery-upload-status gallery-upload-status--${task.status}`}
+            >
+              <div className="gallery-upload-status__main">
+                {isRunning && <Loader2 size={16} className="gallery-spin" />}
+                <span>
+                  {isRunning
+                    ? `后台上传中：${task.albumTitle} ${task.done}/${task.total || 0}`
+                    : isSuccess
+                      ? `上传完成：${task.albumTitle}`
+                      : `上传失败：${task.albumTitle}`}
+                </span>
+              </div>
+              {!isRunning && task.error && (
+                <span className="gallery-upload-status__error">{task.error}</span>
+              )}
+            </div>
+          );
+        })}
+        {hasFinished && (
+          <button
+            type="button"
+            className="gallery-upload-status__clear"
+            onClick={clearFinishedAlbumUploadTasks}
+          >
+            关闭已完成
           </button>
         )}
       </div>
@@ -844,20 +853,9 @@ export default function Gallery() {
                 <button
                   type="submit"
                   className="btn btn-primary"
-                  disabled={submitting || !newAlbum.title.trim()}
+                  disabled={!newAlbum.title.trim()}
                 >
-                  {submitting ? (
-                    <>
-                      <Loader2 size={16} className="gallery-spin" />
-                      {uploadProgress.total > 0
-                        ? `正在上传 ${uploadProgress.done}/${uploadProgress.total}…`
-                        : '正在创建…'}
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={16} /> 创建{createAlbumFiles.length > 0 ? `（含 ${createAlbumFiles.length} 张照片）` : ''}
-                    </>
-                  )}
+                  <Plus size={16} /> 创建{createAlbumFiles.length > 0 ? `（含 ${createAlbumFiles.length} 张照片）` : ''}
                 </button>
               </form>
             </div>
@@ -1073,18 +1071,8 @@ export default function Gallery() {
                 <button
                   className="btn btn-primary"
                   onClick={handleAddPhotos}
-                  disabled={submitting}
                 >
-                  {submitting ? (
-                    <>
-                      <Loader2 size={16} className="gallery-spin" />
-                      正在上传 {uploadProgress.done}/{uploadProgress.total || selectedFiles.length}…
-                    </>
-                  ) : (
-                    <>
-                      <Upload size={16} /> 确认上传 {selectedFiles.length} 张照片
-                    </>
-                  )}
+                  <Upload size={16} /> 确认上传 {selectedFiles.length} 张照片
                 </button>
               </>
             )}

@@ -725,8 +725,18 @@ export async function deleteAlbum(album) {
     const photos = album._partial ? await fetchAlbumPhotos(album.id) : (album.photos || []);
     const paths = collectStoragePaths(photos);
     await removeStoragePaths(paths);
-    const { error } = await supabase.from('albums').delete().eq('id', album.id);
+    // ⚠️ Supabase 的 delete 在被 RLS 行级权限拦截时不会报错，只是删除 0 行。
+    // 加 .select() 把真正被删的行拿回来，若为空说明没有权限或行不存在，
+    // 否则界面会"假装删除成功"，刷新后相册又出现。
+    const { data, error } = await supabase
+      .from('albums')
+      .delete()
+      .eq('id', album.id)
+      .select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('删除未生效：你可能没有权限删除该相册（仅创建者或管理员可删除）。');
+    }
   } catch (err) {
     console.warn('[AlbumService] 删除相册失败：', err.message);
     throw err;
@@ -795,8 +805,16 @@ export async function deletePhoto(album, photo) {
 
   try {
     await removeStoragePaths(collectStoragePaths([photo]));
-    const { error } = await supabase.from('album_photos').delete().eq('id', photo.id);
+    // 同相册删除：用 .select() 校验是否真的删了行，避免 RLS 静默拦截后界面误判成功。
+    const { data, error } = await supabase
+      .from('album_photos')
+      .delete()
+      .eq('id', photo.id)
+      .select('id');
     if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('删除未生效：你可能没有权限删除这张照片（仅上传者、相册创建者或管理员可删除）。');
+    }
   } catch (err) {
     console.warn('[AlbumService] 删除照片失败：', err.message);
     throw err;

@@ -25,6 +25,27 @@
   font-size: var(--text-sm);
 }
 
+.gallery-upload-status-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+  margin: calc(var(--space-xl) * -1) 0 var(--space-xl);
+}
+
+.gallery-upload-status-list .gallery-upload-status {
+  margin: 0;
+}
+
+.gallery-upload-status__clear {
+  align-self: flex-end;
+  border: 0;
+  background: transparent;
+  color: var(--color-primary);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
 .gallery-upload-status {
   display: flex;
   align-items: center;
