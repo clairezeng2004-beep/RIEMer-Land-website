@@ -517,26 +517,27 @@
     --tl-card-w: 260px;
     --tl-card-h: 205px;
     padding: var(--tl-slot-h) 1.5rem;
-    /* 手机端 mask 渐隐宽度收窄到 16px，避免在 375px 屏上占比过大。 */
+    /* 手机端把渐隐区加宽，避免下一张卡片在屏幕右缘露出一条硬边，
+       看起来像一个竖向悬浮按钮。 */
     -webkit-mask-image: linear-gradient(
       to right,
       transparent 0,
-      #000 16px,
-      #000 calc(100% - 16px),
+      #000 48px,
+      #000 calc(100% - 48px),
       transparent 100%
     );
     mask-image: linear-gradient(
       to right,
       transparent 0,
-      #000 16px,
-      #000 calc(100% - 16px),
+      #000 48px,
+      #000 calc(100% - 48px),
       transparent 100%
     );
   }
 
   .timeline__item {
-    width: 290px;
-    min-width: 290px;
+    width: 100vw;
+    min-width: 100vw;
   }
 
   .timeline__card {
@@ -576,22 +577,22 @@
     -webkit-mask-image: linear-gradient(
       to right,
       transparent 0,
-      #000 12px,
-      #000 calc(100% - 12px),
+      #000 48px,
+      #000 calc(100% - 48px),
       transparent 100%
     );
     mask-image: linear-gradient(
       to right,
       transparent 0,
-      #000 12px,
-      #000 calc(100% - 12px),
+      #000 48px,
+      #000 calc(100% - 48px),
       transparent 100%
     );
   }
 
   .timeline__item {
-    width: 276px;
-    min-width: 276px;
+    width: 100vw;
+    min-width: 100vw;
   }
 
   .timeline__card {

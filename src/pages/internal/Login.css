@@ -392,8 +392,8 @@
 
   .login-card {
     padding: var(--space-xl) var(--space-lg);
-    height: calc(100dvh - var(--space-xl) * 2);
-    min-height: 480px;
+    height: auto;
+    min-height: clamp(480px, calc(100dvh - var(--space-xl) * 2), 640px);
   }
 
   .login-card__header {

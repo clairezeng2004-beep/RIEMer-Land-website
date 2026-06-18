@@ -919,6 +919,49 @@
   object-fit: contain;
 }
 
+@media (max-width: 768px) {
+  .ptd-file-preview-overlay {
+    padding: 0;
+  }
+
+  .ptd-file-preview-modal {
+    width: 100vw;
+    height: 100dvh;
+    border-radius: 0;
+  }
+
+  .ptd-file-preview-modal__header {
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .ptd-file-preview-modal__header h3 {
+    min-width: 0;
+    font-size: var(--text-sm);
+    line-height: 1.35;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+
+  .ptd-file-preview-modal__actions {
+    gap: 6px;
+  }
+
+  .ptd-file-preview-modal__actions button {
+    width: 36px;
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0;
+  }
+
+  .ptd-file-preview-modal__actions button span {
+    display: none;
+  }
+}
+
 /* Article Footer — 点赞区 */
 .ptd-article__footer {
   display: flex;

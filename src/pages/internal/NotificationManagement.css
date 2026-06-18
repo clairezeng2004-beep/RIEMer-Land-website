@@ -726,6 +726,42 @@
     grid-template-columns: 1fr;
   }
 
+  .notif-mgmt__modal-overlay {
+    padding: var(--space-md);
+  }
+
+  .notif-mgmt__modal,
+  .notif-mgmt__modal--wide {
+    width: 100%;
+    max-width: 100%;
+    max-height: calc(100dvh - var(--space-md) * 2);
+  }
+
+  .notif-mgmt__modal-header {
+    padding: var(--space-md);
+  }
+
+  .notif-mgmt__modal-header h3 {
+    min-width: 0;
+    font-size: var(--text-base);
+    line-height: 1.35;
+  }
+
+  .notif-mgmt__modal-body {
+    padding: var(--space-md);
+    gap: var(--space-sm);
+  }
+
+  .notif-mgmt__modal-footer {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  .notif-mgmt__modal-footer .btn {
+    flex: 1;
+    justify-content: center;
+    min-height: 38px;
+  }
+
   .notif-mgmt__list-filters {
     flex-direction: column;
   }
@@ -759,8 +795,13 @@
     font-size: var(--text-lg);
   }
 
-  .notif-mgmt__modal {
-    width: 95%;
+  .notif-mgmt__modal-overlay {
+    padding: var(--space-sm);
+  }
+
+  .notif-mgmt__modal,
+  .notif-mgmt__modal--wide {
+    max-height: calc(100dvh - var(--space-sm) * 2);
   }
 }
 
