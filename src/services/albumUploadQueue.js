@@ -3,6 +3,11 @@ import {
   addPhotosToAlbum as addPhotosToAlbumRequest,
 } from './albumService';
 import { emitNotificationEvent } from '../lib/notificationRuleEngine';
+import {
+  savePendingUpload,
+  removePendingUpload,
+  getPendingUploads,
+} from './albumUploadPersistence';
 
 const listeners = new Set();
 const tasks = [];
@@ -17,15 +22,36 @@ const cloneTask = (task) => ({
   albumTitle: task.albumTitle,
   done: task.done,
   total: task.total,
-  phase: task.phase,
-  current: task.current,
   error: task.error,
   createdAt: task.createdAt,
   updatedAt: task.updatedAt,
 });
 
+/* ---------- 刷新/关闭网页前的拦截：有任务在传时弹原生确认框 ---------- */
+const hasRunningTasks = () => tasks.some((task) => task.status === 'running');
+let guardAttached = false;
+const beforeUnloadHandler = (event) => {
+  if (!hasRunningTasks()) return undefined;
+  // 触发浏览器原生"离开此页面？"确认框，防止手滑刷新/关闭打断上传。
+  event.preventDefault();
+  event.returnValue = '';
+  return '';
+};
+const syncBeforeUnloadGuard = () => {
+  if (typeof window === 'undefined') return;
+  const need = hasRunningTasks();
+  if (need && !guardAttached) {
+    window.addEventListener('beforeunload', beforeUnloadHandler);
+    guardAttached = true;
+  } else if (!need && guardAttached) {
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
+    guardAttached = false;
+  }
+};
+
 const notify = () => {
   snapshot = tasks.map(cloneTask);
+  syncBeforeUnloadGuard();
   listeners.forEach((listener) => {
     try {
       listener();
@@ -75,92 +101,137 @@ export const clearFinishedAlbumUploadTasks = () => {
   notify();
 };
 
-export const startCreateAlbumUpload = ({ meta, files, user }) => {
-  const id = `album-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+/* ============================================
+ * 核心：把一个 job 跑起来（新建 / 加图通用）。
+ * job: { id, type, meta?, album?, albumTitle?, files, user, createdAt }
+ * 注意：job 已在调用前写入 IndexedDB；这里只负责执行 + 完成后清盘。
+ * ============================================ */
+const runJob = (job) => {
+  const { id, type, files = [], user } = job;
+  const isCreate = type === 'create-album';
+  const displayTitle = isCreate
+    ? job.meta?.title || '相册'
+    : job.album?.title || job.albumTitle || '相册';
+
+  // 同一任务已在内存队列里（例如续传被重复触发）→ 不重复跑
+  if (tasks.some((item) => item.id === id)) return id;
+
   const task = {
     id,
-    type: 'create-album',
+    type,
     status: 'running',
-    title: meta.title,
-    albumId: null,
-    albumTitle: meta.title,
+    title: displayTitle,
+    albumId: isCreate ? null : job.album?.id || null,
+    albumTitle: displayTitle,
     done: 0,
-    total: files?.length || 0,
-    phase: 'queued',
-    current: '',
+    total: files.length || 0,
     error: '',
-    createdAt: Date.now(),
+    createdAt: job.createdAt || Date.now(),
     updatedAt: Date.now(),
   };
   tasks.unshift(task);
   notify();
 
-  createAlbumRequest(meta, files, user, {
-    onProgress: (done, total, detail = {}) => updateTask(id, { done, total, ...detail }),
-  })
-    .then((album) => {
+  const onProgress = (done, total) => updateTask(id, { done, total });
+
+  const request = isCreate
+    ? createAlbumRequest(job.meta, files, user, { onProgress })
+    : addPhotosToAlbumRequest(job.album, files, user, { onProgress });
+
+  request
+    .then((result) => {
+      const albumTitle = isCreate ? result?.title || displayTitle : displayTitle;
+      const count = isCreate
+        ? files.length || 0
+        : Array.isArray(result)
+          ? result.length
+          : files.length || 0;
       updateTask(id, {
         status: 'success',
-        albumId: album?.id || null,
-        albumTitle: album?.title || meta.title,
-        done: files?.length || 0,
-        total: files?.length || 0,
-        phase: 'done',
-        current: '',
+        albumId: isCreate ? result?.id || null : task.albumId,
+        albumTitle,
+        done: files.length || 0,
+        total: files.length || 0,
       });
-      emitUploadNotification({ user, albumTitle: album?.title || meta.title, count: files?.length || 0 });
+      removePendingUpload(id); // 成功 → 清盘
+      emitUploadNotification({ user, albumTitle, count });
     })
     .catch((err) => {
-      console.error('[AlbumUploadQueue] 创建相册上传失败：', err);
+      console.error('[AlbumUploadQueue] 上传失败：', err);
       updateTask(id, {
         status: 'error',
         error: err?.message || '上传失败',
       });
+      removePendingUpload(id); // 彻底失败 → 也清盘，避免下次打开页面无限重试
     });
 
   return id;
 };
 
+const makeJobId = () =>
+  `album-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const slimUser = (user) =>
+  user ? { id: user.id, name: user.name, nickname: user.nickname } : null;
+
+export const startCreateAlbumUpload = ({ meta, files, user }) => {
+  const id = makeJobId();
+  const job = {
+    id,
+    type: 'create-album',
+    meta,
+    albumTitle: meta?.title || '相册',
+    files,
+    user: slimUser(user),
+    createdAt: Date.now(),
+  };
+  savePendingUpload(job); // 先落盘，再开始传 —— 刷新也能续上
+  runJob(job);
+  return id;
+};
+
 export const startAddPhotosUpload = ({ album, files, user }) => {
-  const id = `album-upload-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  const task = {
+  const id = makeJobId();
+  // 续传时只需要 id / title / _fromDb / 以及"已有照片数"作为 sort_index 基准。
+  const baseIndex = (album?.photos?.length ?? album?.photoCount) || 0;
+  const slimAlbum = {
+    id: album?.id || null,
+    title: album?.title || '相册',
+    _fromDb: !!album?._fromDb,
+    photos: new Array(baseIndex), // 长度即 baseIndex，供 addPhotosToAlbum 计算排序起点
+  };
+  const job = {
     id,
     type: 'add-photos',
-    status: 'running',
-    title: album?.title || '相册',
-    albumId: album?.id || null,
+    album: slimAlbum,
     albumTitle: album?.title || '相册',
-    done: 0,
-    total: files?.length || 0,
-    phase: 'queued',
-    current: '',
-    error: '',
+    files,
+    user: slimUser(user),
     createdAt: Date.now(),
-    updatedAt: Date.now(),
   };
-  tasks.unshift(task);
-  notify();
-
-  addPhotosToAlbumRequest(album, files, user, {
-    onProgress: (done, total, detail = {}) => updateTask(id, { done, total, ...detail }),
-  })
-    .then((photos) => {
-      updateTask(id, {
-        status: 'success',
-        done: files?.length || 0,
-        total: files?.length || 0,
-        phase: 'done',
-        current: '',
-      });
-      emitUploadNotification({ user, albumTitle: album?.title || '相册', count: photos?.length || 0 });
-    })
-    .catch((err) => {
-      console.error('[AlbumUploadQueue] 上传照片失败：', err);
-      updateTask(id, {
-        status: 'error',
-        error: err?.message || '上传失败',
-      });
-    });
-
+  savePendingUpload(job);
+  runJob(job);
   return id;
+};
+
+/* ============================================
+ * 续传：读取 IndexedDB 里残留（被刷新/关闭中断）的任务并重新跑完。
+ * 在相册页挂载时调用一次即可。
+ * 注意：createAlbum / addPhotosToAlbum 都是"先把所有文件传到 Storage、
+ *   最后再一次性写库"，所以中途被打断时数据库尚无记录，整体重跑是安全的
+ *   （最坏只是重复上传若干已传到 Storage 的文件，浪费一点存储，不产生重复相册/照片）。
+ * ============================================ */
+let resuming = false;
+export const resumePersistedAlbumUploads = async () => {
+  if (resuming) return;
+  resuming = true;
+  try {
+    const jobs = await getPendingUploads();
+    jobs.forEach((job) => {
+      if (!job || tasks.some((item) => item.id === job.id)) return;
+      runJob(job);
+    });
+  } finally {
+    resuming = false;
+  }
 };

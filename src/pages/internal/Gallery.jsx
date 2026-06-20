@@ -31,6 +31,7 @@ import {
 import {
   clearFinishedAlbumUploadTasks,
   getAlbumUploadQueueSnapshot,
+  resumePersistedAlbumUploads,
   startAddPhotosUpload,
   startCreateAlbumUpload,
   subscribeAlbumUploadQueue,
@@ -230,6 +231,11 @@ export default function Gallery() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  /* ---- 续传：进入相册页时，把上次被刷新/关闭中断的上传任务接着跑完 ---- */
+  useEffect(() => {
+    resumePersistedAlbumUploads();
   }, []);
 
   useEffect(() => {
