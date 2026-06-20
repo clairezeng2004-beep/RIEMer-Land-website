@@ -191,6 +191,7 @@ function AppShell() {
         <Route path="article/:id" element={<InternalArticleDetail />} />
         <Route path="tasks" element={<Tasks />} />
         <Route path="gallery" element={<Gallery />} />
+        <Route path="gallery/:albumId" element={<Gallery />} />
         <Route path="users" element={<UserManagement />} />
         <Route path="content" element={<ContentManagement />} />
         <Route path="notification-management" element={<NotificationManagement />} />

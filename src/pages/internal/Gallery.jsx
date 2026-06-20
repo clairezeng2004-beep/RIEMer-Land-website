@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect, useSyncExternalStore } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
@@ -151,6 +151,9 @@ const canUseRealtime = () => !!(isSupabaseConfigured && supabase);
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user } = useAuth();
   const { internalConfig, updateInternalConfig } = useSiteContent();
+  const navigate = useNavigate();
+  // 当前 URL 的相册 id（/internal/gallery/:albumId）。无则为列表视图。
+  const { albumId } = useParams();
   const gc = internalConfig.gallery || {};
   const uploadTasks = useSyncExternalStore(
     subscribeAlbumUploadQueue,
@@ -316,6 +319,23 @@ export default function Gallery() {
       setAlbumDetailLoading(false);
     }
   }, []);
+
+  /* ---- URL ↔ 选中相册同步：支持 /internal/gallery/:albumId 直达详情、刷新/收藏不丢 ---- */
+  useEffect(() => {
+    if (!albumId) {
+      setSelectedAlbum(null); // 回到列表视图
+      return;
+    }
+    // 已经打开的就是它：不重复处理，避免覆盖已加载的照片
+    if (selectedAlbum?.id === albumId) return;
+    const found = albums.find((a) => String(a.id) === String(albumId));
+    if (found) {
+      openAlbum(found);
+    } else if (!loading) {
+      // 列表已加载完仍找不到 → 无效或已删除的链接，回退到相册列表
+      navigate('/internal/gallery', { replace: true });
+    }
+  }, [albumId, albums, loading, selectedAlbum?.id, openAlbum, navigate]);
 
   const revokePreviewUrls = (items) => {
     (items || []).forEach((item) => {
@@ -529,9 +549,9 @@ export default function Gallery() {
   };
 
   /* ---- 删除相册 ---- */
-  const handleDeleteAlbum = async (albumId) => {
+  const handleDeleteAlbum = async (targetId) => {
     if (!window.confirm('确定要删除整个相册吗？所有照片将一并删除。')) return;
-    const album = albums.find((a) => a.id === albumId);
+    const album = albums.find((a) => a.id === targetId);
     if (!album) return;
     try {
       await svcDeleteAlbum(album);
@@ -540,8 +560,9 @@ export default function Gallery() {
       alert('删除相册失败：' + (err.message || '未知错误'));
       return;
     }
-    setAlbums((prev) => prev.filter((a) => a.id !== albumId));
-    if (selectedAlbum?.id === albumId) setSelectedAlbum(null);
+    setAlbums((prev) => prev.filter((a) => a.id !== targetId));
+    // 若正在查看被删的相册，回到列表（URL 同步）
+    if (selectedAlbum?.id === targetId) navigate('/internal/gallery', { replace: true });
   };
 
   // 权限判断：管理员或创建者/上传者可删除
@@ -889,7 +910,7 @@ export default function Gallery() {
                   <div
                     key={album.id}
                     className="album-card card"
-                    onClick={() => openAlbum(album)}
+                    onClick={() => navigate(`/internal/gallery/${album.id}`)}
                   >
                     <div className="album-card__cover">
                       {cover ? (
@@ -963,7 +984,7 @@ export default function Gallery() {
           <button
             className="gallery-detail__back"
             onClick={() => {
-              setSelectedAlbum(null);
+              navigate('/internal/gallery'); // URL 同步会清空 selectedAlbum
               setShowAddPhoto(false);
               clearSelectedFiles();
               clearPhotoSelection();
