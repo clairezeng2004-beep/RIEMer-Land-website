@@ -564,11 +564,19 @@ export default function Gallery() {
   const renderUploadStatus = () => {
     if (uploadTasks.length === 0) return null;
     const hasFinished = uploadTasks.some((task) => task.status !== 'running');
+    const phaseLabel = {
+      queued: '等待上传',
+      preparing: '读取照片信息',
+      uploading: '上传照片',
+      saving: '保存相册',
+      done: '上传完成',
+    };
     return (
       <div className="gallery-upload-status-list">
         {uploadTasks.map((task) => {
           const isRunning = task.status === 'running';
           const isSuccess = task.status === 'success';
+          const phase = phaseLabel[task.phase] || '后台上传中';
           return (
             <div
               key={task.id}
@@ -576,13 +584,18 @@ export default function Gallery() {
             >
               <div className="gallery-upload-status__main">
                 {isRunning && <Loader2 size={16} className="gallery-spin" />}
-                <span>
-                  {isRunning
-                    ? `后台上传中：${task.albumTitle} ${task.done}/${task.total || 0}`
-                    : isSuccess
-                      ? `上传完成：${task.albumTitle}`
-                      : `上传失败：${task.albumTitle}`}
-                </span>
+                <div className="gallery-upload-status__text">
+                  <span>
+                    {isRunning
+                      ? `${phase}：${task.albumTitle} ${task.done}/${task.total || 0}`
+                      : isSuccess
+                        ? `上传完成：${task.albumTitle}`
+                        : `上传失败：${task.albumTitle}`}
+                  </span>
+                  {isRunning && task.current && (
+                    <span className="gallery-upload-status__detail">{task.current}</span>
+                  )}
+                </div>
               </div>
               {!isRunning && task.error && (
                 <span className="gallery-upload-status__error">{task.error}</span>

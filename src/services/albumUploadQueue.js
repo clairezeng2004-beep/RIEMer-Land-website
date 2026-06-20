@@ -17,6 +17,8 @@ const cloneTask = (task) => ({
   albumTitle: task.albumTitle,
   done: task.done,
   total: task.total,
+  phase: task.phase,
+  current: task.current,
   error: task.error,
   createdAt: task.createdAt,
   updatedAt: task.updatedAt,
@@ -84,6 +86,8 @@ export const startCreateAlbumUpload = ({ meta, files, user }) => {
     albumTitle: meta.title,
     done: 0,
     total: files?.length || 0,
+    phase: 'queued',
+    current: '',
     error: '',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -92,7 +96,7 @@ export const startCreateAlbumUpload = ({ meta, files, user }) => {
   notify();
 
   createAlbumRequest(meta, files, user, {
-    onProgress: (done, total) => updateTask(id, { done, total }),
+    onProgress: (done, total, detail = {}) => updateTask(id, { done, total, ...detail }),
   })
     .then((album) => {
       updateTask(id, {
@@ -101,6 +105,8 @@ export const startCreateAlbumUpload = ({ meta, files, user }) => {
         albumTitle: album?.title || meta.title,
         done: files?.length || 0,
         total: files?.length || 0,
+        phase: 'done',
+        current: '',
       });
       emitUploadNotification({ user, albumTitle: album?.title || meta.title, count: files?.length || 0 });
     })
@@ -126,6 +132,8 @@ export const startAddPhotosUpload = ({ album, files, user }) => {
     albumTitle: album?.title || '相册',
     done: 0,
     total: files?.length || 0,
+    phase: 'queued',
+    current: '',
     error: '',
     createdAt: Date.now(),
     updatedAt: Date.now(),
@@ -134,13 +142,15 @@ export const startAddPhotosUpload = ({ album, files, user }) => {
   notify();
 
   addPhotosToAlbumRequest(album, files, user, {
-    onProgress: (done, total) => updateTask(id, { done, total }),
+    onProgress: (done, total, detail = {}) => updateTask(id, { done, total, ...detail }),
   })
     .then((photos) => {
       updateTask(id, {
         status: 'success',
         done: files?.length || 0,
         total: files?.length || 0,
+        phase: 'done',
+        current: '',
       });
       emitUploadNotification({ user, albumTitle: album?.title || '相册', count: photos?.length || 0 });
     })

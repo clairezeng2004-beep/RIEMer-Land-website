@@ -551,6 +551,13 @@ async function prepareFilesForUpload(files = []) {
  * 默认并发 4 张，既能跑满家用带宽，又不至于把浏览器 / Supabase 打爆。
  * ============================================ */
 async function uploadFilesConcurrently(files, userId, onProgress, concurrency = DEFAULT_UPLOAD_CONCURRENCY) {
+  try {
+    onProgress && onProgress(0, files?.length || 0, {
+      phase: 'preparing',
+      current: '正在读取照片信息',
+    });
+  } catch { /* noop */ }
+
   const sortedFiles = await prepareFilesForUpload(files);
   const total = sortedFiles.length;
   let done = 0;
@@ -567,6 +574,12 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
   if (hasHugeFiles) {
     effectiveConcurrency = Math.min(effectiveConcurrency, HUGE_UPLOAD_CONCURRENCY);
   }
+  try {
+    onProgress && onProgress(0, total, {
+      phase: 'uploading',
+      current: `准备上传 ${total} 张照片`,
+    });
+  } catch { /* noop */ }
 
   let cursor = 0;
   const workers = Array.from({ length: Math.min(effectiveConcurrency, total) }, async () => {
@@ -574,7 +587,14 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
       const idx = cursor++;
       if (idx >= total) return;
       const f = sortedFiles[idx];
+      const fileName = f?.file?.name || `第 ${idx + 1} 张`;
       try {
+        try {
+          onProgress && onProgress(done, total, {
+            phase: 'uploading',
+            current: `正在上传：${fileName}`,
+          });
+        } catch { /* noop */ }
         const r = await uploadOneWithThumb(f.file, userId);
         results[idx] = { ...r, caption: f.caption || '', capturedAt: f.capturedAt || null };
       } catch (err) {
@@ -582,7 +602,12 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
         results[idx] = null;
       } finally {
         done++;
-        try { onProgress && onProgress(done, total); } catch { /* noop */ }
+        try {
+          onProgress && onProgress(done, total, {
+            phase: 'uploading',
+            current: done >= total ? '照片上传完成，正在保存记录' : `已完成 ${done} 张`,
+          });
+        } catch { /* noop */ }
       }
     }
   });
@@ -646,6 +671,12 @@ export async function createAlbum(meta, files, user, options = {}) {
     ? await uploadFilesConcurrently(files, user?.id, onProgress)
     : [];
   ensureUploadSucceeded(uploaded, files?.length || 0);
+  try {
+    onProgress && onProgress(uploaded.length, files?.length || 0, {
+      phase: 'saving',
+      current: '正在创建相册记录',
+    });
+  } catch { /* noop */ }
 
   if (!hasRemote()) {
     const album = {
@@ -695,6 +726,12 @@ export async function createAlbum(meta, files, user, options = {}) {
 
     let photoRows = [];
     if (uploaded.length > 0) {
+      try {
+        onProgress && onProgress(uploaded.length, files?.length || 0, {
+          phase: 'saving',
+          current: '正在保存照片记录',
+        });
+      } catch { /* noop */ }
       const { data, error: e2 } = await insertPhotoRows(albumRow.id, uploaded, user?.id, 0);
       if (e2) {
         await cleanupUploaded(uploaded);
@@ -753,6 +790,12 @@ export async function addPhotosToAlbum(album, files, user, options = {}) {
     ? await uploadFilesConcurrently(files, user?.id, onProgress)
     : [];
   ensureUploadSucceeded(uploaded, files?.length || 0);
+  try {
+    onProgress && onProgress(uploaded.length, files?.length || 0, {
+      phase: 'saving',
+      current: '正在保存照片记录',
+    });
+  } catch { /* noop */ }
 
   if (!hasRemote() || !album._fromDb) {
     const baseIndex = (album.photos || []).length;

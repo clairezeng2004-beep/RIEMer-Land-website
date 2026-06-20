@@ -67,6 +67,24 @@
   min-width: 0;
 }
 
+.gallery-upload-status__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.gallery-upload-status__text > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gallery-upload-status__detail {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
 .gallery-upload-status__error {
   flex: 1;
   min-width: 0;
