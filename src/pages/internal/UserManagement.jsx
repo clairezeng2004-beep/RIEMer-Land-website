@@ -6,6 +6,7 @@ import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import CustomSelect from '../../components/CustomSelect';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
+import { readListCache, writeListCache } from '../../lib/listCache';
 import {
   Users,
   Shield,
@@ -27,6 +28,7 @@ import {
 import './UserManagement.css';
 
 const ROLE_LABELS = { admin: '管理员', member: '成员' };
+const USERS_CACHE_KEY = 'rl_user_list_cache_v1';
 const ROLE_COLORS = {
   admin: '#4FBFC4',
   member: '#8A9A8C',
@@ -55,12 +57,15 @@ export default function UserManagement() {
     (key, val) => updateInternalConfig({ users: { [key]: val } }),
     [updateInternalConfig]
   );
-  const [users, setUsers] = useState([]);
+  // 首屏先用上次成功加载的本地缓存渲染，保证「初次登录」和「刷新后」看到的数据一致，
+  // 不会因为拉取时机不同（session 是否就绪）而忽多忽少；随后后台拉取最新数据覆盖。
+  const [users, setUsers] = useState(() => readListCache(USERS_CACHE_KEY) || []);
   const [loadingUsers, setLoadingUsers] = useState(true);
   // 是否至少成功完成过一次加载。用 state 以驱动渲染更新：
   // - false：首次加载未完成，统计数字显示占位符 "—"，避免从 0 跳到真实值产生闪动
   // - true：已加载过（后续刷新），继续展示旧数字，等新数据回来后平滑替换
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
+  // 有本地缓存时直接视为「已加载过」，让统计数字立刻显示缓存值而不是占位符。
+  const [hasLoadedOnce, setHasLoadedOnce] = useState(() => !!readListCache(USERS_CACHE_KEY));
   const [loadError, setLoadError] = useState('');
   const [refreshKey, setRefreshKey] = useState(0);
   const [showPendingPanel, setShowPendingPanel] = useState(false);
@@ -208,7 +213,12 @@ export default function UserManagement() {
           authorizedType: typeof u.authorized,
         }));
         console.log('[UserManagement] getAllUsers 返回:', safeData.length, '条', diagInfo);
-        setUsers(safeData);
+        // 一致性保护：若本次拉取为空（多半是 session 未就绪/网络抖动），
+        // 而我们已有缓存列表，则保留缓存，不要用空结果把已显示的数据清掉。
+        setUsers((prev) => (safeData.length > 0 || prev.length === 0 ? safeData : prev));
+        // 只缓存"非空"的成功结果：避免把偶发的空结果写进缓存，
+        // 否则下次首屏又会先闪一下空列表，违背一致性目的。
+        if (safeData.length > 0) writeListCache(USERS_CACHE_KEY, safeData);
         setDiag(diagInfo);
         // 判断诊断结论
         if (safeData.length === 0) {
@@ -231,7 +241,8 @@ export default function UserManagement() {
         diagInfo.error = err?.message || String(err);
         setLoadError('加载失败：' + (err?.message || '未知错误'));
         setDiag(diagInfo);
-        setUsers([]);
+        // 失败时保留已有缓存列表，避免清空造成"刷新后数据消失/不一致"。
+        setUsers((prev) => (prev.length > 0 ? prev : []));
         // 出错也视为"加载已完成"，让占位符切回 0，避免永远悬在 —
         setHasLoadedOnce(true);
       } finally {
