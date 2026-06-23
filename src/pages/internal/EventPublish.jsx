@@ -781,7 +781,9 @@ export default function EventPublish() {
   // ---- 卡片点击：先弹出「中间卡片」预览，由用户在卡片里选择
   //   「打开公众号推文」或「查看活动回放」，不再直接跳转原文链接。
   const handleCardClick = (event) => {
-    setEventPreview(event);
+    // 归一化分类后再交给预览弹窗，保证弹窗里的分类标签与卡片/筛选项一致
+    //（旧名改名、隐藏分类「分享会」都在此统一处理；归一化为空则弹窗不显示分类）。
+    setEventPreview({ ...event, category: normalizeEventCategory(event.category) });
   };
 
   // 预览卡片 →「打开公众号推文」
@@ -1172,13 +1174,15 @@ export default function EventPublish() {
                   </button>
                 )}
                 <div className="ia-card__body">
-                  {countdownDays && (
-                    <div className="ep-card__top">
+                  {/* 始终渲染顶部行（即使没有倒计时徽章也保留固定高度），
+                      保证同一行里「未来活动(有徽章)」与「过去活动(无徽章)」的标题顶端对齐。 */}
+                  <div className="ep-card__top">
+                    {countdownDays && (
                       <span className="ep-card__badge ep-card__badge--upcoming">
                         <Calendar size={12} /> {countdownDays} 天后
                       </span>
-                    </div>
-                  )}
+                    )}
+                  </div>
                   <h3 className="ia-card__title">{event.title}</h3>
                   {event.excerpt && (
                     <p className="ia-card__excerpt">{event.excerpt}</p>
@@ -1508,7 +1512,6 @@ export default function EventPublish() {
                       type="checkbox"
                       checked={draft.hasReplay}
                       onChange={(e) => setDraft({ ...draft, hasReplay: e.target.checked })}
-                      style={{ marginRight: 6 }}
                     />
                     <Video size={14} /> 提供活动回放（需设置链接与访问密码）
                   </label>
@@ -1663,7 +1666,6 @@ export default function EventPublish() {
                       type="checkbox"
                       checked={!!editingEvent.hasReplay}
                       onChange={(e) => setEditingEvent({ ...editingEvent, hasReplay: e.target.checked })}
-                      style={{ marginRight: 6 }}
                     />
                     <Video size={14} /> 提供活动回放（需设置链接与访问密码）
                   </label>
