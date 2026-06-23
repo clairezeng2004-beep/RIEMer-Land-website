@@ -296,4 +296,14 @@
   .custom-select__search-input {
     font-size: var(--text-sm);
   }
+
+  /* 手机端：sm 下拉面板不再强制 120px 最小宽度。
+     面板用 portal 渲染且 inline 宽度已等于触发器宽度（width: rect.width），
+     原先的 min-width:120px 会让窄触发器（如相册"年/月/日"三联选择）对应的
+     面板比触发器更宽 → 看起来没和上方输入框左对齐、右侧留白。
+     去掉最小宽度后，面板宽度跟随触发器，左对齐且不偏宽。 */
+  .custom-select--sm .custom-select__dropdown,
+  .custom-select__dropdown--sm {
+    min-width: 0;
+  }
 }
