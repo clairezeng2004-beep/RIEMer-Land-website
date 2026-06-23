@@ -55,6 +55,7 @@ function rowToPhoto(row) {
     sortIndex: typeof row.sort_index === 'number' ? row.sort_index : 0,
     uploadedById: row.uploaded_by_id || null,
     capturedAt: row.captured_at || null,
+    contentHash: row.content_hash || null,
     _fromDb: true,
   };
 }
@@ -465,6 +466,28 @@ function fileToDataUrl(file) {
   });
 }
 
+/* ============================================
+ * 计算文件内容指纹（SHA-256 十六进制）
+ * 用于识别"完全相同的原图文件"是否已上传过。
+ * 浏览器原生 crypto.subtle，失败（如非安全上下文）时返回 null。
+ * ============================================ */
+export async function computeFileHash(file) {
+  try {
+    if (!file || !(globalThis.crypto && globalThis.crypto.subtle)) return null;
+    const buf = await file.arrayBuffer();
+    const digest = await globalThis.crypto.subtle.digest('SHA-256', buf);
+    const bytes = new Uint8Array(digest);
+    let hex = '';
+    for (let i = 0; i < bytes.length; i++) {
+      hex += bytes[i].toString(16).padStart(2, '0');
+    }
+    return hex;
+  } catch (err) {
+    console.warn('[AlbumService] 计算文件指纹失败：', err?.message || err);
+    return null;
+  }
+}
+
 function parseExifDate(value) {
   if (!value || typeof value !== 'string') return null;
   const match = value
@@ -562,9 +585,11 @@ async function prepareFilesForUpload(files = []) {
     files.map(async (item, originalIndex) => {
       const capturedDate = await readImageCapturedAt(item.file);
       const fallbackTime = Number.isFinite(item.file?.lastModified) ? item.file.lastModified : 0;
+      const contentHash = item.contentHash || (await computeFileHash(item.file));
       return {
         ...item,
         originalIndex,
+        contentHash,
         capturedAt: capturedDate ? capturedDate.toISOString() : null,
         sortTime: capturedDate ? capturedDate.getTime() : fallbackTime,
       };
@@ -630,7 +655,7 @@ async function uploadFilesConcurrently(files, userId, onProgress, concurrency = 
           });
         } catch { /* noop */ }
         const r = await uploadOneWithThumb(f.file, userId);
-        results[idx] = { ...r, caption: f.caption || '', capturedAt: f.capturedAt || null };
+        results[idx] = { ...r, caption: f.caption || '', capturedAt: f.capturedAt || null, contentHash: f.contentHash || null };
       } catch (err) {
         console.warn('[AlbumService] 单张上传失败：', err?.message || err);
         results[idx] = null;
@@ -656,7 +681,8 @@ function ensureUploadSucceeded(uploaded, requestedCount) {
   }
 }
 
-function buildPhotoRows(albumId, uploaded, userId, baseIndex = 0, includeCapturedAt = true) {
+function buildPhotoRows(albumId, uploaded, userId, baseIndex = 0, opts = {}) {
+  const { includeCapturedAt = true, includeHash = true } = opts;
   return uploaded.map((u, i) => {
     const row = {
       album_id: albumId,
@@ -670,27 +696,29 @@ function buildPhotoRows(albumId, uploaded, userId, baseIndex = 0, includeCapture
       uploaded_by_id: userId || null,
     };
     if (includeCapturedAt) row.captured_at = u.capturedAt;
+    if (includeHash) row.content_hash = u.contentHash || null;
     return row;
   });
 }
 
-const isMissingCapturedAtColumn = (error) =>
-  error?.code === '42703' || /captured_at/i.test(error?.message || '');
+// captured_at / content_hash 都是后加的可选列；老库可能尚未迁移。
+const isMissingOptionalColumn = (error) =>
+  error?.code === '42703' || /captured_at|content_hash/i.test(error?.message || '');
 
 async function insertPhotoRows(albumId, uploaded, userId, baseIndex = 0) {
-  let response = await supabase
-    .from('album_photos')
-    .insert(buildPhotoRows(albumId, uploaded, userId, baseIndex, true))
-    .select();
+  const insert = (opts) =>
+    supabase.from('album_photos').insert(buildPhotoRows(albumId, uploaded, userId, baseIndex, opts)).select();
 
-  if (response.error && isMissingCapturedAtColumn(response.error)) {
-    console.warn('[AlbumService] album_photos.captured_at 尚未迁移，已回退为仅按本次上传顺序排序。');
-    response = await supabase
-      .from('album_photos')
-      .insert(buildPhotoRows(albumId, uploaded, userId, baseIndex, false))
-      .select();
+  // 逐级降级：完整 → 去掉指纹 → 再去掉拍摄时间，兼容尚未迁移的老库。
+  let response = await insert({ includeCapturedAt: true, includeHash: true });
+  if (response.error && isMissingOptionalColumn(response.error)) {
+    console.warn('[AlbumService] album_photos 可选列尚未迁移，去掉 content_hash 重试。');
+    response = await insert({ includeCapturedAt: true, includeHash: false });
   }
-
+  if (response.error && isMissingOptionalColumn(response.error)) {
+    console.warn('[AlbumService] album_photos 可选列尚未迁移，再去掉 captured_at 重试。');
+    response = await insert({ includeCapturedAt: false, includeHash: false });
+  }
   return response;
 }
 
@@ -720,7 +748,7 @@ export async function createAlbum(meta, files, user, options = {}) {
       date: meta.date,
       coverIndex: 0,
       createdById: user?.id || null,
-      createdBy: user?.nickname || user?.name || 'Unknown',
+      createdBy: user?.name || user?.nickname || 'Unknown',
       photos: uploaded.map((u, i) => ({
         id: `localp-${Date.now()}-${i}`,
         url: u.url,
@@ -749,7 +777,7 @@ export async function createAlbum(meta, files, user, options = {}) {
         date: meta.date,
         cover_index: 0,
         created_by_id: user?.id || null,
-        created_by: user?.nickname || user?.name || '',
+        created_by: user?.name || user?.nickname || '',
       })
       .select()
       .single();

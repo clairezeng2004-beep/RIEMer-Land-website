@@ -43,6 +43,7 @@ import {
   fetchAlbumComments,
   addAlbumComment,
   deleteAlbumComment,
+  computeFileHash,
 } from '../../services/albumService';
 import {
   clearAlbumUploadTask,
@@ -207,6 +208,14 @@ export default function Gallery() {
   const [selectedAlbum, setSelectedAlbum] = useState(null);
   const [albumDetailLoading, setAlbumDetailLoading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState(null);
+  const [lightboxLoading, setLightboxLoading] = useState(false);
+  const [lightboxError, setLightboxError] = useState(false);
+  const [lightboxReloadKey, setLightboxReloadKey] = useState(0);
+  // 大图缩放/平移（双指捏合放大照片本身，而非整页缩放）
+  const [zoom, setZoom] = useState({ scale: 1, tx: 0, ty: 0 });
+  const zoomRef = useRef(zoom);
+  const lightboxStageRef = useRef(null);
+  const gestureRef = useRef(null);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
   const [showCreateAlbum, setShowCreateAlbum] = useState(false);
@@ -275,7 +284,8 @@ export default function Gallery() {
       const map = {};
       list.forEach((u) => {
         if (!u?.id) return;
-        map[u.id] = u.nickname || u.name || '';
+        // 显示真名(name)优先，没有真名时再退回昵称(nickname)
+        map[u.id] = u.name || u.nickname || '';
       });
       setUploaderNames(map);
     })();
@@ -334,6 +344,74 @@ export default function Gallery() {
       alive = false;
     };
   }, [detailAlbumId]);
+
+  /* ---- 大图切换时重置加载状态与缩放 ---- */
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    setLightboxLoading(true);
+    setLightboxError(false);
+    setZoom({ scale: 1, tx: 0, ty: 0 });
+  }, [lightboxIndex]);
+
+  useEffect(() => {
+    zoomRef.current = zoom;
+  }, [zoom]);
+
+  /* ---- 大图：双指捏合缩放「照片本身」+ 放大后单指平移 ----
+     用原生非 passive 监听以便 preventDefault，阻止浏览器对整页缩放/滚动。 */
+  useEffect(() => {
+    const el = lightboxStageRef.current;
+    if (lightboxIndex === null || !el) return undefined;
+    const dist = (t) => Math.hypot(t[0].clientX - t[1].clientX, t[0].clientY - t[1].clientY);
+    const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+    const onStart = (e) => {
+      if (e.touches.length === 2) {
+        gestureRef.current = {
+          mode: 'pinch',
+          startDist: dist(e.touches) || 1,
+          startScale: zoomRef.current.scale,
+        };
+      } else if (e.touches.length === 1 && zoomRef.current.scale > 1) {
+        const t = e.touches[0];
+        gestureRef.current = {
+          mode: 'pan',
+          startX: t.clientX,
+          startY: t.clientY,
+          startTx: zoomRef.current.tx,
+          startTy: zoomRef.current.ty,
+        };
+      } else {
+        gestureRef.current = null;
+      }
+    };
+    const onMove = (e) => {
+      const g = gestureRef.current;
+      if (!g) return;
+      if (g.mode === 'pinch' && e.touches.length === 2) {
+        e.preventDefault();
+        const s = clamp(g.startScale * (dist(e.touches) / g.startDist), 1, 4);
+        setZoom((z) => (s <= 1 ? { scale: 1, tx: 0, ty: 0 } : { ...z, scale: s }));
+      } else if (g.mode === 'pan' && e.touches.length === 1) {
+        e.preventDefault();
+        const t = e.touches[0];
+        setZoom((z) => ({ ...z, tx: g.startTx + (t.clientX - g.startX), ty: g.startTy + (t.clientY - g.startY) }));
+      }
+    };
+    const onEnd = (e) => {
+      if (zoomRef.current.scale <= 1.01) setZoom({ scale: 1, tx: 0, ty: 0 });
+      if (e.touches.length === 0) gestureRef.current = null;
+    };
+    el.addEventListener('touchstart', onStart, { passive: false });
+    el.addEventListener('touchmove', onMove, { passive: false });
+    el.addEventListener('touchend', onEnd);
+    el.addEventListener('touchcancel', onEnd);
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchmove', onMove);
+      el.removeEventListener('touchend', onEnd);
+      el.removeEventListener('touchcancel', onEnd);
+    };
+  }, [lightboxIndex]);
 
   /* ---- 大图查看：键盘 ←/↑ 上一张，→/↓ 下一张，Esc 关闭 ---- */
   useEffect(() => {
@@ -575,11 +653,20 @@ export default function Gallery() {
     if (e.target) e.target.value = '';
   };
 
+  /* ---- 为预览项异步计算内容指纹，算完后按 file 引用回填到对应项 ---- */
+  const fillPreviewHashes = async (previews, setter) => {
+    for (const p of previews) {
+      const h = await computeFileHash(p.file);
+      setter((prev) => prev.map((it) => (it.file === p.file ? { ...it, contentHash: h } : it)));
+    }
+  };
+
   /* ---- 添加照片到相册（点击） ---- */
   const handleFileSelect = (e) => {
     const files = Array.from(e.target.files || []);
     const previews = filesToPreviews(files, selectedFiles.length);
     setSelectedFiles((prev) => [...prev, ...previews]);
+    fillPreviewHashes(previews, setSelectedFiles);
     if (e.target) e.target.value = '';
   };
 
@@ -608,6 +695,7 @@ export default function Gallery() {
     const previews = filesToPreviews(files, selectedFiles.length);
     if (previews.length > 0) {
       setSelectedFiles((prev) => [...prev, ...previews]);
+      fillPreviewHashes(previews, setSelectedFiles);
     }
   };
 
@@ -1367,7 +1455,9 @@ export default function Gallery() {
               )}
               <span className="gallery-detail__meta">
                 <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photoCount ?? selectedAlbum.photos.length} 张照片
-                {selectedAlbum.createdBy && <> · 由 {selectedAlbum.createdBy} 创建</>}
+                {(uploaderNames[selectedAlbum.createdById] || selectedAlbum.createdBy) && (
+                  <> · 由 {uploaderNames[selectedAlbum.createdById] || selectedAlbum.createdBy} 创建</>
+                )}
               </span>
             </div>
           )}
@@ -1544,13 +1634,30 @@ export default function Gallery() {
               <span>单次最多 {MAX_UPLOAD_FILES} 张，单张不超过 {formatFileSize(MAX_UPLOAD_FILE_SIZE)}</span>
             </div>
 
-            {selectedFiles.length > 0 && (
+            {selectedFiles.length > 0 && (() => {
+              const albumHashSet = new Set(
+                (selectedAlbum.photos || []).map((p) => p.contentHash).filter(Boolean)
+              );
+              const dupCount = selectedFiles.filter(
+                (f) => f.contentHash && albumHashSet.has(f.contentHash)
+              ).length;
+              return (
               <>
+                {dupCount > 0 && (
+                  <div className="gallery-upload__dup-note">
+                    其中 {dupCount} 张已上传过（已标记「已上传」）。不需要的可点右上角 × 移除，需要重复上传也可直接确认。
+                  </div>
+                )}
                 <div className="gallery-upload__preview">
-                  {selectedFiles.map((f, i) => (
-                    <div key={i} className="gallery-upload__preview-item">
+                  {selectedFiles.map((f, i) => {
+                    const isDup = f.contentHash && albumHashSet.has(f.contentHash);
+                    return (
+                    <div key={i} className={`gallery-upload__preview-item${isDup ? ' is-uploaded' : ''}`}>
                       <div className="gallery-upload__preview-img-wrapper">
                         <img src={f.url} alt={f.caption} />
+                        {isDup && (
+                          <span className="gallery-upload__preview-badge">已上传</span>
+                        )}
                         <button
                           className="gallery-upload__preview-remove"
                           onClick={() => {
@@ -1575,7 +1682,8 @@ export default function Gallery() {
                         }}
                       />
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
                 <button
                   className="btn btn-primary"
@@ -1584,7 +1692,8 @@ export default function Gallery() {
                   <Upload size={16} /> 确认上传 {selectedFiles.length} 张照片
                 </button>
               </>
-            )}
+              );
+            })()}
           </div>
         )}
 
@@ -1762,11 +1871,52 @@ export default function Gallery() {
       {lightboxIndex !== null && selectedAlbum.photos[lightboxIndex] && (
         <div className="lightbox" onClick={closeLightbox}>
           <div className="lightbox__content" onClick={(e) => e.stopPropagation()}>
-            <img
-              src={getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
-              alt={selectedAlbum.photos[lightboxIndex].caption}
-              onError={(e) => fallbackToOriginal(e, selectedAlbum.photos[lightboxIndex])}
-            />
+            <div className="lightbox__stage" ref={lightboxStageRef}>
+              {lightboxLoading && !lightboxError && (
+                <div className="lightbox__loading">
+                  <Loader2 size={32} className="gallery-spin" />
+                </div>
+              )}
+              {lightboxError && (
+                <div className="lightbox__error">
+                  <ImageIcon size={36} />
+                  <span>图片加载失败</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLightboxError(false);
+                      setLightboxLoading(true);
+                      setLightboxReloadKey((k) => k + 1); // 改变 img key → 重新挂载并重新加载
+                    }}
+                  >
+                    重试
+                  </button>
+                </div>
+              )}
+              <img
+                key={`${selectedAlbum.photos[lightboxIndex].id}-${lightboxReloadKey}`}
+                src={getDisplayUrl(selectedAlbum.photos[lightboxIndex])}
+                alt={selectedAlbum.photos[lightboxIndex].caption}
+                style={{
+                  transform: `translate(${zoom.tx}px, ${zoom.ty}px) scale(${zoom.scale})`,
+                  transition: gestureRef.current ? 'none' : 'transform 0.18s ease',
+                  visibility: lightboxLoading || lightboxError ? 'hidden' : 'visible',
+                }}
+                onLoad={() => {
+                  setLightboxLoading(false);
+                  setLightboxError(false);
+                }}
+                onError={(e) => {
+                  const before = e.currentTarget.src;
+                  fallbackToOriginal(e, selectedAlbum.photos[lightboxIndex]);
+                  // 若已无可回退（已是原图）：判定为加载失败
+                  if (e.currentTarget.src === before) {
+                    setLightboxLoading(false);
+                    setLightboxError(true);
+                  }
+                }}
+              />
+            </div>
             {selectedAlbum.photos[lightboxIndex].caption && (
               <div className="lightbox__caption">
                 {selectedAlbum.photos[lightboxIndex].caption}
