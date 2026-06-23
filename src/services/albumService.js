@@ -268,14 +268,48 @@ export async function fetchAlbumPhotos(albumId) {
       .from('album_photos')
       .select('*')
       .eq('album_id', albumId)
+      // 兜底排序键；真正的展示顺序在下方按"拍摄时间"重新排序。
       .order('sort_index', { ascending: true })
       .order('created_at', { ascending: true });
     if (error) throw error;
-    return (data || []).map(rowToPhoto);
+    return sortPhotosByCapturedAt((data || []).map(rowToPhoto));
   } catch (err) {
     console.warn('[AlbumService] 加载相册照片失败：', err.message);
     throw err;
   }
+}
+
+/* ============================================
+ * 按"拍摄时间"(captured_at) 升序排序照片。
+ * - 有 EXIF 拍摄时间的照片按拍摄时间从早到晚排列；
+ * - 没有拍摄时间的（老数据 / 无 EXIF）排在最后，并按原有
+ *   sort_index → created_at 作为稳定兜底次序。
+ * ============================================ */
+function sortPhotosByCapturedAt(photos = []) {
+  const toTime = (v) => {
+    if (!v) return null;
+    const t = new Date(v).getTime();
+    return Number.isNaN(t) ? null : t;
+  };
+  return photos
+    .map((photo, index) => ({ photo, index }))
+    .sort((a, b) => {
+      const ta = toTime(a.photo.capturedAt);
+      const tb = toTime(b.photo.capturedAt);
+      if (ta !== null && tb !== null) {
+        if (ta !== tb) return ta - tb;
+      } else if (ta !== null) {
+        return -1; // 有拍摄时间的排在前
+      } else if (tb !== null) {
+        return 1;
+      }
+      // 都没有拍摄时间，或拍摄时间相同：保持稳定兜底次序
+      const sa = typeof a.photo.sortIndex === 'number' ? a.photo.sortIndex : 0;
+      const sb = typeof b.photo.sortIndex === 'number' ? b.photo.sortIndex : 0;
+      if (sa !== sb) return sa - sb;
+      return a.index - b.index;
+    })
+    .map((entry) => entry.photo);
 }
 
 /* ============================================

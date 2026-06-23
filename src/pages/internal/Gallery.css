@@ -37,13 +37,29 @@
 }
 
 .gallery-upload-status__clear {
-  align-self: flex-end;
+  flex-shrink: 0;
+  white-space: nowrap;
   border: 0;
   background: transparent;
   color: var(--color-primary);
   font: inherit;
   font-weight: 600;
   cursor: pointer;
+}
+
+.gallery-upload-status__clear-all {
+  align-self: flex-end;
+  border: 0;
+  background: transparent;
+  color: var(--color-text-muted);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.gallery-upload-status__warn {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
 }
 
 .gallery-upload-status {
@@ -716,6 +732,33 @@
 .photo-card.is-selected .photo-card__select {
   background: var(--color-primary);
   border-color: var(--color-primary);
+}
+
+/* 上传者角标：轻量、半透明，常驻在照片左下角，不打扰浏览。
+   参考窄屏下"相册名"叠加在封面上的展示风格（白字 + 半透明深色底）。 */
+.photo-card__uploader {
+  position: absolute;
+  left: var(--space-sm);
+  bottom: var(--space-sm);
+  z-index: 2;
+  max-width: calc(100% - var(--space-sm) * 2);
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  color: rgba(255, 255, 255, 0.95);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  backdrop-filter: blur(4px);
+  pointer-events: none;
+  transition: opacity var(--transition-fast);
+}
+
+/* 鼠标悬停时让位给 overlay（标题/下载按钮），避免重叠 */
+.photo-card:hover .photo-card__uploader {
+  opacity: 0;
 }
 
 /* 触摸设备（无 hover 能力）：overlay 和下载按钮常驻显示，避免用户找不到 */

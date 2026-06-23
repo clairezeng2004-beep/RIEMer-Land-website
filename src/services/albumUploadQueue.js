@@ -101,6 +101,15 @@ export const clearFinishedAlbumUploadTasks = () => {
   notify();
 };
 
+// 关闭单个已完成（成功/失败）的任务条；正在上传的任务不允许关闭。
+export const clearAlbumUploadTask = (id) => {
+  const idx = tasks.findIndex((task) => task.id === id);
+  if (idx === -1) return;
+  if (tasks[idx].status === 'running') return;
+  tasks.splice(idx, 1);
+  notify();
+};
+
 /* ============================================
  * 核心：把一个 job 跑起来（新建 / 加图通用）。
  * job: { id, type, meta?, album?, albumTitle?, files, user, createdAt }
