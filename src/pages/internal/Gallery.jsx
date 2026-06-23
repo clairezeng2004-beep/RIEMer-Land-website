@@ -29,6 +29,7 @@ import {
   deletePhoto as svcDeletePhoto,
 } from '../../services/albumService';
 import {
+  clearAlbumUploadTask,
   clearFinishedAlbumUploadTasks,
   getAlbumUploadQueueSnapshot,
   resumePersistedAlbumUploads,
@@ -36,6 +37,7 @@ import {
   startCreateAlbumUpload,
   subscribeAlbumUploadQueue,
 } from '../../services/albumUploadQueue';
+import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './Gallery.css';
 
 /* ---------- 工具函数：选择缩略图 / 原图 URL ---------- */
@@ -150,7 +152,8 @@ const canUseRealtime = () => !!(isSupabaseConfigured && supabase);
 
 
 export default function Gallery() {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
+  const [uploaderNames, setUploaderNames] = useState({});
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const navigate = useNavigate();
   // 当前 URL 的相册 id（/internal/gallery/:albumId）。无则为列表视图。
@@ -232,6 +235,24 @@ export default function Gallery() {
       alive = false;
     };
   }, []);
+
+  /* ---- 加载上传者目录：id → 显示名（昵称优先），用于照片角标 ---- */
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const list = await getCachedAllUsers(getAllUsers).catch(() => []);
+      if (!alive || !Array.isArray(list)) return;
+      const map = {};
+      list.forEach((u) => {
+        if (!u?.id) return;
+        map[u.id] = u.nickname || u.name || '';
+      });
+      setUploaderNames(map);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [getAllUsers]);
 
   /* ---- 续传：进入相册页时，把上次被刷新/关闭中断的上传任务接着跑完 ---- */
   useEffect(() => {
@@ -590,7 +611,6 @@ export default function Gallery() {
 
   const renderUploadStatus = () => {
     if (uploadTasks.length === 0) return null;
-    const hasFinished = uploadTasks.some((task) => task.status !== 'running');
     const phaseLabel = {
       queued: '等待上传',
       preparing: '读取照片信息',
@@ -598,6 +618,7 @@ export default function Gallery() {
       saving: '保存相册',
       done: '上传完成',
     };
+    const finishedCount = uploadTasks.filter((task) => task.status !== 'running').length;
     return (
       <div className="gallery-upload-status-list">
         {uploadTasks.map((task) => {
@@ -622,21 +643,35 @@ export default function Gallery() {
                   {isRunning && task.current && (
                     <span className="gallery-upload-status__detail">{task.current}</span>
                   )}
+                  {isRunning && (
+                    <span className="gallery-upload-status__warn">
+                      上传中，请不要刷新或关闭页面
+                    </span>
+                  )}
+                  {!isRunning && task.error && (
+                    <span className="gallery-upload-status__error">{task.error}</span>
+                  )}
                 </div>
               </div>
-              {!isRunning && task.error && (
-                <span className="gallery-upload-status__error">{task.error}</span>
+              {!isRunning && (
+                <button
+                  type="button"
+                  className="gallery-upload-status__clear"
+                  onClick={() => clearAlbumUploadTask(task.id)}
+                >
+                  关闭已完成
+                </button>
               )}
             </div>
           );
         })}
-        {hasFinished && (
+        {finishedCount > 1 && (
           <button
             type="button"
-            className="gallery-upload-status__clear"
+            className="gallery-upload-status__clear-all"
             onClick={clearFinishedAlbumUploadTasks}
           >
-            关闭已完成
+            全部关闭
           </button>
         )}
       </div>
@@ -771,7 +806,8 @@ export default function Gallery() {
                       className="gallery-create__select"
                       value={String(newAlbum.year)}
                       onChange={(v) => setNewAlbum({ ...newAlbum, year: v })}
-                      searchable={false}
+                      searchable={true}
+                      searchPlaceholder="输入年份…"
                       options={Array.from({ length: 10 }, (_, i) => {
                         const y = new Date().getFullYear() - i;
                         return { value: String(y), label: `${y} 年` };
@@ -781,7 +817,8 @@ export default function Gallery() {
                       size="sm"
                       className="gallery-create__select"
                       value={String(newAlbum.month)}
-                      searchable={false}
+                      searchable={true}
+                      searchPlaceholder="输入月份…"
                       onChange={(v) => {
                         // 切换月份后，如果已选的"日"超出新月天数，则清空
                         const maxDay = daysInMonth(newAlbum.year, v);
@@ -803,7 +840,8 @@ export default function Gallery() {
                       onChange={(v) => setNewAlbum({ ...newAlbum, day: v })}
                       placeholder="日（选填）"
                       allowClear
-                      searchable={false}
+                      searchable={true}
+                      searchPlaceholder="输入日期…"
                       options={Array.from(
                         { length: daysInMonth(newAlbum.year, newAlbum.month) },
                         (_, i) => ({ value: String(i + 1), label: `${i + 1} 日` })
@@ -1009,7 +1047,7 @@ export default function Gallery() {
           </div>
           <div className="gallery-detail__actions">
             <button
-              className={`btn ${multiSelectMode ? 'btn-secondary' : 'btn-outline'}`}
+              className={`btn ${multiSelectMode ? 'btn-secondary' : 'btn-ghost'}`}
               onClick={() => {
                 const next = !multiSelectMode;
                 setMultiSelectMode(next);
@@ -1135,7 +1173,7 @@ export default function Gallery() {
                 全选
               </button>
               <button type="button" onClick={() => setSelectedPhotoIds([])}>
-                清空
+                取消选择
               </button>
               <button
                 type="button"
@@ -1208,6 +1246,11 @@ export default function Gallery() {
                   decoding="async"
                   onError={(e) => fallbackToOriginal(e, photo)}
                 />
+                {uploaderNames[photo.uploadedById] && (
+                  <span className="photo-card__uploader" title={`上传者：${uploaderNames[photo.uploadedById]}`}>
+                    {uploaderNames[photo.uploadedById]}
+                  </span>
+                )}
                 <div className="photo-card__overlay">
                   {photo.caption && (
                     <span className="photo-card__caption">{photo.caption}</span>
