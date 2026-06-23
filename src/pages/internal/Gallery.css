@@ -479,6 +479,170 @@
   white-space: nowrap;
 }
 
+/* 多选切换按钮：激活态(退出多选)与未激活态(多选)用同一套盒模型，
+   只切换颜色，避免边框宽度变化(1px↔2px)导致按钮高度跳变；
+   同时给定最小宽度，"多选"→"退出多选"文字变长时不换行、不改变行高。 */
+.gallery-detail__actions .btn.gallery-detail__toggle {
+  min-width: 7em;
+}
+
+.gallery-detail__toggle.is-active {
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+/* 相册级点赞 + 评论 */
+.gallery-detail__social {
+  margin: calc(var(--space-md) * -1) 0 var(--space-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.gallery-detail__social-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.gallery-detail__like,
+.gallery-detail__comment-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 0.9rem;
+  border-radius: 999px;
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.gallery-detail__like:hover,
+.gallery-detail__comment-toggle:hover {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.gallery-detail__like.is-liked {
+  background: rgba(229, 62, 62, 0.1);
+  border-color: rgba(229, 62, 62, 0.6);
+  color: #e53e3e;
+}
+
+.gallery-detail__likers {
+  font-size: var(--text-xs);
+  color: var(--color-text-light);
+  min-width: 0;
+}
+
+.gallery-detail__comments {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+}
+
+.gallery-detail__comments-empty {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+}
+
+.gallery-detail__comment {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--text-sm);
+  line-height: 1.6;
+}
+
+.gallery-detail__comment-author {
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.gallery-detail__comment-text {
+  flex: 1;
+  min-width: 0;
+  color: var(--color-text);
+  word-break: break-word;
+}
+
+.gallery-detail__comment-del {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: var(--color-text-light);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.gallery-detail__comment-del:hover {
+  color: var(--color-danger);
+}
+
+.gallery-detail__comment-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  margin-top: 4px;
+}
+
+.gallery-detail__comment-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.gallery-detail__comment-form input:focus {
+  border-color: var(--color-primary);
+}
+
+.gallery-detail__comment-form button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.gallery-detail__comment-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 相册信息编辑态 */
+.gallery-detail__edit {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.gallery-detail__edit-title {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+
 .gallery-bulkbar {
   display: flex;
   align-items: center;
@@ -716,17 +880,23 @@
   top: var(--space-sm);
   left: var(--space-sm);
   z-index: 3;
-  width: 34px;
-  height: 34px;
-  border: 1px solid rgba(255, 255, 255, 0.45);
+  width: 32px;
+  height: 32px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  background: rgba(0, 0, 0, 0.45);
+  background: rgba(255, 255, 255, 0.18);
   color: white;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   backdrop-filter: blur(6px);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.photo-card__select:hover {
+  background: rgba(255, 255, 255, 0.32);
 }
 
 .photo-card.is-selected .photo-card__select {
@@ -826,6 +996,36 @@
   background: var(--color-danger);
 }
 
+/* 点赞 / 评论：圆角胶囊，图标 + 数量 */
+.photo-card__like,
+.photo-card__comment {
+  height: 28px;
+  padding: 0 9px;
+  gap: 4px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  font-size: 12px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.photo-card__like:hover,
+.photo-card__comment:hover {
+  background: var(--color-primary);
+}
+
+.photo-card__like.is-liked {
+  background: rgba(229, 62, 62, 0.85);
+  color: #fff;
+}
+
 /* ============ Lightbox ============ */
 .lightbox {
   position: fixed;
@@ -845,15 +1045,16 @@
 
 .lightbox__content {
   max-width: 90vw;
-  max-height: 85vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
   align-items: center;
+  overflow-y: auto;
 }
 
 .lightbox__content img {
   max-width: 90vw;
-  max-height: 80vh;
+  max-height: 72vh;
   object-fit: contain;
   border-radius: var(--radius-md);
   box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
@@ -864,6 +1065,147 @@
   font-size: var(--text-base);
   color: rgba(255, 255, 255, 0.85);
   text-align: center;
+}
+
+/* ---- Lightbox 点赞 + 评论面板 ---- */
+.lightbox__social {
+  width: min(560px, 90vw);
+  margin-top: var(--space-md);
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.92);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.lightbox__social-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  flex-wrap: wrap;
+}
+
+.lightbox__like {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.35rem 0.8rem;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.lightbox__like:hover {
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.lightbox__like.is-liked {
+  background: rgba(229, 62, 62, 0.9);
+  border-color: rgba(229, 62, 62, 0.9);
+  color: #fff;
+}
+
+.lightbox__likers {
+  font-size: var(--text-xs);
+  color: rgba(255, 255, 255, 0.65);
+  min-width: 0;
+}
+
+.lightbox__comments {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 22vh;
+  overflow-y: auto;
+}
+
+.lightbox__comments-empty {
+  font-size: var(--text-sm);
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+}
+
+.lightbox__comment {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+
+.lightbox__comment-author {
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.95);
+  flex-shrink: 0;
+}
+
+.lightbox__comment-text {
+  color: rgba(255, 255, 255, 0.82);
+  word-break: break-word;
+  flex: 1;
+  min-width: 0;
+}
+
+.lightbox__comment-del {
+  flex-shrink: 0;
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.45);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+}
+
+.lightbox__comment-del:hover {
+  color: var(--color-danger);
+}
+
+.lightbox__comment-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.lightbox__comment-form input {
+  flex: 1;
+  min-width: 0;
+  padding: 0.5rem 0.8rem;
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font-size: var(--text-sm);
+  outline: none;
+}
+
+.lightbox__comment-form input::placeholder {
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.lightbox__comment-form button {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--color-primary);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.lightbox__comment-form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .lightbox__download {

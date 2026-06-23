@@ -21,12 +21,28 @@ import {
   Loader2,
   CheckSquare,
   Square,
+  Pencil,
+  Check,
+  Heart,
+  MessageCircle,
+  Send,
 } from 'lucide-react';
 import {
   fetchAlbumList,
   fetchAlbumPhotos,
   deleteAlbum as svcDeleteAlbum,
+  updateAlbum as svcUpdateAlbum,
   deletePhoto as svcDeletePhoto,
+  fetchPhotoLikes,
+  togglePhotoLike,
+  fetchPhotoComments,
+  addPhotoComment,
+  deletePhotoComment,
+  fetchAlbumLikes,
+  toggleAlbumLike,
+  fetchAlbumComments,
+  addAlbumComment,
+  deleteAlbumComment,
 } from '../../services/albumService';
 import {
   clearAlbumUploadTask,
@@ -154,6 +170,20 @@ const canUseRealtime = () => !!(isSupabaseConfigured && supabase);
 export default function Gallery() {
   const { isAuthenticated, isAdmin, user, getAllUsers } = useAuth();
   const [uploaderNames, setUploaderNames] = useState({});
+  const [editingAlbum, setEditingAlbum] = useState(false);
+  const [albumEdit, setAlbumEdit] = useState({ title: '', description: '', year: '', month: '', day: '' });
+  const [savingAlbumEdit, setSavingAlbumEdit] = useState(false);
+  // 点赞：{ [photoId]: [userId, ...] }；评论：{ [photoId]: [{id,userId,userName,content,createdAt}] }
+  const [photoLikes, setPhotoLikes] = useState({});
+  const [photoComments, setPhotoComments] = useState({});
+  const [commentDraft, setCommentDraft] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  // 相册级点赞 / 评论
+  const [albumLikes, setAlbumLikes] = useState([]);
+  const [albumComments, setAlbumComments] = useState([]);
+  const [albumCommentDraft, setAlbumCommentDraft] = useState('');
+  const [postingAlbumComment, setPostingAlbumComment] = useState(false);
+  const [showAlbumComments, setShowAlbumComments] = useState(false);
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const navigate = useNavigate();
   // 当前 URL 的相册 id（/internal/gallery/:albumId）。无则为列表视图。
@@ -253,6 +283,85 @@ export default function Gallery() {
       alive = false;
     };
   }, [getAllUsers]);
+
+  /* ---- 加载当前相册照片的点赞 & 评论 ---- */
+  const detailPhotoIdsKey = (selectedAlbum?.photos || [])
+    .filter((p) => p._fromDb)
+    .map((p) => p.id)
+    .join(',');
+  useEffect(() => {
+    const ids = detailPhotoIdsKey ? detailPhotoIdsKey.split(',') : [];
+    if (ids.length === 0) {
+      setPhotoLikes({});
+      setPhotoComments({});
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const [likes, comments] = await Promise.all([
+        fetchPhotoLikes(ids),
+        fetchPhotoComments(ids),
+      ]);
+      if (!alive) return;
+      setPhotoLikes(likes);
+      setPhotoComments(comments);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [detailPhotoIdsKey]);
+
+  /* ---- 加载相册级点赞 & 评论 ---- */
+  const detailAlbumId = selectedAlbum?._fromDb ? selectedAlbum.id : null;
+  useEffect(() => {
+    if (!detailAlbumId) {
+      setAlbumLikes([]);
+      setAlbumComments([]);
+      setShowAlbumComments(false);
+      return;
+    }
+    let alive = true;
+    (async () => {
+      const [likes, comments] = await Promise.all([
+        fetchAlbumLikes(detailAlbumId),
+        fetchAlbumComments(detailAlbumId),
+      ]);
+      if (!alive) return;
+      setAlbumLikes(likes);
+      setAlbumComments(comments);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [detailAlbumId]);
+
+  /* ---- 大图查看：键盘 ←/↑ 上一张，→/↓ 下一张，Esc 关闭 ---- */
+  useEffect(() => {
+    if (lightboxIndex === null) return undefined;
+    const onKeyDown = (e) => {
+      // 正在输入评论时不抢占方向键
+      const tag = (e.target.tagName || '').toLowerCase();
+      if (tag === 'input' || tag === 'textarea' || e.target.isContentEditable) {
+        if (e.key === 'Escape') setLightboxIndex(null);
+        return;
+      }
+      const count = selectedAlbum?.photos?.length || 0;
+      if (count === 0) return;
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        setCommentDraft('');
+        setLightboxIndex((i) => (i - 1 + count) % count);
+      } else if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+        e.preventDefault();
+        setCommentDraft('');
+        setLightboxIndex((i) => (i + 1) % count);
+      } else if (e.key === 'Escape') {
+        setLightboxIndex(null);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [lightboxIndex, selectedAlbum]);
 
   /* ---- 续传：进入相册页时，把上次被刷新/关闭中断的上传任务接着跑完 ---- */
   useEffect(() => {
@@ -592,6 +701,149 @@ export default function Gallery() {
     if (selectedAlbum?.id === targetId) navigate('/internal/gallery', { replace: true });
   };
 
+  /* ---- 编辑相册信息（标题 / 描述 / 日期） ---- */
+  const startEditAlbum = () => {
+    if (!selectedAlbum) return;
+    const parts = String(selectedAlbum.date || '').split('-');
+    setAlbumEdit({
+      title: selectedAlbum.title || '',
+      description: selectedAlbum.description || '',
+      year: parts[0] || String(now.getFullYear()),
+      month: parts[1] ? String(parseInt(parts[1], 10)) : '1',
+      day: parts[2] ? String(parseInt(parts[2], 10)) : '',
+    });
+    setEditingAlbum(true);
+  };
+
+  const cancelEditAlbum = () => {
+    setEditingAlbum(false);
+    setSavingAlbumEdit(false);
+  };
+
+  const handleSaveAlbumEdit = async () => {
+    if (!selectedAlbum) return;
+    if (!albumEdit.title.trim()) {
+      alert('相册主题不能为空');
+      return;
+    }
+    const y = albumEdit.year || String(now.getFullYear());
+    const m = (albumEdit.month || '1').padStart(2, '0');
+    const d = albumEdit.day ? String(albumEdit.day).padStart(2, '0') : '';
+    const date = d ? `${y}-${m}-${d}` : `${y}-${m}`;
+    const patch = { title: albumEdit.title.trim(), description: albumEdit.description.trim(), date };
+
+    setSavingAlbumEdit(true);
+    let saved;
+    try {
+      saved = await svcUpdateAlbum(selectedAlbum, patch);
+    } catch (err) {
+      console.error('[Gallery] 更新相册失败：', err);
+      alert('保存失败：' + (err.message || '未知错误'));
+      setSavingAlbumEdit(false);
+      return;
+    }
+    const merged = { title: saved.title, description: saved.description, date: saved.date };
+    setSelectedAlbum((prev) => (prev ? { ...prev, ...merged } : prev));
+    setAlbums((prev) => prev.map((a) => (a.id === selectedAlbum.id ? { ...a, ...merged } : a)));
+    setEditingAlbum(false);
+    setSavingAlbumEdit(false);
+  };
+
+  /* ---- 点赞 / 取消点赞（乐观更新） ---- */
+  const handleToggleLike = async (photo) => {
+    if (!user?.id) return;
+    const current = photoLikes[photo.id] || [];
+    const liked = current.includes(user.id);
+    const next = liked ? current.filter((id) => id !== user.id) : [...current, user.id];
+    setPhotoLikes((prev) => ({ ...prev, [photo.id]: next }));
+    try {
+      await togglePhotoLike(photo.id, user.id, !liked);
+    } catch (err) {
+      console.warn('[Gallery] 点赞失败：', err);
+      setPhotoLikes((prev) => ({ ...prev, [photo.id]: current })); // 回滚
+    }
+  };
+
+  /* ---- 发表评论 ---- */
+  const handlePostComment = async (photo) => {
+    const text = commentDraft.trim();
+    if (!text || postingComment) return;
+    setPostingComment(true);
+    try {
+      const created = await addPhotoComment(photo.id, user, text);
+      setPhotoComments((prev) => ({
+        ...prev,
+        [photo.id]: [...(prev[photo.id] || []), created],
+      }));
+      setCommentDraft('');
+    } catch (err) {
+      console.error('[Gallery] 评论失败：', err);
+      alert('评论失败：' + (err.message || '未知错误'));
+    } finally {
+      setPostingComment(false);
+    }
+  };
+
+  /* ---- 删除评论 ---- */
+  const handleDeleteComment = async (photoId, commentId) => {
+    const prevList = photoComments[photoId] || [];
+    setPhotoComments((prev) => ({
+      ...prev,
+      [photoId]: prevList.filter((c) => c.id !== commentId),
+    }));
+    try {
+      await deletePhotoComment(commentId);
+    } catch (err) {
+      console.warn('[Gallery] 删除评论失败：', err);
+      setPhotoComments((prev) => ({ ...prev, [photoId]: prevList })); // 回滚
+      alert('删除评论失败：' + (err.message || '未知错误'));
+    }
+  };
+
+  const canDeleteComment = (comment) => isAdmin || (comment.userId && comment.userId === user?.id);
+
+  /* ---- 相册级：点赞 / 评论 ---- */
+  const handleToggleAlbumLike = async () => {
+    if (!user?.id || !selectedAlbum) return;
+    const liked = albumLikes.includes(user.id);
+    const next = liked ? albumLikes.filter((id) => id !== user.id) : [...albumLikes, user.id];
+    setAlbumLikes(next);
+    try {
+      await toggleAlbumLike(selectedAlbum.id, user.id, !liked);
+    } catch (err) {
+      console.warn('[Gallery] 相册点赞失败：', err);
+      setAlbumLikes(albumLikes); // 回滚
+    }
+  };
+
+  const handlePostAlbumComment = async () => {
+    const text = albumCommentDraft.trim();
+    if (!text || postingAlbumComment || !selectedAlbum) return;
+    setPostingAlbumComment(true);
+    try {
+      const created = await addAlbumComment(selectedAlbum.id, user, text);
+      setAlbumComments((prev) => [...prev, created]);
+      setAlbumCommentDraft('');
+    } catch (err) {
+      console.error('[Gallery] 相册评论失败：', err);
+      alert('评论失败：' + (err.message || '未知错误'));
+    } finally {
+      setPostingAlbumComment(false);
+    }
+  };
+
+  const handleDeleteAlbumComment = async (commentId) => {
+    const prevList = albumComments;
+    setAlbumComments((prev) => prev.filter((c) => c.id !== commentId));
+    try {
+      await deleteAlbumComment(commentId);
+    } catch (err) {
+      console.warn('[Gallery] 删除相册评论失败：', err);
+      setAlbumComments(prevList); // 回滚
+      alert('删除评论失败：' + (err.message || '未知错误'));
+    }
+  };
+
   // 权限判断：管理员或创建者/上传者可删除
   const canModifyAlbum = (album) => {
     if (isAdmin) return true;
@@ -679,7 +931,10 @@ export default function Gallery() {
   };
 
   /* ---- Lightbox ---- */
-  const openLightbox = (index) => setLightboxIndex(index);
+  const openLightbox = (index) => {
+    setCommentDraft('');
+    setLightboxIndex(index);
+  };
   const closeLightbox = () => setLightboxIndex(null);
 
   /* ---- 下载原图 ---- */
@@ -723,6 +978,7 @@ export default function Gallery() {
 
   const lightboxPrev = () => {
     if (lightboxIndex === null || !selectedAlbum) return;
+    setCommentDraft('');
     setLightboxIndex(
       (lightboxIndex - 1 + selectedAlbum.photos.length) % selectedAlbum.photos.length
     );
@@ -730,8 +986,10 @@ export default function Gallery() {
 
   const lightboxNext = () => {
     if (lightboxIndex === null || !selectedAlbum) return;
+    setCommentDraft('');
     setLightboxIndex((lightboxIndex + 1) % selectedAlbum.photos.length);
   };
+
 
   /* ========================================
      VIEW: 相册列表
@@ -1030,52 +1288,225 @@ export default function Gallery() {
             onClick={() => {
               navigate('/internal/gallery'); // URL 同步会清空 selectedAlbum
               setShowAddPhoto(false);
+              setEditingAlbum(false);
               clearSelectedFiles();
               clearPhotoSelection();
             }}
           >
             <ChevronLeft size={20} /> 返回相册
           </button>
-          <div className="gallery-detail__info">
-            <h1>{selectedAlbum.title}</h1>
-            {selectedAlbum.description && (
-              <p className="gallery-detail__desc">{selectedAlbum.description}</p>
-            )}
-            <span className="gallery-detail__meta">
-              <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photoCount ?? selectedAlbum.photos.length} 张照片
-            </span>
-          </div>
+          {editingAlbum ? (
+            <div className="gallery-detail__info gallery-detail__edit">
+              <input
+                type="text"
+                className="gallery-create__input gallery-detail__edit-title"
+                value={albumEdit.title}
+                onChange={(e) => setAlbumEdit({ ...albumEdit, title: e.target.value })}
+                placeholder="相册主题"
+              />
+              <textarea
+                className="gallery-create__input gallery-create__textarea"
+                value={albumEdit.description}
+                onChange={(e) => setAlbumEdit({ ...albumEdit, description: e.target.value })}
+                placeholder="描述（选填）"
+                rows={2}
+              />
+              <div className="gallery-create__date-row">
+                <CustomSelect
+                  size="sm"
+                  className="gallery-create__select"
+                  value={String(albumEdit.year)}
+                  onChange={(v) => setAlbumEdit({ ...albumEdit, year: v })}
+                  searchable={true}
+                  searchPlaceholder="输入年份…"
+                  options={Array.from({ length: 10 }, (_, i) => {
+                    const y = now.getFullYear() - i;
+                    return { value: String(y), label: `${y} 年` };
+                  })}
+                />
+                <CustomSelect
+                  size="sm"
+                  className="gallery-create__select"
+                  value={String(albumEdit.month)}
+                  searchable={true}
+                  searchPlaceholder="输入月份…"
+                  onChange={(v) => {
+                    const maxDay = daysInMonth(albumEdit.year, v);
+                    setAlbumEdit((prev) => ({
+                      ...prev,
+                      month: v,
+                      day: prev.day && parseInt(prev.day, 10) > maxDay ? '' : prev.day,
+                    }));
+                  }}
+                  options={Array.from({ length: 12 }, (_, i) => ({
+                    value: String(i + 1),
+                    label: `${i + 1} 月`,
+                  }))}
+                />
+                <CustomSelect
+                  size="sm"
+                  className="gallery-create__select"
+                  value={String(albumEdit.day || '')}
+                  onChange={(v) => setAlbumEdit({ ...albumEdit, day: v })}
+                  placeholder="日（选填）"
+                  allowClear
+                  searchable={true}
+                  searchPlaceholder="输入日期…"
+                  options={Array.from(
+                    { length: daysInMonth(albumEdit.year, albumEdit.month) },
+                    (_, i) => ({ value: String(i + 1), label: `${i + 1} 日` })
+                  )}
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="gallery-detail__info">
+              <h1>{selectedAlbum.title}</h1>
+              {selectedAlbum.description && (
+                <p className="gallery-detail__desc">{selectedAlbum.description}</p>
+              )}
+              <span className="gallery-detail__meta">
+                <Calendar size={14} /> {formatAlbumDate(selectedAlbum.date)} · {selectedAlbum.photoCount ?? selectedAlbum.photos.length} 张照片
+                {selectedAlbum.createdBy && <> · 由 {selectedAlbum.createdBy} 创建</>}
+              </span>
+            </div>
+          )}
           <div className="gallery-detail__actions">
-            <button
-              className={`btn ${multiSelectMode ? 'btn-secondary' : 'btn-ghost'}`}
-              onClick={() => {
-                const next = !multiSelectMode;
-                setMultiSelectMode(next);
-                setSelectedPhotoIds([]);
-                if (next) {
-                  setShowAddPhoto(false);
-                  clearSelectedFiles();
-                }
-              }}
-            >
-              {multiSelectMode ? <CheckSquare size={18} /> : <Square size={18} />}
-              {multiSelectMode ? '退出多选' : '多选'}
-            </button>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                const next = !showAddPhoto;
-                if (!next) clearSelectedFiles();
-                if (next) clearPhotoSelection();
-                setShowAddPhoto(next);
-              }}
-            >
-              {showAddPhoto ? <X size={18} /> : <Upload size={18} />}
-              {showAddPhoto ? '取消' : '上传照片'}
-            </button>
+            {editingAlbum ? (
+              <>
+                <button
+                  className="btn btn-primary"
+                  onClick={handleSaveAlbumEdit}
+                  disabled={savingAlbumEdit}
+                >
+                  {savingAlbumEdit ? <Loader2 size={18} className="gallery-spin" /> : <Check size={18} />}
+                  {savingAlbumEdit ? '保存中' : '保存'}
+                </button>
+                <button
+                  className="btn btn-ghost"
+                  onClick={cancelEditAlbum}
+                  disabled={savingAlbumEdit}
+                >
+                  <X size={18} /> 取消
+                </button>
+              </>
+            ) : (
+              <>
+                {canModifyAlbum(selectedAlbum) && !multiSelectMode && (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={startEditAlbum}
+                    title="编辑相册信息"
+                  >
+                    <Pencil size={18} /> 编辑
+                  </button>
+                )}
+                <button
+                  className={`btn btn-ghost gallery-detail__toggle${multiSelectMode ? ' is-active' : ''}`}
+                  onClick={() => {
+                    const next = !multiSelectMode;
+                    setMultiSelectMode(next);
+                    setSelectedPhotoIds([]);
+                    if (next) {
+                      setShowAddPhoto(false);
+                      clearSelectedFiles();
+                    }
+                  }}
+                >
+                  {multiSelectMode ? <CheckSquare size={18} /> : <Square size={18} />}
+                  {multiSelectMode ? '退出多选' : '多选'}
+                </button>
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    const next = !showAddPhoto;
+                    if (!next) clearSelectedFiles();
+                    if (next) clearPhotoSelection();
+                    setShowAddPhoto(next);
+                  }}
+                >
+                  {showAddPhoto ? <X size={18} /> : <Upload size={18} />}
+                  {showAddPhoto ? '取消' : '上传照片'}
+                </button>
+              </>
+            )}
           </div>
         </div>
         {renderUploadStatus()}
+
+        {/* 相册级点赞 + 评论 */}
+        {!editingAlbum && selectedAlbum._fromDb && (() => {
+          const liked = user?.id && albumLikes.includes(user.id);
+          const likerNames = albumLikes.map((id) => uploaderNames[id]).filter(Boolean).join('、');
+          return (
+            <div className="gallery-detail__social">
+              <div className="gallery-detail__social-bar">
+                <button
+                  className={`gallery-detail__like${liked ? ' is-liked' : ''}`}
+                  onClick={handleToggleAlbumLike}
+                  title={likerNames ? `点赞：${likerNames}` : '点赞这个相册'}
+                >
+                  <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+                  <span>{albumLikes.length > 0 ? `${albumLikes.length} 个赞` : '点赞'}</span>
+                </button>
+                <button
+                  className="gallery-detail__comment-toggle"
+                  onClick={() => setShowAlbumComments((v) => !v)}
+                >
+                  <MessageCircle size={16} />
+                  <span>评论{albumComments.length > 0 ? ` ${albumComments.length}` : ''}</span>
+                </button>
+                {likerNames && <span className="gallery-detail__likers">{likerNames}</span>}
+              </div>
+
+              {showAlbumComments && (
+                <div className="gallery-detail__comments">
+                  {albumComments.length === 0 ? (
+                    <p className="gallery-detail__comments-empty">还没有评论，来说点什么吧</p>
+                  ) : (
+                    albumComments.map((c) => (
+                      <div key={c.id} className="gallery-detail__comment">
+                        <span className="gallery-detail__comment-author">{c.userName || '匿名'}</span>
+                        <span className="gallery-detail__comment-text">{c.content}</span>
+                        {canDeleteComment(c) && (
+                          <button
+                            className="gallery-detail__comment-del"
+                            onClick={() => handleDeleteAlbumComment(c.id)}
+                            title="删除评论"
+                          >
+                            <X size={12} />
+                          </button>
+                        )}
+                      </div>
+                    ))
+                  )}
+                  <div className="gallery-detail__comment-form">
+                    <input
+                      type="text"
+                      value={albumCommentDraft}
+                      onChange={(e) => setAlbumCommentDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handlePostAlbumComment();
+                        }
+                      }}
+                      placeholder="写评论…"
+                      maxLength={500}
+                    />
+                    <button
+                      onClick={handlePostAlbumComment}
+                      disabled={postingAlbumComment || !albumCommentDraft.trim()}
+                      title="发送"
+                    >
+                      {postingAlbumComment ? <Loader2 size={16} className="gallery-spin" /> : <Send size={16} />}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
 
         {/* 上传照片区域 */}
         {showAddPhoto && (
@@ -1267,6 +1698,40 @@ export default function Gallery() {
                       <Download size={14} />
                       <span>下载原图</span>
                     </button>
+                    {(() => {
+                      const likers = photoLikes[photo.id] || [];
+                      const liked = user?.id && likers.includes(user.id);
+                      const likerNames = likers
+                        .map((id) => uploaderNames[id])
+                        .filter(Boolean)
+                        .join('、');
+                      return (
+                        <button
+                          className={`photo-card__like${liked ? ' is-liked' : ''}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleToggleLike(photo);
+                          }}
+                          title={likerNames ? `点赞：${likerNames}` : '点赞'}
+                        >
+                          <Heart size={14} fill={liked ? 'currentColor' : 'none'} />
+                          {likers.length > 0 && <span>{likers.length}</span>}
+                        </button>
+                      );
+                    })()}
+                    <button
+                      className="photo-card__comment"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        openLightbox(index);
+                      }}
+                      title="评论"
+                    >
+                      <MessageCircle size={14} />
+                      {(photoComments[photo.id] || []).length > 0 && (
+                        <span>{(photoComments[photo.id] || []).length}</span>
+                      )}
+                    </button>
                     {canModifyPhoto(photo) && (
                       <button
                         className="photo-card__delete"
@@ -1307,6 +1772,72 @@ export default function Gallery() {
                 {selectedAlbum.photos[lightboxIndex].caption}
               </div>
             )}
+            {(() => {
+              const lp = selectedAlbum.photos[lightboxIndex];
+              const likers = photoLikes[lp.id] || [];
+              const liked = user?.id && likers.includes(user.id);
+              const likerNames = likers.map((id) => uploaderNames[id]).filter(Boolean).join('、');
+              const comments = photoComments[lp.id] || [];
+              return (
+                <div className="lightbox__social" onClick={(e) => e.stopPropagation()}>
+                  <div className="lightbox__social-head">
+                    <button
+                      className={`lightbox__like${liked ? ' is-liked' : ''}`}
+                      onClick={() => handleToggleLike(lp)}
+                    >
+                      <Heart size={16} fill={liked ? 'currentColor' : 'none'} />
+                      <span>{likers.length > 0 ? `${likers.length} 个赞` : '点赞'}</span>
+                    </button>
+                    {likerNames && <span className="lightbox__likers">{likerNames}</span>}
+                  </div>
+
+                  <div className="lightbox__comments">
+                    {comments.length === 0 ? (
+                      <p className="lightbox__comments-empty">还没有评论，来说点什么吧</p>
+                    ) : (
+                      comments.map((c) => (
+                        <div key={c.id} className="lightbox__comment">
+                          <span className="lightbox__comment-author">{c.userName || '匿名'}</span>
+                          <span className="lightbox__comment-text">{c.content}</span>
+                          {canDeleteComment(c) && (
+                            <button
+                              className="lightbox__comment-del"
+                              onClick={() => handleDeleteComment(lp.id, c.id)}
+                              title="删除评论"
+                            >
+                              <X size={12} />
+                            </button>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  <div className="lightbox__comment-form">
+                    <input
+                      type="text"
+                      value={commentDraft}
+                      onChange={(e) => setCommentDraft(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handlePostComment(lp);
+                        }
+                      }}
+                      placeholder="写评论…"
+                      maxLength={500}
+                    />
+                    <button
+                      onClick={() => handlePostComment(lp)}
+                      disabled={postingComment || !commentDraft.trim()}
+                      title="发送"
+                    >
+                      {postingComment ? <Loader2 size={16} className="gallery-spin" /> : <Send size={16} />}
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           <button

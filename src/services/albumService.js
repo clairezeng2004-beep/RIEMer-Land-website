@@ -783,6 +783,55 @@ export async function createAlbum(meta, files, user, options = {}) {
 }
 
 /* ============================================
+ * 更新相册基本信息（标题 / 描述 / 日期）
+ * patch: { title?, description?, date? }
+ * 返回更新后的字段（{ title, description, date }）。
+ * ============================================ */
+export async function updateAlbum(album, patch = {}) {
+  const next = {
+    title: patch.title !== undefined ? patch.title : album.title,
+    description: patch.description !== undefined ? patch.description : album.description,
+    date: patch.date !== undefined ? patch.date : album.date,
+  };
+
+  if (!hasRemote() || !album._fromDb) {
+    const list = getLocalAlbums();
+    const idx = list.findIndex((a) => String(a.id) === String(album.id));
+    if (idx !== -1) {
+      list[idx] = { ...list[idx], ...next };
+      saveLocalAlbums(list);
+    }
+    return next;
+  }
+
+  try {
+    // ⚠️ 同删除：update 被 RLS 拦截时不会报错，只是影响 0 行。
+    // 用 .select() 拿回被更新的行，为空说明没有权限或行不存在。
+    const { data, error } = await supabase
+      .from('albums')
+      .update({
+        title: next.title,
+        description: next.description || '',
+        date: next.date,
+      })
+      .eq('id', album.id)
+      .select('id, title, description, date');
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      throw new Error('修改未生效：你可能没有权限编辑该相册（仅创建者或管理员可编辑）。');
+    }
+    return {
+      title: data[0].title || '',
+      description: data[0].description || '',
+      date: data[0].date || '',
+    };
+  } catch (err) {
+    console.warn('[AlbumService] 更新相册失败：', err.message);
+    throw err;
+  }
+}
+
+/* ============================================
  * 删除相册（级联删除照片 + Storage 文件）
  * ============================================ */
 export async function deleteAlbum(album) {
@@ -915,5 +964,208 @@ function saveLocalAlbums(list) {
     localStorage.setItem(LS_ALBUMS_KEY, JSON.stringify(list));
   } catch (err) {
     console.warn('[AlbumService] 本地存储失败（可能超出 5MB 配额）：', err.message);
+  }
+}
+
+/* ============================================
+ * 照片点赞
+ * ============================================ */
+
+// 拉取一组照片的点赞记录，返回 { [photoId]: [userId, ...] }
+export async function fetchPhotoLikes(photoIds = []) {
+  if (!hasRemote() || photoIds.length === 0) return {};
+  try {
+    const { data, error } = await supabase
+      .from('album_photo_likes')
+      .select('photo_id, user_id')
+      .in('photo_id', photoIds);
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach((row) => {
+      if (!map[row.photo_id]) map[row.photo_id] = [];
+      map[row.photo_id].push(row.user_id);
+    });
+    return map;
+  } catch (err) {
+    console.warn('[AlbumService] 加载点赞失败：', err.message);
+    return {};
+  }
+}
+
+// 点赞 / 取消点赞。liked=true 表示要点赞，false 表示取消。
+export async function togglePhotoLike(photoId, userId, liked) {
+  if (!hasRemote() || !photoId || !userId) return;
+  if (liked) {
+    const { error } = await supabase
+      .from('album_photo_likes')
+      .insert({ photo_id: photoId, user_id: userId });
+    // 唯一约束冲突（已点过）忽略
+    if (error && error.code !== '23505') throw error;
+  } else {
+    const { error } = await supabase
+      .from('album_photo_likes')
+      .delete()
+      .eq('photo_id', photoId)
+      .eq('user_id', userId);
+    if (error) throw error;
+  }
+}
+
+/* ============================================
+ * 照片评论
+ * ============================================ */
+
+// 拉取一组照片的评论，返回 { [photoId]: [{id, userId, userName, content, createdAt}, ...] }
+export async function fetchPhotoComments(photoIds = []) {
+  if (!hasRemote() || photoIds.length === 0) return {};
+  try {
+    const { data, error } = await supabase
+      .from('album_photo_comments')
+      .select('id, photo_id, user_id, user_name, content, created_at')
+      .in('photo_id', photoIds)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach((row) => {
+      if (!map[row.photo_id]) map[row.photo_id] = [];
+      map[row.photo_id].push({
+        id: row.id,
+        userId: row.user_id,
+        userName: row.user_name || '',
+        content: row.content || '',
+        createdAt: row.created_at,
+      });
+    });
+    return map;
+  } catch (err) {
+    console.warn('[AlbumService] 加载评论失败：', err.message);
+    return {};
+  }
+}
+
+// 发表评论，返回新评论对象
+export async function addPhotoComment(photoId, user, content) {
+  if (!hasRemote()) throw new Error('评论功能需要登录并连接服务器');
+  const text = (content || '').trim();
+  if (!text) throw new Error('评论内容不能为空');
+  const userName = user?.nickname || user?.name || '';
+  const { data, error } = await supabase
+    .from('album_photo_comments')
+    .insert({ photo_id: photoId, user_id: user?.id || null, user_name: userName, content: text })
+    .select('id, user_id, user_name, content, created_at')
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    userName: data.user_name || '',
+    content: data.content || '',
+    createdAt: data.created_at,
+  };
+}
+
+// 删除评论
+export async function deletePhotoComment(commentId) {
+  if (!hasRemote() || !commentId) return;
+  const { data, error } = await supabase
+    .from('album_photo_comments')
+    .delete()
+    .eq('id', commentId)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('删除未生效：你可能没有权限删除这条评论。');
+  }
+}
+
+/* ============================================
+ * 相册级点赞 / 评论
+ * ============================================ */
+
+// 拉取某相册的点赞用户 id 列表
+export async function fetchAlbumLikes(albumId) {
+  if (!hasRemote() || !albumId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('album_likes')
+      .select('user_id')
+      .eq('album_id', albumId);
+    if (error) throw error;
+    return (data || []).map((r) => r.user_id);
+  } catch (err) {
+    console.warn('[AlbumService] 加载相册点赞失败：', err.message);
+    return [];
+  }
+}
+
+export async function toggleAlbumLike(albumId, userId, liked) {
+  if (!hasRemote() || !albumId || !userId) return;
+  if (liked) {
+    const { error } = await supabase
+      .from('album_likes')
+      .insert({ album_id: albumId, user_id: userId });
+    if (error && error.code !== '23505') throw error;
+  } else {
+    const { error } = await supabase
+      .from('album_likes')
+      .delete()
+      .eq('album_id', albumId)
+      .eq('user_id', userId);
+    if (error) throw error;
+  }
+}
+
+export async function fetchAlbumComments(albumId) {
+  if (!hasRemote() || !albumId) return [];
+  try {
+    const { data, error } = await supabase
+      .from('album_comments')
+      .select('id, user_id, user_name, content, created_at')
+      .eq('album_id', albumId)
+      .order('created_at', { ascending: true });
+    if (error) throw error;
+    return (data || []).map((row) => ({
+      id: row.id,
+      userId: row.user_id,
+      userName: row.user_name || '',
+      content: row.content || '',
+      createdAt: row.created_at,
+    }));
+  } catch (err) {
+    console.warn('[AlbumService] 加载相册评论失败：', err.message);
+    return [];
+  }
+}
+
+export async function addAlbumComment(albumId, user, content) {
+  if (!hasRemote()) throw new Error('评论功能需要登录并连接服务器');
+  const text = (content || '').trim();
+  if (!text) throw new Error('评论内容不能为空');
+  const userName = user?.nickname || user?.name || '';
+  const { data, error } = await supabase
+    .from('album_comments')
+    .insert({ album_id: albumId, user_id: user?.id || null, user_name: userName, content: text })
+    .select('id, user_id, user_name, content, created_at')
+    .single();
+  if (error) throw error;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    userName: data.user_name || '',
+    content: data.content || '',
+    createdAt: data.created_at,
+  };
+}
+
+export async function deleteAlbumComment(commentId) {
+  if (!hasRemote() || !commentId) return;
+  const { data, error } = await supabase
+    .from('album_comments')
+    .delete()
+    .eq('id', commentId)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('删除未生效：你可能没有权限删除这条评论。');
   }
 }
