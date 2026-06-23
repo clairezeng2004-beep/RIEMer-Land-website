@@ -20,12 +20,27 @@
   margin-bottom: var(--space-sm, 10px);
 }
 
+/* 底部信息区整体贴卡片底部：margin-top:auto 从 footer 移到这里，
+   让「分隔线 + 日期行 + 系列行」作为一个固定高度的块统一锚定在底部，
+   配合网格 align-items:stretch（同行卡片等高），同一行卡片的分隔线就处在同一高度。 */
+.ep-card__bottom {
+  margin-top: auto;
+}
+
+/* footer 的 margin-top:auto 来自 ia- 基类（文章卡片需要），活动卡片这里取消，
+   改由 .ep-card__bottom 统一下沉，避免日期行和系列行之间被撑开。 */
+.ep-card .ia-card__footer {
+  margin-top: 0;
+}
+
 /* 活动信息标签统一排布：日期 · 回放 · 地点，始终保持同一行 */
 .ep-card__info {
   display: grid;
   grid-template-columns: max-content minmax(2.6rem, auto) minmax(0, 1fr);
   align-items: center;
   column-gap: var(--space-xs, 6px);
+  /* footer 自带 border-top 作为分隔线，宽度即卡片内容区宽度，
+     地点列 justify-self:end 贴到该分隔线右端 → 与分隔线右对齐。 */
 }
 
 .ep-card__info-center {
@@ -43,9 +58,14 @@
   white-space: nowrap;
 }
 
-/* 系列标签独占日期/地点下方第二行，左对齐 */
+/* 系列标签独占日期/地点下方第二行，左对齐。
+   始终占位（即使没有系列标签也保留固定高度），这样底部信息区高度恒定，
+   同一行卡片的分隔线高度才能完全一致。 */
 .ep-card__category-row {
   margin-top: var(--space-xs, 6px);
+  min-height: 1.5rem;
+  display: flex;
+  align-items: center;
 }
 .ep-card__category-row .ia-card__category {
   margin-left: 0; /* 覆盖底部一行时用的靠右逻辑，这里左对齐 */
