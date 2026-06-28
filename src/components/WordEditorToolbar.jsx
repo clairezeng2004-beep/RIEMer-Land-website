@@ -4,12 +4,29 @@ import {
   Columns,
   Table as TableIcon,
   ChevronDown,
+  Highlighter,
 } from 'lucide-react';
 import {
+  insertCalloutIntoEditor,
   insertColumnsIntoEditor,
   insertTableIntoEditor,
 } from '../utils/wordDocBlocks';
 import './WordEditorToolbar.css';
+
+const CALLOUT_TONES = [
+  { id: 'sage', label: '松石绿', swatch: '#dfeee4' },
+  { id: 'sun', label: '暖杏黄', swatch: '#fff0bf' },
+  { id: 'rose', label: '浅珊瑚', swatch: '#ffe1df' },
+  { id: 'sky', label: '雾蓝色', swatch: '#dcecff' },
+  { id: 'lavender', label: '淡紫色', swatch: '#eadfff' },
+];
+
+const EMOJI_OPTIONS = [
+  '💡', '⭐', '🔥', '✅', '📌', '📣', '🎯', '🚀', '✨', '🌿',
+  '🧭', '📝', '💬', '🔎', '⚠️', '❗', '❤️', '🤝', '🙌', '😊',
+  '🎉', '🏆', '📚', '🧩', '🔗', '⏰', '📍', '🛠️', '💭', '☕',
+  '🌈', '🌟', '💎', '🪄', '📎', '🔔', '🧡', '💚', '💙', '💜',
+];
 
 /**
  * WordEditorToolbar —— 文档编辑器（Word 风格）上方的统一工具栏
@@ -96,6 +113,10 @@ export default function WordEditorToolbar({
   const [grid, setGrid] = useState({ r: 0, c: 0 });
   const tableBtnRef = useRef(null);
   const tableMenuRef = useRef(null);
+  const [calloutOpen, setCalloutOpen] = useState(false);
+  const calloutBtnRef = useRef(null);
+  const calloutMenuRef = useRef(null);
+  const [emojiPicker, setEmojiPicker] = useState({ open: false, target: null, x: 0, y: 0 });
 
   useEffect(() => {
     if (!tableOpen) return undefined;
@@ -124,6 +145,84 @@ export default function WordEditorToolbar({
     restoreSelection();
     insertTableIntoEditor(editorRef.current, { rows, cols });
     fireChange();
+  };
+
+  useEffect(() => {
+    if (!calloutOpen) return undefined;
+    const onDoc = (e) => {
+      if (
+        calloutMenuRef.current?.contains(e.target) ||
+        calloutBtnRef.current?.contains(e.target)
+      ) {
+        return;
+      }
+      setCalloutOpen(false);
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [calloutOpen]);
+
+  useEffect(() => {
+    const editor = editorRef?.current;
+    if (!editor) return undefined;
+
+    const openPicker = (target) => {
+      const rect = target.getBoundingClientRect();
+      setEmojiPicker({
+        open: true,
+        target,
+        x: rect.left,
+        y: rect.bottom + 6,
+      });
+    };
+
+    const onClick = (e) => {
+      const target = e.target.closest?.('.msc-callout__emoji');
+      if (!target || !editor.contains(target)) return;
+      e.preventDefault();
+      openPicker(target);
+    };
+
+    const onKeyDown = (e) => {
+      const target = e.target.closest?.('.msc-callout__emoji');
+      if (!target || !editor.contains(target)) return;
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      openPicker(target);
+    };
+
+    editor.addEventListener('click', onClick);
+    editor.addEventListener('keydown', onKeyDown);
+    return () => {
+      editor.removeEventListener('click', onClick);
+      editor.removeEventListener('keydown', onKeyDown);
+    };
+  }, [editorRef]);
+
+  useEffect(() => {
+    if (!emojiPicker.open) return undefined;
+    const onDoc = (e) => {
+      if (e.target.closest?.('.wet__emoji-popover') || e.target.closest?.('.msc-callout__emoji')) return;
+      setEmojiPicker({ open: false, target: null, x: 0, y: 0 });
+    };
+    document.addEventListener('mousedown', onDoc);
+    return () => document.removeEventListener('mousedown', onDoc);
+  }, [emojiPicker.open]);
+
+  const handleInsertCallout = (tone) => {
+    setCalloutOpen(false);
+    if (!editorRef?.current) return;
+    restoreSelection();
+    insertCalloutIntoEditor(editorRef.current, { tone });
+    fireChange();
+  };
+
+  const handlePickEmoji = (emoji) => {
+    if (emojiPicker.target && editorRef?.current?.contains(emojiPicker.target)) {
+      emojiPicker.target.textContent = emoji;
+      fireChange();
+    }
+    setEmojiPicker({ open: false, target: null, x: 0, y: 0 });
   };
 
   return (
@@ -170,6 +269,45 @@ export default function WordEditorToolbar({
               ))}
             </div>
             <div className="wet__menu-tip">提示：插入后点击各栏「点此添加图片」补图，或点「输入文字」改为文字栏</div>
+          </div>
+        )}
+      </div>
+
+      {/* 高亮块 */}
+      <div className="wet__dropdown-wrap">
+        <button
+          ref={calloutBtnRef}
+          type="button"
+          className="msc-form__paste-btn msc-form__paste-btn--ghost"
+          onMouseDown={saveSelection}
+          onClick={() => setCalloutOpen((v) => !v)}
+          title="插入带 Emoji 的高亮块"
+        >
+          <Highlighter size={14} /> 高亮块
+          <ChevronDown size={12} />
+        </button>
+        {calloutOpen && (
+          <div ref={calloutMenuRef} className="wet__menu wet__menu--callout">
+            <div className="wet__menu-title">选择高亮颜色</div>
+            <div className="wet__callout-tones">
+              {CALLOUT_TONES.map((tone) => (
+                <button
+                  key={tone.id}
+                  type="button"
+                  className="wet__callout-tone"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => handleInsertCallout(tone.id)}
+                  title={`插入${tone.label}高亮块`}
+                >
+                  <span
+                    className="wet__callout-swatch"
+                    style={{ background: tone.swatch }}
+                  />
+                  <span>{tone.label}</span>
+                </button>
+              ))}
+            </div>
+            <div className="wet__menu-tip">插入后点击第一格 Emoji 可更换图标</div>
           </div>
         )}
       </div>
@@ -222,6 +360,26 @@ export default function WordEditorToolbar({
           </div>
         )}
       </div>
+
+      {emojiPicker.open && (
+        <div
+          className="wet__emoji-popover"
+          style={{ left: emojiPicker.x, top: emojiPicker.y }}
+        >
+          {EMOJI_OPTIONS.map((emoji) => (
+            <button
+              key={emoji}
+              type="button"
+              className="wet__emoji-btn"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => handlePickEmoji(emoji)}
+              title={emoji}
+            >
+              {emoji}
+            </button>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

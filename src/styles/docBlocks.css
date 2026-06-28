@@ -3,7 +3,8 @@
  * 文档中两种"块"结构的全局样式 —— 不依赖祖先选择器，
  * 确保编辑器 / 各预览页 / 公开文章页 / Markdown 预览 中都能一致渲染：
  *   1. .msc-cols / .msc-col —— 图片分栏（类似飞书）
- *   2. .msc-table-wrap / .msc-table —— 表格（类似飞书）
+ *   2. .msc-callout —— 高亮块（带 Emoji 首格）
+ *   3. .msc-table-wrap / .msc-table —— 表格（类似飞书）
  * 交互层（编辑器 hover 控制条、占位点击）另见 WordEditorToolbar.css。
  * ========================================================================= */
 
@@ -307,6 +308,94 @@
 .msc-col:has(> blockquote) {
   align-items: flex-start;
   justify-content: flex-start;
+}
+
+/* ---------- 高亮块 ---------- */
+.msc-callout {
+  --msc-callout-bg: #dfeee4;
+  --msc-callout-border: #8fbc9a;
+  --msc-callout-accent: #4f7f58;
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  margin: 0.8em 0;
+  padding: 12px 14px;
+  border: 1px solid var(--msc-callout-border);
+  border-left-width: 4px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--msc-callout-bg);
+  color: var(--color-text, #1f2937);
+  box-shadow: 0 1px 0 rgba(31, 41, 55, 0.04);
+}
+
+.msc-callout--sage {
+  --msc-callout-bg: #dfeee4;
+  --msc-callout-border: #8fbc9a;
+  --msc-callout-accent: #4f7f58;
+}
+
+.msc-callout--sun {
+  --msc-callout-bg: #fff0bf;
+  --msc-callout-border: #e0b84f;
+  --msc-callout-accent: #9a6b10;
+}
+
+.msc-callout--rose {
+  --msc-callout-bg: #ffe1df;
+  --msc-callout-border: #df8a84;
+  --msc-callout-accent: #a64b45;
+}
+
+.msc-callout--sky {
+  --msc-callout-bg: #dcecff;
+  --msc-callout-border: #82aee0;
+  --msc-callout-accent: #356b9f;
+}
+
+.msc-callout--lavender {
+  --msc-callout-bg: #eadfff;
+  --msc-callout-border: #a995db;
+  --msc-callout-accent: #6853a6;
+}
+
+.msc-callout__emoji {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: inset 0 0 0 1px rgba(31, 41, 55, 0.08);
+  font-size: 20px;
+  line-height: 1;
+  user-select: none;
+}
+
+[contenteditable="true"] .msc-callout__emoji {
+  cursor: pointer;
+}
+
+[contenteditable="true"] .msc-callout__emoji:hover,
+[contenteditable="true"] .msc-callout__emoji:focus {
+  outline: 2px solid var(--msc-callout-accent);
+  outline-offset: 2px;
+}
+
+.msc-callout__body {
+  min-width: 0;
+}
+
+.msc-callout__body > :first-child {
+  margin-top: 0;
+}
+
+.msc-callout__body > :last-child {
+  margin-bottom: 0;
+}
+
+.msc-callout__body p {
+  margin: 0.25em 0;
 }
 
 /* ---------- 表格 ---------- */

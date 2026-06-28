@@ -128,6 +128,81 @@
   line-height: 1.4;
 }
 
+/* ---- 高亮块颜色选择 ---- */
+.wet__menu--callout {
+  min-width: 190px;
+}
+
+.wet__callout-tones {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.wet__callout-tone {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 7px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  color: var(--color-text, #1f2937);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.wet__callout-tone:hover {
+  border-color: var(--color-border, #e5e7eb);
+  background: var(--color-bg-alt, #f9fafb);
+}
+
+.wet__callout-swatch {
+  width: 24px;
+  height: 18px;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(31, 41, 55, 0.12);
+}
+
+.wet__emoji-popover {
+  position: fixed;
+  z-index: 1000;
+  display: grid;
+  grid-template-columns: repeat(8, 30px);
+  gap: 4px;
+  width: max-content;
+  max-width: calc(100vw - 24px);
+  padding: 8px;
+  border: 1px solid var(--color-border, #e5e7eb);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-card, #fff);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.14);
+}
+
+.wet__emoji-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 4px);
+  background: transparent;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.12s, transform 0.12s;
+}
+
+.wet__emoji-btn:hover {
+  background: var(--color-bg-alt, #f3f4f6);
+  transform: scale(1.08);
+}
+
 /* ---- 表格网格选择器 ---- */
 .wet__menu--grid {
   min-width: unset;

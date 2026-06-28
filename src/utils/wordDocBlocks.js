@@ -44,6 +44,7 @@
  *   - 预览页只要加载 wordDocBlocks.css 对应选择器即可还原效果；
  *   - 表格的行列增删是"行为层"，需要额外调用 attachTableControls(editor)
  *     为当前编辑器挂载 hover 控制条。
+ *   - 高亮块是纯 HTML 结构，颜色通过 class 控制，Emoji 通过工具栏交互替换文本。
  */
 
 /** 在光标处插入一段 HTML（作为独立块），若光标不在编辑器内则追加到末尾 */
@@ -373,6 +374,38 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     layoutColumnResizers(container);
     layoutColumnAdders(container);
   });
+}
+
+/* =========================================================================
+ * 2) 高亮块
+ * ========================================================================= */
+
+export function insertCalloutIntoEditor(editor, { tone = 'sage' } = {}) {
+  if (!editor) return;
+  const safeTone = ['sage', 'sun', 'rose', 'sky', 'lavender'].includes(tone) ? tone : 'sage';
+
+  const block = document.createElement('div');
+  block.className = `msc-callout msc-callout--${safeTone}`;
+  block.setAttribute('data-callout-tone', safeTone);
+
+  const emoji = document.createElement('span');
+  emoji.className = 'msc-callout__emoji';
+  emoji.setAttribute('contenteditable', 'false');
+  emoji.setAttribute('role', 'button');
+  emoji.setAttribute('tabindex', '0');
+  emoji.setAttribute('title', '选择 Emoji');
+  emoji.textContent = '💡';
+
+  const body = document.createElement('div');
+  body.className = 'msc-callout__body';
+  const p = document.createElement('p');
+  p.textContent = '在这里输入高亮内容';
+  body.appendChild(p);
+
+  block.appendChild(emoji);
+  block.appendChild(body);
+  insertBlockAtCaret(editor, block);
+  placeCaretAtStart(p);
 }
 
 /**
