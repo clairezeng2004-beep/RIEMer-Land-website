@@ -918,6 +918,7 @@
 }
 
 .msc-form__word-editor {
+  --msc-editor-image-max-width: 808px;
   padding: 1rem;
   border: 1px solid var(--color-border, #d1d5db);
   border-radius: var(--radius-md, 8px);
@@ -1055,6 +1056,7 @@
 /* 编辑器内的图片：允许拖拽移动、并可被选中以便复制/剪切
    （上面的规则为防止预览页图片被拖走而禁用了拖拽/选择，这里在编辑器里放开） */
 .msc-form__word-editor .msc-img {
+  max-width: min(100%, var(--msc-editor-image-max-width));
   user-select: auto;
   -webkit-user-select: auto;
   -webkit-user-drag: element;

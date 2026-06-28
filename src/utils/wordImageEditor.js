@@ -27,6 +27,8 @@
  *   api.pickImage();
  */
 
+const DETAIL_CONTENT_IMAGE_MAX_WIDTH = 808;
+
 /** 文件 → dataURL */
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -77,7 +79,8 @@ function getImageContainerWidth(editor, img) {
   const container = col || editor;
   const rectWidth = container.getBoundingClientRect?.().width || 0;
   const clientWidth = container.clientWidth || rectWidth || editor.clientWidth;
-  return Math.max(32, Math.round(clientWidth - 8));
+  const availableWidth = Math.max(32, Math.round(clientWidth - 8));
+  return col ? availableWidth : Math.min(availableWidth, DETAIL_CONTENT_IMAGE_MAX_WIDTH);
 }
 
 function getImageWrap(img) {
