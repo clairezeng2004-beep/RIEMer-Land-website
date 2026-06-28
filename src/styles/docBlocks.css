@@ -340,8 +340,9 @@
   --msc-callout-border: #8fbc9a;
   --msc-callout-accent: #4f7f58;
   display: grid;
-  grid-template-columns: 1.55em minmax(0, 1fr);
-  gap: 0.5em;
+  grid-template-columns: 1.15em minmax(0, 1fr);
+  align-items: start;
+  gap: 0.45em;
   margin: 0.8em 0;
   padding: 12px 14px;
   border: 1px solid var(--msc-callout-border);
@@ -386,13 +387,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 1.45em;
-  height: 1.45em;
-  border-radius: 0.35em;
-  background: rgba(255, 255, 255, 0.62);
-  box-shadow: inset 0 0 0 1px rgba(31, 41, 55, 0.08);
-  font-size: 1.05em;
-  line-height: 1;
+  width: 1.15em;
+  height: 1.7em;
+  border-radius: 0;
+  background: var(--msc-callout-bg);
+  box-shadow: none;
+  font-size: 0.95em;
+  line-height: 1.7;
   user-select: none;
 }
 
