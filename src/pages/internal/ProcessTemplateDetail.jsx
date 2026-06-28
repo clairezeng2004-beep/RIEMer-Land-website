@@ -43,6 +43,7 @@ import EditorToc from '../../components/EditorToc';
 import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import {
   fetchAllFromCloud,
+  fetchDocFromCloud,
   fetchViewsFromCloud,
   incrementView,
   recordViewLog,
@@ -554,22 +555,33 @@ export default function ProcessTemplateDetail() {
     let cancelled = false;
     (async () => {
       try {
-        const cloud = await fetchAllFromCloud();
-        if (cancelled || !cloud) return;
+        const single = await fetchDocFromCloud(id);
+        if (cancelled) return;
         // 云端 documents 表可能包含两类记录：
         // - 用户发布的新文档（id 以 doc- 开头）
         // - 内置示例被管理员编辑后写入的"覆盖层"（id 与 siteData.documentsData 中一致，如 '1'、'5'）
         // 两类都需要进入本地渲染集合。
-        const userDocs = cloud.docs;
-        setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
-        // 浏览计数合并
-        await fetchViewsFromCloud();
+        if (single) {
+          setCloudData({
+            userDocs: single.doc ? [single.doc] : [],
+            deletedIds: single.deletedIds.map(String),
+          });
+        } else {
+          const cloud = await fetchAllFromCloud();
+          if (cancelled || !cloud) return;
+          const userDocs = cloud.docs;
+          setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
+        }
+        // 浏览数不阻塞正文首屏；慢网络下让内容先出来。
+        fetchViewsFromCloud().catch((err) => {
+          console.warn('[ProcessTemplateDetail] 浏览数加载失败:', err);
+        });
       } finally {
         if (!cancelled) setCloudLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [id]);
 
   // ---- 订阅 documents / documents_deleted_defaults 变更：当前文档被其它设备编辑或删除时自动刷新 ----
   // 用 ref 持有 isEditing，避免闭包陷阱 + 编辑态下不强制刷新（防止覆盖用户输入）
@@ -717,6 +729,16 @@ export default function ProcessTemplateDetail() {
     }
     return stripUnderline(doc.content); // word 格式：已是 HTML
   }, [doc]);
+
+  useEffect(() => {
+    if (!contentRef.current || isEditing) return;
+    const imgs = Array.from(contentRef.current.querySelectorAll('img'));
+    imgs.forEach((img, index) => {
+      img.decoding = 'async';
+      img.loading = index === 0 ? 'eager' : 'lazy';
+      img.setAttribute('fetchpriority', index === 0 ? 'high' : 'low');
+    });
+  }, [renderedContent, isEditing]);
 
   /* 目录（TOC）的初始化被挪到后面（editMarkdownPreview 之后），
    * 因为编辑态下目录需要基于实时预览 DOM 扫描标题，
@@ -1739,7 +1761,13 @@ export default function ProcessTemplateDetail() {
                 )}
                 {doc.fileType === 'image' && (
                   <div className="ptd-article__image-wrap">
-                    <img src={doc.fileUrl} alt={doc.title} className="ptd-article__image" />
+                    <img
+                      src={doc.fileUrl}
+                      alt={doc.title}
+                      className="ptd-article__image"
+                      decoding="async"
+                      fetchPriority="high"
+                    />
                   </div>
                 )}
                 {doc.fileType === 'docx' && (
@@ -1959,6 +1987,7 @@ export default function ProcessTemplateDetail() {
                   src={previewAttachment.dataUrl || previewAttachment.url}
                   alt={previewAttachment.name}
                   className="ptd-file-preview-modal__image"
+                  decoding="async"
                 />
               )}
               {previewAttachment.previewType === 'word' && (

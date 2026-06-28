@@ -309,6 +309,43 @@ export async function fetchAllFromCloud() {
   }
 }
 
+export async function fetchDocFromCloud(id) {
+  if (!canUseSupabase() || !supabase || !id) return null;
+  try {
+    const [docRes, deletedRes] = await Promise.all([
+      supabase
+        .from('documents')
+        .select('*')
+        .eq('id', String(id))
+        .maybeSingle(),
+      supabase.from('documents_deleted_defaults').select('default_id'),
+    ]);
+
+    if (docRes.error) {
+      console.warn('[documentsService] 云端拉取单篇文档失败:', docRes.error.message);
+      return null;
+    }
+
+    const doc = docRes.data ? rowToDoc(docRes.data) : null;
+    const deletedIds = deletedRes.error
+      ? []
+      : (deletedRes.data || []).map((r) => String(r.default_id));
+
+    if (doc) {
+      try {
+        const existing = loadLocalDocs().filter((d) => String(d.id) !== String(doc.id));
+        saveLocalDocs([doc, ...existing]);
+        saveLocalDeletedIds(deletedIds);
+      } catch { /* ignore */ }
+    }
+
+    return { doc, deletedIds };
+  } catch (err) {
+    console.warn('[documentsService] fetchDocFromCloud 异常:', err.message);
+    return null;
+  }
+}
+
 /**
  * 把 Supabase 返回的 error 对象拼成一段对排错有帮助的提示。
  *
