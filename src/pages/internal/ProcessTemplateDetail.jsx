@@ -66,6 +66,7 @@ import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
+import { cleanPastedWordHtml } from '../../utils/cleanPastedWordHtml';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -143,68 +144,13 @@ function getPreviewableAttachmentType(file) {
 }
 
 function cleanWordHtml(html) {
-  const parsed = new DOMParser().parseFromString(html, 'text/html');
-  parsed.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
-
-  parsed.querySelectorAll('[style]').forEach((el) => {
-    const tag = el.tagName.toLowerCase();
-    if (['strong', 'b', 'em', 'i'].includes(tag) || /^h[1-6]$/.test(tag)) return;
-    const fw = (el.style.fontWeight || '').toLowerCase();
-    const isBold = fw === 'bold' || fw === 'bolder' || (/^\d+$/.test(fw) && parseInt(fw, 10) >= 600);
-    const isItalic = (el.style.fontStyle || '').toLowerCase() === 'italic';
-    if (!isBold && !isItalic) return;
-    const frag = parsed.createDocumentFragment();
-    while (el.firstChild) frag.appendChild(el.firstChild);
-    let wrapper = frag;
-    if (isItalic) {
-      const em = parsed.createElement('em');
-      em.appendChild(wrapper);
-      wrapper = em;
-    }
-    if (isBold) {
-      const strong = parsed.createElement('strong');
-      strong.appendChild(wrapper);
-      wrapper = strong;
-    }
-    el.appendChild(wrapper);
+  return cleanPastedWordHtml(html, {
+    preserveTextAlign: true,
+    preserveEditorAttrs: true,
+    normalizeDivs: false,
   });
-
-  parsed.querySelectorAll('*').forEach((el) => {
-    const attrs = [...el.attributes];
-    const tag = el.tagName.toLowerCase();
-    const keepAttrs = tag === 'img'
-      ? new Set(['src', 'alt', 'width', 'height', 'style', 'class'])
-      : new Set(['href', 'class', 'data-msc-table', 'data-cols', 'contenteditable', 'style']);
-    attrs.forEach((attr) => {
-      if (!keepAttrs.has(attr.name)) el.removeAttribute(attr.name);
-    });
-  });
-  parsed.querySelectorAll('img').forEach((img) => {
-    if (!img.src || img.src.startsWith('file:')) {
-      img.remove();
-      return;
-    }
-    if (!img.classList.contains('msc-img')) img.classList.add('msc-img');
-    img.setAttribute('draggable', 'true');
-    const parent = img.parentElement;
-    if (!parent || !parent.classList.contains('msc-img-wrap')) {
-      const wrap = parsed.createElement('p');
-      wrap.className = 'msc-img-wrap';
-      wrap.setAttribute('style', 'text-align:center');
-      img.replaceWith(wrap);
-      wrap.appendChild(img);
-    }
-  });
-
-  return stripUnderline(
-    parsed.body.innerHTML
-      .replace(/<span[^>]*>/gi, '')
-      .replace(/<\/span>/gi, '')
-      .replace(/<p>\s*<\/p>/gi, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim()
-  );
 }
+
 
 /* ========== 编辑日志工具 ========== */
 // 把富文本/Markdown 字符串粗略地还原成纯文本，用于字数统计与摘要展示

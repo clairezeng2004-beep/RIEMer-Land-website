@@ -39,6 +39,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
+import { cleanPastedWordHtml } from '../../utils/cleanPastedWordHtml';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import {
@@ -628,72 +629,7 @@ export default function MemberSharingCreate() {
 
   // 清理从 Word/网页粘贴过来的 HTML，只保留安全标签
   const cleanWordHtml = useCallback((html) => {
-    const doc = new DOMParser().parseFromString(html, 'text/html');
-    doc.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
-
-    // 先把"行内样式表达的加粗/斜体"（Word / Google Docs 常用 <span style="font-weight:700">）
-    // 转成 <strong>/<em>，再做后面的剥属性 / 剥 <span>，否则加粗会被一并清掉、丢失格式。
-    doc.querySelectorAll('[style]').forEach((el) => {
-      const tag = el.tagName.toLowerCase();
-      if (['strong', 'b', 'em', 'i'].includes(tag) || /^h[1-6]$/.test(tag)) return;
-      const fw = (el.style.fontWeight || '').toLowerCase();
-      const isBold = fw === 'bold' || fw === 'bolder' || (/^\d+$/.test(fw) && parseInt(fw, 10) >= 600);
-      const isItalic = (el.style.fontStyle || '').toLowerCase() === 'italic';
-      if (!isBold && !isItalic) return;
-      const frag = doc.createDocumentFragment();
-      while (el.firstChild) frag.appendChild(el.firstChild);
-      let wrapper = frag;
-      if (isItalic) { const em = doc.createElement('em'); em.appendChild(wrapper); wrapper = em; }
-      if (isBold) { const st = doc.createElement('strong'); st.appendChild(wrapper); wrapper = st; }
-      el.appendChild(wrapper);
-    });
-
-    doc.querySelectorAll('*').forEach((el) => {
-      const attrs = [...el.attributes];
-      const tag = el.tagName.toLowerCase();
-      const textAlign = (el.style.textAlign || '').toLowerCase();
-      const hasTextAlign = ['left', 'center', 'right', 'justify'].includes(textAlign);
-      const keepAttrs = tag === 'img'
-        ? new Set(['src', 'alt', 'width', 'height', 'style', 'class'])
-        : new Set(['href', ...(hasTextAlign ? ['style'] : [])]);
-      attrs.forEach((attr) => {
-        if (!keepAttrs.has(attr.name)) el.removeAttribute(attr.name);
-      });
-      if (hasTextAlign) {
-        el.setAttribute('style', `text-align: ${textAlign}`);
-        el.setAttribute('align', textAlign);
-      }
-    });
-    // 对粘贴进来的 <img>：没 class 的补上 msc-img 类并包到居中段落里
-    doc.querySelectorAll('img').forEach((img) => {
-      if (!img.src || img.src.startsWith('file:')) {
-        img.remove();
-        return;
-      }
-      if (!img.classList.contains('msc-img')) img.classList.add('msc-img');
-      img.setAttribute('draggable', 'true');
-      const parent = img.parentElement;
-      if (!parent || !parent.classList.contains('msc-img-wrap')) {
-        const wrap = doc.createElement('p');
-        wrap.className = 'msc-img-wrap';
-        wrap.setAttribute('style', 'text-align:center');
-        img.replaceWith(wrap);
-        wrap.appendChild(img);
-      }
-    });
-    let cleaned = doc.body.innerHTML;
-    cleaned = cleaned
-      .replace(/<div[^>]*>/gi, '<p>')
-      .replace(/<\/div>/gi, '</p>')
-      .replace(/<span[^>]*>/gi, '')
-      .replace(/<\/span>/gi, '')
-      .replace(/<p>\s*<\/p>/gi, '')
-      .replace(/\n{3,}/g, '\n\n')
-      .trim();
-    // 粘贴入口统一清除 Word / 网页带过来的下划线装饰，
-    // 保证编辑器里的所见即所得与全站正文样式一致（站点正文不使用下划线装饰）。
-    cleaned = stripUnderline(cleaned);
-    return cleaned;
+    return cleanPastedWordHtml(html, { preserveTextAlign: true });
   }, []);
 
   // 处理 Word 编辑器的粘贴事件
