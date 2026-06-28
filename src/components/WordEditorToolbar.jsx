@@ -38,7 +38,7 @@ const EMOJI_OPTIONS = [
  *
  * 包含三个功能：
  *   1. 插入图片（复用 imageApi.pickImage()）
- *   2. 分栏（类似飞书图片分栏）：下拉选择 2/3/4 栏 + 可选一次批量选图
+ *   2. 分栏：下拉选择 2/3/4 栏，用于并排排版图片或文字
  *   3. 表格：飞书式网格选择器（悬停决定行列数）+ 点击插入
  */
 export default function WordEditorToolbar({
@@ -268,7 +268,6 @@ export default function WordEditorToolbar({
                 </button>
               ))}
             </div>
-            <div className="wet__menu-tip">提示：插入后点击各栏「点此添加图片」补图，或点「输入文字」改为文字栏</div>
           </div>
         )}
       </div>
