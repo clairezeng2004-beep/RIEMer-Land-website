@@ -81,21 +81,58 @@ export default function useTocScroll({
       .filter(Boolean);
     if (!headings.length) return;
 
-    const observer = new IntersectionObserver(
-      (entries) => {
-        const visible = entries
-          .filter((e) => e.isIntersecting)
-          .sort(
-            (a, b) =>
-              a.target.getBoundingClientRect().top - b.target.getBoundingClientRect().top,
-          );
-        if (visible[0]) setActiveTocId(visible[0].target.id);
-      },
-      { rootMargin: '-80px 0px -70% 0px', threshold: 0 },
-    );
-    headings.forEach((h) => observer.observe(h));
-    return () => observer.disconnect();
-  }, [toc, contentRef]);
+    const findScrollParent = (node) => {
+      let p = node?.parentElement;
+      while (p && p !== document.body) {
+        const style = window.getComputedStyle(p);
+        const oy = style.overflowY;
+        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
+          return p;
+        }
+        p = p.parentElement;
+      }
+      return null;
+    };
+
+    const scrollParent = findScrollParent(contentRef.current);
+    let ticking = false;
+
+    const getTop = (el) => {
+      if (scrollParent) {
+        const containerRect = scrollParent.getBoundingClientRect();
+        const elRect = el.getBoundingClientRect();
+        return scrollParent.scrollTop + (elRect.top - containerRect.top);
+      }
+      return el.getBoundingClientRect().top + window.pageYOffset;
+    };
+
+    const updateActive = () => {
+      ticking = false;
+      const currentTop = scrollParent ? scrollParent.scrollTop : window.pageYOffset;
+      const marker = currentTop + scrollOffset + 8;
+      let active = headings[0];
+      for (const heading of headings) {
+        if (getTop(heading) <= marker) active = heading;
+        else break;
+      }
+      if (active?.id) setActiveTocId(active.id);
+    };
+
+    const requestUpdate = () => {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(updateActive);
+    };
+
+    updateActive();
+    const target = scrollParent || window;
+    target.addEventListener('scroll', requestUpdate, { passive: true });
+    window.addEventListener('resize', requestUpdate);
+    return () => {
+      target.removeEventListener('scroll', requestUpdate);
+      window.removeEventListener('resize', requestUpdate);
+    };
+  }, [toc, contentRef, scrollOffset]);
 
   /* 3) 点击目录跳转 —— 强鲁棒版本 */
   const handleTocClick = useCallback(
@@ -159,11 +196,11 @@ export default function useTocScroll({
             const elRect = el.getBoundingClientRect();
             const target =
               scrollParent.scrollTop + (elRect.top - containerRect.top) - scrollOffset;
-            scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+            scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
           } else {
             const top =
               el.getBoundingClientRect().top + window.pageYOffset - scrollOffset;
-            window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' });
+            window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
           }
         } catch {
           // 极老浏览器兜底
