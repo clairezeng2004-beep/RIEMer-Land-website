@@ -408,7 +408,7 @@ export default function MemberSharingDetail() {
                     onClick={() => handleTocClick(item.id)}
                     title={item.text}
                   >
-                    <span className="msd-toc__dot" />
+                    {item.level > 1 && <span className="msd-toc__dot" />}
                     <span className="msd-toc__text">{item.text}</span>
                   </button>
                 ))}
@@ -603,7 +603,7 @@ export default function MemberSharingDetail() {
                       onClick={() => handleTocClick(item.id)}
                       title={item.text}
                     >
-                      <span className="msd-toc__dot" />
+                      {item.level > 1 && <span className="msd-toc__dot" />}
                       <span className="msd-toc__text">{item.text}</span>
                     </button>
                   ))}

@@ -110,7 +110,7 @@ export default function EditorToc({ editorRef, content, scrollOffset = 64, defau
                 onClick={() => handleTocClick(item.id)}
                 title={item.text}
               >
-                <span className="etoc__dot" />
+                {item.level > 1 && <span className="etoc__dot" />}
                 <span className="etoc__text">{item.text}</span>
               </button>
             ))}
