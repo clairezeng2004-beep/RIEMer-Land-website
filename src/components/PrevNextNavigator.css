@@ -127,6 +127,9 @@
     grid-template-columns: 1fr;
     gap: 10px;
   }
+  .prev-next__slot--empty {
+    display: none;
+  }
   .prev-next__slot--next {
     text-align: left;
     align-items: flex-start;
