@@ -337,11 +337,11 @@ export default function ProcessTemplateCreate() {
   const handleWordPaste = useCallback((e) => {
     // 若剪贴板里有图片，则让 wordImageEditor（capture 阶段已拦截）处理，不要在这里再执行
     const items = e.clipboardData?.items;
-    if (items && Array.from(items).some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
+    const html = e.clipboardData.getData('text/html');
+    if (!html && items && Array.from(items).some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
       return;
     }
     e.preventDefault();
-    const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
 
     if (html) {

@@ -1085,11 +1085,11 @@ export default function ProcessTemplateDetail() {
 
   const handleWordPaste = useCallback((e) => {
     const items = e.clipboardData?.items;
-    if (items && Array.from(items).some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
+    const html = e.clipboardData.getData('text/html');
+    if (!html && items && Array.from(items).some((it) => it.kind === 'file' && it.type.startsWith('image/'))) {
       return;
     }
     e.preventDefault();
-    const html = e.clipboardData.getData('text/html');
     const text = e.clipboardData.getData('text/plain');
 
     if (html) {
@@ -1506,7 +1506,7 @@ export default function ProcessTemplateDetail() {
                     onClick={() => handleTocClick(item.id)}
                     title={item.text}
                   >
-                    <span className="ptd-toc__dot" />
+                    {item.level > 1 && <span className="ptd-toc__dot" />}
                     <span className="ptd-toc__text">{item.text}</span>
                   </button>
                 ))}
@@ -1906,7 +1906,7 @@ export default function ProcessTemplateDetail() {
                       onClick={() => handleTocClick(item.id)}
                       title={item.text}
                     >
-                      <span className="ptd-toc__dot" />
+                      {item.level > 1 && <span className="ptd-toc__dot" />}
                       <span className="ptd-toc__text">{item.text}</span>
                     </button>
                   ))}
