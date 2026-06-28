@@ -90,6 +90,18 @@ function getImageCaption(img) {
   return next?.classList?.contains('msc-img-caption') ? next : null;
 }
 
+function isEmptyParagraph(node) {
+  if (!node || node.nodeType !== 1 || node.tagName.toLowerCase() !== 'p') return false;
+  if (node.querySelector('img, video, table, iframe')) return false;
+  const text = String(node.textContent || '').replace(/\u200B/g, '').trim();
+  if (text) return false;
+  return [...node.childNodes].every((child) => {
+    if (child.nodeType === 3) return !String(child.textContent || '').replace(/\u200B/g, '').trim();
+    if (child.nodeType !== 1) return true;
+    return child.tagName.toLowerCase() === 'br';
+  });
+}
+
 function ensureImageCaption(editor, img) {
   const wrap = getImageWrap(img);
   if (!wrap?.parentNode) return null;
@@ -464,6 +476,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       // 要移动的块：正文图片用 .msc-img-wrap；分栏内裸图则包成居中段落一起搬出
       let node = img.closest('.msc-img-wrap');
       const caption = getImageCaption(img);
+      const staleTrailingParagraph = (caption || node)?.nextElementSibling || null;
       let moveNode = node;
       if (!node) {
         const wrap = document.createElement('p');
@@ -482,6 +495,9 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       if (node.contains(range.startContainer)) return;
       try {
         range.insertNode(moveNode); // 节点已在文档中时会被移动到此处
+        if (staleTrailingParagraph?.isConnected && isEmptyParagraph(staleTrailingParagraph)) {
+          staleTrailingParagraph.remove();
+        }
         const after = document.createRange();
         after.setStartAfter(caption || node);
         after.collapse(true);
