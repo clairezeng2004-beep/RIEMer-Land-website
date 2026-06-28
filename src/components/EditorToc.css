@@ -1,7 +1,8 @@
 /* ============ 编辑器浮动目录 ============ */
 .etoc {
   position: fixed;
-  right: 16px;
+  left: max(16px, calc((100vw - 1520px) / 2 + 16px));
+  right: auto;
   /* 顶栏（sticky 顶部按钮行）高约 48–56px，这里留到 88px，
      确保目录始终在顶栏下方、不被遮挡。 */
   top: 88px;
@@ -12,7 +13,7 @@
 
 /* 展开面板 */
 .etoc__panel {
-  width: min(320px, calc(100vw - 32px));
+  width: min(260px, calc(100vw - 32px));
   /* 长目录不截断内容，超出视口时在目录内部滚动。 */
   max-height: calc(100vh - 112px);
   display: flex;
@@ -145,8 +146,9 @@
 }
 
 /* 窄屏：面板更窄，且默认靠右下，避免遮挡编辑区 */
-@media (max-width: 900px) {
+@media (max-width: 1519px) {
   .etoc {
+    left: auto;
     right: 12px;
     top: auto;
     bottom: 20px;

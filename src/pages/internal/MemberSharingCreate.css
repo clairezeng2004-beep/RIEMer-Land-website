@@ -121,24 +121,22 @@
 .msc-topbar__save-state--saved { color: var(--color-primary, #5B8C3E); }
 .msc-topbar__save-state--error { color: var(--color-danger, #dc2626); }
 
-/* ============ Content Area — Full Width ============ */
+/* ============ Content Area — 与详情页阅读版心一致 ============ */
 .msc-content {
   flex: 1;
   display: flex;
   justify-content: center;
-  /* v4：topbar 不再 fixed，内容区不需要再为它的"悬浮高度"让路；
-     只保留常规的上下左右 padding。上方清零，顶栏底边直接接表单，
-     把顶部留白压到最少。 */
-  padding: 0 2rem 1.5rem;
+  padding: 1.5rem 2rem;
 }
 
 .msc-content__inner {
   width: 100%;
-  max-width: none;
+  max-width: 960px;
   background: white;
-  border-radius: var(--radius-lg, 12px);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06), 0 1px 2px rgba(0, 0, 0, 0.04);
-  padding: var(--space-xl, 24px) var(--space-2xl, 32px);
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: var(--shadow-md, 0 4px 16px rgba(0, 0, 0, 0.08));
+  padding: var(--space-2xl, 32px);
 }
 
 .msc-content__title {
@@ -1307,8 +1305,7 @@
   }
 
   .msc-content {
-    /* 手机端也只保留常规缓冲，不再为 fixed topbar 让出 72px。 */
-    padding: 0.5rem 0.75rem 0.75rem;
+    padding: 0.75rem;
   }
 
   .msc-content__inner {

@@ -97,9 +97,10 @@
   margin: 0;
 }
 
-/* 编辑态：评论栏不渲染，第三列的 340px 应当收回，让正文区（含 md 左右预览分栏）获得足够宽度 */
+/* 编辑态不渲染评论，但保留右侧评论栏的列宽占位。
+   这样目录位置、正文宽度和阅读态保持一致，避免进入编辑后版心突然变宽。 */
 .ptd-content__inner--with-toc.ptd-content__inner--editing {
-  grid-template-columns: 260px minmax(0, 1fr);
+  grid-template-columns: 260px minmax(0, 1fr) 340px;
 }
 
 /* 编辑态复用 MemberSharingCreate 的 Markdown/Word 编辑器尺寸与行为 */
