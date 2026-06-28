@@ -448,10 +448,43 @@
   font-weight: 600;
 }
 
-/* 移动端自动降栏，避免过度拥挤 */
+/* 手机端不展示分栏形态：按普通正文块纵向排列，图片宽度与正文内容区一致。 */
 @media (max-width: 640px) {
+  .msc-cols,
+  .msc-cols--2,
   .msc-cols--3,
   .msc-cols--4 {
-    grid-template-columns: 1fr 1fr;
+    display: block;
+    margin: 0.4em 0;
+  }
+
+  [contenteditable="true"] .msc-cols {
+    padding: 0;
+  }
+
+  [contenteditable="true"] .msc-cols::before,
+  [contenteditable="true"] .msc-col::before,
+  [contenteditable="true"] .msc-col-resizer,
+  [contenteditable="true"] .msc-col-adder {
+    display: none;
+  }
+
+  .msc-col,
+  [contenteditable="true"] .msc-col,
+  [contenteditable="true"] .msc-col:hover,
+  [contenteditable="true"] .msc-col--selected {
+    display: block;
+    min-height: 0;
+    margin: 0.4em 0;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    box-shadow: none;
+  }
+
+  .msc-col:has(> img),
+  .msc-col:has(.msc-img) {
+    padding-left: 0;
+    padding-right: 0;
   }
 }

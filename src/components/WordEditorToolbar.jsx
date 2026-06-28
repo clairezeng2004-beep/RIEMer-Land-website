@@ -238,7 +238,7 @@ export default function WordEditorToolbar({
       </button>
 
       {/* 分栏 */}
-      <div className="wet__dropdown-wrap">
+      <div className="wet__dropdown-wrap wet__dropdown-wrap--columns">
         <button
           ref={colBtnRef}
           type="button"
