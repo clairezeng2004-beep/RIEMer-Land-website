@@ -143,9 +143,9 @@ function normaliseAttachmentsForDb(attachments) {
   return attachments.map(({ dataUrl, blobUrl, file, _file, ...att }) => att);
 }
 
-function stripInlineDataUrls(content = '') {
+function stripInlineLocalImages(content = '') {
   return String(content).replace(
-    /\s(src|href)=["']data:[^"']+["']/gi,
+    /\s(src|href)=["'](?:data:image\/|blob:)[^"']+["']/gi,
     ' data-local-preview="pending-upload"',
   );
 }
@@ -153,7 +153,7 @@ function stripInlineDataUrls(content = '') {
 function makeLocalPreviewPost(post) {
   return {
     ...post,
-    content: stripInlineDataUrls(post.content),
+    content: stripInlineLocalImages(post.content),
     attachments: normaliseAttachmentsForDb(post.attachments),
     _syncing: true,
   };
@@ -227,26 +227,41 @@ const INLINE_IMG_EXT = {
 };
 
 /**
- * 把正文里内嵌的 base64 图片上传到 Storage，并把 src 换成公开 URL。
+ * 把正文里内嵌的 base64/blob 图片上传到 Storage，并把 src 换成公开 URL。
  * 这样正文只存短 URL，不会因为多张大图把内容撑爆（localStorage 配额 / PostgREST 请求体上限），
- * 解决"刷新后除第一张外图片都变成破图"的问题。上传失败的图片保留原 base64，至少不丢图。
+ * 解决跨设备打开时正文图片变成浏览器破图占位的问题。
  */
 async function uploadInlineContentImages(content, { postId, userId }) {
   if (!content || typeof content !== 'string' || !supabase) return content;
-  // 收集去重后的内嵌 dataURL（同一张图只上传一次）
-  const re = /(?:src|href)=["'](data:image\/[^"']+)["']/gi;
-  const dataUrls = new Set();
+  // 收集去重后的内嵌本地图片 URL（同一张图只上传一次）
+  const re = /(?:src|href)=["']((?:data:image\/|blob:)[^"']+)["']/gi;
+  const localUrls = new Set();
   let m;
-  while ((m = re.exec(content)) !== null) dataUrls.add(m[1]);
-  if (dataUrls.size === 0) return content;
+  while ((m = re.exec(content)) !== null) localUrls.add(m[1]);
+  if (localUrls.size === 0) return content;
 
   let out = content;
   let idx = 0;
-  for (const dataUrl of dataUrls) {
+  for (const localUrl of localUrls) {
     idx += 1;
-    const blob = dataUrlToBlob(dataUrl);
-    if (!blob) continue;
-    const mime = (dataUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
+    let blob = null;
+    if (localUrl.startsWith('data:')) {
+      blob = dataUrlToBlob(localUrl);
+    } else if (localUrl.startsWith('blob:')) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetch(localUrl);
+        // eslint-disable-next-line no-await-in-loop
+        blob = res.ok ? await res.blob() : null;
+      } catch (err) {
+        console.warn('[MemberSharingDB] 正文 blob 图片读取失败:', err.message);
+      }
+    }
+    if (!blob) {
+      out = out.split(localUrl).join('');
+      continue;
+    }
+    const mime = blob.type || (localUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
     const ext = INLINE_IMG_EXT[mime] || 'png';
     const path = [
       userId || 'unknown-user',
@@ -260,15 +275,17 @@ async function uploadInlineContentImages(content, { postId, userId }) {
         .upload(path, blob, { contentType: mime, upsert: true });
       if (error) {
         console.warn('[MemberSharingDB] 正文内嵌图片上传失败，保留原图:', error.message);
+        if (localUrl.startsWith('blob:')) out = out.split(localUrl).join('');
         continue;
       }
       const { data } = supabase.storage.from(MEMBER_SHARING_BUCKET).getPublicUrl(path);
       if (data?.publicUrl) {
-        // 用整段 dataURL 做分隔做全局替换，避免正则里特殊字符转义问题
-        out = out.split(dataUrl).join(data.publicUrl);
+        // 用整段 URL 做分隔做全局替换，避免正则里特殊字符转义问题
+        out = out.split(localUrl).join(data.publicUrl);
       }
     } catch (err) {
       console.warn('[MemberSharingDB] 正文内嵌图片上传异常，保留原图:', err.message);
+      if (localUrl.startsWith('blob:')) out = out.split(localUrl).join('');
     }
   }
   return out;
