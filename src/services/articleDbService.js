@@ -7,6 +7,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const LOCAL_ARTICLES_KEY = 'riemer_user_articles';
+const ARTICLE_COVERS_BUCKET = 'article-covers';
 const ARTICLE_LIST_COLUMNS = [
   'id',
   'title',
@@ -24,6 +25,70 @@ const ARTICLE_LIST_COLUMNS = [
   'created_at',
   'work_item_id',
 ].join(', ');
+
+function isDataUrl(value) {
+  return /^data:/i.test(String(value || ''));
+}
+
+function getFileExtFromMime(mime = '') {
+  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
+  if (mime.includes('webp')) return 'webp';
+  if (mime.includes('gif')) return 'gif';
+  if (mime.includes('svg')) return 'svg';
+  return 'png';
+}
+
+function dataUrlToBlob(dataUrl) {
+  const [meta, body] = String(dataUrl || '').split(',');
+  if (!meta || !body) return null;
+  const mime = meta.match(/^data:([^;]+);base64$/)?.[1] || 'image/png';
+  const binary = atob(body);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return new Blob([bytes], { type: mime });
+}
+
+async function uploadCoverImage({ articleId, coverImage, userId }) {
+  if (!isDataUrl(coverImage) || !isSupabaseConfigured || !supabase) return coverImage || null;
+  const blob = dataUrlToBlob(coverImage);
+  if (!blob) return coverImage;
+
+  const ext = getFileExtFromMime(blob.type);
+  const path = [
+    userId || 'unknown-user',
+    articleId || `article-${Date.now()}`,
+    `cover-${Date.now()}.${ext}`,
+  ].join('/');
+
+  const { error } = await supabase.storage
+    .from(ARTICLE_COVERS_BUCKET)
+    .upload(path, blob, {
+      contentType: blob.type || 'image/png',
+      upsert: true,
+    });
+
+  if (error) {
+    console.warn('[ArticleDB] 封面图上传失败，保留原始图片字段:', error.message);
+    return coverImage;
+  }
+
+  const { data } = supabase.storage.from(ARTICLE_COVERS_BUCKET).getPublicUrl(path);
+  return data?.publicUrl || coverImage;
+}
+
+async function prepareArticleForDb(article, userId) {
+  if (!article || !isDataUrl(article.coverImage || article.cover_image)) return article;
+  const coverImage = await uploadCoverImage({
+    articleId: article.id,
+    coverImage: article.coverImage || article.cover_image,
+    userId,
+  });
+  return {
+    ...article,
+    coverImage,
+    cover_image: coverImage,
+  };
+}
 
 /**
  * 从 Supabase 获取所有文章（按日期倒序）
@@ -90,7 +155,8 @@ export async function addArticleToDb(article, userId) {
   }
 
   try {
-    const row = frontendToDb(article, userId);
+    const cloudArticle = await prepareArticleForDb(article, userId);
+    const row = frontendToDb(cloudArticle, userId);
     const { data, error } = await supabase
       .from('articles')
       .insert(row)
@@ -99,8 +165,8 @@ export async function addArticleToDb(article, userId) {
 
     if (error) {
       console.warn('[ArticleDB] 添加文章失败，保存本地:', error.message);
-      addLocalArticle(article);
-      return { ...article, _localOnly: true, _saveError: error.message };
+      addLocalArticle(cloudArticle);
+      return { ...cloudArticle, _localOnly: true, _saveError: error.message };
     }
 
     return dbToFrontend(data);
@@ -121,22 +187,23 @@ export async function updateArticleInDb(id, updates) {
   }
 
   try {
+    const cloudUpdates = await prepareArticleForDb({ id, ...updates });
     const dbUpdates = {};
-    if (updates.title !== undefined) dbUpdates.title = updates.title;
-    if (updates.rawTitle !== undefined) dbUpdates.raw_title = updates.rawTitle;
-    if (updates.category !== undefined) dbUpdates.category = updates.category;
-    if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
-    if (updates.excerpt !== undefined) dbUpdates.excerpt = updates.excerpt;
-    if (updates.outline !== undefined) dbUpdates.outline = updates.outline;
-    if (updates.content !== undefined) dbUpdates.content = updates.content;
-    if (updates.url !== undefined) dbUpdates.url = updates.url;
-    if (updates.date !== undefined) dbUpdates.date = updates.date;
-    if (updates.author !== undefined) dbUpdates.author = updates.author;
-    if (updates.coverImage !== undefined) dbUpdates.cover_image = updates.coverImage;
-    if (updates.readNum !== undefined) dbUpdates.read_num = Number(updates.readNum) || 0;
+    if (cloudUpdates.title !== undefined) dbUpdates.title = cloudUpdates.title;
+    if (cloudUpdates.rawTitle !== undefined) dbUpdates.raw_title = cloudUpdates.rawTitle;
+    if (cloudUpdates.category !== undefined) dbUpdates.category = cloudUpdates.category;
+    if (cloudUpdates.tags !== undefined) dbUpdates.tags = cloudUpdates.tags;
+    if (cloudUpdates.excerpt !== undefined) dbUpdates.excerpt = cloudUpdates.excerpt;
+    if (cloudUpdates.outline !== undefined) dbUpdates.outline = cloudUpdates.outline;
+    if (cloudUpdates.content !== undefined) dbUpdates.content = cloudUpdates.content;
+    if (cloudUpdates.url !== undefined) dbUpdates.url = cloudUpdates.url;
+    if (cloudUpdates.date !== undefined) dbUpdates.date = cloudUpdates.date;
+    if (cloudUpdates.author !== undefined) dbUpdates.author = cloudUpdates.author;
+    if (cloudUpdates.coverImage !== undefined) dbUpdates.cover_image = cloudUpdates.coverImage;
+    if (cloudUpdates.readNum !== undefined) dbUpdates.read_num = Number(cloudUpdates.readNum) || 0;
     // 工作项关联（见 supabase-work-item-link.sql / src/utils/workItem.js）：
     // 允许把 null 写回数据库以解除关联；undefined 则表示调用方没打算改这个字段。
-    if (updates.workItemId !== undefined) dbUpdates.work_item_id = updates.workItemId || null;
+    if (cloudUpdates.workItemId !== undefined) dbUpdates.work_item_id = cloudUpdates.workItemId || null;
     dbUpdates.updated_at = new Date().toISOString();
 
     const { error } = await supabase
@@ -146,7 +213,7 @@ export async function updateArticleInDb(id, updates) {
 
     if (error) {
       console.warn('[ArticleDB] 更新文章失败:', error.message);
-      updateLocalArticle(id, updates);
+      updateLocalArticle(id, cloudUpdates);
     }
   } catch (err) {
     console.warn('[ArticleDB] 更新文章异常:', err.message);
