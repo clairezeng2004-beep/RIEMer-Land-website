@@ -923,7 +923,7 @@
 
   .msd-article__content {
     padding: var(--space-lg);
-    font-size: 14px;
+    font-size: var(--text-sm);
   }
 
   .msd-article__content h1 {
