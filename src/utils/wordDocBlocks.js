@@ -481,6 +481,21 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     getColumns(container).forEach((item) => item.classList.toggle('msc-col--selected', item === col));
   };
 
+  const ensureCaretInColumn = (col) => {
+    if (!col || !editor.contains(col)) return;
+    const sel = window.getSelection();
+    const anchor = sel?.anchorNode;
+    if (anchor && col.contains(anchor)) return;
+    const target =
+      col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote, img')
+      || col;
+    if (target.tagName === 'IMG') {
+      placeCaretAtEnd(col);
+      return;
+    }
+    placeCaretAtStart(target);
+  };
+
   const handler = (e) => {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
@@ -502,7 +517,10 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const col = t.closest('.msc-col');
     if (col && editor.contains(col)) {
       selectColumn(col);
-      requestAnimationFrame(() => layoutColumnResizers(col.closest('.msc-cols')));
+      requestAnimationFrame(() => {
+        ensureCaretInColumn(col);
+        layoutColumnResizers(col.closest('.msc-cols'));
+      });
     }
 
     // 1) 历史文档里的「输入文字」按钮

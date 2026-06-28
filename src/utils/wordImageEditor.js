@@ -195,7 +195,7 @@ function createResizer(editor, getImg, onResizeChange) {
   const captionBtn = document.createElement('button');
   captionBtn.type = 'button';
   captionBtn.className = 'msc-img-resizer__caption-btn';
-  captionBtn.textContent = '编辑描述';
+  captionBtn.innerHTML = '<span aria-hidden="true">▣</span><span>图片注释</span>';
   captionBtn.title = '在图片下方添加或编辑注释';
   toolbar.appendChild(captionBtn);
   overlay.appendChild(toolbar);
