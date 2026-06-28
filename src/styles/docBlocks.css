@@ -315,6 +315,7 @@
 .msc-col > blockquote {
   width: 100%;
   margin: 0.25em 0;
+  line-height: 1.7;
   text-align: left;
   white-space: pre-wrap;
   word-break: break-word;
