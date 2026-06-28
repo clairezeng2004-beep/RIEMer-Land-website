@@ -24,7 +24,7 @@ import './PrevNextNavigator.css';
  * @param {(item:Object)=>string} [props.getTitle]   取标题，默认 item.title
  * @param {(item:Object)=>string} [props.getAuthor]  取作者文字，默认 item.author；为空则不显示
  * @param {string}    [props.className]              外层样式类，便于各详情页微调间距
- * @param {string}    [props.sameAuthorHint='同作者推荐']  徽标文字
+ * @param {string}    [props.sameAuthorHint='相同作者']  徽标文字
  */
 export default function PrevNextNavigator({
   prev,
@@ -35,7 +35,7 @@ export default function PrevNextNavigator({
   getTitle = (x) => x?.title || '',
   getAuthor = (x) => x?.author || '',
   className = '',
-  sameAuthorHint = '同作者推荐',
+  sameAuthorHint = '相同作者',
 }) {
   if (!prev && !next) return null;
 
