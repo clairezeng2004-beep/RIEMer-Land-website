@@ -60,6 +60,28 @@ function sanitizeStyle(el, { preserveTextAlign, preserveImageSize }) {
   else el.removeAttribute('style');
 }
 
+function sanitizeClass(el, { preserveEditorAttrs }) {
+  const raw = String(el.getAttribute('class') || '');
+  if (!raw) return;
+  const classes = raw
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((name) => name.startsWith('msc-'));
+
+  if (classes.length === 0) {
+    el.removeAttribute('class');
+    return;
+  }
+
+  if (el.tagName.toLowerCase() === 'img') {
+    el.setAttribute('class', classes.includes('msc-img') ? 'msc-img' : classes.join(' '));
+    return;
+  }
+
+  if (preserveEditorAttrs) el.setAttribute('class', classes.join(' '));
+  else el.removeAttribute('class');
+}
+
 export function cleanPastedWordHtml(html, {
   preserveTextAlign = true,
   preserveEditorAttrs = false,
@@ -72,6 +94,7 @@ export function cleanPastedWordHtml(html, {
 
   doc.querySelectorAll('*').forEach((el) => {
     sanitizeStyle(el, { preserveTextAlign, preserveImageSize: true });
+    sanitizeClass(el, { preserveEditorAttrs });
 
     const tag = el.tagName.toLowerCase();
     const allowed = tag === 'img'

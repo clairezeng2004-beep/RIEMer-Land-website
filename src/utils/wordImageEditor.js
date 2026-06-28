@@ -377,6 +377,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   function onEditorPaste(e) {
     const items = e.clipboardData?.items;
     if (!items) return;
+    if (e.clipboardData?.getData('text/html')) return;
     const imgs = Array.from(items).filter((it) => it.kind === 'file' && it.type.startsWith('image/'));
     if (imgs.length === 0) return; // 不拦截纯文本粘贴，交给外层原有逻辑处理
     e.preventDefault();
