@@ -132,6 +132,10 @@ export default function useTocScroll({
         return;
       }
 
+      const wasMobileDrawerOpen = tocOpenMobile;
+      setActiveTocId(tocId);
+      if (wasMobileDrawerOpen) setTocOpenMobile(false);
+
       /* ========== 3.2 探测真实滚动容器 ========== */
       const findScrollParent = (node) => {
         let p = node?.parentElement;
@@ -167,26 +171,34 @@ export default function useTocScroll({
             el.getBoundingClientRect().top + window.pageYOffset - scrollOffset;
           window.scrollTo(0, Math.max(0, top));
         }
+
+        try {
+          window.history.replaceState(null, '', `#${tocId}`);
+        } catch {
+          /* ignore */
+        }
       };
 
-      const rect = el.getBoundingClientRect();
-      // 还没布局完成（例如内容区图片正在撑开高度），下一帧再跳一次
-      if (rect.top === 0 && rect.height === 0) {
-        requestAnimationFrame(doScroll);
-      } else {
-        doScroll();
-      }
+      const scheduleScroll = () => {
+        const rect = el.getBoundingClientRect();
+        // 还没布局完成（例如内容区图片正在撑开高度），下一帧再跳一次
+        if (rect.top === 0 && rect.height === 0) {
+          requestAnimationFrame(doScroll);
+        } else {
+          doScroll();
+        }
+      };
 
-      /* ========== 3.4 写 hash + 更新状态 ========== */
-      try {
-        window.history.replaceState(null, '', `#${tocId}`);
-      } catch {
-        /* ignore */
+      /* ========== 3.4 移动端抽屉先关闭，再滚动 ==========
+       * 若在抽屉仍挂载时启动 smooth scroll，关闭抽屉的 fixed 层卸载会与页面滚动
+       * 叠加，手机端靠近页面底部时容易出现跳动/闪动。 */
+      if (wasMobileDrawerOpen) {
+        requestAnimationFrame(() => requestAnimationFrame(scheduleScroll));
+      } else {
+        scheduleScroll();
       }
-      setActiveTocId(tocId);
-      setTocOpenMobile(false);
     },
-    [toc, contentRef, headingSelector, anchorClassName, scrollOffset],
+    [toc, contentRef, headingSelector, anchorClassName, scrollOffset, tocOpenMobile],
   );
 
   return {
