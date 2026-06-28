@@ -19,6 +19,7 @@ export const DOCUMENTS_KEY = 'riemer_documents';
 export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
 export const DOC_VIEWS_KEY = 'riemer_process_template_views';
 const DOCUMENTS_BUCKET = 'documents';
+const VIEW_LOG_TIMEOUT_MS = 8000;
 
 /**
  * 判断当前是否可以使用 Supabase（已配置 + 健康检测通过）
@@ -28,6 +29,14 @@ export function canUseSupabase() {
   // 不能因此直接切到 localStorage，否则会出现跨设备只看到本地旧数据。
   // 只要 Supabase 已配置，就让真实的 documents 查询自己决定成功或失败。
   return Boolean(isSupabaseConfigured && supabase);
+}
+
+function withTimeout(promise, ms, label) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} 超时`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
 }
 
 /* ============ Row ↔ Doc 对象互转 ============ */
@@ -674,12 +683,16 @@ export async function recordViewLog(documentId, user) {
 export async function fetchViewLog(documentId) {
   if (canUseSupabase() && supabase) {
     try {
-      const { data, error } = await supabase
-        .from('document_view_logs')
-        .select('user_id,user_name,viewed_at')
-        .eq('document_id', documentId)
-        .order('viewed_at', { ascending: false })
-        .limit(500);
+      const { data, error } = await withTimeout(
+        supabase
+          .from('document_view_logs')
+          .select('user_id,user_name,viewed_at')
+          .eq('document_id', documentId)
+          .order('viewed_at', { ascending: false })
+          .limit(500),
+        VIEW_LOG_TIMEOUT_MS,
+        '加载访问记录',
+      );
       if (!error && Array.isArray(data)) {
         return data.map((r) => ({
           userId: r.user_id || null,

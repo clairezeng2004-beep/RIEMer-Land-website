@@ -19,6 +19,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Eye, X, Clock, User as UserIcon } from 'lucide-react';
 import './ViewLogPopover.css';
 
+const VIEW_LOG_UI_TIMEOUT_MS = 10000;
+
 function formatDateTime(iso) {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -67,20 +69,38 @@ export default function ViewLogPopover({
     const fn = fetchLogRef.current;
     if (!fn) return;
     let cancelled = false;
+    let timedOut = false;
     setLoading(true);
     setError(null);
+    const timeoutId = setTimeout(() => {
+      if (!cancelled) {
+        timedOut = true;
+        setError('访问记录加载超时，请稍后重试');
+        setLoading(false);
+      }
+    }, VIEW_LOG_UI_TIMEOUT_MS);
     (async () => {
       try {
         const list = await fn();
-        if (!cancelled) setLogs(Array.isArray(list) ? list : []);
+        if (!cancelled && !timedOut) {
+          clearTimeout(timeoutId);
+          setLogs(Array.isArray(list) ? list : []);
+        }
       } catch (err) {
-        if (!cancelled) setError(err?.message || '加载访问记录失败');
+        if (!cancelled && !timedOut) {
+          clearTimeout(timeoutId);
+          setError(err?.message || '加载访问记录失败');
+        }
       } finally {
-        if (!cancelled) setLoading(false);
+        if (!cancelled && !timedOut) {
+          clearTimeout(timeoutId);
+          setLoading(false);
+        }
       }
     })();
     return () => {
       cancelled = true;
+      clearTimeout(timeoutId);
     };
   }, [open]);
 
