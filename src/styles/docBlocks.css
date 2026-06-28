@@ -228,6 +228,19 @@
   text-align: center;
 }
 
+.msc-img-caption {
+  margin: 2px 0 0.8em;
+  font-size: 0.82em;
+  color: var(--color-text-muted, #888);
+  line-height: 1.5;
+  text-align: center;
+}
+
+[contenteditable="true"] .msc-img-caption:empty::before {
+  content: '图片注释…';
+  color: var(--color-text-muted, #bbb);
+}
+
 /* 占位（仅编辑器里会出现；预览页若正常使用不会留下占位节点） */
 
 /* 旧版单占位 span（历史文档兼容） */

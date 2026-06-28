@@ -12,9 +12,9 @@
 
 /* 展开面板 */
 .etoc__panel {
-  width: 220px;
-  /* 目录加长：占用更多竖向空间，长文档目录少滚动。 */
-  max-height: min(80vh, 680px);
+  width: min(320px, calc(100vw - 32px));
+  /* 长目录不截断内容，超出视口时在目录内部滚动。 */
+  max-height: calc(100vh - 112px);
   display: flex;
   flex-direction: column;
   border: 1px solid var(--color-border, #e5e7eb);
@@ -66,13 +66,14 @@
 }
 
 .etoc__list {
+  min-height: 0;
   overflow-y: auto;
   padding: 4px;
 }
 
 .etoc__item {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
   width: 100%;
   padding: 0.35rem 0.5rem;
@@ -105,6 +106,7 @@
 
 .etoc__dot {
   flex-shrink: 0;
+  margin-top: 0.6em;
   width: 4px;
   height: 4px;
   border-radius: 50%;
@@ -114,9 +116,11 @@
 
 .etoc__text {
   flex: 1;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  min-width: 0;
+  overflow: visible;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* 收起态：一个小圆按钮 */
@@ -148,7 +152,7 @@
     bottom: 20px;
   }
   .etoc__panel {
-    width: 180px;
-    max-height: 50vh;
+    width: min(300px, calc(100vw - 24px));
+    max-height: calc(100vh - 40px);
   }
 }

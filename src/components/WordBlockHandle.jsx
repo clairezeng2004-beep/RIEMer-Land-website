@@ -378,7 +378,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
               onClick={addCaption}
             >
               <Captions size={15} className="wbh__menu-icon" />
-              <span>添加注释</span>
+              <span>编辑描述</span>
             </button>
           )}
         </div>

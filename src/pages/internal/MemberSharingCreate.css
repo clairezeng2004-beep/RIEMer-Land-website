@@ -1080,6 +1080,43 @@
   box-sizing: border-box;
 }
 
+.msc-img-resizer__toolbar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--color-border, #d1d5db);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-card, #fff);
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.16);
+  pointer-events: auto;
+}
+
+.msc-img-resizer__caption-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 74px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  background: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.msc-img-resizer__caption-btn:hover {
+  background: rgba(59, 130, 246, 0.2);
+}
+
 /* 8 个手柄 */
 .msc-img-resizer__handle {
   position: absolute;

@@ -12,6 +12,7 @@
  *   <p class="msc-img-wrap" style="text-align:center">
  *     <img src="..." class="msc-img" style="width:XXXpx" />
  *   </p>
+ *   <p class="msc-img-caption" style="text-align:center">图片注释</p>
  *
  * 使用方式：
  *   const api = attachWordImageEditor(editorEl, {
@@ -77,6 +78,38 @@ function getImageContainerWidth(editor, img) {
   return Math.max(32, Math.round(clientWidth - 8));
 }
 
+function getImageWrap(img) {
+  return img?.closest?.('.msc-img-wrap') || null;
+}
+
+function getImageCaption(img) {
+  const wrap = getImageWrap(img);
+  const next = wrap?.nextElementSibling;
+  return next?.classList?.contains('msc-img-caption') ? next : null;
+}
+
+function ensureImageCaption(editor, img) {
+  const wrap = getImageWrap(img);
+  if (!wrap?.parentNode) return null;
+  let caption = getImageCaption(img);
+  if (!caption) {
+    caption = document.createElement('p');
+    caption.className = 'msc-img-caption';
+    caption.textContent = '图片注释';
+    wrap.parentNode.insertBefore(caption, wrap.nextSibling);
+  }
+  caption.style.textAlign = wrap.style.textAlign || 'center';
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(caption);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+    editor.focus();
+  } catch { /* ignore */ }
+  return caption;
+}
+
 /**
  * 在当前光标处（或编辑器末尾）插入一张图片段落
  * 返回插入的 <img> 元素
@@ -138,6 +171,17 @@ function createResizer(editor, getImg, onResizeChange) {
   const overlay = document.createElement('div');
   overlay.className = 'msc-img-resizer';
   overlay.style.display = 'none';
+
+  const toolbar = document.createElement('div');
+  toolbar.className = 'msc-img-resizer__toolbar';
+  toolbar.setAttribute('contenteditable', 'false');
+  const captionBtn = document.createElement('button');
+  captionBtn.type = 'button';
+  captionBtn.className = 'msc-img-resizer__caption-btn';
+  captionBtn.textContent = '编辑描述';
+  captionBtn.title = '在图片下方添加或编辑注释';
+  toolbar.appendChild(captionBtn);
+  overlay.appendChild(toolbar);
 
   // 8 个手柄：nw, n, ne, e, se, s, sw, w
   const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((pos) => {
@@ -236,6 +280,19 @@ function createResizer(editor, getImg, onResizeChange) {
   }
 
   overlay.addEventListener('mousedown', onMouseDown);
+  captionBtn.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  captionBtn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const img = getImg();
+    if (!img) return;
+    ensureImageCaption(editor, img);
+    if (onResizeChange) onResizeChange();
+    requestAnimationFrame(layout);
+  });
 
   // 编辑器滚动或窗口 resize 时同步 overlay 位置
   const onScrollOrResize = () => layout();
@@ -403,19 +460,27 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       if (!range) return;
       // 要移动的块：正文图片用 .msc-img-wrap；分栏内裸图则包成居中段落一起搬出
       let node = img.closest('.msc-img-wrap');
+      const caption = getImageCaption(img);
+      let moveNode = node;
       if (!node) {
         const wrap = document.createElement('p');
         wrap.className = 'msc-img-wrap';
         wrap.style.textAlign = 'center';
         wrap.appendChild(img);
         node = wrap;
+        moveNode = wrap;
+      } else if (caption) {
+        const bundle = document.createDocumentFragment();
+        bundle.appendChild(node);
+        bundle.appendChild(caption);
+        moveNode = bundle;
       }
       // 落点若在被拖块内部则放弃，避免把块塞进自己
       if (node.contains(range.startContainer)) return;
       try {
-        range.insertNode(node); // 节点已在文档中时会被移动到此处
+        range.insertNode(moveNode); // 节点已在文档中时会被移动到此处
         const after = document.createRange();
-        after.setStartAfter(node);
+        after.setStartAfter(caption || node);
         after.collapse(true);
         const sel = window.getSelection();
         sel?.removeAllRanges();
@@ -482,6 +547,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
 
       // 普通正文图片：删除整段容器，让整行随之消失
       const block = wrap || img.parentElement;
+      const caption = getImageCaption(img);
+      caption?.remove();
       if (block && block.parentElement) block.parentElement.removeChild(block);
       else if (img.parentElement) img.parentElement.removeChild(img);
       fireChange();
@@ -503,6 +570,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     // 点到 overlay（resizer）也算在编辑里
     if (e.target instanceof HTMLElement && e.target.classList.contains('msc-img-resizer__handle')) return;
     if (e.target instanceof HTMLElement && e.target.classList.contains('msc-img-resizer')) return;
+    if (e.target instanceof HTMLElement && e.target.closest('.msc-img-resizer__toolbar')) return;
     selectImage(null);
   }
 

@@ -965,7 +965,7 @@ export default function MemberSharingCreate() {
             <div className="msc-form__field">
               <label>
                 贡献者
-                <span className="msc-form__hint">可多选，默认为本人；列表第一位作为主贡献者</span>
+                <span className="msc-form__hint">可多选，默认为本人</span>
               </label>
               <CustomSelect
                 multiple
