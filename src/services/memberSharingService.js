@@ -150,6 +150,10 @@ function stripInlineLocalImages(content = '') {
   );
 }
 
+function hasInlineLocalImages(content = '') {
+  return /(?:src|href)=["'](?:data:image\/|blob:)[^"']+["']/i.test(String(content || ''));
+}
+
 function makeLocalPreviewPost(post) {
   return {
     ...post,
@@ -258,7 +262,7 @@ async function uploadInlineContentImages(content, { postId, userId }) {
       }
     }
     if (!blob) {
-      out = out.split(localUrl).join('');
+      console.warn('[MemberSharingDB] 正文本地图片读取失败，保留原地址');
       continue;
     }
     const mime = blob.type || (localUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
@@ -275,7 +279,6 @@ async function uploadInlineContentImages(content, { postId, userId }) {
         .upload(path, blob, { contentType: mime, upsert: true });
       if (error) {
         console.warn('[MemberSharingDB] 正文内嵌图片上传失败，保留原图:', error.message);
-        if (localUrl.startsWith('blob:')) out = out.split(localUrl).join('');
         continue;
       }
       const { data } = supabase.storage.from(MEMBER_SHARING_BUCKET).getPublicUrl(path);
@@ -285,7 +288,6 @@ async function uploadInlineContentImages(content, { postId, userId }) {
       }
     } catch (err) {
       console.warn('[MemberSharingDB] 正文内嵌图片上传异常，保留原图:', err.message);
-      if (localUrl.startsWith('blob:')) out = out.split(localUrl).join('');
     }
   }
   return out;
@@ -476,9 +478,12 @@ export async function updateSharing(id, updates) {
   if (!isSupabaseConfigured || !supabase) return;
   try {
     let cloudUpdates = updates;
-    if (updates.attachments !== undefined) {
+    if (updates.attachments !== undefined || hasInlineLocalImages(updates.content)) {
       cloudUpdates = await prepareSharingForCloud({ id, ...updates });
-      updateLocalSharing(id, { attachments: cloudUpdates.attachments });
+      updateLocalSharing(id, {
+        ...(cloudUpdates.attachments !== undefined ? { attachments: cloudUpdates.attachments } : {}),
+        ...(cloudUpdates.content !== undefined ? { content: cloudUpdates.content } : {}),
+      });
     }
     const dbUpdates = frontendToDbUpdate(cloudUpdates);
     let { error } = await supabase
