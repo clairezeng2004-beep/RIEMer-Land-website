@@ -1019,7 +1019,7 @@ export default function MemberSharingCreate() {
             {(newPost.category === 'experience' || newPost.category === 'history') && (
               <div className="msc-form__field">
                 <label>
-                  <Calendar size={14} /> {newPost.category === 'history' ? '会议时间' : '时间段'}
+                  <Calendar size={14} /> {newPost.category === 'history' ? '会议时间' : '经验时间段'}
                   <span className="msc-form__hint">
                     {newPost.category === 'history'
                       ? '选填，标注会议发生的具体年份和月份，例如 2025 年 6 月'
