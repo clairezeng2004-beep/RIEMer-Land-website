@@ -108,6 +108,8 @@ function appendColumnImage(col, src) {
   col.appendChild(img);
 
   const p = document.createElement('p');
+  p.style.textAlign = 'left';
+  p.setAttribute('align', 'left');
   p.innerHTML = '<br />';
   col.appendChild(p);
   return img;

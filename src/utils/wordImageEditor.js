@@ -54,6 +54,8 @@ function whenImgLoaded(img) {
 /** 在节点后补一个空段落，并把光标放进去，方便继续输入 */
 function insertTrailingParagraphAfter(node) {
   const trailer = document.createElement('p');
+  trailer.style.textAlign = 'left';
+  trailer.setAttribute('align', 'left');
   trailer.innerHTML = '<br />';
   node.parentNode?.insertBefore(trailer, node.nextSibling);
 
@@ -529,6 +531,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
         // 若删图后这一栏没有可落脚的块，补一个空段落，保证仍可编辑/再插图
         if (!col.querySelector('img') && !col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote')) {
           const p = document.createElement('p');
+          p.style.textAlign = 'left';
+          p.setAttribute('align', 'left');
           p.innerHTML = '<br />';
           col.appendChild(p);
         }
