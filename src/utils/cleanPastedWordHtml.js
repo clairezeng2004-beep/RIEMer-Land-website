@@ -142,3 +142,62 @@ export function cleanPastedWordHtml(html, {
 
   return stripUnderline(cleaned);
 }
+
+function isEmptyParagraph(node) {
+  if (!node || node.nodeType !== 1 || node.tagName.toLowerCase() !== 'p') return false;
+  if (node.querySelector('img, video, table, iframe')) return false;
+  const text = String(node.textContent || '').replace(/\u200B/g, '').trim();
+  if (text) return false;
+  return [...node.childNodes].every((child) => {
+    if (child.nodeType === 3) return !String(child.textContent || '').replace(/\u200B/g, '').trim();
+    if (child.nodeType !== 1) return true;
+    return child.tagName.toLowerCase() === 'br';
+  });
+}
+
+function fragmentFromHtml(html) {
+  const template = document.createElement('template');
+  template.innerHTML = html || '';
+  return template.content;
+}
+
+function placeCaretAfter(node) {
+  if (!node) return;
+  try {
+    const range = document.createRange();
+    range.setStartAfter(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch { /* ignore */ }
+}
+
+export function insertHtmlReplacingEmptyParagraph(editor, html) {
+  if (!editor || !html) return false;
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
+  const range = sel.getRangeAt(0);
+  if (!editor.contains(range.commonAncestorContainer)) return false;
+
+  const anchor =
+    range.startContainer.nodeType === 1
+      ? range.startContainer
+      : range.startContainer.parentElement;
+  const paragraph = anchor?.closest?.('p');
+  if (!paragraph || !editor.contains(paragraph) || !isEmptyParagraph(paragraph)) return false;
+
+  const previous = paragraph.previousElementSibling;
+  const isAfterImage =
+    previous?.classList?.contains('msc-img-wrap')
+    || previous?.matches?.('img.msc-img')
+    || previous?.querySelector?.('img.msc-img');
+  if (!isAfterImage) return false;
+
+  const frag = fragmentFromHtml(html);
+  const inserted = [...frag.childNodes];
+  if (inserted.length === 0) return false;
+  paragraph.replaceWith(frag);
+  placeCaretAfter(inserted[inserted.length - 1]);
+  return true;
+}

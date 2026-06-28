@@ -66,7 +66,7 @@ import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
-import { cleanPastedWordHtml } from '../../utils/cleanPastedWordHtml';
+import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph } from '../../utils/cleanPastedWordHtml';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -1093,12 +1093,17 @@ export default function ProcessTemplateDetail() {
     const text = e.clipboardData.getData('text/plain');
 
     if (html) {
-      document.execCommand('insertHTML', false, cleanWordHtml(html));
+      const cleaned = cleanWordHtml(html);
+      if (!insertHtmlReplacingEmptyParagraph(ptdWordEditorRef.current, cleaned)) {
+        document.execCommand('insertHTML', false, cleaned);
+      }
     } else if (text) {
       const paragraphs = stripUnderline(
         text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
       );
-      document.execCommand('insertHTML', false, paragraphs || text);
+      if (!insertHtmlReplacingEmptyParagraph(ptdWordEditorRef.current, paragraphs || text)) {
+        document.execCommand('insertHTML', false, paragraphs || text);
+      }
     }
 
     if (ptdWordEditorRef.current) {

@@ -39,7 +39,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
-import { cleanPastedWordHtml } from '../../utils/cleanPastedWordHtml';
+import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph } from '../../utils/cleanPastedWordHtml';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import {
@@ -645,12 +645,16 @@ export default function MemberSharingCreate() {
 
     if (html) {
       const cleaned = cleanWordHtml(html);
-      document.execCommand('insertHTML', false, cleaned);
+      if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, cleaned)) {
+        document.execCommand('insertHTML', false, cleaned);
+      }
     } else if (text) {
       const paragraphs = stripUnderline(
         text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
       );
-      document.execCommand('insertHTML', false, paragraphs || text);
+      if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, paragraphs || text)) {
+        document.execCommand('insertHTML', false, paragraphs || text);
+      }
     }
 
     if (wordEditorRef.current) {
