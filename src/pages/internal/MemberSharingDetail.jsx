@@ -28,17 +28,22 @@ import ViewLogPopover from '../../components/ViewLogPopover';
 import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useTocScroll from '../../hooks/useTocScroll';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
-import { recordViewLog, fetchViewLog } from '../../lib/documentsService';
+import {
+  recordViewLog,
+  fetchViewLog,
+  fetchViewsFromCloud,
+  incrementView,
+  loadLocalViews,
+} from '../../lib/documentsService';
 import {
   fetchSharings,
+  fetchSharingById,
   subscribeSharings,
   updateSharing,
   fetchCategories,
   DEFAULT_CATEGORIES,
 } from '../../services/memberSharingService';
 import './MemberSharingDetail.css';
-
-const SHARING_VIEWS_KEY = 'riemer_sharing_views';
 
 function buildCategoryMaps(cats) {
   const labels = { history: '历史会议' };
@@ -92,18 +97,6 @@ function getPreviewableAttachmentType(file) {
     /\.(docx|doc)$/i.test(name)
   ) return 'word';
   return null;
-}
-
-function loadViews() {
-  try {
-    const stored = localStorage.getItem(SHARING_VIEWS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return {};
-}
-
-function saveViews(data) {
-  localStorage.setItem(SHARING_VIEWS_KEY, JSON.stringify(data));
 }
 
 export default function MemberSharingDetail() {
@@ -188,6 +181,7 @@ export default function MemberSharingDetail() {
 
   const [sharings, setSharings] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [views, setViews] = useState(() => loadLocalViews());
   const post = sharings.find((s) => String(s.id) === String(id));
 
   // 浏览器标签页标题：新窗口里直观显示这是成员分享的文档
@@ -202,9 +196,17 @@ export default function MemberSharingDetail() {
     let cancelled = false;
     (async () => {
       try {
-        const [list, cats] = await Promise.all([fetchSharings(), fetchCategories()]);
+        const [list, cats, freshPost, cloudViews] = await Promise.all([
+          fetchSharings(),
+          fetchCategories(),
+          fetchSharingById(id),
+          fetchViewsFromCloud(),
+        ]);
         if (cancelled) return;
-        setSharings(list);
+        setSharings((freshPost && String(freshPost.id) === String(id))
+          ? [freshPost, ...list.filter((item) => String(item.id) !== String(id))]
+          : list);
+        if (cloudViews) setViews(cloudViews);
         // 兼容云端返回空数组（他人已在另一设备把分类全部删除的场景）
         if (Array.isArray(cats)) setCategoryList(cats);
       } catch (err) {
@@ -214,7 +216,7 @@ export default function MemberSharingDetail() {
       }
     })();
     return () => { cancelled = true; };
-  }, []);
+  }, [id]);
 
   // 订阅 member_sharing 实时变更
   useEffect(() => {
@@ -246,11 +248,14 @@ export default function MemberSharingDetail() {
         JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
       );
       if (sessionViewed.has(String(post.id))) return;
-      const views = loadViews();
-      views[post.id] = (views[post.id] || 0) + 1;
-      saveViews(views);
       sessionViewed.add(String(post.id));
       sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
+      incrementView(String(post.id)).then((result) => {
+        setViews((prev) => ({
+          ...prev,
+          [post.id]: Number(result?.count) || (Number(prev[post.id]) || 0) + 1,
+        }));
+      });
       // 访问日志（云端 + 本地兜底）
       recordViewLog(String(post.id), user).catch((err) => {
         console.warn('[MemberSharingDetail] 访问日志写入失败:', err);
@@ -359,7 +364,6 @@ export default function MemberSharingDetail() {
   };
 
   const hasLiked = post.likes?.some((l) => l.userId === user?.id);
-  const views = loadViews();
 
   const showToc = toc.length > 0 && (post.format === 'markdown' || post.format === 'word');
 

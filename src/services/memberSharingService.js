@@ -339,23 +339,31 @@ export async function fetchSharings() {
 
 /** 按 id 获取单条分享 */
 export async function fetchSharingById(id) {
+  const localMatch = getLocalSharings().find((s) => String(s.id) === String(id)) || null;
   if (!isSupabaseConfigured || !supabase) {
-    return getLocalSharings().find((s) => String(s.id) === String(id)) || null;
+    return localMatch;
   }
   try {
-    const { data, error } = await supabase
-      .from('member_sharing')
-      .select('*')
-      .eq('id', String(id))
-      .maybeSingle();
+    const { data, error } = await withTimeout(
+      supabase
+        .from('member_sharing')
+        .select('*')
+        .eq('id', String(id))
+        .maybeSingle(),
+      MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+      '获取成员分享详情',
+    );
     if (error) {
       console.warn('[MemberSharingDB] 获取单条分享失败:', error.message);
-      return getLocalSharings().find((s) => String(s.id) === String(id)) || null;
+      return localMatch;
     }
-    return data ? dbToFrontend(data) : null;
+    if (!data) return null;
+    const fresh = dbToFrontend(data);
+    addLocalSharing(fresh);
+    return fresh;
   } catch (err) {
     console.warn('[MemberSharingDB] 获取单条分享异常:', err.message);
-    return getLocalSharings().find((s) => String(s.id) === String(id)) || null;
+    return localMatch;
   }
 }
 

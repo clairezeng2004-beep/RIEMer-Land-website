@@ -5,7 +5,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import ViewLogPopover from '../../components/ViewLogPopover';
-import { fetchViewLog } from '../../lib/documentsService';
+import { fetchViewLog, fetchViewsFromCloud, loadLocalViews } from '../../lib/documentsService';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import {
   fetchSharings,
@@ -42,7 +42,6 @@ import {
 } from 'lucide-react';
 import './MemberSharing.css';
 
-const SHARING_VIEWS_KEY = 'riemer_sharing_views';
 const HIDDEN_CATEGORY_KEYS = new Set(['history']);
 
 // 预设颜色供选择
@@ -65,14 +64,6 @@ function buildCategoryMaps(cats) {
 
 function getVisibleCategories(cats) {
   return (Array.isArray(cats) ? cats : []).filter((cat) => !HIDDEN_CATEGORY_KEYS.has(cat.key));
-}
-
-function loadViews() {
-  try {
-    const stored = localStorage.getItem(SHARING_VIEWS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return {};
 }
 
 function getAttachmentExtension(file = {}) {
@@ -179,7 +170,7 @@ export default function MemberSharing() {
   const [loaded, setLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const views = loadViews();
+  const [views, setViews] = useState(() => loadLocalViews());
 
   // 动态分类管理
   const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
@@ -195,9 +186,14 @@ export default function MemberSharing() {
       } catch { /* ignore */ }
       if (cancelled) return;
       try {
-        const [list, cats] = await Promise.all([fetchSharings(), fetchCategories()]);
+        const [list, cats, cloudViews] = await Promise.all([
+          fetchSharings(),
+          fetchCategories(),
+          fetchViewsFromCloud(),
+        ]);
         if (cancelled) return;
         setSharings(list);
+        if (cloudViews) setViews(cloudViews);
         // ⚠️ 必须兼容"空数组"—— 若只有云端可用且用户已在另一设备把分类全删光，
         // fetchCategories 会返回 []，直接同步给 UI；若 cats 为 null/undefined
         // （服务层意外分支）才保留默认列表不动。
