@@ -89,13 +89,14 @@ export default function FloatingTextToolbar({
   /* =================================================================
    * 共用：位置计算（从一个矩形算出工具栏坐标）
    * ================================================================= */
-  const placeAt = useCallback((rect) => {
+  const placeAt = useCallback((rect, { forceAbove = false } = {}) => {
     if (!rect || (rect.width === 0 && rect.height === 0)) return;
     const tbWidth = toolbarRef.current?.offsetWidth || 240;
     const tbHeight = toolbarRef.current?.offsetHeight || 40;
     const gap = 8;
     let top = rect.top - tbHeight - gap;
-    if (top < 8) top = rect.bottom + gap;
+    if (!forceAbove && top < 8) top = rect.bottom + gap;
+    if (forceAbove && top < 8) top = 8;
     let left = rect.left + rect.width / 2 - tbWidth / 2;
     const minLeft = 8;
     const maxLeft = window.innerWidth - tbWidth - 8;
@@ -110,6 +111,7 @@ export default function FloatingTextToolbar({
   const selectionInsideEditor = useCallback(() => {
     const editor = editorRef.current;
     if (!editor) return false;
+    if (getSelectedImage(editor)) return true;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return false;
     const range = sel.getRangeAt(0);
@@ -199,13 +201,18 @@ export default function FloatingTextToolbar({
   }, [editorRef]);
 
   const updatePositionRich = useCallback(() => {
+    const selectedImage = getSelectedImage(editorRef.current);
+    if (selectedImage) {
+      placeAt(selectedImage.getBoundingClientRect(), { forceAbove: true });
+      return;
+    }
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
     const range = sel.getRangeAt(0);
     const rects = range.getClientRects();
     const rect = rects.length > 0 ? rects[0] : range.getBoundingClientRect();
     placeAt(rect);
-  }, [placeAt]);
+  }, [editorRef, placeAt]);
 
   /* =================================================================
    * Markdown 模式：textarea 选区检测 + 位置
@@ -660,7 +667,8 @@ export default function FloatingTextToolbar({
       className={`ftt__btn${activeFlag ? ' ftt__btn--active' : ''}`}
       onMouseDown={stop}
       onClick={onClick}
-      title={title}
+      aria-label={title}
+      data-tooltip={title}
     >
       {children}
     </button>

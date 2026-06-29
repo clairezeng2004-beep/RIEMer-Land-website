@@ -30,6 +30,7 @@
 }
 
 .ftt__btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -42,6 +43,55 @@
   color: var(--color-text-muted, #4b5563);
   cursor: pointer;
   transition: background 0.15s ease, color 0.15s ease;
+}
+
+.ftt__btn::before,
+.ftt__btn::after {
+  position: absolute;
+  left: 50%;
+  z-index: 2;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.ftt__btn::before {
+  content: attr(data-tooltip);
+  bottom: calc(100% + 10px);
+  max-width: 160px;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(17, 24, 39, 0.96);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.25;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.22);
+}
+
+.ftt__btn::after {
+  content: '';
+  bottom: calc(100% + 4px);
+  width: 9px;
+  height: 9px;
+  background: rgba(17, 24, 39, 0.96);
+  transform: translate(-50%, 4px) rotate(45deg);
+}
+
+.ftt__btn:hover::before,
+.ftt__btn:hover::after,
+.ftt__btn:focus-visible::before,
+.ftt__btn:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.ftt__btn:hover::after,
+.ftt__btn:focus-visible::after {
+  transform: translate(-50%, 0) rotate(45deg);
 }
 
 .ftt__btn:hover {
