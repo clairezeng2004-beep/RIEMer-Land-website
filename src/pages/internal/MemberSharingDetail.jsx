@@ -275,6 +275,19 @@ export default function MemberSharingDetail() {
     return stripUnderline(rawContent);
   }, [post]);
 
+  useEffect(() => {
+    if (!contentRef.current) return;
+    const imgs = Array.from(contentRef.current.querySelectorAll('img'));
+    imgs.forEach((img, index) => {
+      img.decoding = 'async';
+      img.loading = index === 0 ? 'eager' : 'lazy';
+      img.setAttribute('fetchpriority', index === 0 ? 'high' : 'low');
+      img.setAttribute('sizes', img.closest('.msc-col')
+        ? '(max-width: 768px) calc(100vw - 48px), 42vw'
+        : '(max-width: 768px) calc(100vw - 48px), 760px');
+    });
+  }, [renderedContent]);
+
   // 上/下一篇：sharings 已按 created_at 降序；同作者优先（authorId 可能为 null，
   // hook 会自动 fallback 到按 author 字符串匹配）
   const { prev: prevSharing, next: nextSharing, prevSameAuthor, nextSameAuthor } = useAdjacentItems({
