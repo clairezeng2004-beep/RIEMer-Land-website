@@ -936,7 +936,44 @@ export function attachWordEditingNormalizer(editor, onChange) {
     if (normalizeOrderedListNumbering(editor)) onChange?.();
   };
 
+  const convertTypedOrderedListMarker = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
+    const range = sel.getRangeAt(0);
+    const anchor = range.startContainer?.nodeType === 1
+      ? range.startContainer
+      : range.startContainer?.parentElement;
+    const block = anchor?.closest?.('p, li');
+    if (!block || !editor.contains(block)) return false;
+    if (block.querySelector('img, table, iframe, video')) return false;
+
+    const probe = document.createRange();
+    probe.selectNodeContents(block);
+    try {
+      probe.setEnd(range.startContainer, range.startOffset);
+    } catch {
+      return false;
+    }
+    const before = String(probe.toString() || '').replace(/\u200B/g, '');
+    if (!/^\s*(?:\d+|[a-zA-Z]|[ivxlcdmIVXLCDM]+)\.$/.test(before)) return false;
+
+    probe.deleteContents();
+    if (block.tagName?.toLowerCase() !== 'li') {
+      document.execCommand('insertOrderedList', false, null);
+    }
+    normalizeOrderedListNumbering(editor);
+    onChange?.();
+    return true;
+  };
+
   const onKeyDown = (e) => {
+    if (e.key === ' ' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (convertTypedOrderedListMarker()) {
+        e.preventDefault();
+        return;
+      }
+    }
+
     if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
