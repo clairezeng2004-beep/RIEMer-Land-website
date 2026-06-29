@@ -330,6 +330,7 @@ export default function InternalArticles() {
   const [previewArticle, setPreviewArticle] = useState(null);
   const [showCoverGallery, setShowCoverGallery] = useState(false);
   const [coverPickerTarget, setCoverPickerTarget] = useState(null); // null | 'draft' | 'archive'
+  const [coverGalleryUploadState, setCoverGalleryUploadState] = useState('idle'); // idle | uploading | success | error
 
   // 挂载时从云端拉取一次，并订阅变更（跨设备同步）
   useEffect(() => {
@@ -769,12 +770,20 @@ export default function InternalArticles() {
   };
 
   const handleAddGalleryCover = async (file) => {
+    if (!file) return;
+    setCoverGalleryUploadState('uploading');
     const dataUrl = await readCoverImage(file);
-    if (!dataUrl) return;
+    if (!dataUrl) {
+      setCoverGalleryUploadState('error');
+      window.setTimeout(() => setCoverGalleryUploadState('idle'), 1800);
+      return;
+    }
     const item = makeCoverGalleryItem(file, dataUrl);
     const updated = [item, ...coverGallery];
     setCoverGallery(updated);
     persistCoverGallery(updated, lastCoverGallerySyncRef);
+    setCoverGalleryUploadState('success');
+    window.setTimeout(() => setCoverGalleryUploadState('idle'), 1800);
   };
 
   const handleDeleteGalleryCover = (id) => {
@@ -2486,7 +2495,7 @@ export default function InternalArticles() {
 
             <div className="ia-modal__body">
               <label
-                className="ia-cover-gallery__upload"
+                className={`ia-cover-gallery__upload ia-cover-gallery__upload--${coverGalleryUploadState}`}
                 {...makeImageDropHandlers((file) => handleAddGalleryCover(file))}
               >
                 <input
@@ -2499,7 +2508,20 @@ export default function InternalArticles() {
                   }}
                 />
                 <ImagePlus size={20} />
-                <span>点击或拖拽上传图片到封面图库</span>
+                <span className="ia-cover-gallery__upload-copy">
+                  <span className="ia-cover-gallery__upload-title">
+                    {coverGalleryUploadState === 'uploading'
+                      ? '正在上传…'
+                      : coverGalleryUploadState === 'success'
+                        ? '已加入封面图库'
+                        : coverGalleryUploadState === 'error'
+                          ? '上传失败'
+                          : '上传图片'}
+                  </span>
+                  <span className="ia-cover-gallery__upload-hint">
+                    点击按钮选择图片，或拖拽图片到这里后自动上传
+                  </span>
+                </span>
               </label>
 
               {coverGallery.length > 0 ? (

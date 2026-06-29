@@ -1101,6 +1101,30 @@
   transition: border-color var(--transition-fast), color var(--transition-fast), background var(--transition-fast);
 }
 
+.ia-cover-gallery__upload-copy {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.ia-cover-gallery__upload-title {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  padding: 0.28rem 0.7rem;
+  border-radius: var(--radius-full);
+  background: var(--color-primary);
+  color: #fff;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.ia-cover-gallery__upload-hint {
+  color: var(--color-text-muted);
+  font-size: var(--text-xs);
+}
+
 .ia-cover-gallery__upload:hover,
 .ia-cover-gallery__upload.is-dragover {
   border-color: var(--color-primary);
@@ -1111,6 +1135,32 @@
 /* 拖拽悬停时实线高亮，提示可以松手放下 */
 .ia-cover-gallery__upload.is-dragover {
   border-style: solid;
+}
+
+.ia-cover-gallery__upload--uploading {
+  border-style: solid;
+  border-color: var(--color-primary);
+  background: color-mix(in srgb, var(--color-primary) 7%, var(--color-bg-card));
+}
+
+.ia-cover-gallery__upload--success {
+  border-color: var(--color-success, #10B981);
+  color: var(--color-success, #10B981);
+  background: color-mix(in srgb, var(--color-success, #10B981) 8%, var(--color-bg-card));
+}
+
+.ia-cover-gallery__upload--success .ia-cover-gallery__upload-title {
+  background: var(--color-success, #10B981);
+}
+
+.ia-cover-gallery__upload--error {
+  border-color: #D9534F;
+  color: #D9534F;
+  background: color-mix(in srgb, #D9534F 8%, var(--color-bg-card));
+}
+
+.ia-cover-gallery__upload--error .ia-cover-gallery__upload-title {
+  background: #D9534F;
 }
 
 .ia-cover-gallery__grid {
