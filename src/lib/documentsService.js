@@ -247,6 +247,9 @@ async function prepareDocForCloud(doc) {
   const content = doc.content !== undefined
     ? await uploadInlineContentImages(doc.content, { docId: doc.id, userId })
     : doc.content;
+  if (doc.content !== undefined && hasInlineLocalImages(content)) {
+    throw new Error('正文图片尚未成功上传，请检查网络后重试。');
+  }
   return { ...doc, content, attachments, fileUrl };
 }
 
@@ -439,12 +442,34 @@ export async function createDoc(doc) {
  * 会同时写云端和本地缓存；云端失败不致命，只是跨设备不同步。
  */
 export async function updateDoc(id, patch) {
-  // 更新本地缓存
+  const needsAssetUpload = Boolean(
+    ('attachments' in patch && Array.isArray(patch.attachments)) ||
+    ('fileUrl' in patch && String(patch.fileUrl || '').startsWith('data:')) ||
+    ('content' in patch && hasInlineLocalImages(patch.content))
+  );
+  let localPatch = patch;
+  try {
+    if (needsAssetUpload && canUseSupabase() && supabase) {
+      const prepared = await prepareDocForCloud({ id, ...patch });
+      patch = {
+        ...patch,
+        ...('attachments' in patch ? { attachments: prepared.attachments } : {}),
+        ...('fileUrl' in patch ? { fileUrl: prepared.fileUrl } : {}),
+        ...('content' in patch ? { content: prepared.content } : {}),
+      };
+    }
+    localPatch = patch;
+  } catch (err) {
+    console.warn('[documentsService] 正文图片上传失败，跳过本地临时图片缓存:', err.message);
+    if (needsAssetUpload) return { remote: false, error: err };
+  }
+
+  // 图片上传完成后再更新本地缓存，避免把 blob: / data: 这类临时地址持久化成破图。
   try {
     const all = loadLocalDocs();
     const idx = all.findIndex((d) => String(d.id) === String(id));
     if (idx !== -1) {
-      all[idx] = { ...all[idx], ...patch };
+      all[idx] = { ...all[idx], ...localPatch };
       saveLocalDocs(all);
     }
   } catch { /* ignore */ }
@@ -454,27 +479,6 @@ export async function updateDoc(id, patch) {
   }
 
   try {
-    if (
-      ('attachments' in patch && Array.isArray(patch.attachments)) ||
-      ('fileUrl' in patch && String(patch.fileUrl || '').startsWith('data:')) ||
-      ('content' in patch && hasInlineLocalImages(patch.content))
-    ) {
-      const prepared = await prepareDocForCloud({ id, ...patch });
-      patch = {
-        ...patch,
-        ...('attachments' in patch ? { attachments: prepared.attachments } : {}),
-        ...('fileUrl' in patch ? { fileUrl: prepared.fileUrl } : {}),
-        ...('content' in patch ? { content: prepared.content } : {}),
-      };
-      try {
-        const all = loadLocalDocs();
-        const idx = all.findIndex((d) => String(d.id) === String(id));
-        if (idx !== -1) {
-          all[idx] = { ...all[idx], ...patch };
-          saveLocalDocs(all);
-        }
-      } catch { /* ignore */ }
-    }
     // 把 camelCase patch 转成 snake_case（只转已知字段，避免污染数据库列）
     const update = {};
     if ('title' in patch) update.title = patch.title;

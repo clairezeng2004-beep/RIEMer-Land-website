@@ -144,10 +144,20 @@ function normaliseAttachmentsForDb(attachments) {
 }
 
 function stripInlineLocalImages(content = '') {
-  return String(content).replace(
-    /\s(src|href)=["'](?:data:image\/|blob:)[^"']+["']/gi,
-    ' data-local-preview="pending-upload"',
-  );
+  const source = String(content || '');
+  if (typeof DOMParser === 'undefined') {
+    return source.replace(/<img\b[^>]*(?:src|href)=["'](?:data:image\/|blob:)[^"']+["'][^>]*>/gi, '');
+  }
+  try {
+    const doc = new DOMParser().parseFromString(source, 'text/html');
+    doc.querySelectorAll('img').forEach((img) => {
+      const src = img.getAttribute('src') || img.getAttribute('href') || '';
+      if (/^(?:data:image\/|blob:)/i.test(src)) img.remove();
+    });
+    return doc.body.innerHTML;
+  } catch {
+    return source.replace(/<img\b[^>]*(?:src|href)=["'](?:data:image\/|blob:)[^"']+["'][^>]*>/gi, '');
+  }
 }
 
 function hasInlineLocalImages(content = '') {
@@ -307,6 +317,9 @@ async function prepareSharingForCloud(post) {
   const content = post.content !== undefined
     ? await uploadInlineContentImages(post.content, { postId: post.id, userId })
     : post.content;
+  if (post.content !== undefined && hasInlineLocalImages(content)) {
+    throw new Error('正文图片尚未成功上传，请检查网络后重试。');
+  }
   return {
     ...post,
     content,
@@ -472,19 +485,23 @@ export async function addSharing(post) {
 
 /** 更新分享（支持部分字段，例如只更新 likes） */
 export async function updateSharing(id, updates) {
-  // 本地兜底
-  updateLocalSharing(id, updates);
-
-  if (!isSupabaseConfigured || !supabase) return;
+  const needsAssetUpload = Boolean(
+    updates.attachments !== undefined || hasInlineLocalImages(updates.content)
+  );
+  let localUpdates = updates;
   try {
     let cloudUpdates = updates;
-    if (updates.attachments !== undefined || hasInlineLocalImages(updates.content)) {
+    if (needsAssetUpload && isSupabaseConfigured && supabase) {
       cloudUpdates = await prepareSharingForCloud({ id, ...updates });
-      updateLocalSharing(id, {
+      localUpdates = {
+        ...updates,
         ...(cloudUpdates.attachments !== undefined ? { attachments: cloudUpdates.attachments } : {}),
         ...(cloudUpdates.content !== undefined ? { content: cloudUpdates.content } : {}),
-      });
+      };
     }
+    // 图片上传完成后再写本地，避免把 blob: / data: 临时地址缓存成后续破图。
+    updateLocalSharing(id, localUpdates);
+    if (!isSupabaseConfigured || !supabase) return;
     const dbUpdates = frontendToDbUpdate(cloudUpdates);
     let { error } = await supabase
       .from('member_sharing')
