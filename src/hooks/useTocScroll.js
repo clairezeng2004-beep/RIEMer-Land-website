@@ -11,7 +11,7 @@ import { useCallback, useEffect, useState } from 'react';
  * 这里的"强鲁棒"包括：
  *   1. 标题 id 查找三级兜底：
  *        a) contentRef 子树里 querySelector（用 CSS.escape 处理数字/中文开头）
- *        b) 全局 document.getElementById
+ *        b) 全局 document.getElementById，但必须仍属于 contentRef 子树
  *        c) 按 toc 里的 text 在子树里按文本内容重找；找到后把 id 补回去
  *   2. getBoundingClientRect().top === 0 时（元素尚未布局/图片还在撑开高度）
  *      用 requestAnimationFrame 再取一次 rect，避免跳到 0
@@ -39,6 +39,20 @@ export default function useTocScroll({
   const [toc, setToc] = useState([]); // [{ id, text, level }]
   const [activeTocId, setActiveTocId] = useState('');
   const [tocOpenMobile, setTocOpenMobile] = useState(false);
+
+  const findHeadingInRoot = useCallback((tocId, root = contentRef.current) => {
+    if (!tocId) return null;
+    let el = null;
+    try {
+      el = root?.querySelector?.(`#${CSS.escape(tocId)}`) || null;
+    } catch {
+      el = null;
+    }
+    if (el) return el;
+
+    const globalEl = document.getElementById(tocId);
+    return root && globalEl && root.contains(globalEl) ? globalEl : null;
+  }, [contentRef]);
 
   /* 1) 提取标题并打 id */
   useEffect(() => {
@@ -76,8 +90,9 @@ export default function useTocScroll({
   /* 2) 滚动时高亮当前章节 */
   useEffect(() => {
     if (!toc.length || !contentRef.current) return;
+    const root = contentRef.current;
     const headings = toc
-      .map((t) => document.getElementById(t.id))
+      .map((t) => findHeadingInRoot(t.id, root))
       .filter(Boolean);
     if (!headings.length) return;
 
@@ -132,7 +147,7 @@ export default function useTocScroll({
       target.removeEventListener('scroll', requestUpdate);
       window.removeEventListener('resize', requestUpdate);
     };
-  }, [toc, contentRef, scrollOffset]);
+  }, [toc, contentRef, scrollOffset, findHeadingInRoot]);
 
   /* 3) 点击目录跳转 —— 强鲁棒版本 */
   const handleTocClick = useCallback(
@@ -140,15 +155,7 @@ export default function useTocScroll({
       const root = contentRef.current;
 
       /* ========== 3.1 找标题元素（三级兜底） ========== */
-      let el = null;
-      // (a) 子树内 querySelector，CSS.escape 处理数字/中文开头 id
-      try {
-        el = root && root.querySelector(`#${CSS.escape(tocId)}`);
-      } catch {
-        el = null;
-      }
-      // (b) 全局 getElementById（即使子树没挂上也能找）
-      if (!el) el = document.getElementById(tocId);
+      let el = findHeadingInRoot(tocId, root);
       // (c) 按文本内容重找：React 重渲染 dangerouslySetInnerHTML 时 id 会被清掉
       if (!el && root) {
         const item = toc.find((t) => t.id === tocId);
@@ -198,8 +205,9 @@ export default function useTocScroll({
 
       const syncActiveToCurrentPosition = () => {
         const scrollParent = findScrollParent(contentRef.current);
+        const root = contentRef.current;
         const headings = toc
-          .map((t) => document.getElementById(t.id))
+          .map((t) => findHeadingInRoot(t.id, root))
           .filter(Boolean);
         if (!headings.length) return;
         const currentTop = scrollParent ? scrollParent.scrollTop : window.pageYOffset;
@@ -288,7 +296,7 @@ export default function useTocScroll({
         /* ignore */
       }
     },
-    [toc, contentRef, headingSelector, anchorClassName, scrollOffset, tocOpenMobile],
+    [toc, contentRef, headingSelector, anchorClassName, scrollOffset, tocOpenMobile, findHeadingInRoot],
   );
 
   return {
