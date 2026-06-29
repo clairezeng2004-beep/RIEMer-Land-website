@@ -511,6 +511,11 @@
   padding-left: 24px;
 }
 
+.msd-article__content ol { list-style: decimal; }
+.msd-article__content ol ol { list-style: lower-alpha; }
+.msd-article__content ol ol ol { list-style: lower-roman; }
+.msd-article__content ol ol ol ol { list-style: decimal; }
+
 .msd-article__content li {
   margin: 5px 0;
 }

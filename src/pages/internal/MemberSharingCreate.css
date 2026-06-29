@@ -779,6 +779,9 @@
 .msc-md-split__preview ol { list-style: decimal; }
 .msc-md-split__preview ul ul { list-style: circle; }
 .msc-md-split__preview ul ul ul { list-style: square; }
+.msc-md-split__preview ol ol { list-style: lower-alpha; }
+.msc-md-split__preview ol ol ol { list-style: lower-roman; }
+.msc-md-split__preview ol ol ol ol { list-style: decimal; }
 
 .msc-md-split__preview li {
   margin: 0.25em 0;
@@ -1057,6 +1060,11 @@
   margin: 0.4em 0;
   padding-left: 1.5em;
 }
+
+.msc-form__word-editor ol { list-style: decimal; }
+.msc-form__word-editor ol ol { list-style: lower-alpha; }
+.msc-form__word-editor ol ol ol { list-style: lower-roman; }
+.msc-form__word-editor ol ol ol ol { list-style: decimal; }
 
 .msc-form__word-editor li { margin: 0.2em 0; }
 
