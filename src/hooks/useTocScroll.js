@@ -187,6 +187,50 @@ export default function useTocScroll({
         return null;
       };
 
+      const getHeadingTop = (heading, scrollParent) => {
+        if (scrollParent) {
+          const containerRect = scrollParent.getBoundingClientRect();
+          const headingRect = heading.getBoundingClientRect();
+          return scrollParent.scrollTop + (headingRect.top - containerRect.top);
+        }
+        return heading.getBoundingClientRect().top + window.pageYOffset;
+      };
+
+      const syncActiveToCurrentPosition = () => {
+        const scrollParent = findScrollParent(contentRef.current);
+        const headings = toc
+          .map((t) => document.getElementById(t.id))
+          .filter(Boolean);
+        if (!headings.length) return;
+        const currentTop = scrollParent ? scrollParent.scrollTop : window.pageYOffset;
+        const marker = currentTop + scrollOffset + 8;
+        let active = headings[0];
+        for (const heading of headings) {
+          if (getHeadingTop(heading, scrollParent) <= marker) active = heading;
+          else break;
+        }
+        if (active?.id) setActiveTocId(active.id);
+      };
+
+      const scrollInstantly = (targetTop, scrollParent) => {
+        const top = Math.max(0, targetTop);
+        if (scrollParent) {
+          const previous = scrollParent.style.scrollBehavior;
+          scrollParent.style.scrollBehavior = 'auto';
+          scrollParent.scrollTo({ top, behavior: 'instant' });
+          scrollParent.style.scrollBehavior = previous;
+          return;
+        }
+
+        const previousHtml = document.documentElement.style.scrollBehavior;
+        const previousBody = document.body.style.scrollBehavior;
+        document.documentElement.style.scrollBehavior = 'auto';
+        document.body.style.scrollBehavior = 'auto';
+        window.scrollTo({ top, behavior: 'instant' });
+        document.documentElement.style.scrollBehavior = previousHtml;
+        document.body.style.scrollBehavior = previousBody;
+      };
+
       /* ========== 3.3 执行滚动；rect 为 0 时用 rAF 再试一次 ========== */
       const doScroll = () => {
         const scrollParent = findScrollParent(el);
@@ -196,11 +240,11 @@ export default function useTocScroll({
             const elRect = el.getBoundingClientRect();
             const target =
               scrollParent.scrollTop + (elRect.top - containerRect.top) - scrollOffset;
-            scrollParent.scrollTo({ top: Math.max(0, target), behavior: 'auto' });
+            scrollInstantly(target, scrollParent);
           } else {
             const top =
               el.getBoundingClientRect().top + window.pageYOffset - scrollOffset;
-            window.scrollTo({ top: Math.max(0, top), behavior: 'auto' });
+            scrollInstantly(top, null);
           }
         } catch {
           // 极老浏览器兜底
@@ -214,6 +258,9 @@ export default function useTocScroll({
         } catch {
           /* ignore */
         }
+
+        syncActiveToCurrentPosition();
+        requestAnimationFrame(syncActiveToCurrentPosition);
       };
 
       const scheduleScroll = () => {
@@ -233,6 +280,12 @@ export default function useTocScroll({
         requestAnimationFrame(() => requestAnimationFrame(scheduleScroll));
       } else {
         scheduleScroll();
+      }
+
+      try {
+        document.activeElement?.blur?.();
+      } catch {
+        /* ignore */
       }
     },
     [toc, contentRef, headingSelector, anchorClassName, scrollOffset, tocOpenMobile],

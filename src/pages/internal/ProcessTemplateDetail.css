@@ -178,7 +178,6 @@
 
 .ptd-toc__item:hover {
   color: var(--color-primary, #5B8C3E);
-  background: rgba(91, 140, 62, 0.05);
 }
 
 .ptd-toc__item--active {

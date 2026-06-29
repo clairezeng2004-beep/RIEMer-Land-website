@@ -178,7 +178,6 @@
 
 .msd-toc__item:hover {
   color: var(--color-primary, #5B8C3E);
-  background: rgba(91, 140, 62, 0.05);
 }
 
 .msd-toc__item--active {
