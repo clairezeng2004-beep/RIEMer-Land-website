@@ -65,8 +65,8 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
+  align-items: flex-start;
+  justify-content: flex-start;
   box-sizing: border-box;
   min-width: 0;
   padding: 4px;
@@ -259,6 +259,17 @@
 .msc-col .msc-img-wrap .msc-img {
   display: block;
   margin: 0;
+}
+
+[contenteditable="true"] .msc-col .msc-img-wrap,
+.msc-form__word-editor .msc-col .msc-img-wrap {
+  margin: 0 0 0.25em;
+  line-height: 1;
+}
+
+[contenteditable="true"] .msc-col .msc-img-wrap .msc-img,
+.msc-form__word-editor .msc-col .msc-img-wrap .msc-img {
+  display: block;
 }
 
 .msc-col .msc-img-wrap + .msc-img-caption,

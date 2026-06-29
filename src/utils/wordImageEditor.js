@@ -189,12 +189,24 @@ function normalizeColumnImageInsertion(editor, wrap, img) {
   img.style.width = '100%';
   img.style.height = 'auto';
 
-  if (wrap.parentNode) {
-    while (wrap.previousSibling && isEmptyParagraph(wrap.previousSibling)) {
-      wrap.previousSibling.remove();
+  if (wrap.parentNode === col) {
+    while (wrap.previousElementSibling && isEmptyParagraph(wrap.previousElementSibling)) {
+      wrap.previousElementSibling.remove();
     }
-    while (wrap.nextSibling && isEmptyParagraph(wrap.nextSibling)) {
-      wrap.nextSibling.remove();
+    while (wrap.nextElementSibling && isEmptyParagraph(wrap.nextElementSibling)) {
+      wrap.nextElementSibling.remove();
+    }
+    [...col.childNodes].forEach((node) => {
+      if (node.nodeType === 3 && !String(node.textContent || '').replace(/\u200B/g, '').trim()) {
+        node.remove();
+      }
+    });
+    const firstContent = [...col.children].find((child) => (
+      child === wrap
+      || (!isEmptyParagraph(child) && !child.classList?.contains('msc-col-resizer') && !child.classList?.contains('msc-col-adder'))
+    ));
+    if (firstContent && firstContent !== wrap) {
+      col.insertBefore(wrap, firstContent);
     }
   }
 
