@@ -326,6 +326,24 @@
   text-align: center;
 }
 
+.msd-article__content .msc-img-wrap,
+.ptd-article__content .msc-img-wrap,
+.doc-preview__text .msc-img-wrap,
+.msc-md-split__preview .msc-img-wrap,
+.ia-detail__content .msc-img-wrap {
+  display: block;
+}
+
+.msd-article__content .msc-img-wrap .msc-img,
+.ptd-article__content .msc-img-wrap .msc-img,
+.doc-preview__text .msc-img-wrap .msc-img,
+.msc-md-split__preview .msc-img-wrap .msc-img,
+.ia-detail__content .msc-img-wrap .msc-img {
+  display: inline-block !important;
+  margin: 0;
+  vertical-align: top;
+}
+
 [contenteditable="true"] .msc-img-caption:empty::before {
   content: '图片注释…';
   color: var(--color-text-muted, #bbb);
