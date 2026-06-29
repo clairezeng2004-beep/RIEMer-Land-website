@@ -63,6 +63,8 @@ function insertBlockAtCaret(editor, node) {
 
   // 插一个空段落在后面，方便继续输入
   const trailer = document.createElement('p');
+  trailer.style.textAlign = 'left';
+  trailer.setAttribute('align', 'left');
   trailer.innerHTML = '<br />';
   node.parentNode?.insertBefore(trailer, node.nextSibling);
 
@@ -93,6 +95,8 @@ function buildEmptyColumnContent() {
   // 只放一个空段落：避免图片插入后其前/后出现多余空行（栏高度由 CSS min-height 控制）
   const frag = document.createDocumentFragment();
   const p = document.createElement('p');
+  p.style.textAlign = 'left';
+  p.setAttribute('align', 'left');
   p.innerHTML = '<br />';
   frag.appendChild(p);
   return frag;
@@ -106,12 +110,6 @@ function appendColumnImage(col, src) {
   img.setAttribute('draggable', 'true');
   img.alt = '';
   col.appendChild(img);
-
-  const p = document.createElement('p');
-  p.style.textAlign = 'left';
-  p.setAttribute('align', 'left');
-  p.innerHTML = '<br />';
-  col.appendChild(p);
   return img;
 }
 
@@ -442,10 +440,15 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       if (!file) return;
       const url = await fileToDataUrl(file);
       col.innerHTML = '';
-      appendColumnImage(col, url);
-      // 光标默认落到图片下方的文字行（而不是图片右侧）
-      const trailingP = col.querySelector('p');
-      if (trailingP) placeCaretAtStart(trailingP);
+      const img = appendColumnImage(col, url);
+      // 分栏图片不再自动追加空行；选区停在图片节点上，避免生成右侧光标。
+      try {
+        const range = document.createRange();
+        range.selectNode(img);
+        const sel = window.getSelection();
+        sel?.removeAllRanges();
+        sel?.addRange(range);
+      } catch { /* ignore */ }
       const container = col.closest('.msc-cols');
       ensureColumnMeta(container);
       requestAnimationFrame(() => layoutColumnResizers(container));
@@ -459,6 +462,8 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     col.innerHTML = '';
     const p = document.createElement('p');
     // 用 <br> 占位，保证空 <p> 在 contentEditable 里有可落脚的基线
+    p.style.textAlign = 'left';
+    p.setAttribute('align', 'left');
     p.innerHTML = '<br />';
     col.appendChild(p);
     try {
@@ -487,12 +492,8 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const anchor = sel?.anchorNode;
     if (anchor && col.contains(anchor)) return;
     const target =
-      col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote, img')
+      col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote')
       || col;
-    if (target.tagName === 'IMG') {
-      placeCaretAtEnd(col);
-      return;
-    }
     placeCaretAtStart(target);
   };
 
@@ -521,6 +522,8 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
         ensureCaretInColumn(col);
         layoutColumnResizers(col.closest('.msc-cols'));
       });
+    } else if (editor.contains(t)) {
+      editor.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
     }
 
     // 1) 历史文档里的「输入文字」按钮
@@ -568,6 +571,12 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
   };
 
   const onPointerDown = (e) => {
+    const target = e.target instanceof HTMLElement ? e.target : null;
+    const pressedCol = target?.closest('.msc-col');
+    if (pressedCol && editor.contains(pressedCol)) {
+      selectColumn(pressedCol);
+    }
+
     const handle = e.target instanceof HTMLElement ? e.target.closest('.msc-col-resizer') : null;
     if (!handle || !editor.contains(handle)) return;
     const container = handle.closest('.msc-cols');

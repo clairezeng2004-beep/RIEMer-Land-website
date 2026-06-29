@@ -329,7 +329,9 @@
 .msc-col:has(> h4),
 .msc-col:has(> ul),
 .msc-col:has(> ol),
-.msc-col:has(> blockquote) {
+.msc-col:has(> blockquote),
+.msc-col:has(> img),
+.msc-col:has(.msc-img) {
   align-items: flex-start;
   justify-content: flex-start;
 }
