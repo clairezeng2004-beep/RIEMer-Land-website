@@ -233,9 +233,18 @@
 .msc-col .msc-img-wrap {
   display: block;
   width: 100%;
-  margin: 0.25em 0 1em;
+  margin: 0.25em 0;
   line-height: 1;
   text-align: center;
+}
+
+.msc-col .msc-img-wrap .msc-img {
+  margin: 0;
+}
+
+.msc-col .msc-img-wrap + .msc-img-caption,
+.msc-col > img + .msc-img-caption {
+  margin-top: 0.25em;
 }
 
 .msc-img-caption {
