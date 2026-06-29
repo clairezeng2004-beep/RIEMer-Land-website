@@ -40,6 +40,29 @@ function imageFileToEditorDataUrl(file) {
   return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
 }
 
+function imageFileToImmediateDataUrl(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function compressInsertedImageInBackground(img, file, fireChange) {
+  if (!img || !file) return;
+  imageFileToEditorDataUrl(file).then((compressed) => {
+    if (!compressed || !img.isConnected) return;
+    const current = img.getAttribute('src') || '';
+    if (compressed !== current && compressed.length < current.length) {
+      img.setAttribute('src', compressed);
+      fireChange();
+    }
+  }).catch(() => {
+    /* 保留已插入的即时预览图 */
+  });
+}
+
 /** 获取 img 原始尺寸（等图片加载完） */
 function whenImgLoaded(img) {
   return new Promise((resolve) => {
@@ -495,7 +518,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     normalizeTimer = setTimeout(() => {
       normalizeTimer = null;
       normalizeExistingEditorImages(editor, onChange);
-    }, 0);
+    }, 1200);
   };
 
   scheduleNormalizeExistingImages();
@@ -571,8 +594,9 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       for (const it of imgs) {
         const file = it.getAsFile();
         if (!file) continue;
-        const dataUrl = await imageFileToEditorDataUrl(file);
-        await insertImageHtmlAtCaret(editor, dataUrl);
+        const dataUrl = await imageFileToImmediateDataUrl(file);
+        const img = await insertImageHtmlAtCaret(editor, dataUrl);
+        compressInsertedImageInBackground(img, file, fireChange);
       }
       fireChange();
     })();
@@ -769,8 +793,9 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     }
     (async () => {
       for (const f of files) {
-        const dataUrl = await imageFileToEditorDataUrl(f);
-        await insertImageHtmlAtCaret(editor, dataUrl);
+        const dataUrl = await imageFileToImmediateDataUrl(f);
+        const img = await insertImageHtmlAtCaret(editor, dataUrl);
+        compressInsertedImageInBackground(img, f, fireChange);
       }
       fireChange();
     })();
@@ -855,8 +880,9 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     /** 主动插入一张图片 */
     async insertImageFromFile(file) {
       if (!file) return;
-      const dataUrl = await imageFileToEditorDataUrl(file);
-      await insertImageHtmlAtCaret(editor, dataUrl);
+      const dataUrl = await imageFileToImmediateDataUrl(file);
+      const img = await insertImageHtmlAtCaret(editor, dataUrl);
+      compressInsertedImageInBackground(img, file, fireChange);
       fireChange();
     },
     /** 弹起系统文件选择器 */
@@ -868,8 +894,9 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       input.onchange = async () => {
         const files = Array.from(input.files || []);
         for (const f of files) {
-          const dataUrl = await imageFileToEditorDataUrl(f);
-          await insertImageHtmlAtCaret(editor, dataUrl);
+          const dataUrl = await imageFileToImmediateDataUrl(f);
+          const img = await insertImageHtmlAtCaret(editor, dataUrl);
+          compressInsertedImageInBackground(img, f, fireChange);
         }
         fireChange();
       };
