@@ -143,6 +143,24 @@ export function cleanPastedWordHtml(html, {
   return stripUnderline(cleaned);
 }
 
+function escapeHtml(text) {
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+export function plainTextToEditorHtml(text) {
+  return stripUnderline(
+    String(text || '')
+      .split(/\n\n+/)
+      .map((p) => `<p>${escapeHtml(p).replace(/\n/g, '<br>')}</p>`)
+      .join('')
+  );
+}
+
 function isEmptyParagraph(node) {
   if (!node || node.nodeType !== 1 || node.tagName.toLowerCase() !== 'p') return false;
   if (node.querySelector('img, video, table, iframe')) return false;

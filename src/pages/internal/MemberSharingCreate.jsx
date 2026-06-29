@@ -39,7 +39,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
-import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph } from '../../utils/cleanPastedWordHtml';
+import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import {
@@ -462,6 +462,7 @@ export default function MemberSharingCreate() {
   const navigate = useNavigate();
   const location = useLocation();
   const wordEditorRef = useRef(null);
+  const pasteAsPlainTextRef = useRef(false);
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
   const editId = useMemo(() => new URLSearchParams(location.search).get('edit'), [location.search]);
@@ -642,16 +643,16 @@ export default function MemberSharingCreate() {
     }
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
+    const shouldMatchStyle = pasteAsPlainTextRef.current || e.shiftKey;
+    pasteAsPlainTextRef.current = false;
 
-    if (html) {
+    if (html && !shouldMatchStyle) {
       const cleaned = cleanWordHtml(html);
       if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, cleaned)) {
         document.execCommand('insertHTML', false, cleaned);
       }
     } else if (text) {
-      const paragraphs = stripUnderline(
-        text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-      );
+      const paragraphs = plainTextToEditorHtml(text);
       if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, paragraphs || text)) {
         document.execCommand('insertHTML', false, paragraphs || text);
       }
@@ -661,6 +662,12 @@ export default function MemberSharingCreate() {
       setNewPost((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
     }
   }, [cleanWordHtml]);
+
+  const handleWordBeforeInput = useCallback((e) => {
+    if (e.nativeEvent?.inputType === 'insertFromPasteAsPlainText') {
+      pasteAsPlainTextRef.current = true;
+    }
+  }, []);
 
   // 一键粘贴按钮
   const handleOneClickPaste = useCallback(async () => {
@@ -680,9 +687,7 @@ export default function MemberSharingCreate() {
         if (item.types.includes('text/plain')) {
           const blob = await item.getType('text/plain');
           const text = await blob.text();
-          const paragraphs = stripUnderline(
-            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-          );
+          const paragraphs = plainTextToEditorHtml(text);
           if (wordEditorRef.current) {
             wordEditorRef.current.innerHTML = paragraphs;
             setNewPost((prev) => ({ ...prev, content: paragraphs }));
@@ -694,9 +699,7 @@ export default function MemberSharingCreate() {
       try {
         const text = await navigator.clipboard.readText();
         if (text && wordEditorRef.current) {
-          const paragraphs = stripUnderline(
-            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-          );
+          const paragraphs = plainTextToEditorHtml(text);
           wordEditorRef.current.innerHTML = paragraphs;
           setNewPost((prev) => ({ ...prev, content: paragraphs }));
         }
@@ -1185,6 +1188,7 @@ export default function MemberSharingCreate() {
                     className="msc-form__word-editor"
                     contentEditable
                     onKeyDown={handleEditorKeyDown}
+                    onBeforeInput={handleWordBeforeInput}
                     onPaste={handleWordPaste}
                     onInput={() => {
                       if (wordEditorRef.current) {

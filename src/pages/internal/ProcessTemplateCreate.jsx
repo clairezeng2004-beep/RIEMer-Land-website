@@ -39,7 +39,7 @@ import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
-import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph } from '../../utils/cleanPastedWordHtml';
+import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
@@ -97,6 +97,7 @@ export default function ProcessTemplateCreate() {
   const { isAuthenticated, user, getAllUsers } = useAuth();
   const navigate = useNavigate();
   const wordEditorRef = useRef(null);
+  const pasteAsPlainTextRef = useRef(false);
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
 
@@ -343,16 +344,16 @@ export default function ProcessTemplateCreate() {
     }
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
+    const shouldMatchStyle = pasteAsPlainTextRef.current || e.shiftKey;
+    pasteAsPlainTextRef.current = false;
 
-    if (html) {
+    if (html && !shouldMatchStyle) {
       const cleaned = cleanWordHtml(html);
       if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, cleaned)) {
         document.execCommand('insertHTML', false, cleaned);
       }
     } else if (text) {
-      const paragraphs = stripUnderline(
-        text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-      );
+      const paragraphs = plainTextToEditorHtml(text);
       if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, paragraphs || text)) {
         document.execCommand('insertHTML', false, paragraphs || text);
       }
@@ -362,6 +363,12 @@ export default function ProcessTemplateCreate() {
       setNewDoc((prev) => ({ ...prev, content: wordEditorRef.current.innerHTML }));
     }
   }, [cleanWordHtml]);
+
+  const handleWordBeforeInput = useCallback((e) => {
+    if (e.nativeEvent?.inputType === 'insertFromPasteAsPlainText') {
+      pasteAsPlainTextRef.current = true;
+    }
+  }, []);
 
   const handleOneClickPaste = useCallback(async () => {
     try {
@@ -380,9 +387,7 @@ export default function ProcessTemplateCreate() {
         if (item.types.includes('text/plain')) {
           const blob = await item.getType('text/plain');
           const text = await blob.text();
-          const paragraphs = stripUnderline(
-            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-          );
+          const paragraphs = plainTextToEditorHtml(text);
           if (wordEditorRef.current) {
             wordEditorRef.current.innerHTML = paragraphs;
             setNewDoc((prev) => ({ ...prev, content: paragraphs }));
@@ -394,9 +399,7 @@ export default function ProcessTemplateCreate() {
       try {
         const text = await navigator.clipboard.readText();
         if (text && wordEditorRef.current) {
-          const paragraphs = stripUnderline(
-            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-          );
+          const paragraphs = plainTextToEditorHtml(text);
           wordEditorRef.current.innerHTML = paragraphs;
           setNewDoc((prev) => ({ ...prev, content: paragraphs }));
         }
@@ -835,6 +838,7 @@ export default function ProcessTemplateCreate() {
                     className="msc-form__word-editor"
                     contentEditable
                     onKeyDown={handleEditorKeyDown}
+                    onBeforeInput={handleWordBeforeInput}
                     onPaste={handleWordPaste}
                     onInput={() => {
                       if (wordEditorRef.current) {

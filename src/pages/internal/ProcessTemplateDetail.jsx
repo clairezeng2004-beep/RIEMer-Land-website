@@ -67,7 +67,7 @@ import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
-import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph } from '../../utils/cleanPastedWordHtml';
+import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -984,6 +984,7 @@ export default function ProcessTemplateDetail() {
 
   /* 编辑态文本框：高度随内容自动增长，不再限制高度。 */
   const ptdWordEditorRef = useRef(null);
+  const pasteAsPlainTextRef = useRef(false);
   const ptdWordImageApiRef = useRef(null);
   useAutoResizeTextarea(mdSyncEditorRef, editContent, { minHeight: 360 });
 
@@ -1113,16 +1114,16 @@ export default function ProcessTemplateDetail() {
     }
     e.preventDefault();
     const text = e.clipboardData.getData('text/plain');
+    const shouldMatchStyle = pasteAsPlainTextRef.current || e.shiftKey;
+    pasteAsPlainTextRef.current = false;
 
-    if (html) {
+    if (html && !shouldMatchStyle) {
       const cleaned = cleanWordHtml(html);
       if (!insertHtmlReplacingEmptyParagraph(ptdWordEditorRef.current, cleaned)) {
         document.execCommand('insertHTML', false, cleaned);
       }
     } else if (text) {
-      const paragraphs = stripUnderline(
-        text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-      );
+      const paragraphs = plainTextToEditorHtml(text);
       if (!insertHtmlReplacingEmptyParagraph(ptdWordEditorRef.current, paragraphs || text)) {
         document.execCommand('insertHTML', false, paragraphs || text);
       }
@@ -1130,6 +1131,12 @@ export default function ProcessTemplateDetail() {
 
     if (ptdWordEditorRef.current) {
       setEditContent(stripUnderline(ptdWordEditorRef.current.innerHTML));
+    }
+  }, []);
+
+  const handleWordBeforeInput = useCallback((e) => {
+    if (e.nativeEvent?.inputType === 'insertFromPasteAsPlainText') {
+      pasteAsPlainTextRef.current = true;
     }
   }, []);
 
@@ -1149,9 +1156,7 @@ export default function ProcessTemplateDetail() {
         if (item.types.includes('text/plain')) {
           const blob = await item.getType('text/plain');
           const text = await blob.text();
-          const paragraphs = stripUnderline(
-            text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-          );
+          const paragraphs = plainTextToEditorHtml(text);
           if (ptdWordEditorRef.current) {
             ptdWordEditorRef.current.innerHTML = paragraphs;
             setEditContent(paragraphs);
@@ -1162,9 +1167,7 @@ export default function ProcessTemplateDetail() {
     } catch {
       try {
         const text = await navigator.clipboard.readText();
-        const paragraphs = stripUnderline(
-          text.split(/\n\n+/).map((p) => `<p>${p.replace(/\n/g, '<br>')}</p>`).join('')
-        );
+        const paragraphs = plainTextToEditorHtml(text);
         if (ptdWordEditorRef.current) {
           ptdWordEditorRef.current.innerHTML = paragraphs;
           setEditContent(paragraphs);
@@ -1713,6 +1716,7 @@ export default function ProcessTemplateDetail() {
                         className="msc-form__word-editor ptd-edit__word-editor"
                         contentEditable
                         onKeyDown={handleEditorKeyDown}
+                        onBeforeInput={handleWordBeforeInput}
                         onPaste={handleWordPaste}
                         onInput={() => {
                           if (ptdWordEditorRef.current) {
