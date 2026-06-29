@@ -470,7 +470,7 @@
   margin: 28px 0 14px;
   line-height: 1.4;
   border-bottom: 2px solid var(--color-primary);
-  padding-bottom: 8px;
+  padding-bottom: 2px;
 }
 
 .msd-article__content h2 {
