@@ -47,6 +47,8 @@
  *   - 高亮块是纯 HTML 结构，颜色通过 class 控制，Emoji 通过工具栏交互替换文本。
  */
 
+import { imageFileToCompressedDataUrl } from './imageCompression';
+
 /** 在光标处插入一段 HTML（作为独立块），若光标不在编辑器内则追加到末尾 */
 function insertBlockAtCaret(editor, node) {
   const sel = window.getSelection();
@@ -112,6 +114,8 @@ function appendColumnImage(col, src) {
   img.className = 'msc-img';
   // 允许选中后随光标拖拽移动（编辑器内）
   img.setAttribute('draggable', 'true');
+  img.setAttribute('loading', 'lazy');
+  img.setAttribute('decoding', 'async');
   img.alt = '';
   wrap.appendChild(img);
   col.appendChild(wrap);
@@ -322,16 +326,6 @@ function insertEmptyColumnAt(container, index) {
   }
 }
 
-/** 文件 → dataURL */
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
 /* =========================================================================
  * 1) 图片分栏（飞书风格）
  * ========================================================================= */
@@ -354,7 +348,7 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     const f = files[i];
     if (f && f.type?.startsWith('image/')) {
       // eslint-disable-next-line no-await-in-loop
-      const url = await fileToDataUrl(f);
+      const url = await imageFileToCompressedDataUrl(f);
       datas[i] = url;
     } else {
       datas[i] = null;
@@ -443,7 +437,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const url = await fileToDataUrl(file);
+      const url = await imageFileToCompressedDataUrl(file);
       col.innerHTML = '';
       const img = appendColumnImage(col, url);
       // 分栏图片不再自动追加空行；选区停在图片节点上，避免生成右侧光标。

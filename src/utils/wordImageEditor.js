@@ -27,17 +27,9 @@
  *   api.pickImage();
  */
 
-const DETAIL_CONTENT_IMAGE_MAX_WIDTH = 808;
+import { imageFileToCompressedDataUrl } from './imageCompression';
 
-/** 文件 → dataURL */
-function fileToDataUrl(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
+const DETAIL_CONTENT_IMAGE_MAX_WIDTH = 808;
 
 /** 获取 img 原始尺寸（等图片加载完） */
 function whenImgLoaded(img) {
@@ -226,6 +218,8 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
   img.className = 'msc-img';
   // 允许选中后随光标拖拽移动（编辑器内）
   img.setAttribute('draggable', 'true');
+  img.setAttribute('loading', 'lazy');
+  img.setAttribute('decoding', 'async');
   img.alt = '';
 
   wrap.appendChild(img);
@@ -469,7 +463,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       for (const it of imgs) {
         const file = it.getAsFile();
         if (!file) continue;
-        const dataUrl = await fileToDataUrl(file);
+        const dataUrl = await imageFileToCompressedDataUrl(file);
         await insertImageHtmlAtCaret(editor, dataUrl);
       }
       fireChange();
@@ -610,7 +604,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     }
     (async () => {
       for (const f of files) {
-        const dataUrl = await fileToDataUrl(f);
+        const dataUrl = await imageFileToCompressedDataUrl(f);
         await insertImageHtmlAtCaret(editor, dataUrl);
       }
       fireChange();
@@ -696,7 +690,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     /** 主动插入一张图片 */
     async insertImageFromFile(file) {
       if (!file) return;
-      const dataUrl = await fileToDataUrl(file);
+      const dataUrl = await imageFileToCompressedDataUrl(file);
       await insertImageHtmlAtCaret(editor, dataUrl);
       fireChange();
     },
@@ -709,7 +703,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       input.onchange = async () => {
         const files = Array.from(input.files || []);
         for (const f of files) {
-          const dataUrl = await fileToDataUrl(f);
+          const dataUrl = await imageFileToCompressedDataUrl(f);
           await insertImageHtmlAtCaret(editor, dataUrl);
         }
         fireChange();
