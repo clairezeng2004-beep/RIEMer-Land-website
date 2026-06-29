@@ -182,6 +182,44 @@ function placeCaretAtStart(node) {
   } catch { /* ignore */ }
 }
 
+function placeCaretAfter(node) {
+  try {
+    const range = document.createRange();
+    range.setStartAfter(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch { /* ignore */ }
+}
+
+function rangeInsideEditor(editor, range) {
+  if (!editor || !range) return false;
+  const startEl = getNodeElement(range.startContainer);
+  const endEl = getNodeElement(range.endContainer);
+  return !!(startEl && endEl && editor.contains(startEl) && editor.contains(endEl));
+}
+
+function serializeRange(range) {
+  const fragment = range.cloneContents();
+  const wrap = document.createElement('div');
+  wrap.appendChild(fragment);
+  return {
+    html: wrap.innerHTML,
+    text: wrap.textContent || '',
+  };
+}
+
+function insertHtmlFragmentAtRange(range, html) {
+  const template = document.createElement('template');
+  template.innerHTML = html || '';
+  const fragment = template.content;
+  const inserted = [...fragment.childNodes];
+  range.deleteContents();
+  range.insertNode(fragment);
+  if (inserted.length > 0) placeCaretAfter(inserted[inserted.length - 1]);
+}
+
 function ensureLeftTrailingParagraphAfter(node) {
   if (!node?.parentNode) return null;
   let trailer = node.nextElementSibling;
@@ -474,6 +512,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   // 正在被拖拽移动的编辑器内图片（用于和「文件拖入」区分）
   let draggingImg = null;
   let draggingSourceBlock = null;
+  let draggingTextRange = null;
+  let draggingTextHtml = '';
 
   // 触发 onChange：把 editor.innerHTML 回写到 state
   const fireChange = () => {
@@ -557,6 +597,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     const t = e.target;
     const sel = window.getSelection();
     draggingSourceBlock = null;
+    draggingTextRange = null;
+    draggingTextHtml = '';
     if (t instanceof HTMLImageElement && t.classList.contains('msc-img')) {
       draggingImg = t;
       draggingSourceBlock = t.closest('.msc-img-wrap') || getDirectEditorBlock(editor, t);
@@ -567,6 +609,23 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       } catch { /* ignore */ }
     } else {
       draggingImg = null;
+      if (sel?.rangeCount && !sel.isCollapsed) {
+        const range = sel.getRangeAt(0);
+        if (rangeInsideEditor(editor, range)) {
+          const data = serializeRange(range);
+          if (data.text || data.html) {
+            draggingTextRange = range.cloneRange();
+            draggingTextHtml = data.html || data.text;
+            try {
+              e.dataTransfer.effectAllowed = 'move';
+              e.dataTransfer.setData('text/html', data.html);
+              e.dataTransfer.setData('text/plain', data.text);
+            } catch { /* ignore */ }
+            selectImage(null);
+            return;
+          }
+        }
+      }
       const anchor = sel?.rangeCount ? sel.getRangeAt(0).commonAncestorContainer : t;
       draggingSourceBlock = getDirectEditorBlock(editor, anchor);
     }
@@ -574,6 +633,8 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   function onDragEnd() {
     draggingImg = null;
     draggingSourceBlock = null;
+    draggingTextRange = null;
+    draggingTextHtml = '';
     editor.classList.remove('msc-form__word-editor--drag');
   }
 
@@ -582,6 +643,11 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     const dt = e.dataTransfer;
     if (!dt) return;
     if (draggingImg) {
+      e.preventDefault();
+      dt.dropEffect = 'move';
+      return;
+    }
+    if (draggingTextRange) {
       e.preventDefault();
       dt.dropEffect = 'move';
       return;
@@ -647,7 +713,38 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       return;
     }
 
-    // 2) 普通文字/块由浏览器执行默认移动；完成后清理源位置留下的空行
+    // 2) 编辑器内选中文字移动：明确移动选区内容，避免浏览器默认行为不稳定或不触发保存
+    if (draggingTextRange && draggingTextHtml) {
+      e.preventDefault();
+      e.stopPropagation();
+      editor.classList.remove('msc-form__word-editor--drag');
+      const sourceRange = draggingTextRange;
+      draggingTextRange = null;
+      const html = draggingTextHtml;
+      draggingTextHtml = '';
+      const targetRange = caretRangeFromPoint(e.clientX, e.clientY);
+      if (!targetRange || !rangeInsideEditor(editor, targetRange)) return;
+      if (sourceRange.isPointInRange(targetRange.startContainer, targetRange.startOffset)) return;
+
+      try {
+        const insertRange = targetRange.cloneRange();
+        const sourceStartsBeforeTarget =
+          sourceRange.compareBoundaryPoints(Range.START_TO_START, insertRange) < 0;
+        sourceRange.deleteContents();
+        if (sourceStartsBeforeTarget) {
+          const adjusted = caretRangeFromPoint(e.clientX, e.clientY);
+          if (adjusted && rangeInsideEditor(editor, adjusted)) {
+            insertHtmlFragmentAtRange(adjusted, html);
+          }
+        } else {
+          insertHtmlFragmentAtRange(insertRange, html);
+        }
+        fireChange();
+      } catch { /* ignore */ }
+      return;
+    }
+
+    // 3) 普通文字/块由浏览器执行默认移动；完成后清理源位置留下的空行
     const files = Array.from(dt.files || []).filter((f) => f.type.startsWith('image/'));
     if (files.length === 0) {
       const source = draggingSourceBlock;
@@ -660,7 +757,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       return;
     }
 
-    // 3) 从系统拖入图片文件
+    // 4) 从系统拖入图片文件
     e.preventDefault();
     e.stopPropagation();
     editor.classList.remove('msc-form__word-editor--drag');

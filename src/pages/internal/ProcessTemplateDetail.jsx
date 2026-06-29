@@ -67,6 +67,7 @@ import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
+import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle } from '../../utils/pasteMatchStyle';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -1010,8 +1011,10 @@ export default function ProcessTemplateDetail() {
     const detachTable = attachTableControls(editor, syncHtml);
     const detachCols = attachColumnPlaceholderHandler(editor, syncHtml);
     const detachNormalize = attachWordEditingNormalizer(editor, syncHtml);
+    const detachPasteMatch = attachPasteAndMatchStyleHandler(editor, { onChange: syncHtml });
 
     return () => {
+      detachPasteMatch();
       detachNormalize();
       detachCols();
       detachTable();
@@ -1122,10 +1125,7 @@ export default function ProcessTemplateDetail() {
         document.execCommand('insertHTML', false, cleaned);
       }
     } else if (text) {
-      const paragraphs = plainTextToEditorHtml(text);
-      if (!insertHtmlReplacingEmptyParagraph(ptdWordEditorRef.current, paragraphs || text)) {
-        document.execCommand('insertHTML', false, paragraphs || text);
-      }
+      insertPlainTextMatchingEditorStyle(ptdWordEditorRef.current, text);
     }
 
     if (ptdWordEditorRef.current) {

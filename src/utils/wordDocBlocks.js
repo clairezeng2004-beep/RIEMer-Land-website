@@ -56,6 +56,27 @@ function imageFileToEditorDataUrl(file) {
   return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
 }
 
+function getScrollSnapshot(editor) {
+  const nodes = [{ node: window, top: window.scrollY, left: window.scrollX }];
+  let el = editor;
+  while (el) {
+    nodes.push({ node: el, top: el.scrollTop, left: el.scrollLeft });
+    el = el.parentElement;
+  }
+  return nodes;
+}
+
+function restoreScrollSnapshot(snapshot) {
+  snapshot.forEach(({ node, top, left }) => {
+    if (node === window) {
+      window.scrollTo(left, top);
+    } else {
+      node.scrollTop = top;
+      node.scrollLeft = left;
+    }
+  });
+}
+
 /** 在光标处插入一段 HTML（作为独立块），若光标不在编辑器内则追加到末尾 */
 function insertBlockAtCaret(editor, node, { addTrailingParagraph = true } = {}) {
   const sel = window.getSelection();
@@ -228,7 +249,7 @@ function placeCaretAtEnd(node) {
 function redistributeColumns(container) {
   const cols = getColumns(container);
   const n = cols.length;
-  container.classList.remove('msc-cols--2', 'msc-cols--3', 'msc-cols--4');
+  container.classList.remove('msc-cols--1', 'msc-cols--2', 'msc-cols--3', 'msc-cols--4');
   container.classList.add(`msc-cols--${n}`);
   // 清掉拖拽时写入的内联宽度，交回 .msc-cols--N 的等分规则
   container.style.gridTemplateColumns = '';
@@ -239,35 +260,6 @@ function redistributeColumns(container) {
     layoutColumnResizers(container);
     layoutColumnAdders(container);
   });
-}
-
-/** 只剩一栏时：取消分栏，把该栏内容平铺回正文（图片居中），返回首个块 */
-function unwrapSingleColumn(container, col) {
-  const parent = container.parentNode;
-  if (!parent) return null;
-  const frag = document.createDocumentFragment();
-  let firstBlock = null;
-  [...col.childNodes].forEach((node) => {
-    let out = node;
-    if (node.nodeType === 1 && (node.matches?.('img') || node.tagName === 'IMG')) {
-      const p = document.createElement('p');
-      p.className = 'msc-img-wrap';
-      p.style.textAlign = 'center';
-      p.appendChild(node);
-      out = p;
-    }
-    if (!firstBlock) firstBlock = out;
-    frag.appendChild(out);
-  });
-  if (!frag.childNodes.length) {
-    const p = document.createElement('p');
-    p.innerHTML = '<br />';
-    frag.appendChild(p);
-    firstBlock = p;
-  }
-  parent.insertBefore(frag, container);
-  container.remove();
-  return firstBlock;
 }
 
 /** 生成/校正「新增一栏」加号按钮：左端、各栏之间、右端各一个（最多 4 栏） */
@@ -347,6 +339,7 @@ function insertEmptyColumnAt(container, index) {
 export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } = {}) {
   if (!editor) return;
   const n = Math.max(2, Math.min(4, Math.floor(count) || 2));
+  const scrollSnapshot = getScrollSnapshot(editor);
 
   const container = document.createElement('div');
   container.className = `msc-cols msc-cols--${n}`;
@@ -378,10 +371,12 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
   ensureColumnAdders(container);
 
   insertBlockAtCaret(editor, container, { addTrailingParagraph: false });
+  restoreScrollSnapshot(scrollSnapshot);
   requestAnimationFrame(() => {
     layoutColumnResizers(container);
     layoutColumnAdders(container);
     placeCaretAtStart(container.querySelector('.msc-col p') || container);
+    restoreScrollSnapshot(scrollSnapshot);
   });
 }
 
@@ -684,8 +679,9 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
         redistributeColumns(container);
         placeCaretAtStart(remaining[0]);
       } else if (remaining.length === 1) {
-        const block = unwrapSingleColumn(container, remaining[0]);
-        if (block) placeCaretAtStart(block);
+        redistributeColumns(container);
+        remaining[0].setAttribute('data-col-label', '100%');
+        placeCaretAtStart(remaining[0]);
       } else {
         // 理论上不会出现（分栏至少 2 栏），兜底：删空块
         const prev = container.previousElementSibling;
@@ -940,6 +936,23 @@ export function attachWordEditingNormalizer(editor, onChange) {
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
     const anchor =
       sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+    const caption = anchor?.closest?.('.msc-img-caption');
+    if (caption && editor.contains(caption)) {
+      e.preventDefault();
+      const p = document.createElement('p');
+      p.style.textAlign = 'left';
+      p.setAttribute('align', 'left');
+      p.innerHTML = '<br />';
+      const cols = caption.closest('.msc-cols');
+      if (cols?.parentNode) {
+        cols.parentNode.insertBefore(p, cols.nextSibling);
+      } else {
+        caption.parentNode?.insertBefore(p, caption.nextSibling);
+      }
+      placeCaretAtStart(p);
+      onChange?.();
+      return;
+    }
     const quote = anchor?.closest?.('blockquote');
     if (!quote || !editor.contains(quote)) return;
 

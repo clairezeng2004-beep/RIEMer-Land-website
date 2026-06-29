@@ -42,6 +42,7 @@ import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
+import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle } from '../../utils/pasteMatchStyle';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import {
@@ -749,10 +750,7 @@ export default function MemberSharingCreate() {
         document.execCommand('insertHTML', false, cleaned);
       }
     } else if (text) {
-      const paragraphs = plainTextToEditorHtml(text);
-      if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, paragraphs || text)) {
-        document.execCommand('insertHTML', false, paragraphs || text);
-      }
+      insertPlainTextMatchingEditorStyle(wordEditorRef.current, text);
     }
 
     if (wordEditorRef.current) {
@@ -834,8 +832,10 @@ export default function MemberSharingCreate() {
     const detachTable = attachTableControls(editor, syncHtml);
     const detachCols = attachColumnPlaceholderHandler(editor, syncHtml);
     const detachNormalize = attachWordEditingNormalizer(editor, syncHtml);
+    const detachPasteMatch = attachPasteAndMatchStyleHandler(editor, { onChange: syncHtml });
 
     return () => {
+      detachPasteMatch();
       detachNormalize();
       detachCols();
       detachTable();

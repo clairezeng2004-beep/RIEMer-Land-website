@@ -29,6 +29,7 @@
   position: relative;
 }
 
+.msc-cols--1 { grid-template-columns: 1fr; }
 .msc-cols--2 { grid-template-columns: 1fr 1fr; }
 .msc-cols--3 { grid-template-columns: 1fr 1fr 1fr; }
 .msc-cols--4 { grid-template-columns: repeat(4, 1fr); }
