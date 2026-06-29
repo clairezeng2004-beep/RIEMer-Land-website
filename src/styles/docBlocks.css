@@ -285,6 +285,38 @@
   text-align: center;
 }
 
+.msd-article__content .msc-cols,
+.ptd-article__content .msc-cols,
+.doc-preview__text .msc-cols,
+.msc-md-split__preview .msc-cols {
+  margin: 0.4em 0;
+}
+
+.msd-article__content .msc-col > p,
+.ptd-article__content .msc-col > p,
+.doc-preview__text .msc-col > p,
+.msc-md-split__preview .msc-col > p {
+  margin: 0.25em 0;
+  line-height: 1.7;
+}
+
+.msd-article__content .msc-col .msc-img-wrap,
+.ptd-article__content .msc-col .msc-img-wrap,
+.doc-preview__text .msc-col .msc-img-wrap,
+.msc-md-split__preview .msc-col .msc-img-wrap {
+  margin: 0 0 0.25em;
+  line-height: 1;
+}
+
+.msd-article__content .msc-img-caption,
+.ptd-article__content .msc-img-caption,
+.doc-preview__text .msc-img-caption,
+.msc-md-split__preview .msc-img-caption {
+  margin: 0 0 0.6em;
+  line-height: 1.5;
+  text-align: center;
+}
+
 [contenteditable="true"] .msc-img-caption:empty::before {
   content: '图片注释…';
   color: var(--color-text-muted, #bbb);
