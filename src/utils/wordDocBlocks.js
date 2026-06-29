@@ -50,7 +50,7 @@
 import { imageFileToCompressedDataUrl } from './imageCompression';
 
 /** 在光标处插入一段 HTML（作为独立块），若光标不在编辑器内则追加到末尾 */
-function insertBlockAtCaret(editor, node) {
+function insertBlockAtCaret(editor, node, { addTrailingParagraph = true } = {}) {
   const sel = window.getSelection();
   let inserted = false;
   if (sel && sel.rangeCount > 0) {
@@ -62,6 +62,8 @@ function insertBlockAtCaret(editor, node) {
     }
   }
   if (!inserted) editor.appendChild(node);
+
+  if (!addTrailingParagraph) return;
 
   // 插一个空段落在后面，方便继续输入
   const trailer = document.createElement('p');
@@ -368,10 +370,11 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
   ensureColumnResizers(container);
   ensureColumnAdders(container);
 
-  insertBlockAtCaret(editor, container);
+  insertBlockAtCaret(editor, container, { addTrailingParagraph: false });
   requestAnimationFrame(() => {
     layoutColumnResizers(container);
     layoutColumnAdders(container);
+    placeCaretAtStart(container.querySelector('.msc-col p') || container);
   });
 }
 
