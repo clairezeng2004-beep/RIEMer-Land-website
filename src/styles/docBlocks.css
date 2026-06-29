@@ -274,11 +274,11 @@
 
 .msc-col .msc-img-wrap + .msc-img-caption,
 .msc-col > img + .msc-img-caption {
-  margin-top: 0.25em;
+  margin-top: 0;
 }
 
 .msc-img-caption {
-  margin: 2px 0 0.8em;
+  margin: 0 0 0.8em;
   font-size: 0.82em;
   color: var(--color-text-muted, #888);
   line-height: 1.5;

@@ -1106,7 +1106,7 @@
 
 /* 图片注释：图片下方一行更小的说明文字（跟随其所在段落的对齐方式） */
 .msc-img-caption {
-  margin: 2px 0 0.6em;
+  margin: 0 0 0.6em;
   font-size: 0.82em;
   color: var(--color-text-muted, #888);
   line-height: 1.5;
