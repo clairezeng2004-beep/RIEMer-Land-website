@@ -113,6 +113,23 @@ function insertBlockAtCaret(editor, node, { addTrailingParagraph = true } = {}) 
   } catch { /* ignore */ }
 }
 
+function removeEmptyParagraphAfter(node) {
+  const next = node?.nextElementSibling;
+  if (!next || next.tagName?.toLowerCase() !== 'p') return false;
+  if (next.classList?.contains('msc-img-caption')) return false;
+  if (next.querySelector?.('img, video, table, iframe')) return false;
+  const text = String(next.textContent || '').replace(/\u200B/g, '').trim();
+  if (text) return false;
+  const isEmpty = [...next.childNodes].every((child) => {
+    if (child.nodeType === 3) return !String(child.textContent || '').replace(/\u200B/g, '').trim();
+    if (child.nodeType !== 1) return true;
+    return child.tagName?.toLowerCase() === 'br';
+  });
+  if (!isEmpty) return false;
+  next.remove();
+  return true;
+}
+
 function placeCaretAtStart(node) {
   try {
     const range = document.createRange();
@@ -373,8 +390,10 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
   ensureColumnAdders(container);
 
   insertBlockAtCaret(editor, container, { addTrailingParagraph: false });
+  removeEmptyParagraphAfter(container);
   restoreScrollSnapshot(scrollSnapshot);
   requestAnimationFrame(() => {
+    removeEmptyParagraphAfter(container);
     layoutColumnResizers(container);
     layoutColumnAdders(container);
     placeCaretAtStart(container.querySelector('.msc-col p') || container);
