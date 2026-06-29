@@ -176,19 +176,34 @@ const INLINE_IMG_EXT = {
  */
 async function uploadInlineContentImages(content, { docId, userId }) {
   if (!content || typeof content !== 'string' || !supabase) return content;
-  const re = /(?:src|href)=["'](data:image\/[^"']+)["']/gi;
-  const dataUrls = new Set();
+  const re = /(?:src|href)=["']((?:data:image\/|blob:)[^"']+)["']/gi;
+  const localUrls = new Set();
   let m;
-  while ((m = re.exec(content)) !== null) dataUrls.add(m[1]);
-  if (dataUrls.size === 0) return content;
+  while ((m = re.exec(content)) !== null) localUrls.add(m[1]);
+  if (localUrls.size === 0) return content;
 
   let out = content;
   let idx = 0;
-  for (const dataUrl of dataUrls) {
+  for (const localUrl of localUrls) {
     idx += 1;
-    const blob = dataUrlToBlob(dataUrl);
-    if (!blob) continue;
-    const mime = (dataUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
+    let blob = null;
+    if (localUrl.startsWith('data:')) {
+      blob = dataUrlToBlob(localUrl);
+    } else if (localUrl.startsWith('blob:')) {
+      try {
+        // eslint-disable-next-line no-await-in-loop
+        const res = await fetch(localUrl);
+        // eslint-disable-next-line no-await-in-loop
+        blob = res.ok ? await res.blob() : null;
+      } catch (err) {
+        console.warn('[DocumentsDB] 正文 blob 图片读取失败:', err.message);
+      }
+    }
+    if (!blob) {
+      console.warn('[DocumentsDB] 正文本地图片读取失败，保留原地址');
+      continue;
+    }
+    const mime = blob.type || (localUrl.match(/^data:([^;]+);/) || [])[1] || 'image/png';
     const ext = INLINE_IMG_EXT[mime] || 'png';
     const path = [userId || 'unknown-user', docId || 'no-doc', `inline-${Date.now()}-${idx}.${ext}`].join('/');
     try {
@@ -201,12 +216,16 @@ async function uploadInlineContentImages(content, { docId, userId }) {
         continue;
       }
       const { data } = supabase.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path);
-      if (data?.publicUrl) out = out.split(dataUrl).join(data.publicUrl);
+      if (data?.publicUrl) out = out.split(localUrl).join(data.publicUrl);
     } catch (err) {
       console.warn('[DocumentsDB] 正文内嵌图片上传异常，保留原图:', err.message);
     }
   }
   return out;
+}
+
+function hasInlineLocalImages(content = '') {
+  return /(?:src|href)=["'](?:data:image\/|blob:)[^"']+["']/i.test(String(content || ''));
 }
 
 async function prepareDocForCloud(doc) {
@@ -437,14 +456,24 @@ export async function updateDoc(id, patch) {
   try {
     if (
       ('attachments' in patch && Array.isArray(patch.attachments)) ||
-      ('fileUrl' in patch && String(patch.fileUrl || '').startsWith('data:'))
+      ('fileUrl' in patch && String(patch.fileUrl || '').startsWith('data:')) ||
+      ('content' in patch && hasInlineLocalImages(patch.content))
     ) {
       const prepared = await prepareDocForCloud({ id, ...patch });
       patch = {
         ...patch,
-        attachments: prepared.attachments,
-        fileUrl: prepared.fileUrl,
+        ...('attachments' in patch ? { attachments: prepared.attachments } : {}),
+        ...('fileUrl' in patch ? { fileUrl: prepared.fileUrl } : {}),
+        ...('content' in patch ? { content: prepared.content } : {}),
       };
+      try {
+        const all = loadLocalDocs();
+        const idx = all.findIndex((d) => String(d.id) === String(id));
+        if (idx !== -1) {
+          all[idx] = { ...all[idx], ...patch };
+          saveLocalDocs(all);
+        }
+      } catch { /* ignore */ }
     }
     // 把 camelCase patch 转成 snake_case（只转已知字段，避免污染数据库列）
     const update = {};
