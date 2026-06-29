@@ -182,28 +182,6 @@ function normalizeColumnImageInsertion(editor, wrap, img) {
   return true;
 }
 
-function ensureImageCaption(editor, img) {
-  const wrap = getImageWrap(img);
-  if (!wrap?.parentNode) return null;
-  let caption = getImageCaption(img);
-  if (!caption) {
-    caption = document.createElement('p');
-    caption.className = 'msc-img-caption';
-    caption.textContent = '图片注释';
-    wrap.parentNode.insertBefore(caption, wrap.nextSibling);
-  }
-  caption.style.textAlign = wrap.style.textAlign || 'center';
-  try {
-    const range = document.createRange();
-    range.selectNodeContents(caption);
-    const sel = window.getSelection();
-    sel?.removeAllRanges();
-    sel?.addRange(range);
-    editor.focus();
-  } catch { /* ignore */ }
-  return caption;
-}
-
 /**
  * 在当前光标处（或编辑器末尾）插入一张图片段落
  * 返回插入的 <img> 元素
@@ -271,17 +249,6 @@ function createResizer(editor, getImg, onResizeChange) {
   const overlay = document.createElement('div');
   overlay.className = 'msc-img-resizer';
   overlay.style.display = 'none';
-
-  const toolbar = document.createElement('div');
-  toolbar.className = 'msc-img-resizer__toolbar';
-  toolbar.setAttribute('contenteditable', 'false');
-  const captionBtn = document.createElement('button');
-  captionBtn.type = 'button';
-  captionBtn.className = 'msc-img-resizer__caption-btn';
-  captionBtn.innerHTML = '<span aria-hidden="true">▣</span><span>图片注释</span>';
-  captionBtn.title = '在图片下方添加或编辑注释';
-  toolbar.appendChild(captionBtn);
-  overlay.appendChild(toolbar);
 
   // 8 个手柄：nw, n, ne, e, se, s, sw, w
   const handles = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'].map((pos) => {
@@ -380,20 +347,6 @@ function createResizer(editor, getImg, onResizeChange) {
   }
 
   overlay.addEventListener('mousedown', onMouseDown);
-  captionBtn.addEventListener('mousedown', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-  });
-  captionBtn.addEventListener('click', (e) => {
-    e.preventDefault();
-    e.stopPropagation();
-    const img = getImg();
-    if (!img) return;
-    ensureImageCaption(editor, img);
-    if (onResizeChange) onResizeChange();
-    requestAnimationFrame(layout);
-  });
-
   // 编辑器滚动或窗口 resize 时同步 overlay 位置
   const onScrollOrResize = () => layout();
   window.addEventListener('resize', onScrollOrResize);
@@ -677,7 +630,6 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     // 点到 overlay（resizer）也算在编辑里
     if (e.target instanceof HTMLElement && e.target.classList.contains('msc-img-resizer__handle')) return;
     if (e.target instanceof HTMLElement && e.target.classList.contains('msc-img-resizer')) return;
-    if (e.target instanceof HTMLElement && e.target.closest('.msc-img-resizer__toolbar')) return;
     selectImage(null);
   }
 

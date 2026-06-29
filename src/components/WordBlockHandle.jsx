@@ -82,7 +82,11 @@ function getCaretLineRect(editor) {
 function getCurrentBlock(editor) {
   const sel = window.getSelection();
   if (!sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
   let node = sel.anchorNode;
+  if (range.startContainer === editor && editor.childNodes[range.startOffset]) {
+    node = editor.childNodes[range.startOffset];
+  }
   if (!node || !editor.contains(node)) return null;
   if (node === editor) return null;
   if (node.nodeType === 3) node = node.parentNode;
