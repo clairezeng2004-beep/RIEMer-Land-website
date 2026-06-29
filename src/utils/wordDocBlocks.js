@@ -85,8 +85,9 @@ function insertBlockAtCaret(editor, node, { addTrailingParagraph = true } = {}) 
   if (sel && sel.rangeCount > 0) {
     const range = sel.getRangeAt(0);
     if (editor.contains(range.commonAncestorContainer)) {
-      range.deleteContents();
-      range.insertNode(node);
+      const insertRange = range.cloneRange();
+      insertRange.collapse(false);
+      insertRange.insertNode(node);
       inserted = true;
     }
   }
