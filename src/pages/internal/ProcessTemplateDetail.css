@@ -728,7 +728,6 @@
 
 /* 编辑器插入的图片：段落居中 + 图片显示为 inline-block */
 .ptd-article__content .msc-img-wrap {
-  text-align: center;
   margin: 0.6em 0;
   line-height: 1;
 }

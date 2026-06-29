@@ -9,6 +9,15 @@
  * ========================================================================= */
 
 /* ---------- 分栏 ---------- */
+.msc-img-wrap {
+  text-align: center;
+  line-height: 1;
+}
+
+.msc-img-wrap .msc-img {
+  display: inline-block;
+}
+
 .msc-cols {
   display: grid;
   gap: 12px;
