@@ -928,6 +928,13 @@
   .msd-article__content {
     padding: var(--space-lg);
     font-size: var(--text-sm);
+    line-height: 1.7;
+  }
+
+  .msd-article__content p,
+  .msd-article__content li {
+    margin: 0 0 0.7em;
+    line-height: 1.7;
   }
 
   .msd-article__content h1 {
@@ -959,5 +966,7 @@
 
   .msd-article__content {
     padding: var(--space-md);
+    font-size: var(--text-sm);
+    line-height: 1.7;
   }
 }
