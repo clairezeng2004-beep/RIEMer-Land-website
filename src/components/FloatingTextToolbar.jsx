@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
 import './FloatingTextToolbar.css';
 
 /**
@@ -48,6 +48,31 @@ function applyTextAlignToSelection(editor, cmd) {
     block.style.textAlign = align;
     block.setAttribute('align', align);
   });
+}
+
+function getSelectedImage(editor) {
+  const sel = window.getSelection();
+  if (!editor || !sel || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+
+  const selectedNode = range.startContainer === range.endContainer
+    ? range.startContainer.childNodes?.[range.startOffset]
+    : null;
+  if (selectedNode instanceof HTMLImageElement && editor.contains(selectedNode)) {
+    return selectedNode;
+  }
+
+  const node =
+    range.commonAncestorContainer.nodeType === 1
+      ? range.commonAncestorContainer
+      : range.commonAncestorContainer.parentElement;
+  const img = node?.matches?.('img.msc-img') ? node : node?.querySelector?.('img.msc-img');
+  if (img instanceof HTMLImageElement && editor.contains(img) && range.intersectsNode(img)) {
+    return img;
+  }
+
+  const marked = editor.querySelector('img.msc-img--selected');
+  return marked instanceof HTMLImageElement ? marked : null;
 }
 
 export default function FloatingTextToolbar({
@@ -106,7 +131,12 @@ export default function FloatingTextToolbar({
       blockquote: false,
       link: false,
       linkHref: '',
+      image: false,
     };
+    const selectedImage = getSelectedImage(editorRef.current);
+    if (selectedImage) {
+      next.image = true;
+    }
     try {
       const blockTag = (document.queryCommandValue('formatBlock') || '').toLowerCase();
       if (blockTag === 'h1') next.h1 = true;
@@ -378,6 +408,32 @@ export default function FloatingTextToolbar({
     fireChangeRich();
   }, [detectActiveRich, editorRef, fireChangeRich]);
 
+  const addImageCaptionRich = useCallback(() => {
+    const editor = editorRef.current;
+    const img = getSelectedImage(editor);
+    if (!editor || !img) return;
+    const wrap = img.closest('.msc-img-wrap') || img.parentElement;
+    if (!wrap?.parentNode) return;
+    let caption = wrap.nextElementSibling;
+    if (!caption?.classList?.contains('msc-img-caption')) {
+      caption = document.createElement('p');
+      caption.className = 'msc-img-caption';
+      caption.textContent = '图片注释';
+      wrap.parentNode.insertBefore(caption, wrap.nextSibling);
+    }
+    caption.style.textAlign = wrap.style.textAlign || 'center';
+    try {
+      const range = document.createRange();
+      range.selectNodeContents(caption);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      editor.focus();
+    } catch { /* ignore */ }
+    setVisible(false);
+    fireChangeRich();
+  }, [editorRef, fireChangeRich]);
+
   /* -----------------------------------------------------------------
    * 链接：富文本模式
    *   - 当选中已是 <a>：弹框预填当前 href；用户留空 → 解除链接（unlink）；
@@ -625,6 +681,7 @@ export default function FloatingTextToolbar({
   const onAlignLeft = isMarkdown ? () => applyAlignMarkdown('left') : () => applyAlignRich('justifyLeft');
   const onAlignCenter = isMarkdown ? () => applyAlignMarkdown('center') : () => applyAlignRich('justifyCenter');
   const onAlignRight = isMarkdown ? () => applyAlignMarkdown('right') : () => applyAlignRich('justifyRight');
+  const onImageCaption = isMarkdown ? undefined : addImageCaptionRich;
 
   return (
     <div
@@ -659,6 +716,11 @@ export default function FloatingTextToolbar({
       <Btn onClick={onOL} title="有序列表（Tab 缩进多级）">
         <ListOrdered size={16} />
       </Btn>
+      {!isMarkdown && active.image && (
+        <Btn onClick={onImageCaption} title="图片注释">
+          <Captions size={16} />
+        </Btn>
+      )}
       <Btn onClick={onBold} title="加粗 (Ctrl/Cmd+B)" activeFlag={active.bold}>
         <Bold size={16} />
       </Btn>
