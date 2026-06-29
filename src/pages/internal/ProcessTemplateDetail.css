@@ -587,7 +587,7 @@
 
 /* Article Content — 通用排版 */
 .ptd-article__content {
-  padding: var(--space-2xl);
+  padding: var(--space-lg) var(--space-2xl) var(--space-2xl);
   font-size: 15px;
   line-height: 1.85;
   color: var(--color-text);
@@ -1064,7 +1064,7 @@
   }
 
   .ptd-article__content {
-    padding: var(--space-lg);
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
     font-size: var(--text-sm);
   }
 
@@ -1096,7 +1096,7 @@
   }
 
   .ptd-article__content {
-    padding: var(--space-md);
+    padding: var(--space-sm) var(--space-md) var(--space-md);
   }
 }
 
