@@ -1,7 +1,10 @@
 /* ============ 编辑器浮动目录 ============ */
 .etoc {
   position: fixed;
-  left: max(16px, calc((100vw - 1520px) / 2 + 16px));
+  /* 对齐详情页三栏布局的目录左边界：
+     .ptd/.msd-content 有 left 16px、right 32px padding，内层最大 1520px 居中，
+     因此左边界为 16px + (100vw - 48px - 1520px) / 2。 */
+  left: max(16px, calc((100vw - 1568px) / 2 + 16px));
   right: auto;
   /* 顶栏（sticky 顶部按钮行）高约 48–56px，这里留到 88px，
      确保目录始终在顶栏下方、不被遮挡。 */
@@ -137,8 +140,8 @@
   box-shadow: var(--shadow-lg, 0 10px 30px rgba(0, 0, 0, 0.14));
 }
 
-/* 窄屏：面板更窄，且默认靠右下，避免遮挡编辑区 */
-@media (max-width: 1519px) {
+/* 窄屏：与详情页一致，1024px 以下退出左侧目录，改为右下角浮动入口 */
+@media (max-width: 1024px) {
   .etoc {
     left: auto;
     right: 12px;
