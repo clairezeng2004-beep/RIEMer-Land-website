@@ -82,39 +82,65 @@ function sanitizeClass(el, { preserveEditorAttrs }) {
   else el.removeAttribute('class');
 }
 
-function flattenPastedColumns(doc) {
-  doc.querySelectorAll('.msc-cols').forEach((container) => {
-    const frag = doc.createDocumentFragment();
-    const cols = [...container.children].filter((child) => child.classList?.contains('msc-col'));
-    const sources = cols.length > 0 ? cols : [...container.children];
-
-    sources.forEach((source) => {
-      if (source.classList?.contains('msc-col-resizer') || source.classList?.contains('msc-col-adder')) return;
-      while (source.firstChild) {
-        const child = source.firstChild;
-        if (
-          child.nodeType === 1
-          && (child.classList?.contains('msc-col-resizer') || child.classList?.contains('msc-col-adder'))
-        ) {
-          child.remove();
-          continue;
-        }
-        frag.appendChild(child);
-      }
-    });
-
-    container.replaceWith(frag);
-  });
-}
-
-function hasBlockChild(el) {
-  return !!el.querySelector?.('address, article, aside, blockquote, div, dl, fieldset, figure, h1, h2, h3, h4, h5, h6, hr, ol, p, pre, table, ul');
+function isColumnAuxiliary(el) {
+  return !!el?.classList && (
+    el.classList.contains('msc-col-resizer')
+    || el.classList.contains('msc-col-adder')
+    || el.classList.contains('msc-col__empty')
+    || el.classList.contains('msc-col__act')
+    || el.classList.contains('msc-col__placeholder')
+  );
 }
 
 function unwrapElement(el) {
   const frag = el.ownerDocument.createDocumentFragment();
   while (el.firstChild) frag.appendChild(el.firstChild);
   el.replaceWith(frag);
+}
+
+function moveColumnContentIntoFragment(source, frag) {
+  if (isColumnAuxiliary(source)) return;
+  while (source.firstChild) {
+    const child = source.firstChild;
+    if (child.nodeType === 1 && isColumnAuxiliary(child)) {
+      child.remove();
+      continue;
+    }
+    frag.appendChild(child);
+  }
+}
+
+function isExternalColumnLayout(el) {
+  const tag = el.tagName?.toLowerCase?.();
+  if (!['div', 'section', 'article'].includes(tag)) return false;
+  const style = String(el.getAttribute('style') || '').toLowerCase();
+  return /column-count\s*:|columns\s*:|grid-template-columns\s*:/.test(style);
+}
+
+function flattenPastedColumns(doc) {
+  doc
+    .querySelectorAll('.msc-col-resizer, .msc-col-adder, .msc-col__empty, .msc-col__act, .msc-col__placeholder')
+    .forEach((el) => el.remove());
+
+  doc.querySelectorAll('.msc-cols, [data-cols]').forEach((container) => {
+    const frag = doc.createDocumentFragment();
+    const cols = [...container.children].filter((child) => child.classList?.contains('msc-col'));
+    const sources = cols.length > 0 ? cols : [...container.children];
+
+    sources.forEach((source) => moveColumnContentIntoFragment(source, frag));
+
+    container.replaceWith(frag);
+  });
+
+  doc.querySelectorAll('.msc-col').forEach((col) => unwrapElement(col));
+
+  [...doc.querySelectorAll('div, section, article')].reverse().forEach((el) => {
+    if (isExternalColumnLayout(el)) unwrapElement(el);
+  });
+}
+
+function hasBlockChild(el) {
+  return !!el.querySelector?.('address, article, aside, blockquote, div, dl, fieldset, figure, h1, h2, h3, h4, h5, h6, hr, ol, p, pre, table, ul');
 }
 
 function normalizeDivElements(doc) {
