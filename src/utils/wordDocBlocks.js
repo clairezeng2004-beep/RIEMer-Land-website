@@ -103,13 +103,18 @@ function buildEmptyColumnContent() {
 }
 
 function appendColumnImage(col, src) {
+  const wrap = document.createElement('p');
+  wrap.className = 'msc-img-wrap';
+  wrap.style.textAlign = 'center';
+
   const img = document.createElement('img');
   img.src = src;
   img.className = 'msc-img';
   // 允许选中后随光标拖拽移动（编辑器内）
   img.setAttribute('draggable', 'true');
   img.alt = '';
-  col.appendChild(img);
+  wrap.appendChild(img);
+  col.appendChild(wrap);
   return img;
 }
 

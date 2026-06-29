@@ -233,6 +233,12 @@
   max-width: 100%;
 }
 
+.msc-col > img:first-child,
+.msc-col > .msc-img:first-child,
+.msc-col > .msc-img-wrap:first-child {
+  margin-top: 0;
+}
+
 /* 含图片的栏：用左右内边距做两侧留白，图片本身铺满内容宽度 */
 .msc-col:has(> img),
 .msc-col:has(.msc-img) {
@@ -251,6 +257,7 @@
 }
 
 .msc-col .msc-img-wrap .msc-img {
+  display: block;
   margin: 0;
 }
 
