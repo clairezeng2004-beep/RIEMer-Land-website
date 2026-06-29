@@ -101,6 +101,16 @@ function getFirstColumnContent(col) {
   }) || null;
 }
 
+function isColumnEmptyForImage(col) {
+  if (!col) return false;
+  return [...col.childNodes].every((node) => {
+    if (node.nodeType === 3) return !String(node.textContent || '').replace(/\u200B/g, '').trim();
+    if (node.nodeType !== 1) return true;
+    if (node.classList?.contains('msc-col-resizer') || node.classList?.contains('msc-col-adder')) return true;
+    return isEmptyParagraph(node);
+  });
+}
+
 function getImageWrap(img) {
   return img?.closest?.('.msc-img-wrap') || null;
 }
@@ -239,7 +249,12 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
   // 分栏内插图必须落在具体栏里，不能插成 .msc-cols 的额外 grid 子项。
   const activeCol = getActiveColumn(editor);
   if (activeCol) {
-    activeCol.insertBefore(wrap, getFirstColumnContent(activeCol));
+    if (isColumnEmptyForImage(activeCol)) {
+      activeCol.innerHTML = '';
+      activeCol.appendChild(wrap);
+    } else {
+      activeCol.insertBefore(wrap, getFirstColumnContent(activeCol));
+    }
     await whenImgLoaded(img);
     normalizeColumnImageInsertion(editor, wrap, img);
     return img;
