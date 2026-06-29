@@ -88,10 +88,11 @@
   background: rgba(91, 140, 62, 0.06);
 }
 
-/* 分栏正下方自动生成的空段落：收紧行高，避免额外光标显得过高 */
+/* 分栏正下方自动生成的输入段落：必须和正文行距一致，避免输入后变成窄行距 */
 [contenteditable="true"] .msc-cols + p {
-  line-height: 1.3;
-  margin: 0.3em 0;
+  line-height: 1.7;
+  margin: 0.4em 0;
+  text-align: left;
 }
 
 [contenteditable="true"] .msc-col::before {

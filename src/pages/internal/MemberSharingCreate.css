@@ -975,7 +975,14 @@
 .msc-form__word-editor h2 { font-size: 20px; }
 .msc-form__word-editor h3 { font-size: 17px; }
 
-.msc-form__word-editor p { margin: 0.4em 0; }
+.msc-form__word-editor p {
+  margin: 0.4em 0;
+  line-height: 1.7;
+}
+
+.msc-form__word-editor li {
+  line-height: 1.7;
+}
 
 .msc-form__word-editor blockquote {
   margin: 0.6em 0;
