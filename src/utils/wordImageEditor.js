@@ -27,9 +27,18 @@
  *   api.pickImage();
  */
 
-import { imageFileToCompressedDataUrl } from './imageCompression';
+import {
+  EDITOR_IMAGE_COMPRESSION_OPTIONS,
+  imageDataUrlToCompressedDataUrl,
+  imageFileToCompressedDataUrl,
+} from './imageCompression';
 
 const DETAIL_CONTENT_IMAGE_MAX_WIDTH = 808;
+const EDITOR_IMAGE_RECOMPRESS_MIN_CHARS = 120000;
+
+function imageFileToEditorDataUrl(file) {
+  return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
+}
 
 /** 获取 img 原始尺寸（等图片加载完） */
 function whenImgLoaded(img) {
@@ -223,6 +232,24 @@ function normalizeColumnImageInsertion(editor, wrap, img) {
   container.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
   ensureLeftTrailingParagraphAfter(container);
   return true;
+}
+
+async function normalizeExistingEditorImages(editor, onChange) {
+  const imgs = Array.from(editor.querySelectorAll('img.msc-img, img'));
+  let changed = false;
+  for (const img of imgs) {
+    const src = img.getAttribute('src') || '';
+    if (!src.startsWith('data:image/')) continue;
+    if (src.startsWith('data:image/gif') || src.startsWith('data:image/svg')) continue;
+    if (src.length < EDITOR_IMAGE_RECOMPRESS_MIN_CHARS) continue;
+    // eslint-disable-next-line no-await-in-loop
+    const next = await imageDataUrlToCompressedDataUrl(src, EDITOR_IMAGE_COMPRESSION_OPTIONS);
+    if (next && next !== src && next.length < src.length) {
+      img.setAttribute('src', next);
+      changed = true;
+    }
+  }
+  if (changed) onChange?.(editor.innerHTML);
 }
 
 /**
@@ -423,6 +450,17 @@ function createResizer(editor, getImg, onResizeChange) {
 /** 主函数 */
 export function attachWordImageEditor(editor, { onChange } = {}) {
   if (!editor) return { destroy() {} };
+  let normalizeTimer = null;
+
+  const scheduleNormalizeExistingImages = () => {
+    if (normalizeTimer) clearTimeout(normalizeTimer);
+    normalizeTimer = setTimeout(() => {
+      normalizeTimer = null;
+      normalizeExistingEditorImages(editor, onChange);
+    }, 0);
+  };
+
+  scheduleNormalizeExistingImages();
 
   // 确保 overlay 的定位容器是 position:relative
   if (editor.parentElement) {
@@ -481,7 +519,10 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
   function onEditorPaste(e) {
     const items = e.clipboardData?.items;
     if (!items) return;
-    if (e.clipboardData?.getData('text/html')) return;
+    if (e.clipboardData?.getData('text/html')) {
+      scheduleNormalizeExistingImages();
+      return;
+    }
     const imgs = Array.from(items).filter((it) => it.kind === 'file' && it.type.startsWith('image/'));
     if (imgs.length === 0) return; // 不拦截纯文本粘贴，交给外层原有逻辑处理
     e.preventDefault();
@@ -490,7 +531,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       for (const it of imgs) {
         const file = it.getAsFile();
         if (!file) continue;
-        const dataUrl = await imageFileToCompressedDataUrl(file);
+        const dataUrl = await imageFileToEditorDataUrl(file);
         await insertImageHtmlAtCaret(editor, dataUrl);
       }
       fireChange();
@@ -631,7 +672,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     }
     (async () => {
       for (const f of files) {
-        const dataUrl = await imageFileToCompressedDataUrl(f);
+        const dataUrl = await imageFileToEditorDataUrl(f);
         await insertImageHtmlAtCaret(editor, dataUrl);
       }
       fireChange();
@@ -717,7 +758,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     /** 主动插入一张图片 */
     async insertImageFromFile(file) {
       if (!file) return;
-      const dataUrl = await imageFileToCompressedDataUrl(file);
+      const dataUrl = await imageFileToEditorDataUrl(file);
       await insertImageHtmlAtCaret(editor, dataUrl);
       fireChange();
     },
@@ -730,7 +771,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       input.onchange = async () => {
         const files = Array.from(input.files || []);
         for (const f of files) {
-          const dataUrl = await imageFileToCompressedDataUrl(f);
+          const dataUrl = await imageFileToEditorDataUrl(f);
           await insertImageHtmlAtCaret(editor, dataUrl);
         }
         fireChange();
@@ -738,6 +779,7 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
       input.click();
     },
     destroy() {
+      if (normalizeTimer) clearTimeout(normalizeTimer);
       editor.removeEventListener('click', onEditorClick);
       editor.removeEventListener('paste', onEditorPaste, true);
       editor.removeEventListener('dragstart', onDragStart);

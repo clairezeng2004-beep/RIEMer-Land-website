@@ -47,7 +47,14 @@
  *   - 高亮块是纯 HTML 结构，颜色通过 class 控制，Emoji 通过工具栏交互替换文本。
  */
 
-import { imageFileToCompressedDataUrl } from './imageCompression';
+import {
+  EDITOR_IMAGE_COMPRESSION_OPTIONS,
+  imageFileToCompressedDataUrl,
+} from './imageCompression';
+
+function imageFileToEditorDataUrl(file) {
+  return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
+}
 
 /** 在光标处插入一段 HTML（作为独立块），若光标不在编辑器内则追加到末尾 */
 function insertBlockAtCaret(editor, node, { addTrailingParagraph = true } = {}) {
@@ -350,7 +357,7 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     const f = files[i];
     if (f && f.type?.startsWith('image/')) {
       // eslint-disable-next-line no-await-in-loop
-      const url = await imageFileToCompressedDataUrl(f);
+      const url = await imageFileToEditorDataUrl(f);
       datas[i] = url;
     } else {
       datas[i] = null;
@@ -440,7 +447,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     input.onchange = async () => {
       const file = input.files?.[0];
       if (!file) return;
-      const url = await imageFileToCompressedDataUrl(file);
+      const url = await imageFileToEditorDataUrl(file);
       col.innerHTML = '';
       const img = appendColumnImage(col, url);
       // 分栏图片不再自动追加空行；选区停在图片节点上，避免生成右侧光标。

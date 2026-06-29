@@ -2,6 +2,13 @@ const DEFAULT_MAX_WIDTH = 1600;
 const DEFAULT_MAX_HEIGHT = 1600;
 const DEFAULT_QUALITY = 0.78;
 
+export const EDITOR_IMAGE_COMPRESSION_OPTIONS = {
+  maxWidth: 960,
+  maxHeight: 960,
+  quality: 0.68,
+  outputType: 'image/webp',
+};
+
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -78,5 +85,17 @@ export async function imageFileToCompressedDataUrl(file, {
     return fileToDataUrl(blob);
   } catch {
     return fileToDataUrl(file);
+  }
+}
+
+export async function imageDataUrlToCompressedDataUrl(dataUrl, options = {}) {
+  if (!String(dataUrl || '').startsWith('data:image/')) return dataUrl;
+  try {
+    const res = await fetch(dataUrl);
+    const blob = await res.blob();
+    if (!blob?.type?.startsWith('image/')) return dataUrl;
+    return imageFileToCompressedDataUrl(blob, options);
+  } catch {
+    return dataUrl;
   }
 }
