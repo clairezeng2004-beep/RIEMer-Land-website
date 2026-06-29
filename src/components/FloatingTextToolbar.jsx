@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
 import './FloatingTextToolbar.css';
+import { normalizeOrderedListNumbering } from '../utils/orderedListNumbering';
 
 /**
  * FloatingTextToolbar
@@ -401,10 +402,12 @@ export default function FloatingTextToolbar({
   // 再次点击同类型可取消列表（execCommand 自带切换）。生成的 <ul>/<ol> 支持
   // 在编辑器里用 Tab / Shift+Tab 缩进到多级（见 utils/editorTabIndent.js）。
   const applyListRich = useCallback((cmd) => {
+    const editor = editorRef.current;
     document.execCommand(cmd, false, null);
+    if (cmd === 'insertOrderedList') normalizeOrderedListNumbering(editor);
     detectActiveRich();
     fireChangeRich();
-  }, [detectActiveRich, fireChangeRich]);
+  }, [detectActiveRich, editorRef, fireChangeRich]);
 
   // 对齐（富文本）：justifyLeft / justifyCenter / justifyRight，作用在当前块上。
   const applyAlignRich = useCallback((cmd) => {

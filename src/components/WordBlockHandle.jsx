@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions, RotateCcw } from 'lucide-react';
 import './WordBlockHandle.css';
+import {
+  getCurrentOrderedList,
+  isOrderedListRestarted,
+  normalizeOrderedListNumbering,
+  setOrderedListRestart,
+} from '../utils/orderedListNumbering';
 
 /** 四个点（正方形四顶点）图标 —— 块手柄的抓取标识 */
 function FourDotsIcon({ size = 14 }) {
@@ -115,6 +121,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
   const [pos, setPos] = useState(null); // { top, left } 视口坐标
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockHasImage, setBlockHasImage] = useState(false); // 当前块是否含图片（决定是否显示"添加注释"）
+  const [currentOlRestarted, setCurrentOlRestarted] = useState(null); // null = 当前不在有序列表里
   const blockRef = useRef(null); // 当前块 DOM 节点（点菜单时用来恢复光标）
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null); // 悬浮离开后的延时关闭计时器
@@ -147,6 +154,8 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     if (!editor.contains(block)) { setPos(null); blockRef.current = null; return; }
     blockRef.current = block; // 仍记录所在块，供格式命令使用
     setBlockHasImage(!!(block.querySelector && block.querySelector('img')));
+    const currentOl = getCurrentOrderedList(editor);
+    setCurrentOlRestarted(currentOl ? isOrderedListRestarted(currentOl) : null);
 
     // 位置以「光标当前所在行」为准：跟随换行、滚动，并与该行垂直居中。
     const lineRect = getCaretLineRect(editor) || block.getBoundingClientRect();
@@ -267,6 +276,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     }
     try {
       document.execCommand(opt.cmd, false, value);
+      if (opt.key === 'ol') normalizeOrderedListNumbering(editorRef?.current);
       if (opt.key === 'alignLeft' || opt.key === 'alignCenter' || opt.key === 'alignRight') {
         applyTextAlignToBlock(blockRef.current, opt.key);
       }
@@ -291,6 +301,20 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     // 下一帧重算手柄位置（块标签变了，高度可能变化）
     requestAnimationFrame(() => refresh());
   }, [restoreCaret, fireChange, refresh, editorRef]);
+
+  const toggleOrderedListRestart = useCallback(() => {
+    const editor = editorRef?.current;
+    if (!editor) { setMenuOpen(false); return; }
+    const list = getCurrentOrderedList(editor);
+    if (!list) { setMenuOpen(false); return; }
+    const nextRestart = !isOrderedListRestarted(list);
+    setOrderedListRestart(list, nextRestart);
+    normalizeOrderedListNumbering(editor);
+    setCurrentOlRestarted(nextRestart);
+    fireChange();
+    setMenuOpen(false);
+    requestAnimationFrame(() => refresh());
+  }, [editorRef, fireChange, refresh]);
 
   // 给图片添加/聚焦注释：在图片所在段落下方插入一行更小的说明文字
   const addCaption = useCallback(() => {
@@ -383,6 +407,17 @@ export default function WordBlockHandle({ editorRef, onChange }) {
             >
               <Captions size={15} className="wbh__menu-icon" />
               <span>图片注释</span>
+            </button>
+          )}
+          {currentOlRestarted !== null && (
+            <button
+              type="button"
+              className="wbh__menu-item"
+              onMouseDown={stop}
+              onClick={toggleOrderedListRestart}
+            >
+              <RotateCcw size={15} className="wbh__menu-icon" />
+              <span>{currentOlRestarted ? '继续前序编号' : '重新开始编号'}</span>
             </button>
           )}
         </div>

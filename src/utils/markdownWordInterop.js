@@ -107,7 +107,7 @@ function blockToMarkdown(node, depth = 0) {
       .join('\n');
   }
   if (tag === 'ul' || tag === 'ol') {
-    let index = 1;
+    let index = tag === 'ol' ? (Number.parseInt(node.getAttribute('start') || '1', 10) || 1) : 1;
     return Array.from(node.children)
       .filter((child) => child.tagName.toLowerCase() === 'li')
       .map((li) => {

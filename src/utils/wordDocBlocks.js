@@ -51,6 +51,7 @@ import {
   EDITOR_IMAGE_COMPRESSION_OPTIONS,
   imageFileToCompressedDataUrl,
 } from './imageCompression';
+import { normalizeOrderedListNumbering } from './orderedListNumbering';
 
 function imageFileToEditorDataUrl(file) {
   return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
@@ -930,6 +931,10 @@ export function attachTableControls(editor, onChange) {
 export function attachWordEditingNormalizer(editor, onChange) {
   if (!editor) return () => {};
 
+  const normalizeLists = () => {
+    if (normalizeOrderedListNumbering(editor)) onChange?.();
+  };
+
   const onKeyDown = (e) => {
     if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
     const sel = window.getSelection();
@@ -964,6 +969,15 @@ export function attachWordEditingNormalizer(editor, onChange) {
     onChange?.();
   };
 
+  const onInput = () => {
+    requestAnimationFrame(normalizeLists);
+  };
+
+  normalizeLists();
   editor.addEventListener('keydown', onKeyDown);
-  return () => editor.removeEventListener('keydown', onKeyDown);
+  editor.addEventListener('input', onInput);
+  return () => {
+    editor.removeEventListener('keydown', onKeyDown);
+    editor.removeEventListener('input', onInput);
+  };
 }
