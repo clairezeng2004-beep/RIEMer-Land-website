@@ -83,6 +83,32 @@ function getImageContainerWidth(editor, img) {
   return col ? availableWidth : Math.min(availableWidth, DETAIL_CONTENT_IMAGE_MAX_WIDTH);
 }
 
+function getNodeElement(node) {
+  if (!node) return null;
+  return node.nodeType === 1 ? node : node.parentElement;
+}
+
+function getActiveColumn(editor) {
+  const sel = window.getSelection();
+  if (sel?.rangeCount) {
+    const range = sel.getRangeAt(0);
+    const startEl = getNodeElement(range.startContainer);
+    const col = startEl?.closest?.('.msc-col');
+    if (col && editor.contains(col)) return col;
+  }
+
+  const selected = editor.querySelector('.msc-col--selected');
+  return selected && editor.contains(selected) ? selected : null;
+}
+
+function getFirstColumnContent(col) {
+  return [...col.children].find((child) => {
+    if (child.classList?.contains('msc-col-resizer')) return false;
+    if (child.classList?.contains('msc-col-adder')) return false;
+    return true;
+  }) || null;
+}
+
 function getImageWrap(img) {
   return img?.closest?.('.msc-img-wrap') || null;
 }
@@ -103,6 +129,57 @@ function isEmptyParagraph(node) {
     if (child.nodeType !== 1) return true;
     return child.tagName.toLowerCase() === 'br';
   });
+}
+
+function placeCaretAtStart(node) {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(true);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch { /* ignore */ }
+}
+
+function ensureLeftTrailingParagraphAfter(node) {
+  if (!node?.parentNode) return null;
+  let trailer = node.nextElementSibling;
+  while (trailer && isEmptyParagraph(trailer)) {
+    const next = trailer.nextElementSibling;
+    trailer.remove();
+    trailer = next;
+  }
+
+  const p = document.createElement('p');
+  p.style.textAlign = 'left';
+  p.setAttribute('align', 'left');
+  p.innerHTML = '<br />';
+  node.parentNode.insertBefore(p, node.nextSibling);
+  placeCaretAtStart(p);
+  return p;
+}
+
+function normalizeColumnImageInsertion(editor, wrap, img) {
+  const col = img.closest('.msc-col');
+  const container = col?.closest('.msc-cols');
+  if (!col || !container || !editor.contains(container)) return false;
+
+  img.style.width = '100%';
+  img.style.height = 'auto';
+
+  if (wrap.parentNode) {
+    while (wrap.previousSibling && isEmptyParagraph(wrap.previousSibling)) {
+      wrap.previousSibling.remove();
+    }
+    while (wrap.nextSibling && isEmptyParagraph(wrap.nextSibling)) {
+      wrap.nextSibling.remove();
+    }
+  }
+
+  container.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
+  ensureLeftTrailingParagraphAfter(container);
+  return true;
 }
 
 function ensureImageCaption(editor, img) {
@@ -146,6 +223,15 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
 
   wrap.appendChild(img);
 
+  // 分栏内插图必须落在具体栏里，不能插成 .msc-cols 的额外 grid 子项。
+  const activeCol = getActiveColumn(editor);
+  if (activeCol) {
+    activeCol.insertBefore(wrap, getFirstColumnContent(activeCol));
+    await whenImgLoaded(img);
+    normalizeColumnImageInsertion(editor, wrap, img);
+    return img;
+  }
+
   // 插到当前 selection 位置，若光标不在 editor 内，则追加到末尾
   const sel = window.getSelection();
   let inserted = false;
@@ -164,10 +250,7 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
   // 图片加载后默认撑满当前输入区域：普通正文撑满编辑器，分栏内撑满当前栏。
   await whenImgLoaded(img);
   try {
-    if (img.closest('.msc-col')) {
-      img.style.width = '100%';
-      img.style.height = 'auto';
-      insertTrailingParagraphAfter(wrap);
+    if (normalizeColumnImageInsertion(editor, wrap, img)) {
       return img;
     }
     const maxW = getImageContainerWidth(editor, img);
