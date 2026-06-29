@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { marked } from 'marked';
 import {
   FolderOpen,
   Plus,
@@ -410,7 +409,7 @@ export default function ProcessTemplateCreate() {
   /* ============ Markdown 预览 ============ */
   const markdownPreview = useMemo(() => {
     if (newDoc.format !== 'markdown' || !newDoc.content.trim()) return '';
-    return marked.parse(newDoc.content, { breaks: true, gfm: true });
+    return markdownToHtml(newDoc.content);
   }, [newDoc.format, newDoc.content]);
 
   /* ============ Word 编辑器挂载：图片插入/拖拽/粘贴/拉伸 + 分栏 + 表格 ============ */

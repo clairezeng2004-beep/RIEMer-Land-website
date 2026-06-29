@@ -574,6 +574,63 @@
   border-bottom: 2px solid var(--color-border-light, #e5e7eb);
 }
 
+.msc-md-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.msc-md-toolbar__group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.msc-md-toolbar__group + .msc-md-toolbar__group {
+  padding-left: 8px;
+  border-left: 1px solid var(--color-border-light, #e5e7eb);
+}
+
+.msc-md-toolbar__btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-sm, 4px);
+  background: #fff;
+  color: var(--color-text-light, #6b7280);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.msc-md-toolbar__btn:hover {
+  border-color: var(--color-primary, #5B8C3E);
+  color: var(--color-primary, #5B8C3E);
+  background: rgba(91, 140, 62, 0.05);
+}
+
+.msc-md-toolbar__btn--swatch {
+  padding-right: 0.55rem;
+}
+
+.msc-md-toolbar__swatch {
+  width: 12px;
+  height: 12px;
+  border: 1px solid rgba(31, 41, 55, 0.14);
+  border-radius: 50%;
+  flex: 0 0 auto;
+}
+
 /* ====== 同步滚动开关按钮（在「编辑」label 右侧） ====== */
 .msc-md-split__sync-btn {
   margin-left: auto; /* 推到行尾 */
@@ -931,6 +988,7 @@
   min-height: 400px;
   max-height: none;
   line-height: 1.7;
+  text-align: left;
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 

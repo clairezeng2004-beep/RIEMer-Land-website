@@ -1,5 +1,8 @@
 import { marked } from 'marked';
 
+const PROTECTED_BLOCK_SELECTOR = '.msc-cols, .msc-callout, .msc-table-wrap';
+const SKIP_INLINE_PARSE_SELECTOR = 'pre, code, a, script, style';
+
 function escapeMarkdownText(text = '') {
   return text
     .replace(/\\/g, '\\\\')
@@ -85,6 +88,14 @@ function blockToMarkdown(node, depth = 0) {
   const inline = () => inlineToMarkdown(node).trim();
   const blocks = () => Array.from(node.childNodes).map((child) => blockToMarkdown(child, depth)).filter(Boolean).join('\n\n');
 
+  if (
+    node.classList?.contains('msc-cols') ||
+    node.classList?.contains('msc-callout') ||
+    node.classList?.contains('msc-table-wrap')
+  ) {
+    return node.outerHTML;
+  }
+
   if (/^h[1-6]$/.test(tag)) {
     return `${'#'.repeat(Number(tag[1]))} ${inline()}`.trim();
   }
@@ -131,6 +142,22 @@ export function htmlToMarkdown(html = '') {
 
 export function markdownToHtml(markdown = '') {
   if (!markdown.trim()) return '';
-  return marked.parse(markdown, { breaks: true, gfm: true });
-}
+  const html = marked.parse(markdown, { breaks: true, gfm: true });
+  const parsed = new DOMParser().parseFromString(html, 'text/html');
 
+  parsed.querySelectorAll(PROTECTED_BLOCK_SELECTOR).forEach((block) => {
+    block.querySelectorAll('p, li, td, th, .msc-callout__body').forEach((node) => {
+      if (node.closest(SKIP_INLINE_PARSE_SELECTOR)) return;
+      Array.from(node.childNodes).forEach((child) => {
+        if (child.nodeType !== Node.TEXT_NODE) return;
+        const text = child.textContent || '';
+        if (!/[*_`[\]~]/.test(text)) return;
+        const template = parsed.createElement('template');
+        template.innerHTML = marked.parseInline(text, { breaks: true, gfm: true });
+        child.replaceWith(template.content);
+      });
+    });
+  });
+
+  return parsed.body.innerHTML;
+}

@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { marked } from 'marked';
 import { stripUnderline } from '../../utils/stripUnderline';
+import { markdownToHtml } from '../../utils/markdownWordInterop';
 import {
   ChevronLeft,
   Clock,
@@ -264,12 +264,12 @@ export default function MemberSharingDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.id]);
 
-  // 配置 marked
+  // Markdown / Word-HTML 渲染
   const renderedContent = useMemo(() => {
     if (!post) return '';
     const rawContent = String(post.content || '');
     if (post.format === 'markdown') {
-      return stripUnderline(marked.parse(stripUnderline(rawContent), { breaks: true, gfm: true }));
+      return stripUnderline(markdownToHtml(stripUnderline(rawContent)));
     }
     // word (HTML) 格式直接返回（清掉下划线）
     return stripUnderline(rawContent);

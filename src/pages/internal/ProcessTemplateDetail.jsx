@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
-import { marked } from 'marked';
 import { stripUnderline } from '../../utils/stripUnderline';
 import {
   ChevronLeft,
@@ -725,7 +724,7 @@ export default function ProcessTemplateDetail() {
   const renderedContent = useMemo(() => {
     if (!doc || !doc.content) return '';
     if (doc.format === 'markdown') {
-      return stripUnderline(marked.parse(stripUnderline(doc.content), { breaks: true, gfm: true }));
+      return stripUnderline(markdownToHtml(stripUnderline(doc.content)));
     }
     return stripUnderline(doc.content); // word 格式：已是 HTML
   }, [doc]);
@@ -1188,7 +1187,7 @@ export default function ProcessTemplateDetail() {
   const editMarkdownPreview = useMemo(() => {
     if (!doc || editFormat !== 'markdown') return '';
     if (!editContent || !editContent.trim()) return '';
-    return stripUnderline(marked.parse(stripUnderline(editContent), { breaks: true, gfm: true }));
+    return stripUnderline(markdownToHtml(stripUnderline(editContent)));
   }, [editContent, editFormat, doc]);
 
   /* ========== 目录（TOC） ==========

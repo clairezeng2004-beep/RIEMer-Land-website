@@ -1,6 +1,5 @@
 import { useState, useRef, useCallback, useMemo, useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
-import { marked } from 'marked';
 import { useAuth } from '../../contexts/AuthContext';
 import { emitNotificationEvent } from '../../lib/notificationRuleEngine';
 import {
@@ -34,6 +33,7 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import EditableText from '../../components/EditableText';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import { stripUnderline } from '../../utils/stripUnderline';
+import { markdownToHtml } from '../../utils/markdownWordInterop';
 import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
 import {
@@ -947,7 +947,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const renderedTextContent = useMemo(() => {
     if (!previewDoc || !previewDoc.content) return '';
     if (previewDoc.format === 'markdown') {
-      return stripUnderline(marked.parse(stripUnderline(previewDoc.content), { breaks: true, gfm: true }));
+      return stripUnderline(markdownToHtml(stripUnderline(previewDoc.content)));
     }
     // word 格式本身就是 HTML，原样返回（清掉下划线）
     return stripUnderline(previewDoc.content);
