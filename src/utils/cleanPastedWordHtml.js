@@ -82,6 +82,31 @@ function sanitizeClass(el, { preserveEditorAttrs }) {
   else el.removeAttribute('class');
 }
 
+function flattenPastedColumns(doc) {
+  doc.querySelectorAll('.msc-cols').forEach((container) => {
+    const frag = doc.createDocumentFragment();
+    const cols = [...container.children].filter((child) => child.classList?.contains('msc-col'));
+    const sources = cols.length > 0 ? cols : [...container.children];
+
+    sources.forEach((source) => {
+      if (source.classList?.contains('msc-col-resizer') || source.classList?.contains('msc-col-adder')) return;
+      while (source.firstChild) {
+        const child = source.firstChild;
+        if (
+          child.nodeType === 1
+          && (child.classList?.contains('msc-col-resizer') || child.classList?.contains('msc-col-adder'))
+        ) {
+          child.remove();
+          continue;
+        }
+        frag.appendChild(child);
+      }
+    });
+
+    container.replaceWith(frag);
+  });
+}
+
 export function cleanPastedWordHtml(html, {
   preserveTextAlign = true,
   preserveEditorAttrs = false,
@@ -91,6 +116,7 @@ export function cleanPastedWordHtml(html, {
   doc.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
 
   toSemanticInlineTags(doc);
+  flattenPastedColumns(doc);
 
   doc.querySelectorAll('*').forEach((el) => {
     sanitizeStyle(el, { preserveTextAlign, preserveImageSize: true });
