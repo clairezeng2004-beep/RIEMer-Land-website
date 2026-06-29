@@ -107,6 +107,30 @@ function flattenPastedColumns(doc) {
   });
 }
 
+function hasBlockChild(el) {
+  return !!el.querySelector?.('address, article, aside, blockquote, div, dl, fieldset, figure, h1, h2, h3, h4, h5, h6, hr, ol, p, pre, table, ul');
+}
+
+function unwrapElement(el) {
+  const frag = el.ownerDocument.createDocumentFragment();
+  while (el.firstChild) frag.appendChild(el.firstChild);
+  el.replaceWith(frag);
+}
+
+function normalizeDivElements(doc) {
+  [...doc.querySelectorAll('div')].reverse().forEach((div) => {
+    if (hasBlockChild(div)) {
+      unwrapElement(div);
+      return;
+    }
+
+    const p = doc.createElement('p');
+    [...div.attributes].forEach((attr) => p.setAttribute(attr.name, attr.value));
+    while (div.firstChild) p.appendChild(div.firstChild);
+    div.replaceWith(p);
+  });
+}
+
 export function cleanPastedWordHtml(html, {
   preserveTextAlign = true,
   preserveEditorAttrs = false,
@@ -155,9 +179,8 @@ export function cleanPastedWordHtml(html, {
 
   let cleaned = doc.body.innerHTML;
   if (normalizeDivs) {
-    cleaned = cleaned
-      .replace(/<div[^>]*>/gi, '<p>')
-      .replace(/<\/div>/gi, '</p>');
+    normalizeDivElements(doc);
+    cleaned = doc.body.innerHTML;
   }
   cleaned = cleaned
     .replace(/<span[^>]*>/gi, '')

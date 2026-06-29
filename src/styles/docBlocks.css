@@ -400,6 +400,20 @@
   word-break: break-word;
 }
 
+.msc-col > .msc-img-wrap {
+  margin: 0 0 0.2em;
+  line-height: 1;
+  text-align: center;
+}
+
+.msc-col > .msc-img-wrap:first-child {
+  margin-top: 0;
+}
+
+.msc-col > .msc-img-wrap + .msc-img-wrap {
+  margin-top: 0.4em;
+}
+
 /* 文字栏让 flex 从顶部对齐，避免单段文字被居中导致看起来是垂直居中图片预览 */
 .msc-col:has(> p),
 .msc-col:has(> h1),
