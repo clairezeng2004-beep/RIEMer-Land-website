@@ -955,6 +955,45 @@ export function attachWordEditingNormalizer(editor, onChange) {
     if (normalizeOrderedListNumbering(editor)) onChange?.();
   };
 
+  const isEmptyPlainParagraph = (node) => {
+    if (!node || node.tagName?.toLowerCase() !== 'p') return false;
+    if (node.classList?.contains('msc-img-wrap') || node.classList?.contains('msc-img-caption')) return false;
+    if (node.querySelector?.('img, video, table, iframe')) return false;
+    const text = String(node.textContent || '').replace(/\u200B/g, '').trim();
+    if (text) return false;
+    return [...node.childNodes].every((child) => {
+      if (child.nodeType === 3) return !String(child.textContent || '').replace(/\u200B/g, '').trim();
+      if (child.nodeType !== 1) return true;
+      return child.tagName?.toLowerCase() === 'br';
+    });
+  };
+
+  const ensureEmptyCaretLeftAligned = () => {
+    let changed = false;
+    if (!String(editor.textContent || '').replace(/\u200B/g, '').trim()
+      && !editor.querySelector('img, video, table, iframe')) {
+      const p = editor.querySelector('p') || document.createElement('p');
+      if (!p.parentNode) editor.appendChild(p);
+      if (!p.innerHTML || p.innerHTML === '') p.innerHTML = '<br />';
+      if (p.style.textAlign !== 'left' || p.getAttribute('align') !== 'left') {
+        p.style.textAlign = 'left';
+        p.setAttribute('align', 'left');
+        changed = true;
+      }
+    }
+
+    editor.querySelectorAll('p').forEach((p) => {
+      if (!isEmptyPlainParagraph(p)) return;
+      const align = String(p.style.textAlign || p.getAttribute('align') || '').toLowerCase();
+      if (align && align !== 'left') {
+        p.style.textAlign = 'left';
+        p.setAttribute('align', 'left');
+        changed = true;
+      }
+    });
+    if (changed) onChange?.();
+  };
+
   const convertTypedOrderedListMarker = () => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
@@ -1027,10 +1066,14 @@ export function attachWordEditingNormalizer(editor, onChange) {
   };
 
   const onInput = () => {
-    requestAnimationFrame(normalizeLists);
+    requestAnimationFrame(() => {
+      normalizeLists();
+      ensureEmptyCaretLeftAligned();
+    });
   };
 
   normalizeLists();
+  ensureEmptyCaretLeftAligned();
   editor.addEventListener('keydown', onKeyDown);
   editor.addEventListener('input', onInput);
   return () => {

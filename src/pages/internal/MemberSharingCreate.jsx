@@ -42,7 +42,7 @@ import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { stripUnderline } from '../../utils/stripUnderline';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
-import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle } from '../../utils/pasteMatchStyle';
+import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle, isSelectionInImageCaption } from '../../utils/pasteMatchStyle';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import {
@@ -743,8 +743,11 @@ export default function MemberSharingCreate() {
     const text = e.clipboardData.getData('text/plain');
     const shouldMatchStyle = pasteAsPlainTextRef.current || e.shiftKey;
     pasteAsPlainTextRef.current = false;
+    const shouldPasteAsCaptionText = text && isSelectionInImageCaption(wordEditorRef.current);
 
-    if (html && !shouldMatchStyle) {
+    if (shouldPasteAsCaptionText) {
+      insertPlainTextMatchingEditorStyle(wordEditorRef.current, text);
+    } else if (html && !shouldMatchStyle) {
       const cleaned = cleanWordHtml(html);
       if (!insertHtmlReplacingEmptyParagraph(wordEditorRef.current, cleaned)) {
         document.execCommand('insertHTML', false, cleaned);

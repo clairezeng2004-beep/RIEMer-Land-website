@@ -23,6 +23,13 @@ function getSelectionInEditor(editor) {
   return { sel, range, start, end };
 }
 
+export function isSelectionInImageCaption(editor) {
+  const context = getSelectionInEditor(editor);
+  if (!context) return false;
+  const caption = context.start.closest?.('.msc-img-caption');
+  return !!(caption && editor.contains(caption) && caption.contains(context.end));
+}
+
 function insertTextIntoCaption(editor, text) {
   const context = getSelectionInEditor(editor);
   if (!context) return false;

@@ -67,7 +67,7 @@ import useAdjacentItems from '../../hooks/useAdjacentItems';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
-import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle } from '../../utils/pasteMatchStyle';
+import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle, isSelectionInImageCaption } from '../../utils/pasteMatchStyle';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
   attachTableControls,
@@ -1118,8 +1118,11 @@ export default function ProcessTemplateDetail() {
     const text = e.clipboardData.getData('text/plain');
     const shouldMatchStyle = pasteAsPlainTextRef.current || e.shiftKey;
     pasteAsPlainTextRef.current = false;
+    const shouldPasteAsCaptionText = text && isSelectionInImageCaption(ptdWordEditorRef.current);
 
-    if (html && !shouldMatchStyle) {
+    if (shouldPasteAsCaptionText) {
+      insertPlainTextMatchingEditorStyle(ptdWordEditorRef.current, text);
+    } else if (html && !shouldMatchStyle) {
       const cleaned = cleanWordHtml(html);
       if (!insertHtmlReplacingEmptyParagraph(ptdWordEditorRef.current, cleaned)) {
         document.execCommand('insertHTML', false, cleaned);
