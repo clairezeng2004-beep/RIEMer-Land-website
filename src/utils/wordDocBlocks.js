@@ -1032,7 +1032,7 @@ export function attachWordEditingNormalizer(editor, onChange) {
       }
     }
 
-    if (e.key !== 'Enter' || e.shiftKey || e.altKey || e.ctrlKey || e.metaKey) return;
+    if (e.key !== 'Enter' || e.altKey || e.ctrlKey || e.metaKey) return;
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return;
     const anchor =
@@ -1040,20 +1040,20 @@ export function attachWordEditingNormalizer(editor, onChange) {
     const caption = anchor?.closest?.('.msc-img-caption');
     if (caption && editor.contains(caption)) {
       e.preventDefault();
-      const p = document.createElement('p');
-      p.style.textAlign = 'left';
-      p.setAttribute('align', 'left');
-      p.innerHTML = '<br />';
-      const col = caption.closest('.msc-col');
-      if (col && editor.contains(col)) {
-        col.insertBefore(p, caption.nextSibling);
-      } else {
-        caption.parentNode?.insertBefore(p, caption.nextSibling);
-      }
-      placeCaretAtStart(p);
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+      const br = document.createElement('br');
+      const spacer = document.createTextNode('\u200B');
+      range.insertNode(br);
+      br.parentNode?.insertBefore(spacer, br.nextSibling);
+      range.setStart(spacer, 1);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
       onChange?.();
       return;
     }
+    if (e.shiftKey) return;
     const quote = anchor?.closest?.('blockquote');
     if (!quote || !editor.contains(quote)) return;
 
