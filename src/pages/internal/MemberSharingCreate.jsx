@@ -731,6 +731,24 @@ export default function MemberSharingCreate() {
     return cleanPastedWordHtml(html, { preserveTextAlign: true });
   }, []);
 
+  const cleanEditorHtmlForSave = useCallback((html) => {
+    if (!html || typeof DOMParser === 'undefined') return stripUnderline(html || '');
+    try {
+      const doc = new DOMParser().parseFromString(String(html), 'text/html');
+      doc.querySelectorAll('.msc-img-expired-note').forEach((node) => node.remove());
+      doc.querySelectorAll('img').forEach((img) => {
+        if (!img.getAttribute('src')) img.remove();
+        if (!img.getAttribute('src')?.startsWith('data:')) {
+          img.removeAttribute('data-external-expired');
+          img.removeAttribute('data-storage-retry-count');
+        }
+      });
+      return stripUnderline(doc.body.innerHTML);
+    } catch {
+      return stripUnderline(html || '');
+    }
+  }, []);
+
   // 处理 Word 编辑器的粘贴事件
   const handleWordPaste = useCallback((e) => {
     // 若剪贴板里有图片，交给 wordImageEditor（capture 阶段已处理），此处不再执行
@@ -886,7 +904,7 @@ export default function MemberSharingCreate() {
     const currentContent = newPost.format === 'word' && wordEditorRef.current
       ? wordEditorRef.current.innerHTML
       : newPost.content;
-    const normalizedContent = stripUnderline(currentContent || '');
+    const normalizedContent = cleanEditorHtmlForSave(currentContent || '');
     const hasContent = normalizedContent.trim().length > 0;
     const hasAttachments = newPost.attachments.length > 0;
     if (!newPost.title.trim() || (!hasContent && !hasAttachments)) return null;
@@ -978,13 +996,13 @@ export default function MemberSharingCreate() {
       const existingId = isEditingPost ? post.id : savedIdRef.current;
       if (existingId) {
         // 编辑，或自动保存已创建过云端记录 → 走更新，避免重复插入。
-        updateSharing(existingId, {
+        await updateSharing(existingId, {
           title: post.title, summary: post.summary, category: post.category,
           format: post.format, content: post.content, period: post.period, attachments: post.attachments,
           author: post.author, authorId: post.authorId, contributorIds: post.contributorIds,
-        }).catch((err) => console.warn('[MemberSharingCreate] 云端更新失败（已写本地）:', err?.message || err));
+        });
       } else {
-        addSharing(post).catch((err) => console.warn('[MemberSharingCreate] 云端发布失败（已写本地）:', err?.message || err));
+        await addSharing(post);
         savedIdRef.current = post.id;
         try {
           const categoryLabel = cats.find((c) => c.key === post.category)?.label || '';
@@ -996,6 +1014,9 @@ export default function MemberSharingCreate() {
         }
       }
       navigate('/internal/member-sharing');
+    } catch (err) {
+      console.warn('[MemberSharingCreate] 保存失败:', err?.message || err);
+      alert(err?.message || '保存失败，请检查图片是否已重新上传后再试。');
     } finally {
       setIsPublishing(false);
     }

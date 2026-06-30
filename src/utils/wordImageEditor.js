@@ -153,6 +153,14 @@ function getImageCaption(img) {
   return next?.classList?.contains('msc-img-caption') ? next : null;
 }
 
+function getImageAtPoint(editor, x, y) {
+  const el = document.elementFromPoint(x, y);
+  const img = el instanceof HTMLImageElement
+    ? el
+    : el?.closest?.('img.msc-img, img');
+  return img instanceof HTMLImageElement && editor.contains(img) ? img : null;
+}
+
 function isEmptyParagraph(node) {
   if (!node || node.nodeType !== 1 || node.tagName.toLowerCase() !== 'p') return false;
   if (node.querySelector('img, video, table, iframe')) return false;
@@ -785,6 +793,28 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
     e.preventDefault();
     e.stopPropagation();
     editor.classList.remove('msc-form__word-editor--drag');
+    const replaceTarget = selectedImg?.isConnected
+      ? selectedImg
+      : getImageAtPoint(editor, e.clientX, e.clientY);
+    if (replaceTarget && files.length === 1) {
+      (async () => {
+        const f = files[0];
+        const dataUrl = await imageFileToImmediateDataUrl(f);
+        replaceTarget.setAttribute('src', dataUrl);
+        replaceTarget.classList.add('msc-img');
+        replaceTarget.setAttribute('draggable', 'true');
+        replaceTarget.setAttribute('loading', 'lazy');
+        replaceTarget.setAttribute('decoding', 'async');
+        replaceTarget.removeAttribute('data-external-expired');
+        replaceTarget.removeAttribute('data-storage-retry-count');
+        replaceTarget.removeAttribute('data-storage-bucket');
+        replaceTarget.removeAttribute('data-storage-path');
+        selectImage(replaceTarget);
+        compressInsertedImageInBackground(replaceTarget, f, fireChange);
+        fireChange();
+      })();
+      return;
+    }
     const range = caretRangeFromPoint(e.clientX, e.clientY);
     if (range) {
       const sel = window.getSelection();

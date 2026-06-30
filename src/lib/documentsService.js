@@ -458,7 +458,9 @@ export async function updateDoc(id, patch) {
   const needsAssetUpload = Boolean(
     ('attachments' in patch && Array.isArray(patch.attachments)) ||
     ('fileUrl' in patch && String(patch.fileUrl || '').startsWith('data:')) ||
-    ('content' in patch && hasInlineLocalImages(patch.content))
+    ('content' in patch && (
+      hasInlineLocalImages(patch.content) || hasUnstableExternalImages(patch.content)
+    ))
   );
   let localPatch = patch;
   try {

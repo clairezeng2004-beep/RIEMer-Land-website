@@ -503,7 +503,9 @@ export async function addSharing(post) {
 /** 更新分享（支持部分字段，例如只更新 likes） */
 export async function updateSharing(id, updates) {
   const needsAssetUpload = Boolean(
-    updates.attachments !== undefined || hasInlineLocalImages(updates.content)
+    updates.attachments !== undefined
+    || hasInlineLocalImages(updates.content)
+    || hasUnstableExternalImages(updates.content)
   );
   let localUpdates = updates;
   try {
@@ -536,9 +538,11 @@ export async function updateSharing(id, updates) {
     }
     if (error) {
       console.warn('[MemberSharingDB] 更新分享失败:', error.message);
+      throw new Error(error.message || '成员分享更新失败');
     }
   } catch (err) {
     console.warn('[MemberSharingDB] 更新分享异常:', err.message);
+    throw err;
   }
 }
 
