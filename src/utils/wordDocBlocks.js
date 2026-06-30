@@ -1044,9 +1044,9 @@ export function attachWordEditingNormalizer(editor, onChange) {
       p.style.textAlign = 'left';
       p.setAttribute('align', 'left');
       p.innerHTML = '<br />';
-      const cols = caption.closest('.msc-cols');
-      if (cols?.parentNode) {
-        cols.parentNode.insertBefore(p, cols.nextSibling);
+      const col = caption.closest('.msc-col');
+      if (col && editor.contains(col)) {
+        col.insertBefore(p, caption.nextSibling);
       } else {
         caption.parentNode?.insertBefore(p, caption.nextSibling);
       }
