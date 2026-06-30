@@ -521,18 +521,26 @@ export async function updateSharing(id, updates) {
     updateLocalSharing(id, localUpdates);
     if (!isSupabaseConfigured || !supabase) return;
     const dbUpdates = frontendToDbUpdate(cloudUpdates);
-    let { error } = await supabase
-      .from('member_sharing')
-      .update(dbUpdates)
-      .eq('id', String(id));
+    let { error } = await withTimeout(
+      supabase
+        .from('member_sharing')
+        .update(dbUpdates)
+        .eq('id', String(id)),
+      MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+      '成员分享云端更新',
+    );
     if (error && (isMissingSummaryColumnError(error) || isMissingContributorColumnError(error))) {
       let retryUpdates = dbUpdates;
       if (isMissingSummaryColumnError(error)) retryUpdates = stripSummaryField(retryUpdates);
       if (isMissingContributorColumnError(error)) retryUpdates = stripContributorIdsField(retryUpdates);
-      const retry = await supabase
-        .from('member_sharing')
-        .update(retryUpdates)
-        .eq('id', String(id));
+      const retry = await withTimeout(
+        supabase
+          .from('member_sharing')
+          .update(retryUpdates)
+          .eq('id', String(id)),
+        MEMBER_SHARING_CLOUD_TIMEOUT_MS,
+        '成员分享云端更新',
+      );
       error = retry.error;
     }
     if (error) {

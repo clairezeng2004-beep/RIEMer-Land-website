@@ -23,6 +23,7 @@ export const DOCUMENTS_KEY = 'riemer_documents';
 export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
 export const DOC_VIEWS_KEY = 'riemer_process_template_views';
 const DOCUMENTS_BUCKET = 'documents';
+const DOCUMENTS_CLOUD_TIMEOUT_MS = 25000;
 const VIEW_LOG_TIMEOUT_MS = 8000;
 
 /**
@@ -511,7 +512,11 @@ export async function updateDoc(id, patch) {
     if ('lastEditedBy' in patch) update.last_edited_by = patch.lastEditedBy;
     update.updated_at = new Date().toISOString();
 
-    const { error } = await supabase.from('documents').update(update).eq('id', id);
+    const { error } = await withTimeout(
+      supabase.from('documents').update(update).eq('id', id),
+      DOCUMENTS_CLOUD_TIMEOUT_MS,
+      '流程模板云端更新',
+    );
     if (error) {
       // updateDoc 故意保留"return 而非 throw"——调用方（点赞、编辑保存）已经
       // 用 result.remote / .catch 各自处理云端失败，不希望编辑中断 UI 流程。
