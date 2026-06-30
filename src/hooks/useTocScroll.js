@@ -54,6 +54,42 @@ export default function useTocScroll({
     return root && globalEl && root.contains(globalEl) ? globalEl : null;
   }, [contentRef]);
 
+  const findScrollParent = useCallback((node) => {
+    let p = node?.parentElement;
+    while (p && p !== document.body) {
+      const style = window.getComputedStyle(p);
+      const oy = style.overflowY;
+      if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
+        return p;
+      }
+      p = p.parentElement;
+    }
+    return null;
+  }, []);
+
+  const getHeadingTop = useCallback((heading, scrollParent) => {
+    if (scrollParent) {
+      const containerRect = scrollParent.getBoundingClientRect();
+      const headingRect = heading.getBoundingClientRect();
+      return scrollParent.scrollTop + (headingRect.top - containerRect.top);
+    }
+    return heading.getBoundingClientRect().top + window.pageYOffset;
+  }, []);
+
+  const pickActiveHeading = useCallback((headings, scrollParent) => {
+    if (!headings.length) return null;
+    const markerY = scrollParent
+      ? scrollParent.getBoundingClientRect().top + scrollOffset + 8
+      : scrollOffset + 8;
+    let active = headings[0];
+    for (const heading of headings) {
+      const rect = heading.getBoundingClientRect();
+      if (rect.top <= markerY) active = heading;
+      else break;
+    }
+    return active;
+  }, [scrollOffset]);
+
   /* 1) 提取标题并打 id */
   useEffect(() => {
     if (!contentRef.current) return;
@@ -96,40 +132,12 @@ export default function useTocScroll({
       .filter(Boolean);
     if (!headings.length) return;
 
-    const findScrollParent = (node) => {
-      let p = node?.parentElement;
-      while (p && p !== document.body) {
-        const style = window.getComputedStyle(p);
-        const oy = style.overflowY;
-        if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
-          return p;
-        }
-        p = p.parentElement;
-      }
-      return null;
-    };
-
     const scrollParent = findScrollParent(contentRef.current);
     let ticking = false;
 
-    const getTop = (el) => {
-      if (scrollParent) {
-        const containerRect = scrollParent.getBoundingClientRect();
-        const elRect = el.getBoundingClientRect();
-        return scrollParent.scrollTop + (elRect.top - containerRect.top);
-      }
-      return el.getBoundingClientRect().top + window.pageYOffset;
-    };
-
     const updateActive = () => {
       ticking = false;
-      const currentTop = scrollParent ? scrollParent.scrollTop : window.pageYOffset;
-      const marker = currentTop + scrollOffset + 8;
-      let active = headings[0];
-      for (const heading of headings) {
-        if (getTop(heading) <= marker) active = heading;
-        else break;
-      }
+      const active = pickActiveHeading(headings, scrollParent);
       if (active?.id) setActiveTocId(active.id);
     };
 
@@ -140,14 +148,30 @@ export default function useTocScroll({
     };
 
     updateActive();
+    const timers = [120, 360, 900].map((ms) => window.setTimeout(requestUpdate, ms));
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(requestUpdate)
+      : null;
+    try { resizeObserver?.observe(root); } catch { /* ignore */ }
+    const imgs = Array.from(root.querySelectorAll('img'));
+    imgs.forEach((img) => {
+      img.addEventListener('load', requestUpdate, { once: true });
+      img.addEventListener('error', requestUpdate, { once: true });
+    });
     const target = scrollParent || window;
     target.addEventListener('scroll', requestUpdate, { passive: true });
     window.addEventListener('resize', requestUpdate);
     return () => {
+      timers.forEach((id) => window.clearTimeout(id));
+      resizeObserver?.disconnect();
+      imgs.forEach((img) => {
+        img.removeEventListener('load', requestUpdate);
+        img.removeEventListener('error', requestUpdate);
+      });
       target.removeEventListener('scroll', requestUpdate);
       window.removeEventListener('resize', requestUpdate);
     };
-  }, [toc, contentRef, scrollOffset, findHeadingInRoot]);
+  }, [toc, contentRef, findHeadingInRoot, findScrollParent, pickActiveHeading]);
 
   /* 3) 点击目录跳转 —— 强鲁棒版本 */
   const handleTocClick = useCallback(
@@ -180,29 +204,6 @@ export default function useTocScroll({
       setActiveTocId(tocId);
       if (wasMobileDrawerOpen) setTocOpenMobile(false);
 
-      /* ========== 3.2 探测真实滚动容器 ========== */
-      const findScrollParent = (node) => {
-        let p = node?.parentElement;
-        while (p && p !== document.body) {
-          const style = window.getComputedStyle(p);
-          const oy = style.overflowY;
-          if ((oy === 'auto' || oy === 'scroll') && p.scrollHeight > p.clientHeight) {
-            return p;
-          }
-          p = p.parentElement;
-        }
-        return null;
-      };
-
-      const getHeadingTop = (heading, scrollParent) => {
-        if (scrollParent) {
-          const containerRect = scrollParent.getBoundingClientRect();
-          const headingRect = heading.getBoundingClientRect();
-          return scrollParent.scrollTop + (headingRect.top - containerRect.top);
-        }
-        return heading.getBoundingClientRect().top + window.pageYOffset;
-      };
-
       const syncActiveToCurrentPosition = () => {
         const scrollParent = findScrollParent(contentRef.current);
         const root = contentRef.current;
@@ -210,13 +211,7 @@ export default function useTocScroll({
           .map((t) => findHeadingInRoot(t.id, root))
           .filter(Boolean);
         if (!headings.length) return;
-        const currentTop = scrollParent ? scrollParent.scrollTop : window.pageYOffset;
-        const marker = currentTop + scrollOffset + 8;
-        let active = headings[0];
-        for (const heading of headings) {
-          if (getHeadingTop(heading, scrollParent) <= marker) active = heading;
-          else break;
-        }
+        const active = pickActiveHeading(headings, scrollParent);
         if (active?.id) setActiveTocId(active.id);
       };
 
@@ -261,12 +256,6 @@ export default function useTocScroll({
           window.scrollTo(0, Math.max(0, top));
         }
 
-        try {
-          window.history.replaceState(null, '', `#${tocId}`);
-        } catch {
-          /* ignore */
-        }
-
         syncActiveToCurrentPosition();
         requestAnimationFrame(syncActiveToCurrentPosition);
       };
@@ -296,7 +285,18 @@ export default function useTocScroll({
         /* ignore */
       }
     },
-    [toc, contentRef, headingSelector, anchorClassName, scrollOffset, tocOpenMobile, findHeadingInRoot],
+    [
+      toc,
+      contentRef,
+      headingSelector,
+      anchorClassName,
+      scrollOffset,
+      tocOpenMobile,
+      findHeadingInRoot,
+      findScrollParent,
+      getHeadingTop,
+      pickActiveHeading,
+    ],
   );
 
   return {

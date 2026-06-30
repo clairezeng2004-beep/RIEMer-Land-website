@@ -3,9 +3,9 @@ const DEFAULT_MAX_HEIGHT = 1600;
 const DEFAULT_QUALITY = 0.78;
 
 export const EDITOR_IMAGE_COMPRESSION_OPTIONS = {
-  maxWidth: 960,
-  maxHeight: 960,
-  quality: 0.68,
+  maxWidth: 820,
+  maxHeight: 820,
+  quality: 0.58,
   outputType: 'image/webp',
 };
 
