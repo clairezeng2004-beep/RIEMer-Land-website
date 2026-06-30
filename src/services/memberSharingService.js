@@ -452,8 +452,15 @@ async function syncSharingToCloud(post) {
 }
 
 export async function addSharing(post) {
+  const shouldDeferLocalAssets = Boolean(
+    isSupabaseConfigured
+    && supabase
+    && (hasInlineLocalImages(post.content) || post.attachments?.some((att) => att?.dataUrl || att?.blobUrl))
+  );
+  const localPost = shouldDeferLocalAssets ? makeLocalPreviewPost(post) : post;
   // 先写本地，确保发布按钮不会被 Storage/PostgREST 的慢请求卡住。
-  const localResult = addLocalSharing(post);
+  // 但不能把 blob:/data: 临时图片写进持久缓存，否则刷新后会变成破图。
+  const localResult = addLocalSharing(localPost);
 
   if (!isSupabaseConfigured || !supabase) {
     if (!localResult.success) {
@@ -476,11 +483,11 @@ export async function addSharing(post) {
     return { ...previewPost, _syncing: true };
   }
 
-  // 本地已保存，可以立即返回列表；云端同步放到后台，成功后会用云端返回值覆盖本地附件 URL 等元数据。
+  // 本地已保存，可以立即返回列表；云端同步放到后台，成功后会用云端返回值覆盖本地图片 URL 等元数据。
   syncSharingToCloud(post).catch((err) => {
     console.warn('[MemberSharingDB] 后台同步分享失败:', err?.message || err);
   });
-  return { ...post, _syncing: true };
+  return { ...localPost, _syncing: true };
 }
 
 /** 更新分享（支持部分字段，例如只更新 likes） */
@@ -738,7 +745,13 @@ export function subscribeCategories(onChange) {
 function getLocalSharings() {
   try {
     const raw = localStorage.getItem(LOCAL_SHARINGS_KEY);
-    return raw ? JSON.parse(raw) : [];
+    const parsed = raw ? JSON.parse(raw) : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((post) => (
+      hasInlineLocalImages(post?.content)
+        ? { ...post, content: stripInlineLocalImages(post.content), _syncing: true }
+        : post
+    ));
   } catch {
     return [];
   }
@@ -746,7 +759,14 @@ function getLocalSharings() {
 
 function saveLocalSharings(list) {
   try {
-    localStorage.setItem(LOCAL_SHARINGS_KEY, JSON.stringify(list));
+    const safeList = Array.isArray(list)
+      ? list.map((post) => (
+        hasInlineLocalImages(post?.content)
+          ? { ...post, content: stripInlineLocalImages(post.content), _syncing: true }
+          : post
+      ))
+      : [];
+    localStorage.setItem(LOCAL_SHARINGS_KEY, JSON.stringify(safeList));
     return { success: true, error: null };
   } catch (err) {
     console.warn('[MemberSharingDB] 本地分享缓存保存失败:', err?.message || err);
