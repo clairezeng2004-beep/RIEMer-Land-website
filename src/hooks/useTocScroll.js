@@ -220,7 +220,6 @@ export default function useTocScroll({
 
       const wasMobileDrawerOpen = tocOpenMobile;
       setActiveTocId(tocId);
-      if (wasMobileDrawerOpen) setTocOpenMobile(false);
 
       const syncActiveToCurrentPosition = () => {
         const scrollParent = findScrollParent(contentRef.current);
@@ -282,20 +281,20 @@ export default function useTocScroll({
         const rect = el.getBoundingClientRect();
         // 还没布局完成（例如内容区图片正在撑开高度），下一帧再跳一次
         if (rect.top === 0 && rect.height === 0) {
-          requestAnimationFrame(doScroll);
+          requestAnimationFrame(() => {
+            doScroll();
+            if (wasMobileDrawerOpen) setTocOpenMobile(false);
+          });
         } else {
           doScroll();
+          if (wasMobileDrawerOpen) setTocOpenMobile(false);
         }
       };
 
-      /* ========== 3.4 移动端抽屉先关闭，再滚动 ==========
-       * 若在抽屉仍挂载时启动 smooth scroll，关闭抽屉的 fixed 层卸载会与页面滚动
-       * 叠加，手机端靠近页面底部时容易出现跳动/闪动。 */
-      if (wasMobileDrawerOpen) {
-        requestAnimationFrame(() => requestAnimationFrame(scheduleScroll));
-      } else {
-        scheduleScroll();
-      }
+      /* ========== 3.4 移动端单次跳转 ==========
+       * 先滚动，再关闭 fixed 抽屉，避免抽屉卸载重排和页面滚动拆成两次视觉变化。
+       * 之前"先关抽屉，再等两帧滚动"在手机端会让 sticky 顶栏明显闪一下。 */
+      scheduleScroll();
 
       try {
         document.activeElement?.blur?.();

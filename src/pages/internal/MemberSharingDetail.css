@@ -21,6 +21,9 @@
   background: var(--color-bg, #f9fafb);
   border-bottom: 1px solid var(--color-border-light, #e5e7eb);
   box-shadow: none;
+  transform: translateZ(0);
+  backface-visibility: hidden;
+  will-change: transform;
 }
 
 /* InternalLayout 内部（有 72px 固定 Navbar）：吸附在 Navbar 下沿 */
