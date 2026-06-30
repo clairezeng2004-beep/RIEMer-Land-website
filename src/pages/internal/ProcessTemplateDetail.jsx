@@ -64,6 +64,10 @@ import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useTocScroll from '../../hooks/useTocScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
+import {
+  attachInlineImageRecovery,
+  hydrateInlineImageStorageRefs,
+} from '../../utils/inlineImageRecovery';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
@@ -731,9 +735,12 @@ export default function ProcessTemplateDetail() {
   const renderedContent = useMemo(() => {
     if (!doc || !doc.content) return '';
     if (doc.format === 'markdown') {
-      return stripUnderline(markdownToHtml(stripUnderline(doc.content)));
+      return hydrateInlineImageStorageRefs(
+        stripUnderline(markdownToHtml(stripUnderline(doc.content))),
+        'documents',
+      );
     }
-    return stripUnderline(doc.content); // word 格式：已是 HTML
+    return hydrateInlineImageStorageRefs(stripUnderline(doc.content), 'documents'); // word 格式：已是 HTML
   }, [doc]);
 
   useEffect(() => {
@@ -744,6 +751,7 @@ export default function ProcessTemplateDetail() {
       img.loading = index === 0 ? 'eager' : 'lazy';
       img.setAttribute('fetchpriority', index === 0 ? 'high' : 'low');
     });
+    return attachInlineImageRecovery(contentRef.current, 'documents');
   }, [renderedContent, isEditing]);
 
   /* 目录（TOC）的初始化被挪到后面（editMarkdownPreview 之后），

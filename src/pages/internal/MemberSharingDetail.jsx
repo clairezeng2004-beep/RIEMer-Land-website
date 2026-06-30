@@ -29,6 +29,10 @@ import PrevNextNavigator from '../../components/PrevNextNavigator';
 import useTocScroll from '../../hooks/useTocScroll';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import {
+  attachInlineImageRecovery,
+  hydrateInlineImageStorageRefs,
+} from '../../utils/inlineImageRecovery';
+import {
   recordViewLog,
   fetchViewLog,
   fetchViewsFromCloud,
@@ -276,10 +280,13 @@ export default function MemberSharingDetail() {
     if (!post) return '';
     const rawContent = String(post.content || '');
     if (post.format === 'markdown') {
-      return stripUnderline(markdownToHtml(stripUnderline(rawContent)));
+      return hydrateInlineImageStorageRefs(
+        stripUnderline(markdownToHtml(stripUnderline(rawContent))),
+        'member-sharing-attachments',
+      );
     }
     // word (HTML) 格式直接返回（清掉下划线）
-    return stripUnderline(rawContent);
+    return hydrateInlineImageStorageRefs(stripUnderline(rawContent), 'member-sharing-attachments');
   }, [post]);
 
   useEffect(() => {
@@ -293,6 +300,7 @@ export default function MemberSharingDetail() {
         ? '(max-width: 768px) calc(100vw - 48px), 42vw'
         : '(max-width: 768px) calc(100vw - 48px), 760px');
     });
+    return attachInlineImageRecovery(contentRef.current, 'member-sharing-attachments');
   }, [renderedContent]);
 
   // 上/下一篇：sharings 已按 created_at 降序；同作者优先（authorId 可能为 null，

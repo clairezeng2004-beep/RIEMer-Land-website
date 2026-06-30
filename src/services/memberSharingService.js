@@ -7,6 +7,7 @@
 // ============================================
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { stampInlineImageStorageRef } from '../utils/inlineImageRecovery';
 
 // ---- localStorage keys（保持与旧版 MemberSharing 页面一致，作为兜底缓存）----
 const LOCAL_SHARINGS_KEY = 'riemer_member_sharing';
@@ -293,8 +294,11 @@ async function uploadInlineContentImages(content, { postId, userId }) {
       }
       const { data } = supabase.storage.from(MEMBER_SHARING_BUCKET).getPublicUrl(path);
       if (data?.publicUrl) {
-        // 用整段 URL 做分隔做全局替换，避免正则里特殊字符转义问题
-        out = out.split(localUrl).join(data.publicUrl);
+        out = stampInlineImageStorageRef(out, localUrl, {
+          bucket: MEMBER_SHARING_BUCKET,
+          path,
+          publicUrl: data.publicUrl,
+        });
       }
     } catch (err) {
       console.warn('[MemberSharingDB] 正文内嵌图片上传异常，保留原图:', err.message);

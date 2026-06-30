@@ -14,6 +14,7 @@
 // 跨设备浏览计数走 document_views 表。
 
 import { supabase, isSupabaseConfigured } from './supabase';
+import { stampInlineImageStorageRef } from '../utils/inlineImageRecovery';
 
 export const DOCUMENTS_KEY = 'riemer_documents';
 export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
@@ -216,7 +217,13 @@ async function uploadInlineContentImages(content, { docId, userId }) {
         continue;
       }
       const { data } = supabase.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path);
-      if (data?.publicUrl) out = out.split(localUrl).join(data.publicUrl);
+      if (data?.publicUrl) {
+        out = stampInlineImageStorageRef(out, localUrl, {
+          bucket: DOCUMENTS_BUCKET,
+          path,
+          publicUrl: data.publicUrl,
+        });
+      }
     } catch (err) {
       console.warn('[DocumentsDB] 正文内嵌图片上传异常，保留原图:', err.message);
     }
