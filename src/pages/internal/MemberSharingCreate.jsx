@@ -657,6 +657,7 @@ export default function MemberSharingCreate() {
   // cloudSaveState 用于顶栏展示"保存中…/已保存到云端/保存失败"。
   const savedIdRef = useRef(null);
   const [cloudSaveState, setCloudSaveState] = useState(null); // 'saving' | 'saved' | 'error' | null
+  const [cloudSaveError, setCloudSaveError] = useState('');
   const [lastCloudSaveAt, setLastCloudSaveAt] = useState(null);
   const autosaveTimerRef = useRef(null);
 
@@ -970,8 +971,13 @@ export default function MemberSharingCreate() {
       format: post.format, content: post.content, period: post.period, attachments: post.attachments,
       author: post.author, authorId: post.authorId, contributorIds: post.contributorIds,
     };
-    const onOk = () => { setCloudSaveState('saved'); setLastCloudSaveAt(new Date()); };
-    const onErr = (err) => { console.warn('[MemberSharingCreate] 云端保存失败:', err?.message || err); setCloudSaveState('error'); };
+    const onOk = () => { setCloudSaveState('saved'); setCloudSaveError(''); setLastCloudSaveAt(new Date()); };
+    const onErr = (err) => {
+      const message = err?.message || String(err || '未知错误');
+      console.warn('[MemberSharingCreate] 云端保存失败:', message);
+      setCloudSaveError(message);
+      setCloudSaveState('error');
+    };
     setCloudSaveState('saving');
     const existingId = isEditingPost ? post.id : savedIdRef.current;
     if (existingId) {
@@ -1016,6 +1022,7 @@ export default function MemberSharingCreate() {
       navigate('/internal/member-sharing');
     } catch (err) {
       console.warn('[MemberSharingCreate] 保存失败:', err?.message || err);
+      setCloudSaveError(err?.message || '保存失败，请检查图片是否已重新上传后再试。');
       alert(err?.message || '保存失败，请检查图片是否已重新上传后再试。');
     } finally {
       setIsPublishing(false);
@@ -1042,7 +1049,7 @@ export default function MemberSharingCreate() {
             <span className={`msc-topbar__save-state msc-topbar__save-state--${cloudSaveState}`}>
               {cloudSaveState === 'saving' && '保存中…'}
               {cloudSaveState === 'saved' && '已保存到云端'}
-              {cloudSaveState === 'error' && '云端保存失败，请稍后重试'}
+              {cloudSaveState === 'error' && `云端保存失败：${cloudSaveError || '请稍后重试'}`}
             </span>
           )}
           <button

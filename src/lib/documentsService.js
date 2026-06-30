@@ -216,8 +216,7 @@ async function uploadInlineContentImages(content, { docId, userId }) {
         .from(DOCUMENTS_BUCKET)
         .upload(path, blob, { contentType: mime, upsert: true });
       if (error) {
-        console.warn('[DocumentsDB] 正文内嵌图片上传失败，保留原图:', error.message);
-        continue;
+        throw new Error(`正文图片保存失败：${error.message}`);
       }
       const { data } = supabase.storage.from(DOCUMENTS_BUCKET).getPublicUrl(path);
       if (data?.publicUrl) {
@@ -228,7 +227,7 @@ async function uploadInlineContentImages(content, { docId, userId }) {
         });
       }
     } catch (err) {
-      console.warn('[DocumentsDB] 正文内嵌图片上传异常，保留原图:', err.message);
+      throw new Error(`正文图片保存失败：${err.message}`);
     }
   }
   return out;
