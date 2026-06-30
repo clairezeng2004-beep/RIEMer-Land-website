@@ -65,6 +65,7 @@ import useTocScroll from '../../hooks/useTocScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import useAdjacentItems from '../../hooks/useAdjacentItems';
 import {
+  attachExternalImageFailureLabels,
   attachInlineImageRecovery,
   hydrateInlineImageStorageRefs,
 } from '../../utils/inlineImageRecovery';
@@ -751,7 +752,12 @@ export default function ProcessTemplateDetail() {
       img.loading = index === 0 ? 'eager' : 'lazy';
       img.setAttribute('fetchpriority', index === 0 ? 'high' : 'low');
     });
-    return attachInlineImageRecovery(contentRef.current, 'documents');
+    const cleanupStorage = attachInlineImageRecovery(contentRef.current, 'documents');
+    const cleanupExternal = attachExternalImageFailureLabels(contentRef.current);
+    return () => {
+      cleanupStorage();
+      cleanupExternal();
+    };
   }, [renderedContent, isEditing]);
 
   /* 目录（TOC）的初始化被挪到后面（editMarkdownPreview 之后），

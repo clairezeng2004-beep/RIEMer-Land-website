@@ -14,7 +14,10 @@
 // 跨设备浏览计数走 document_views 表。
 
 import { supabase, isSupabaseConfigured } from './supabase';
-import { stampInlineImageStorageRef } from '../utils/inlineImageRecovery';
+import {
+  hasUnstableExternalImages,
+  stampInlineImageStorageRef,
+} from '../utils/inlineImageRecovery';
 
 export const DOCUMENTS_KEY = 'riemer_documents';
 export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
@@ -256,6 +259,9 @@ async function prepareDocForCloud(doc) {
     : doc.content;
   if (doc.content !== undefined && hasInlineLocalImages(content)) {
     throw new Error('正文图片尚未成功上传，请检查网络后重试。');
+  }
+  if (doc.content !== undefined && hasUnstableExternalImages(content)) {
+    throw new Error('正文中包含飞书临时图片链接，链接会过期导致破图。请重新上传这些图片后再保存。');
   }
   return { ...doc, content, attachments, fileUrl };
 }

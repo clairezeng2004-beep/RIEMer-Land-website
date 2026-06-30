@@ -7,7 +7,10 @@
 // ============================================
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { stampInlineImageStorageRef } from '../utils/inlineImageRecovery';
+import {
+  hasUnstableExternalImages,
+  stampInlineImageStorageRef,
+} from '../utils/inlineImageRecovery';
 
 // ---- localStorage keys（保持与旧版 MemberSharing 页面一致，作为兜底缓存）----
 const LOCAL_SHARINGS_KEY = 'riemer_member_sharing';
@@ -323,6 +326,9 @@ async function prepareSharingForCloud(post) {
     : post.content;
   if (post.content !== undefined && hasInlineLocalImages(content)) {
     throw new Error('正文图片尚未成功上传，请检查网络后重试。');
+  }
+  if (post.content !== undefined && hasUnstableExternalImages(content)) {
+    throw new Error('正文中包含飞书临时图片链接，链接会过期导致破图。请重新上传这些图片后再保存。');
   }
   return {
     ...post,

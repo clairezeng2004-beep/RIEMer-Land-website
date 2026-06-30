@@ -1,6 +1,7 @@
 import { supabase } from '../lib/supabase';
 
 const STORAGE_PUBLIC_RE = /\/storage\/v1\/object\/public\/([^/?#]+)\/([^?#]+)/;
+const UNSTABLE_EXTERNAL_IMAGE_RE = /https?:\/\/(?:[^/]+\.)?(?:feishu\.cn|larksuite\.com)\/space\/api\/box\/stream\/download\//i;
 
 function decodePath(path = '') {
   try {
@@ -23,6 +24,15 @@ export function getStoragePublicUrl(bucket, path) {
   if (!supabase || !bucket || !path) return '';
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data?.publicUrl || '';
+}
+
+export function isUnstableExternalImageUrl(src = '') {
+  return UNSTABLE_EXTERNAL_IMAGE_RE.test(String(src || ''));
+}
+
+export function hasUnstableExternalImages(html = '') {
+  return /<img\b[^>]*(?:src|href)=["']https?:\/\/[^"']+["'][^>]*>/i.test(String(html || ''))
+    && UNSTABLE_EXTERNAL_IMAGE_RE.test(String(html || ''));
 }
 
 export function stampInlineImageStorageRef(html, sourceUrl, { bucket, path, publicUrl }) {
@@ -97,6 +107,27 @@ export function attachInlineImageRecovery(container, fallbackBucket) {
 
     img.addEventListener('error', recover);
     cleanups.push(() => img.removeEventListener('error', recover));
+  });
+  return () => cleanups.forEach((fn) => fn());
+}
+
+export function attachExternalImageFailureLabels(container) {
+  if (!container) return () => {};
+  const imgs = Array.from(container.querySelectorAll('img'));
+  const cleanups = [];
+  imgs.forEach((img) => {
+    if (!isUnstableExternalImageUrl(img.getAttribute('src') || '')) return;
+    const showExpired = () => {
+      if (img.dataset.externalExpired === 'true') return;
+      img.dataset.externalExpired = 'true';
+      const note = document.createElement('span');
+      note.className = 'msc-img-expired-note';
+      note.textContent = '外部临时图片已失效，请重新上传图片';
+      img.insertAdjacentElement('afterend', note);
+    };
+    if (img.complete && !img.naturalWidth) showExpired();
+    img.addEventListener('error', showExpired);
+    cleanups.push(() => img.removeEventListener('error', showExpired));
   });
   return () => cleanups.forEach((fn) => fn());
 }

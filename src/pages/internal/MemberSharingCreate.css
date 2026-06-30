@@ -1119,6 +1119,17 @@
   color: var(--color-text-muted, #888);
   line-height: 1.5;
 }
+.msc-img-expired-note {
+  display: block;
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid var(--color-border-light, #e5e7eb);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-soft, #f7faf5);
+  color: var(--color-text-muted, #6b7280);
+  font-size: var(--text-sm, 14px);
+  line-height: 1.6;
+}
 .msc-form__word-editor .msc-img-caption:empty::before {
   content: '图片注释…';
   color: var(--color-text-muted, #bbb);
