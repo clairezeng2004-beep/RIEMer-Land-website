@@ -202,6 +202,21 @@ function updateColumnLabels(container) {
   });
 }
 
+function setColumnTrackFractions(container, widths) {
+  const total = widths.reduce((sum, width) => sum + Math.max(0, width), 0) || 1;
+  container.style.gridTemplateColumns = widths
+    .map((width) => `${Math.max(0.001, width / total).toFixed(6)}fr`)
+    .join(' ');
+}
+
+function normalizePercentColumnTracks(container) {
+  if (!container || !/%/.test(container.style.gridTemplateColumns || '')) return;
+  const cols = getColumns(container);
+  if (cols.length === 0) return;
+  const widths = cols.map((col) => col.getBoundingClientRect().width);
+  setColumnTrackFractions(container, widths);
+}
+
 function ensureColumnResizers(container) {
   if (!container) return;
   const cols = ensureColumnMeta(container);
@@ -227,6 +242,7 @@ function ensureColumnResizers(container) {
 
 function layoutColumnResizers(container) {
   if (!container) return;
+  normalizePercentColumnTracks(container);
   updateColumnLabels(container); // 顺带刷新各栏百分比标签
   const cols = getColumns(container);
   const handles = [...container.querySelectorAll(':scope > .msc-col-resizer')];
@@ -658,10 +674,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const next = [...colWidths];
     next[index] = nextLeft;
     next[index + 1] = nextRight;
-    const total = next.reduce((sum, width) => sum + width, 0) || 1;
-    container.style.gridTemplateColumns = next
-      .map((width) => `${((width / total) * 100).toFixed(3)}%`)
-      .join(' ');
+    setColumnTrackFractions(container, next);
     cols[index]?.classList.add('msc-col--selected');
     cols[index + 1]?.classList.add('msc-col--selected');
     layoutColumnResizers(container);

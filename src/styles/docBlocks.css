@@ -21,6 +21,9 @@
 .msc-cols {
   display: grid;
   gap: 12px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   /* 上下外边距与普通段落行间距对齐，避免详情页里分栏上下留白过多 */
   margin: 0.4em 0;
   /* stretch：同一行的各栏高度自动拉齐 —— 某一栏插入/调整图片变高后，
@@ -29,10 +32,10 @@
   position: relative;
 }
 
-.msc-cols--1 { grid-template-columns: 1fr; }
-.msc-cols--2 { grid-template-columns: 1fr 1fr; }
-.msc-cols--3 { grid-template-columns: 1fr 1fr 1fr; }
-.msc-cols--4 { grid-template-columns: repeat(4, 1fr); }
+.msc-cols--1 { grid-template-columns: minmax(0, 1fr); }
+.msc-cols--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.msc-cols--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.msc-cols--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
 /* 编辑器内：分栏块本身只负责布局和栏数标签，视觉边界交给每一栏。
    这样不会出现外层框与最右栏框线错位，也避免多层矩形叠在一起。 */
@@ -41,6 +44,7 @@
   border-radius: var(--radius-md, 8px);
   background: transparent;
   box-shadow: none;
+  overflow: visible;
 }
 
 [contenteditable="true"] .msc-cols::before {
