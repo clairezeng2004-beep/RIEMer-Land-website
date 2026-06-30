@@ -45,6 +45,7 @@ import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEdit
 import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle, isSelectionInImageCaption } from '../../utils/pasteMatchStyle';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
+import { isUnstableExternalImageUrl } from '../../utils/inlineImageRecovery';
 import {
   addSharing,
   updateSharing,
@@ -738,8 +739,16 @@ export default function MemberSharingCreate() {
       const doc = new DOMParser().parseFromString(String(html), 'text/html');
       doc.querySelectorAll('.msc-img-expired-note').forEach((node) => node.remove());
       doc.querySelectorAll('img').forEach((img) => {
-        if (!img.getAttribute('src')) img.remove();
-        if (!img.getAttribute('src')?.startsWith('data:')) {
+        const src = img.getAttribute('src') || img.getAttribute('href') || '';
+        if (!src || isUnstableExternalImageUrl(src)) {
+          const next = img.nextElementSibling;
+          if (next?.classList?.contains('msc-img-caption') || next?.classList?.contains('msc-img-expired-note')) {
+            next.remove();
+          }
+          img.remove();
+          return;
+        }
+        if (!src.startsWith('data:')) {
           img.removeAttribute('data-external-expired');
           img.removeAttribute('data-storage-retry-count');
         }

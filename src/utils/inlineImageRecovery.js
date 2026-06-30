@@ -31,8 +31,25 @@ export function isUnstableExternalImageUrl(src = '') {
 }
 
 export function hasUnstableExternalImages(html = '') {
-  return /<img\b[^>]*(?:src|href)=["']https?:\/\/[^"']+["'][^>]*>/i.test(String(html || ''))
-    && UNSTABLE_EXTERNAL_IMAGE_RE.test(String(html || ''));
+  const source = String(html || '');
+  if (!source || !/<img\b/i.test(source) || !UNSTABLE_EXTERNAL_IMAGE_RE.test(source)) return false;
+  if (typeof DOMParser !== 'undefined') {
+    try {
+      const doc = new DOMParser().parseFromString(source, 'text/html');
+      return Array.from(doc.querySelectorAll('img')).some((img) => (
+        isUnstableExternalImageUrl(img.getAttribute('src') || img.getAttribute('href') || '')
+      ));
+    } catch {
+      /* fall through to regex scan */
+    }
+  }
+  const imgTagRe = /<img\b[^>]*>/gi;
+  let match;
+  while ((match = imgTagRe.exec(source)) !== null) {
+    const attr = match[0].match(/\b(?:src|href)=["']([^"']+)["']/i)?.[1] || '';
+    if (isUnstableExternalImageUrl(attr)) return true;
+  }
+  return false;
 }
 
 export function stampInlineImageStorageRef(html, sourceUrl, { bucket, path, publicUrl }) {
