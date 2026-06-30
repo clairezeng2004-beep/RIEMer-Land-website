@@ -105,6 +105,13 @@ export default function MemberSharingDetail() {
   const navigate = useNavigate();
   const contentRef = useRef(null);
 
+  useEffect(() => {
+    if (window.location.hash) return;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  }, [id]);
+
   // 访问记录弹层开关
   const [viewLogOpen, setViewLogOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState(null);

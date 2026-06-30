@@ -449,6 +449,12 @@ export default function ProcessTemplateDetail() {
   const { filterOptions } = useSiteContent();
   const { id } = useParams();
   const navigate = useNavigate();
+  useEffect(() => {
+    if (window.location.hash) return;
+    requestAnimationFrame(() => {
+      window.scrollTo({ top: 0, behavior: 'auto' });
+    });
+  }, [id]);
 
   /* ==========
      贡献者真名映射：Supabase + 本地成员的 id → 真名

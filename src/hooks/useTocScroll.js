@@ -78,13 +78,26 @@ export default function useTocScroll({
 
   const pickActiveHeading = useCallback((headings, scrollParent) => {
     if (!headings.length) return null;
-    const markerY = scrollParent
+    const markerViewportY = scrollParent
       ? scrollParent.getBoundingClientRect().top + scrollOffset + 8
       : scrollOffset + 8;
-    let active = headings[0];
-    for (const heading of headings) {
-      const rect = heading.getBoundingClientRect();
-      if (rect.top <= markerY) active = heading;
+
+    const visibleHeadings = headings
+      .map((heading) => ({ heading, rect: heading.getBoundingClientRect() }))
+      .filter(({ rect }) => rect.width > 0 || rect.height > 0)
+      .sort((a, b) => a.rect.top - b.rect.top);
+
+    if (!visibleHeadings.length) return null;
+
+    const viewportHeight = scrollParent?.clientHeight || window.innerHeight || 0;
+    const markerBottom = scrollParent
+      ? scrollParent.getBoundingClientRect().bottom
+      : viewportHeight;
+    const readableTop = Math.min(markerViewportY, markerBottom - 1);
+
+    let active = visibleHeadings[0].heading;
+    for (const { heading, rect } of visibleHeadings) {
+      if (rect.top <= readableTop) active = heading;
       else break;
     }
     return active;
@@ -137,6 +150,11 @@ export default function useTocScroll({
 
     const updateActive = () => {
       ticking = false;
+      const rootRect = root.getBoundingClientRect();
+      const viewportBottom = scrollParent
+        ? scrollParent.getBoundingClientRect().bottom
+        : window.innerHeight || 0;
+      if (rootRect.height <= 0 || rootRect.top >= viewportBottom) return;
       const active = pickActiveHeading(headings, scrollParent);
       if (active?.id) setActiveTocId(active.id);
     };
