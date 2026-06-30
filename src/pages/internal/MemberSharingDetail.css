@@ -927,7 +927,7 @@
 
   .msd-article__content {
     padding: var(--space-lg);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     line-height: 1.7;
   }
 
@@ -966,7 +966,7 @@
 
   .msd-article__content {
     padding: var(--space-md);
-    font-size: var(--text-sm);
+    font-size: var(--text-base);
     line-height: 1.7;
   }
 }
