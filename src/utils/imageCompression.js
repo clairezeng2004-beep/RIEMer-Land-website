@@ -7,6 +7,9 @@ export const EDITOR_IMAGE_COMPRESSION_OPTIONS = {
   maxHeight: 820,
   quality: 0.58,
   outputType: 'image/webp',
+  minInputBytes: 300 * 1024,
+  minScaleOversize: 1.15,
+  minSavingsRatio: 0.12,
 };
 
 function fileToDataUrl(file) {
@@ -52,6 +55,9 @@ export async function imageFileToCompressedDataUrl(file, {
   maxHeight = DEFAULT_MAX_HEIGHT,
   quality = DEFAULT_QUALITY,
   outputType = 'image/webp',
+  minInputBytes = 0,
+  minScaleOversize = 1,
+  minSavingsRatio = 0,
 } = {}) {
   if (!file) return '';
   if (shouldSkipCompression(file)) return fileToDataUrl(file);
@@ -61,6 +67,15 @@ export async function imageFileToCompressedDataUrl(file, {
     const sourceWidth = bitmap.width || bitmap.naturalWidth;
     const sourceHeight = bitmap.height || bitmap.naturalHeight;
     if (!sourceWidth || !sourceHeight) return fileToDataUrl(file);
+
+    const exceedsTargetSize =
+      sourceWidth > maxWidth * minScaleOversize ||
+      sourceHeight > maxHeight * minScaleOversize;
+    const exceedsFileSize = Number(file.size || 0) > minInputBytes;
+    if (!exceedsTargetSize && !exceedsFileSize) {
+      if (typeof bitmap.close === 'function') bitmap.close();
+      return fileToDataUrl(file);
+    }
 
     const scale = Math.min(1, maxWidth / sourceWidth, maxHeight / sourceHeight);
     const width = Math.max(1, Math.round(sourceWidth * scale));
@@ -81,7 +96,8 @@ export async function imageFileToCompressedDataUrl(file, {
     }
     if (!blob) return fileToDataUrl(file);
 
-    if (blob.size >= file.size && scale === 1) return fileToDataUrl(file);
+    const requiredSize = file.size * (1 - minSavingsRatio);
+    if (blob.size >= requiredSize) return fileToDataUrl(file);
     return fileToDataUrl(blob);
   } catch {
     return fileToDataUrl(file);
