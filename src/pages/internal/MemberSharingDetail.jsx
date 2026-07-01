@@ -674,9 +674,10 @@ export default function MemberSharingDetail() {
         <>
           <button
             type="button"
-            className="msd-toc-fab"
+            className={`msd-toc-fab ${tocOpenMobile ? 'msd-toc-fab--open' : ''}`}
             onClick={() => setTocOpenMobile(true)}
             aria-label="打开目录"
+            title="打开目录"
           >
             <List size={18} />
           </button>

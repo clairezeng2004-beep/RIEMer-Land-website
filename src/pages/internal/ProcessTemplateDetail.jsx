@@ -1966,9 +1966,10 @@ export default function ProcessTemplateDetail() {
         <>
           <button
             type="button"
-            className="ptd-toc-fab"
+            className={`ptd-toc-fab ${tocOpenMobile ? 'ptd-toc-fab--open' : ''}`}
             onClick={() => setTocOpenMobile(true)}
             aria-label="打开目录"
+            title="打开目录"
           >
             <List size={18} />
           </button>

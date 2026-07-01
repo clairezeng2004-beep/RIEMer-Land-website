@@ -228,7 +228,7 @@
   display: none;
   position: fixed;
   right: 16px;
-  bottom: 24px;
+  bottom: 84px;
   width: 44px;
   height: 44px;
   border: none;
@@ -237,10 +237,16 @@
   color: #fff;
   box-shadow: 0 4px 14px rgba(91, 140, 62, 0.35);
   cursor: pointer;
-  z-index: 200;
+  z-index: 950;
   align-items: center;
   justify-content: center;
   transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.msd-toc-fab--open {
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(8px) scale(0.96);
 }
 
 .msd-toc-fab:hover {
@@ -252,7 +258,7 @@
   position: fixed;
   inset: 0;
   background: rgba(0, 0, 0, 0.32);
-  z-index: 300;
+  z-index: 1100;
   display: flex;
   justify-content: flex-end;
   animation: msd-fade-in 0.18s ease;

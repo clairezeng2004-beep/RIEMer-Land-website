@@ -33,14 +33,23 @@ export function normalizeOrderedListNumbering(root) {
   const countersByParent = new WeakMap();
 
   root.querySelectorAll('ol').forEach((list) => {
-    const shouldRestart = isOrderedListRestarted(list);
     const parentScope = list.parentElement || root;
     const previousCount = countersByParent.get(parentScope) || 0;
+    const rawStart = list.getAttribute('start');
+    const currentStart = Number.parseInt(rawStart || '1', 10) || 1;
+    // 粘贴 Word / 网页内容时，"重新开始编号"通常只保留为 start="1"，
+    // 不会带我们自己的 data-list-restart。遇到同一父级下已有前序编号时，
+    // 显式 start=1 应视为用户/来源内容的重启意图，而不是强行续号。
+    const shouldRestart = isOrderedListRestarted(list) || (previousCount > 0 && rawStart === '1');
     const start = shouldRestart || previousCount === 0 ? 1 : previousCount + 1;
-    const currentStart = Number.parseInt(list.getAttribute('start') || '1', 10) || 1;
 
     if (currentStart !== start) {
       list.setAttribute('start', String(start));
+      changed = true;
+    }
+
+    if (shouldRestart && !isOrderedListRestarted(list)) {
+      list.setAttribute(LIST_RESTART_ATTR, 'true');
       changed = true;
     }
 
