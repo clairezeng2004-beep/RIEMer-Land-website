@@ -46,9 +46,12 @@ import {
   subscribeSharings,
   updateSharing,
   fetchCategories,
+  getCachedSharings,
   DEFAULT_CATEGORIES,
 } from '../../services/memberSharingService';
 import './MemberSharingDetail.css';
+
+const MEMBER_SHARING_VIEWED_KEY = 'riemer_member_sharing_viewed_v2';
 
 function buildCategoryMaps(cats) {
   const labels = { history: '历史会议' };
@@ -104,8 +107,37 @@ function getPreviewableAttachmentType(file) {
   return null;
 }
 
+function getLocalDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function hasCountedViewToday(postId, user) {
+  try {
+    const viewerId = user?.id || user?.email || 'anonymous';
+    const key = `${viewerId}:${postId}:${getLocalDateKey()}`;
+    const stored = JSON.parse(localStorage.getItem(MEMBER_SHARING_VIEWED_KEY) || '{}');
+    if (stored[key]) return true;
+
+    const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+    Object.keys(stored).forEach((storedKey) => {
+      if (Number(stored[storedKey]) < cutoff) delete stored[storedKey];
+    });
+    stored[key] = Date.now();
+    localStorage.setItem(MEMBER_SHARING_VIEWED_KEY, JSON.stringify(stored));
+    return false;
+  } catch {
+    const fallbackKey = `${MEMBER_SHARING_VIEWED_KEY}:${postId}:${getLocalDateKey()}`;
+    if (sessionStorage.getItem(fallbackKey)) return true;
+    sessionStorage.setItem(fallbackKey, '1');
+    return false;
+  }
+}
+
 export default function MemberSharingDetail() {
-  const { isAuthenticated, user, isAdmin, getAllUsers } = useAuth();
+  const { isAuthenticated, loading, user, isAdmin, getAllUsers } = useAuth();
   const { id } = useParams();
   const navigate = useNavigate();
   const contentRef = useRef(null);
@@ -123,6 +155,7 @@ export default function MemberSharingDetail() {
 
   // 成员真名映射（用于弹层里把历史数据存的 userName 还原到真名）
   const [userNameMap, setUserNameMap] = useState({});
+  const [userAvatarMap, setUserAvatarMap] = useState({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -130,10 +163,13 @@ export default function MemberSharingDetail() {
         const list = (await getAllUsers?.()) || [];
         if (cancelled) return;
         const map = {};
+        const avatarMap = {};
         list.forEach((u) => {
           if (u?.id) map[u.id] = u.name || u.nickname || '';
+          if (u?.id && u.avatar) avatarMap[u.id] = u.avatar;
         });
         setUserNameMap(map);
+        setUserAvatarMap(avatarMap);
       } catch { /* ignore */ }
     })();
     return () => {
@@ -150,6 +186,15 @@ export default function MemberSharingDetail() {
       return fallback || '访客';
     },
     [userNameMap, user],
+  );
+
+  const resolveVisitorAvatar = useCallback(
+    (uid) => {
+      if (uid && userAvatarMap[uid]) return userAvatarMap[uid];
+      if (uid && user?.id === uid) return user.avatar || null;
+      return null;
+    },
+    [userAvatarMap, user],
   );
 
   // 多贡献者展示：优先读 post.contributorIds，缺省回退到旧的单作者字段（与流程模板文件一致）
@@ -191,7 +236,7 @@ export default function MemberSharingDetail() {
   const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
 
-  const [sharings, setSharings] = useState([]);
+  const [sharings, setSharings] = useState(() => getCachedSharings());
   const [loaded, setLoaded] = useState(false);
   const [views, setViews] = useState(() => loadLocalViews());
   const post = sharings.find((s) => String(s.id) === String(id));
@@ -203,30 +248,50 @@ export default function MemberSharingDetail() {
     return () => { document.title = prev; };
   }, []);
 
-  // 首次加载：云端拉取 + 分类拉取
+  // 首次加载：详情内容优先显示；分类 / 浏览数等辅助信息不阻塞正文。
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const [list, cats, freshPost, cloudViews] = await Promise.all([
-          fetchSharings(),
-          fetchCategories(),
-          fetchSharingById(id),
-          fetchViewsFromCloud(),
-        ]);
+        const freshPost = await fetchSharingById(id);
         if (cancelled) return;
-        setSharings((freshPost && String(freshPost.id) === String(id))
-          ? [freshPost, ...list.filter((item) => String(item.id) !== String(id))]
-          : list);
-        if (cloudViews) setViews(cloudViews);
-        // 兼容云端返回空数组（他人已在另一设备把分类全部删除的场景）
-        if (Array.isArray(cats)) setCategoryList(cats);
+        if (freshPost && String(freshPost.id) === String(id)) {
+          setSharings((prev) => [
+            freshPost,
+            ...prev.filter((item) => String(item.id) !== String(id)),
+          ]);
+        }
       } catch (err) {
-        console.warn('[MemberSharingDetail] 加载失败:', err);
+        console.warn('[MemberSharingDetail] 单篇加载失败:', err);
       } finally {
         if (!cancelled) setLoaded(true);
       }
     })();
+
+    (async () => {
+      const [listResult, catsResult, viewsResult] = await Promise.allSettled([
+        fetchSharings(),
+        fetchCategories(),
+        fetchViewsFromCloud(),
+      ]);
+      if (cancelled) return;
+      if (listResult.status === 'fulfilled' && Array.isArray(listResult.value)) {
+        setSharings((prev) => {
+          const currentPost = prev.find((item) => String(item.id) === String(id));
+          const list = listResult.value;
+          return currentPost
+            ? [currentPost, ...list.filter((item) => String(item.id) !== String(id))]
+            : list;
+        });
+      }
+      if (catsResult.status === 'fulfilled' && Array.isArray(catsResult.value)) {
+        setCategoryList(catsResult.value);
+      }
+      if (viewsResult.status === 'fulfilled' && viewsResult.value) {
+        setViews(viewsResult.value);
+      }
+    })();
+
     return () => { cancelled = true; };
   }, [id]);
 
@@ -250,18 +315,11 @@ export default function MemberSharingDetail() {
   }, []);
 
   // 浏览次数统计 + 访问日志
-  // 同一个会话内重复刷新不重复计数，避免"每刷一次 +1"；
-  // 关闭窗口重开 → sessionStorage 清空 → 新会话再计一次。
+  // 同一登录用户 / 同一篇分享 / 同一自然日只计一次，刷新和重开浏览器都不会重复 +1。
   useEffect(() => {
     if (!post) return;
     try {
-      const SESSION_KEY = 'riemer_msd_session_viewed';
-      const sessionViewed = new Set(
-        JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
-      );
-      if (sessionViewed.has(String(post.id))) return;
-      sessionViewed.add(String(post.id));
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
+      if (hasCountedViewToday(String(post.id), user)) return;
       incrementView(String(post.id)).then((result) => {
         setViews((prev) => ({
           ...prev,
@@ -274,7 +332,7 @@ export default function MemberSharingDetail() {
       });
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [post?.id]);
+  }, [post?.id, user?.id]);
 
   // Markdown / Word-HTML 渲染
   const renderedContent = useMemo(() => {
@@ -336,6 +394,19 @@ export default function MemberSharingDetail() {
     // navbar(72) + fixed topbar(~60) + 缓冲(~12)
     scrollOffset: 144,
   });
+
+  if (loading) {
+    return (
+      <div className="msd-page">
+        <div className="msd-content">
+          <div className="msd-not-found">
+            <Share2 size={48} />
+            <h3>正在验证登录状态…</h3>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
@@ -659,6 +730,7 @@ export default function MemberSharingDetail() {
         totalCount={views[post.id] || 0}
         fetchLog={() => fetchViewLog(String(post.id))}
         resolveName={resolveVisitorName}
+        resolveAvatar={resolveVisitorAvatar}
       />
 
       {previewAttachment && (

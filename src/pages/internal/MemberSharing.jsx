@@ -104,6 +104,7 @@ export default function MemberSharing() {
 
   // 访问者真名映射
   const [userNameMap, setUserNameMap] = useState({});
+  const [userAvatarMap, setUserAvatarMap] = useState({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -111,10 +112,13 @@ export default function MemberSharing() {
         const list = (await getAllUsers?.()) || [];
         if (cancelled) return;
         const map = {};
+        const avatarMap = {};
         list.forEach((u) => {
           if (u?.id) map[u.id] = u.name || u.nickname || '';
+          if (u?.id && u.avatar) avatarMap[u.id] = u.avatar;
         });
         setUserNameMap(map);
+        setUserAvatarMap(avatarMap);
       } catch { /* ignore */ }
     })();
     return () => {
@@ -131,6 +135,15 @@ export default function MemberSharing() {
       return fallback || '访客';
     },
     [userNameMap, user],
+  );
+
+  const resolveVisitorAvatar = useCallback(
+    (uid) => {
+      if (uid && userAvatarMap[uid]) return userAvatarMap[uid];
+      if (uid && user?.id === uid) return user.avatar || null;
+      return null;
+    },
+    [userAvatarMap, user],
   );
 
   const resolveLikeUserName = useCallback(
@@ -917,6 +930,7 @@ export default function MemberSharing() {
           viewLogPost ? () => fetchViewLog(String(viewLogPost.id)) : undefined
         }
         resolveName={resolveVisitorName}
+        resolveAvatar={resolveVisitorAvatar}
       />
     </div>
   );

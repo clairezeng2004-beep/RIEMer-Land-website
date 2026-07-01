@@ -13,6 +13,7 @@
 //     onClose={() => ...}
 //     fetchLog={async () => recordList}
 //     resolveName={(uid, fallback) => 真名}  // 可选：用真名覆盖日志中的 userName
+//     resolveAvatar={(uid) => 头像 URL}      // 可选：显示用户当前设置的头像
 //   />
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -51,6 +52,7 @@ export default function ViewLogPopover({
   onClose,
   fetchLog,
   resolveName,
+  resolveAvatar,
 }) {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -184,11 +186,16 @@ export default function ViewLogPopover({
               {groupedVisitors.map((v) => {
                 const displayName =
                   (resolveName && resolveName(v.userId, v.userName)) || v.userName || '访客';
+                const avatar = resolveAvatar?.(v.userId);
                 const rel = formatRelative(v.latestAt);
                 return (
                   <li key={v.userId || `anon:${v.userName}`} className="vlp-item">
                     <div className="vlp-item__avatar">
-                      <UserIcon size={14} />
+                      {avatar ? (
+                        <img src={avatar} alt={`${displayName} 的头像`} className="vlp-item__avatar-img" />
+                      ) : (
+                        <UserIcon size={14} />
+                      )}
                     </div>
                     <div className="vlp-item__main">
                       <div className="vlp-item__name">

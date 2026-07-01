@@ -24,6 +24,7 @@ export const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
 export const DOC_VIEWS_KEY = 'riemer_process_template_views';
 const DOCUMENTS_BUCKET = 'documents';
 const DOCUMENTS_CLOUD_TIMEOUT_MS = 25000;
+const VIEW_COUNT_TIMEOUT_MS = 8000;
 const VIEW_LOG_TIMEOUT_MS = 8000;
 
 /**
@@ -310,13 +311,17 @@ export function saveLocalDeletedIds(ids) {
 export async function fetchAllFromCloud() {
   if (!canUseSupabase() || !supabase) return null;
   try {
-    const [docsRes, deletedRes] = await Promise.all([
-      supabase
-        .from('documents')
-        .select('*')
-        .order('created_at', { ascending: false }),
-      supabase.from('documents_deleted_defaults').select('default_id'),
-    ]);
+    const [docsRes, deletedRes] = await withTimeout(
+      Promise.all([
+        supabase
+          .from('documents')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase.from('documents_deleted_defaults').select('default_id'),
+      ]),
+      DOCUMENTS_CLOUD_TIMEOUT_MS,
+      '拉取流程模板文件',
+    );
 
     if (docsRes.error) {
       console.warn('[documentsService] 云端拉取 documents 失败:', docsRes.error.message);
@@ -347,14 +352,18 @@ export async function fetchAllFromCloud() {
 export async function fetchDocFromCloud(id) {
   if (!canUseSupabase() || !supabase || !id) return null;
   try {
-    const [docRes, deletedRes] = await Promise.all([
-      supabase
-        .from('documents')
-        .select('*')
-        .eq('id', String(id))
-        .maybeSingle(),
-      supabase.from('documents_deleted_defaults').select('default_id'),
-    ]);
+    const [docRes, deletedRes] = await withTimeout(
+      Promise.all([
+        supabase
+          .from('documents')
+          .select('*')
+          .eq('id', String(id))
+          .maybeSingle(),
+        supabase.from('documents_deleted_defaults').select('default_id'),
+      ]),
+      DOCUMENTS_CLOUD_TIMEOUT_MS,
+      '拉取流程模板文件详情',
+    );
 
     if (docRes.error) {
       console.warn('[documentsService] 云端拉取单篇文档失败:', docRes.error.message);
@@ -616,9 +625,13 @@ export async function fetchViewsFromCloud() {
   try {
     // 只拉需要的两个字段（document_id + view_count）——避免被新加列或大字段
     // （比如后续若加 metadata jsonb）拖慢全表扫描。
-    const { data, error } = await supabase
-      .from('document_views')
-      .select('document_id,view_count');
+    const { data, error } = await withTimeout(
+      supabase
+        .from('document_views')
+        .select('document_id,view_count'),
+      VIEW_COUNT_TIMEOUT_MS,
+      '加载浏览计数',
+    );
     if (error) {
       console.warn('[documentsService] 拉取浏览计数失败:', error.message);
       return null;
@@ -660,9 +673,13 @@ export async function incrementView(documentId) {
     //    "select → upsert" 两次 RT 并发覆盖问题。
     //    如果数据库里还没部署这个 RPC，Supabase 会返回函数不存在错误，
     //    自动降级到下面的 select + upsert 路径，保持向后兼容。
-    const rpc = await supabase.rpc('increment_document_view', {
-      p_document_id: documentId,
-    });
+    const rpc = await withTimeout(
+      supabase.rpc('increment_document_view', {
+        p_document_id: documentId,
+      }),
+      VIEW_COUNT_TIMEOUT_MS,
+      '更新浏览计数',
+    );
     if (!rpc.error) {
       const nextCount = Number(rpc.data) || 0;
       return { remote: true, count: nextCount };
@@ -674,18 +691,26 @@ export async function incrementView(documentId) {
     }
 
     // ② 兜底：先读当前云端值，再 upsert 新值（非原子，并发冲突对于浏览计数可接受）
-    const { data: existing } = await supabase
-      .from('document_views')
-      .select('view_count')
-      .eq('document_id', documentId)
-      .maybeSingle();
+    const { data: existing } = await withTimeout(
+      supabase
+        .from('document_views')
+        .select('view_count')
+        .eq('document_id', documentId)
+        .maybeSingle(),
+      VIEW_COUNT_TIMEOUT_MS,
+      '读取浏览计数',
+    );
     const nextCount = (existing?.view_count || 0) + 1;
-    const { error } = await supabase
-      .from('document_views')
-      .upsert(
-        { document_id: documentId, view_count: nextCount, updated_at: new Date().toISOString() },
-        { onConflict: 'document_id' }
-      );
+    const { error } = await withTimeout(
+      supabase
+        .from('document_views')
+        .upsert(
+          { document_id: documentId, view_count: nextCount, updated_at: new Date().toISOString() },
+          { onConflict: 'document_id' }
+        ),
+      VIEW_COUNT_TIMEOUT_MS,
+      '写入浏览计数',
+    );
     if (error) {
       console.warn('[documentsService] 浏览计数写入失败:', error.message);
       return { remote: false, error };

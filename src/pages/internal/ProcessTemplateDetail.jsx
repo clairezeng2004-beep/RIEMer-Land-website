@@ -88,6 +88,7 @@ import './DraftAutosave.css';
 const DOCUMENTS_KEY = 'riemer_documents';
 const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
 const PROCESS_VIEWS_KEY = 'riemer_process_template_views';
+const PROCESS_TEMPLATE_VIEWED_KEY = 'riemer_process_template_viewed_v2';
 
 const DEFAULT_TYPE_LABELS = {
   process: '流程手册及模版文件',
@@ -121,6 +122,35 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return bytes + ' B';
   if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+}
+
+function getLocalDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function hasCountedViewToday(docId, user) {
+  try {
+    const viewerId = user?.id || user?.email || 'anonymous';
+    const key = `${viewerId}:${docId}:${getLocalDateKey()}`;
+    const stored = JSON.parse(localStorage.getItem(PROCESS_TEMPLATE_VIEWED_KEY) || '{}');
+    if (stored[key]) return true;
+
+    const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+    Object.keys(stored).forEach((storedKey) => {
+      if (Number(stored[storedKey]) < cutoff) delete stored[storedKey];
+    });
+    stored[key] = Date.now();
+    localStorage.setItem(PROCESS_TEMPLATE_VIEWED_KEY, JSON.stringify(stored));
+    return false;
+  } catch {
+    const fallbackKey = `${PROCESS_TEMPLATE_VIEWED_KEY}:${docId}:${getLocalDateKey()}`;
+    if (sessionStorage.getItem(fallbackKey)) return true;
+    sessionStorage.setItem(fallbackKey, '1');
+    return false;
+  }
 }
 
 function downloadFile({ dataUrl, url, name }) {
@@ -471,6 +501,7 @@ export default function ProcessTemplateDetail() {
      profiles 查询，直接砍掉一次全表 RT。
      ========== */
   const [userNameMap, setUserNameMap] = useState({});
+  const [userAvatarMap, setUserAvatarMap] = useState({});
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -478,10 +509,13 @@ export default function ProcessTemplateDetail() {
         const list = await getCachedAllUsers(getAllUsers);
         if (cancelled) return;
         const map = {};
+        const avatarMap = {};
         list.forEach((u) => {
           if (u?.id) map[u.id] = u.name || u.nickname || '';
+          if (u?.id && u.avatar) avatarMap[u.id] = u.avatar;
         });
         setUserNameMap(map);
+        setUserAvatarMap(avatarMap);
       } catch {
         /* 拉取失败时降级：使用文档里原始 uploadedBy */
       }
@@ -500,6 +534,15 @@ export default function ProcessTemplateDetail() {
       return fallback || 'Unknown';
     },
     [userNameMap, user],
+  );
+
+  const resolveVisitorAvatar = useCallback(
+    (uid) => {
+      if (uid && userAvatarMap[uid]) return userAvatarMap[uid];
+      if (uid && user?.id === uid) return user.avatar || null;
+      return null;
+    },
+    [userAvatarMap, user],
   );
 
   const resolveLikeUserName = useCallback(
@@ -584,9 +627,13 @@ export default function ProcessTemplateDetail() {
           setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
         }
         // 浏览数不阻塞正文首屏；慢网络下让内容先出来。
-        fetchViewsFromCloud().catch((err) => {
-          console.warn('[ProcessTemplateDetail] 浏览数加载失败:', err);
-        });
+        fetchViewsFromCloud()
+          .then(() => {
+            if (!cancelled) setDocsVersion((v) => v + 1);
+          })
+          .catch((err) => {
+            console.warn('[ProcessTemplateDetail] 浏览数加载失败:', err);
+          });
       } finally {
         if (!cancelled) setCloudLoading(false);
       }
@@ -604,6 +651,20 @@ export default function ProcessTemplateDetail() {
       if (isEditingRef.current) return; // 编辑态下不要刷新
       if (timer) clearTimeout(timer);
       timer = setTimeout(async () => {
+        const single = await fetchDocFromCloud(id);
+        if (single?.doc) {
+          setCloudData((prev) => {
+            const existingDocs = prev?.userDocs || [];
+            return {
+              userDocs: [
+                single.doc,
+                ...existingDocs.filter((item) => String(item.id) !== String(single.doc.id)),
+              ],
+              deletedIds: single.deletedIds.map(String),
+            };
+          });
+          return;
+        }
         const cloud = await fetchAllFromCloud();
         if (!cloud) return;
         // 同 fetch 首拉逻辑：用户文档 + 内置示例覆盖层都要收
@@ -617,7 +678,7 @@ export default function ProcessTemplateDetail() {
       unsubDocs();
       unsubDeleted();
     };
-  }, []);
+  }, [id]);
 
   const allDocs = useMemo(() => {
     void docsVersion;
@@ -646,52 +707,24 @@ export default function ProcessTemplateDetail() {
   /* 浏览次数：
      - 本地 localStorage: riemer_process_template_views（与卡片列表共享）
      - 云端 document_views 表（跨设备累计）
-     - 同一个会话内刷新不重复计数，避免"每刷一次就 +1"
-     - 关闭窗口重开 → sessionStorage 清空 → 新会话再计一次
+     - 同一登录用户 / 同一篇文档 / 同一自然日只计一次
+     - 刷新页面、退出浏览器后当天重新打开都不会重复 +1
   */
   useEffect(() => {
     if (!doc) return;
-    let cancelled = false;
     try {
-      const SESSION_KEY = 'riemer_ptd_session_viewed';
-      const sessionViewed = new Set(
-        JSON.parse(sessionStorage.getItem(SESSION_KEY) || '[]')
-      );
-      if (sessionViewed.has(String(doc.id))) {
-        return;
-      }
-      // 本地即时 +1（UI 立刻显示新浏览数）
-      const views = loadViews();
-      views[doc.id] = (views[doc.id] || 0) + 1;
-      saveViews(views);
-      sessionViewed.add(String(doc.id));
-      sessionStorage.setItem(SESSION_KEY, JSON.stringify([...sessionViewed]));
-
-      // ====== 云端写入延迟 1.5s ======
-      // 原本进入页面立刻并发打 incrementView（select + upsert 两次 RT）+
-      // recordViewLog（insert）共 3 次写相关请求，会和评论 / 编辑历史的拉取
-      // 请求抢 Supabase 连接池，体感上导致"加载评论中…"转很久。
-      // 浏览统计本身对时效要求极低（谁统计时差个 1-2s 都无所谓），所以整体
-      // 挪到 setTimeout 之外，等主链路读完再写——刷新访客数据只在用户点开
-      // 小眼睛时才读，延迟写入完全不影响展示。
-      const timer = setTimeout(() => {
-        if (cancelled) return;
-        if (canUseSupabase()) {
-          incrementView(String(doc.id)).catch((err) => {
-            console.warn('[ProcessTemplateDetail] 云端浏览计数同步失败:', err);
-          });
-        }
-        recordViewLog(String(doc.id), user).catch((err) => {
-          console.warn('[ProcessTemplateDetail] 访问日志写入失败:', err);
-        });
-      }, 1500);
-      return () => {
-        cancelled = true;
-        clearTimeout(timer);
-      };
+      if (hasCountedViewToday(String(doc.id), user)) return;
+      incrementView(String(doc.id)).then(() => {
+        setDocsVersion((v) => v + 1);
+      }).catch((err) => {
+        console.warn('[ProcessTemplateDetail] 浏览计数同步失败:', err);
+      });
+      recordViewLog(String(doc.id), user).catch((err) => {
+        console.warn('[ProcessTemplateDetail] 访问日志写入失败:', err);
+      });
     } catch { /* ignore */ }
     return undefined;
-  }, [doc?.id]);
+  }, [doc?.id, user?.id]);
 
   /* 编辑历史：拉取 + 订阅实时新增。
      延迟 400ms 启动，避让文档主内容 / 评论 / 用户目录的首屏请求——
@@ -1984,6 +2017,7 @@ export default function ProcessTemplateDetail() {
         totalCount={(views[doc.id] || 0) + (doc.viewCount || 0)}
         fetchLog={() => fetchViewLog(String(doc.id))}
         resolveName={resolveContributorName}
+        resolveAvatar={resolveVisitorAvatar}
       />
 
       {previewAttachment && (
