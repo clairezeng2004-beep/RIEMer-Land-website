@@ -251,24 +251,6 @@ function insertHtmlFragmentAtRange(range, html) {
   if (inserted.length > 0) placeCaretAfter(inserted[inserted.length - 1]);
 }
 
-function ensureLeftTrailingParagraphAfter(node) {
-  if (!node?.parentNode) return null;
-  let trailer = node.nextElementSibling;
-  while (trailer && isEmptyParagraph(trailer)) {
-    const next = trailer.nextElementSibling;
-    trailer.remove();
-    trailer = next;
-  }
-
-  const p = document.createElement('p');
-  p.style.textAlign = 'left';
-  p.setAttribute('align', 'left');
-  p.innerHTML = '<br />';
-  node.parentNode.insertBefore(p, node.nextSibling);
-  placeCaretAtStart(p);
-  return p;
-}
-
 function normalizeColumnImageInsertion(editor, wrap, img) {
   const col = img.closest('.msc-col');
   const container = col?.closest('.msc-cols');
@@ -299,7 +281,13 @@ function normalizeColumnImageInsertion(editor, wrap, img) {
   }
 
   container.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
-  ensureLeftTrailingParagraphAfter(container);
+  try {
+    const range = document.createRange();
+    range.selectNode(img);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch { /* ignore */ }
   return true;
 }
 
