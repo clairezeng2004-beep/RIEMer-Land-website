@@ -77,27 +77,6 @@ function whenImgLoaded(img) {
   });
 }
 
-/** 在节点后补一个空段落，并把光标放进去，方便继续输入 */
-function insertTrailingParagraphAfter(node) {
-  const trailer = document.createElement('p');
-  trailer.style.textAlign = 'left';
-  trailer.setAttribute('align', 'left');
-  trailer.innerHTML = '<br />';
-  node.parentNode?.insertBefore(trailer, node.nextSibling);
-
-  try {
-    const sel = window.getSelection();
-    if (!sel) return trailer;
-    const range = document.createRange();
-    range.selectNodeContents(trailer);
-    range.collapse(true);
-    sel.removeAllRanges();
-    sel.addRange(range);
-  } catch { /* ignore */ }
-
-  return trailer;
-}
-
 function getImageContainerWidth(editor, img) {
   const col = img.closest('.msc-col');
   const container = col || editor;
@@ -371,8 +350,13 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
     img.style.height = 'auto';
   } catch { /* noop */ }
 
-  // 插入图片后默认另起一个空段落，同栏文字只能从图片下方继续输入。
-  insertTrailingParagraphAfter(wrap);
+  try {
+    const range = document.createRange();
+    range.selectNode(img);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch { /* ignore */ }
 
   return img;
 }
