@@ -598,11 +598,15 @@
                 的体感问题轻得多。
      ----------------------------------------------------------- */
   .member-profiles-table-wrapper {
-    overflow: auto;
+    overflow-x: auto;
+    overflow-y: hidden;
     /* 视口高度减去：全局 Navbar(64px) + 内部 mobile-nav(46px) +
        页面 header / hint / 控件按钮 ≈ 200px 余量，
        让表格在屏幕上至少占据约 60% 高度。 */
-    max-height: calc(100vh - 220px);
+    max-height: none;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
+    touch-action: pan-x pan-y;
   }
 
   /* 表头相对 wrapper sticky（参照系明确，不会被外层滚动推走） */

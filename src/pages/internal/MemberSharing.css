@@ -1125,12 +1125,40 @@
     display: contents;
   }
 
-  .ms-card__author { order: 1; }
-  .ms-card__date { order: 2; }
-  .ms-card__views { order: 3; }
-  .ms-card__like-btn { order: 4; }
+  .ms-card__meta::before {
+    content: "";
+    order: 4;
+    flex-basis: 100%;
+    height: 0;
+  }
+
+  .ms-card__author {
+    order: 1;
+    flex: 0 0 auto;
+  }
+  .ms-card__date {
+    order: 2;
+    flex: 1 1 0;
+    justify-content: center;
+    min-width: 0;
+    text-align: center;
+  }
+  .ms-card__views {
+    order: 3;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
+  .ms-card__like-btn {
+    order: 5;
+    flex: 0 0 auto;
+  }
   /* 点赞人名单独换行，避免挤压上面一行的均分 */
-  .ms-card__like-names { order: 5; flex-basis: 100%; }
+  .ms-card__like-names {
+    order: 6;
+    flex: 1 1 0;
+    min-width: 0;
+    margin-left: 0;
+  }
   /* 类型/附件格式标签靠左自然宽度，不撑满整行 */
   .ms-card__badge,
   .ms-card__format-tag {
@@ -1140,8 +1168,8 @@
     margin-left: 0;
   }
 
-  .ms-card__badge { order: 6; }
-  .ms-card__format-tag { order: 7; }
+  .ms-card__badge { order: 7; }
+  .ms-card__format-tag { order: 8; }
 }
 
 @media (max-width: 480px) {
