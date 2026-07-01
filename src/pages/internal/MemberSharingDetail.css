@@ -546,7 +546,9 @@
 
 .msd-article__content a {
   color: var(--color-primary);
-  text-decoration: underline;
+  text-decoration-line: underline;
+  text-decoration-style: double;
+  text-underline-offset: 0.16em;
 }
 
 .msd-article__content code {

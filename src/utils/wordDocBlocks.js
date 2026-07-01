@@ -280,6 +280,22 @@ function placeCaretAtEnd(node) {
   } catch { /* ignore */ }
 }
 
+export function attachEditableLinkOpener(editor) {
+  if (!editor) return () => {};
+  const handler = (e) => {
+    const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
+    const link = target?.closest?.('a[href]');
+    if (!link || !editor.contains(link)) return;
+    const href = link.getAttribute('href');
+    if (!href || href.startsWith('#')) return;
+    e.preventDefault();
+    e.stopPropagation();
+    window.open(href, '_blank', 'noopener,noreferrer');
+  };
+  editor.addEventListener('click', handler);
+  return () => editor.removeEventListener('click', handler);
+}
+
 /** 删栏后：把剩余栏还原为等分，并刷新栏数标签/分隔手柄 */
 function redistributeColumns(container) {
   const cols = getColumns(container);

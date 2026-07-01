@@ -31,6 +31,7 @@ import {
   attachTableControls,
   attachColumnPlaceholderHandler,
   attachWordEditingNormalizer,
+  attachEditableLinkOpener,
 } from '../../utils/wordDocBlocks';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
@@ -864,8 +865,10 @@ export default function MemberSharingCreate() {
     const detachCols = attachColumnPlaceholderHandler(editor, syncHtml);
     const detachNormalize = attachWordEditingNormalizer(editor, syncHtml);
     const detachPasteMatch = attachPasteAndMatchStyleHandler(editor, { onChange: syncHtml });
+    const detachLinks = attachEditableLinkOpener(editor);
 
     return () => {
+      detachLinks();
       detachPasteMatch();
       detachNormalize();
       detachCols();

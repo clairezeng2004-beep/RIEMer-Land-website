@@ -174,7 +174,9 @@
 
 .word-preview__content a {
   color: var(--primary, #5B8C3E);
-  text-decoration: underline;
+  text-decoration-line: underline;
+  text-decoration-style: double;
+  text-underline-offset: 0.16em;
 }
 
 .word-preview__content blockquote {

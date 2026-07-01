@@ -437,6 +437,29 @@
   justify-content: flex-start;
 }
 
+[contenteditable="true"] a[href],
+.ptd-article__content a[href],
+.msd-article__content a[href],
+.doc-preview__text a[href],
+.word-preview__content a[href],
+.msc-md-split__preview a[href] {
+  color: var(--color-primary, var(--primary, #5B8C3E));
+  text-decoration-line: underline;
+  text-decoration-style: double;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.16em;
+  cursor: pointer;
+}
+
+[contenteditable="true"] a[href]:hover,
+.ptd-article__content a[href]:hover,
+.msd-article__content a[href]:hover,
+.doc-preview__text a[href]:hover,
+.word-preview__content a[href]:hover,
+.msc-md-split__preview a[href]:hover {
+  text-decoration-thickness: 1.5px;
+}
+
 /* ---------- 高亮块 ---------- */
 .msc-callout {
   --msc-callout-bg: #dfeee4;
