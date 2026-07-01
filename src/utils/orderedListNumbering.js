@@ -4,16 +4,6 @@ function directListItems(list) {
   return [...(list?.children || [])].filter((child) => child.tagName?.toLowerCase() === 'li');
 }
 
-function orderedListDepth(list, root) {
-  let depth = 0;
-  let node = list.parentElement;
-  while (node && node !== root) {
-    if (node.tagName?.toLowerCase() === 'ol') depth += 1;
-    node = node.parentElement;
-  }
-  return depth;
-}
-
 export function getCurrentOrderedList(editor) {
   if (!editor) return null;
   const sel = window.getSelection();
@@ -40,14 +30,12 @@ export function setOrderedListRestart(list, shouldRestart) {
 export function normalizeOrderedListNumbering(root) {
   if (!root) return false;
   let changed = false;
-  const countersByDepth = [];
+  const countersByParent = new WeakMap();
 
   root.querySelectorAll('ol').forEach((list) => {
-    const depth = orderedListDepth(list, root);
-    countersByDepth.length = depth + 1;
-
     const shouldRestart = isOrderedListRestarted(list);
-    const previousCount = countersByDepth[depth] || 0;
+    const parentScope = list.parentElement || root;
+    const previousCount = countersByParent.get(parentScope) || 0;
     const start = shouldRestart || previousCount === 0 ? 1 : previousCount + 1;
     const currentStart = Number.parseInt(list.getAttribute('start') || '1', 10) || 1;
 
@@ -61,7 +49,7 @@ export function normalizeOrderedListNumbering(root) {
       changed = true;
     }
 
-    countersByDepth[depth] = start + Math.max(0, directListItems(list).length - 1);
+    countersByParent.set(parentScope, start + Math.max(0, directListItems(list).length - 1));
   });
 
   return changed;

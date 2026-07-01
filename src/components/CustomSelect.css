@@ -244,9 +244,12 @@
   outline: none;
   background: transparent;
   color: var(--color-text);
+  caret-color: var(--color-text);
   font-size: var(--text-sm);
   font-family: var(--font-body);
   padding: 2px 0;
+  appearance: none;
+  -webkit-appearance: none;
 }
 
 .custom-select__search-input::placeholder {

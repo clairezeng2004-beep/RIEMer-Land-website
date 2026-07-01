@@ -4,29 +4,44 @@
 
 /* ---- 文本高亮 ---- */
 mark.ta-highlight {
-  background: rgba(91, 140, 62, 0.18);
-  border-bottom: 2px solid var(--color-primary);
-  padding: 1px 0;
+  background: transparent;
+  border-bottom: 2px solid rgba(91, 140, 62, 0.65);
+  padding: 0 0 1px;
   cursor: pointer;
   border-radius: 2px;
   transition: background var(--transition-fast);
+  text-decoration: none;
 }
 
 mark.ta-highlight:hover {
-  background: rgba(91, 140, 62, 0.3);
+  background: rgba(91, 140, 62, 0.08);
 }
 
 /* ---- 浮动工具栏 ---- */
 .ta-toolbar {
   position: fixed;
   z-index: 800;
-  transform: translateY(-50%);
+  width: min(360px, calc(100vw - 24px));
+  transform: translate(-50%, 0);
   animation: ta-toolbar-in 0.15s ease;
 }
 
+.ta-toolbar[data-placement="top"] {
+  transform: translate(-50%, -100%);
+}
+
 @keyframes ta-toolbar-in {
-  from { opacity: 0; transform: translateY(-50%) translateX(-4px); }
-  to { opacity: 1; transform: translateY(-50%) translateX(0); }
+  from { opacity: 0; transform: translate(-50%, 4px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.ta-toolbar[data-placement="top"] {
+  animation-name: ta-toolbar-in-top;
+}
+
+@keyframes ta-toolbar-in-top {
+  from { opacity: 0; transform: translate(-50%, calc(-100% - 4px)); }
+  to { opacity: 1; transform: translate(-50%, -100%); }
 }
 
 .ta-toolbar__btn {
@@ -57,8 +72,9 @@ mark.ta-highlight:hover {
   border-radius: var(--radius-lg);
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.14);
   padding: 10px 12px;
-  min-width: 280px;
-  max-width: 360px;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
 }
 
 .ta-toolbar__selected-text {
@@ -76,21 +92,27 @@ mark.ta-highlight:hover {
 .ta-toolbar__input-row {
   display: flex;
   gap: 6px;
+  align-items: flex-end;
 }
 
-.ta-toolbar__input-row input {
+.ta-toolbar__input-row textarea {
   flex: 1;
+  min-height: 36px;
+  max-height: 140px;
   padding: 7px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
+  line-height: 1.5;
   color: var(--color-text);
   background: var(--color-bg);
   outline: none;
+  resize: none;
+  overflow-y: auto;
   transition: border-color var(--transition-fast);
 }
 
-.ta-toolbar__input-row input:focus {
+.ta-toolbar__input-row textarea:focus {
   border-color: var(--color-primary);
 }
 
@@ -263,21 +285,27 @@ mark.ta-highlight:hover {
 .ta-panel__new-input-row {
   display: flex;
   gap: 6px;
+  align-items: flex-end;
 }
 
-.ta-panel__new-input-row input {
+.ta-panel__new-input-row textarea {
   flex: 1;
+  min-height: 34px;
+  max-height: 120px;
   padding: 8px 10px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
+  line-height: 1.5;
   color: var(--color-text);
   background: var(--color-bg);
   outline: none;
+  resize: none;
+  overflow-y: auto;
   transition: border-color var(--transition-fast);
 }
 
-.ta-panel__new-input-row input:focus {
+.ta-panel__new-input-row textarea:focus {
   border-color: var(--color-primary);
 }
 
@@ -608,6 +636,12 @@ mark.ta-highlight:hover {
 
 /* ---- 响应式 ---- */
 @media (max-width: 768px) {
+  mark.ta-highlight {
+    border-bottom-width: 1.5px;
+    border-bottom-style: solid;
+    border-bottom-color: rgba(91, 140, 62, 0.72);
+  }
+
   .ta-panel {
     width: 100%;
     border-left: none;
@@ -648,15 +682,81 @@ mark.ta-highlight:hover {
     backdrop-filter: blur(2px);
   }
 
+  .ta-toolbar {
+    z-index: 860;
+    width: auto;
+    max-width: calc(100vw - 24px);
+  }
+
+  .ta-toolbar--commenting {
+    left: 0 !important;
+    right: 0;
+    top: auto !important;
+    bottom: 0;
+    width: 100%;
+    max-width: none;
+    transform: none;
+    animation: ta-mobile-sheet-in 0.18s ease;
+  }
+
+  .ta-toolbar--commenting[data-placement="top"],
+  .ta-toolbar--commenting[data-placement="bottom"] {
+    transform: none;
+  }
+
+  .ta-toolbar--commenting .ta-toolbar__input-area {
+    width: 100%;
+    min-height: 42vh;
+    max-height: 68vh;
+    display: flex;
+    flex-direction: column;
+    border-radius: var(--radius-xl) var(--radius-xl) 0 0;
+    border-left: none;
+    border-right: none;
+    border-bottom: none;
+    padding: 16px;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.16);
+  }
+
+  .ta-toolbar--commenting .ta-toolbar__selected-text {
+    flex-shrink: 0;
+    padding: 8px 10px;
+    margin-bottom: 12px;
+    background: rgba(91, 140, 62, 0.06);
+    border-left: 2px solid var(--color-primary);
+    border-radius: var(--radius-md);
+  }
+
+  .ta-toolbar--commenting .ta-toolbar__input-row {
+    flex: 1;
+    align-items: stretch;
+  }
+
+  .ta-toolbar--commenting .ta-toolbar__input-row textarea {
+    min-height: 140px;
+    max-height: none;
+  }
+
+  .ta-toolbar--commenting .ta-toolbar__send {
+    align-self: flex-end;
+  }
+
+  @keyframes ta-mobile-sheet-in {
+    from { opacity: 0; transform: translateY(18px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
   .ta-toolbar__input-area {
-    min-width: 240px;
-    max-width: 300px;
+    width: min(300px, calc(100vw - 24px));
   }
 }
 
 @media (max-width: 480px) {
   .ta-toolbar__input-area {
-    min-width: 200px;
-    max-width: 260px;
+    width: min(260px, calc(100vw - 24px));
+  }
+
+  .ta-toolbar--commenting .ta-toolbar__input-area {
+    width: 100%;
   }
 }

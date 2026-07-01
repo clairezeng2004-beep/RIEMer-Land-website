@@ -13,6 +13,8 @@ import './TextAnnotation.css';
 
 // ---- 头像背景色（统一主题色） ----
 const AVATAR_BG = '#5B8C3E';
+const FLOATING_COMMENT_WIDTH = 360;
+const FLOATING_COMMENT_MAX_HEIGHT = 220;
 
 function timeAgo(dateStr) {
   const now = new Date();
@@ -26,6 +28,33 @@ function timeAgo(dateStr) {
   const days = Math.floor(hours / 24);
   if (days < 30) return `${days} 天前`;
   return d.toLocaleDateString('zh-CN');
+}
+
+function getSelectionToolbarPosition(rect) {
+  const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+  const safeGap = 10;
+  const safeEdge = 12;
+  const width = Math.min(FLOATING_COMMENT_WIDTH, Math.max(260, viewportWidth - safeEdge * 2));
+  const rawCenter = rect.left + rect.width / 2;
+  const minX = safeEdge + width / 2;
+  const maxX = Math.max(minX, viewportWidth - safeEdge - width / 2);
+  const x = Math.min(maxX, Math.max(minX, rawCenter));
+  const hasRoomBelow = rect.bottom + safeGap + FLOATING_COMMENT_MAX_HEIGHT < viewportHeight;
+  const y = hasRoomBelow
+    ? rect.bottom + safeGap
+    : Math.max(safeEdge, rect.top - safeGap);
+  return {
+    x,
+    y,
+    placement: hasRoomBelow ? 'bottom' : 'top',
+  };
+}
+
+function autoGrowTextarea(el) {
+  if (!el) return;
+  el.style.height = 'auto';
+  el.style.height = `${Math.min(140, Math.max(36, el.scrollHeight))}px`;
 }
 
 /**
@@ -94,7 +123,7 @@ export default function TextAnnotation({
   );
 
   // 浮动工具栏（划中文字后弹出）
-  const [toolbar, setToolbar] = useState({ visible: false, x: 0, y: 0 });
+  const [toolbar, setToolbar] = useState({ visible: false, x: 0, y: 0, placement: 'bottom' });
   const [selection, setSelection] = useState({ text: '', anchorData: null });
 
   // 评论输入
@@ -167,7 +196,7 @@ export default function TextAnnotation({
         if (!text || text.length < 2) {
           // 如果不是点击在工具栏上，隐藏工具栏
           if (toolbarRef.current && !toolbarRef.current.contains(e.target)) {
-            setToolbar({ visible: false, x: 0, y: 0 });
+            setToolbar({ visible: false, x: 0, y: 0, placement: 'bottom' });
           }
           return;
         }
@@ -177,7 +206,7 @@ export default function TextAnnotation({
 
         const range = sel.getRangeAt(0);
         const rect = range.getBoundingClientRect();
-        const containerRect = contentRef.current.getBoundingClientRect();
+        const nextPos = getSelectionToolbarPosition(rect);
 
         setSelection({
           text,
@@ -187,12 +216,9 @@ export default function TextAnnotation({
           },
         });
 
-        // 工具栏吸附在文档容器的右边缘，垂直跟随选区中点
-        // 使用视口坐标（position: fixed）避免被 inline 模式的 .ta-inline 父定位干扰
         setToolbar({
           visible: true,
-          x: containerRect.right + 8,
-          y: rect.top + rect.height / 2,
+          ...nextPos,
         });
       }, 10);
     };
@@ -216,7 +242,7 @@ export default function TextAnnotation({
       ) {
         const sel = window.getSelection();
         if (!sel?.toString().trim()) {
-          setToolbar({ visible: false, x: 0, y: 0 });
+          setToolbar({ visible: false, x: 0, y: 0, placement: 'bottom' });
           setIsCommenting(false);
           setCommentInput('');
         }
@@ -235,11 +261,10 @@ export default function TextAnnotation({
       try {
         const range = sel.getRangeAt(0);
         const rect = range.getBoundingClientRect();
-        const containerRect = contentRef.current.getBoundingClientRect();
+        const nextPos = getSelectionToolbarPosition(rect);
         setToolbar((prev) => ({
           ...prev,
-          x: containerRect.right + 8,
-          y: rect.top + rect.height / 2,
+          ...nextPos,
         }));
       } catch {
         /* ignore */
@@ -272,7 +297,7 @@ export default function TextAnnotation({
       }
       setCommentInput('');
       setIsCommenting(false);
-      setToolbar({ visible: false, x: 0, y: 0 });
+      setToolbar({ visible: false, x: 0, y: 0, placement: 'bottom' });
       window.getSelection()?.removeAllRanges();
       if (!inline) setShowPanel(true);
       // 异步对齐远端数据（失败也无所谓，乐观插入已经生效）
@@ -529,16 +554,17 @@ export default function TextAnnotation({
       {/* 整体评论输入 */}
       <div className="ta-panel__new-comment">
         <div className="ta-panel__new-input-row">
-          <input
-            type="text"
+          <textarea
             value={!isCommenting ? commentInput : ''}
             onChange={(e) => {
               if (!isCommenting) setCommentInput(e.target.value);
+              autoGrowTextarea(e.target);
             }}
             placeholder="添加整体评论…（或划选文字精准评论）"
             onKeyDown={(e) => {
-              if (e.key === 'Enter') handleSubmitGeneralComment();
+              if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitGeneralComment();
             }}
+            rows={1}
           />
           <button
             onClick={handleSubmitGeneralComment}
@@ -591,7 +617,8 @@ export default function TextAnnotation({
   const floatingToolbar = toolbar.visible && (
     <div
       ref={toolbarRef}
-      className="ta-toolbar"
+      className={`ta-toolbar ${isCommenting ? 'ta-toolbar--commenting' : ''}`}
+      data-placement={toolbar.placement}
       style={{
         left: toolbar.x,
         top: toolbar.y,
@@ -613,19 +640,22 @@ export default function TextAnnotation({
               : selection.text}&rdquo;
           </div>
           <div className="ta-toolbar__input-row">
-            <input
-              type="text"
+            <textarea
               value={commentInput}
-              onChange={(e) => setCommentInput(e.target.value)}
+              onChange={(e) => {
+                setCommentInput(e.target.value);
+                autoGrowTextarea(e.target);
+              }}
               placeholder="写下你的评论…"
               autoFocus
               onKeyDown={(e) => {
-                if (e.key === 'Enter') handleSubmitComment();
+                if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) handleSubmitComment();
                 if (e.key === 'Escape') {
                   setIsCommenting(false);
                   setCommentInput('');
                 }
               }}
+              rows={2}
             />
             <button
               onClick={handleSubmitComment}
