@@ -29,6 +29,13 @@
   background: color-mix(in srgb, var(--color-primary, #5B8C3E) 8%, var(--color-bg-card, #fff));
 }
 
+.wbh__handle--active {
+  opacity: 1;
+  color: var(--color-primary, #5B8C3E);
+  border-color: color-mix(in srgb, var(--color-primary, #5B8C3E) 40%, transparent);
+  background: color-mix(in srgb, var(--color-primary, #5B8C3E) 10%, var(--color-bg-card, #fff));
+}
+
 /* 触屏没有 hover，手柄保持可见 */
 @media (hover: none) {
   .wbh__handle {
@@ -73,11 +80,25 @@
   color: var(--color-primary, #5B8C3E);
 }
 
+.wbh__menu-item--active,
+.wbh__menu-item--active:hover {
+  background: color-mix(in srgb, var(--color-primary, #5B8C3E) 12%, transparent);
+  color: var(--color-primary, #5B8C3E);
+  font-weight: 600;
+}
+
 .wbh__menu-icon {
   flex-shrink: 0;
   color: var(--color-text-muted, #9ca3af);
 }
 
-.wbh__menu-item:hover .wbh__menu-icon {
+.wbh__menu-item:hover .wbh__menu-icon,
+.wbh__menu-item--active .wbh__menu-icon {
   color: var(--color-primary, #5B8C3E);
+}
+
+.wbh__menu-check {
+  margin-left: auto;
+  color: var(--color-primary, #5B8C3E);
+  flex-shrink: 0;
 }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions, RotateCcw } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions, RotateCcw, Check } from 'lucide-react';
 import './WordBlockHandle.css';
 import {
   getCurrentOrderedList,
@@ -117,11 +117,33 @@ function applyTextAlignToBlock(block, key) {
   }
 }
 
+function getBlockFormatKey(block) {
+  if (!block) return '';
+  const tag = String(block.tagName || '').toLowerCase();
+  if (tag === 'h1' || tag === 'h2' || tag === 'h3' || tag === 'blockquote') return tag;
+  if (tag === 'ul') return 'ul';
+  if (tag === 'ol') return 'ol';
+  if (block.closest?.('ul')) return 'ul';
+  if (block.closest?.('ol')) return 'ol';
+  return 'p';
+}
+
+function getBlockAlignKey(block) {
+  if (!block) return '';
+  const align = String(block.style?.textAlign || block.getAttribute?.('align') || '').toLowerCase();
+  if (align === 'center') return 'alignCenter';
+  if (align === 'right' || align === 'end') return 'alignRight';
+  if (align === 'left' || align === 'start') return 'alignLeft';
+  return '';
+}
+
 export default function WordBlockHandle({ editorRef, onChange }) {
   const [pos, setPos] = useState(null); // { top, left } 视口坐标
   const [menuOpen, setMenuOpen] = useState(false);
   const [blockHasImage, setBlockHasImage] = useState(false); // 当前块是否含图片（决定是否显示"添加注释"）
   const [currentOlRestarted, setCurrentOlRestarted] = useState(null); // null = 当前不在有序列表里
+  const [activeFormatKey, setActiveFormatKey] = useState('p');
+  const [activeAlignKey, setActiveAlignKey] = useState('');
   const blockRef = useRef(null); // 当前块 DOM 节点（点菜单时用来恢复光标）
   const rootRef = useRef(null);
   const closeTimerRef = useRef(null); // 悬浮离开后的延时关闭计时器
@@ -154,6 +176,8 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     if (!editor.contains(block)) { setPos(null); blockRef.current = null; return; }
     blockRef.current = block; // 仍记录所在块，供格式命令使用
     setBlockHasImage(!!(block.querySelector && block.querySelector('img')));
+    setActiveFormatKey(getBlockFormatKey(block));
+    setActiveAlignKey(getBlockAlignKey(block));
     const currentOl = getCurrentOrderedList(editor);
     setCurrentOlRestarted(currentOl ? isOrderedListRestarted(currentOl) : null);
 
@@ -280,6 +304,11 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       if (opt.key === 'alignLeft' || opt.key === 'alignCenter' || opt.key === 'alignRight') {
         applyTextAlignToBlock(blockRef.current, opt.key);
       }
+      if (opt.key === 'alignLeft' || opt.key === 'alignCenter' || opt.key === 'alignRight') {
+        setActiveAlignKey(opt.key);
+      } else if (['p', 'h1', 'h2', 'h3', 'blockquote', 'ul', 'ol'].includes(opt.key)) {
+        setActiveFormatKey(opt.key);
+      }
       // 链接补 target，安全打开
       if (opt.key === 'link' && value) {
         const editor = editorRef?.current;
@@ -376,7 +405,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     >
       <button
         type="button"
-        className="wbh__handle"
+        className={`wbh__handle ${menuOpen ? 'wbh__handle--active' : ''}`}
         onMouseDown={stop}
         onClick={openMenu}
         title="插入/切换格式（标题层级、引用等）"
@@ -386,18 +415,23 @@ export default function WordBlockHandle({ editorRef, onChange }) {
 
       {menuOpen && (
         <div className="wbh__menu" onMouseDown={stop}>
-          {BLOCK_OPTIONS.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              className="wbh__menu-item"
-              onMouseDown={stop}
-              onClick={() => applyOption(opt)}
-            >
-              <opt.icon size={15} className="wbh__menu-icon" />
-              <span>{opt.label}</span>
-            </button>
-          ))}
+          {BLOCK_OPTIONS.map((opt) => {
+            const isActive = opt.key === activeFormatKey || opt.key === activeAlignKey;
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                className={`wbh__menu-item ${isActive ? 'wbh__menu-item--active' : ''}`}
+                aria-pressed={isActive}
+                onMouseDown={stop}
+                onClick={() => applyOption(opt)}
+              >
+                <opt.icon size={15} className="wbh__menu-icon" />
+                <span>{opt.label}</span>
+                {isActive && <Check size={14} className="wbh__menu-check" />}
+              </button>
+            );
+          })}
           {blockHasImage && (
             <button
               type="button"
