@@ -731,6 +731,12 @@ export default function MemberSharingDetail() {
         fetchLog={() => fetchViewLog(String(post.id))}
         resolveName={resolveVisitorName}
         resolveAvatar={resolveVisitorAvatar}
+        onResolvedTotalCount={(count) => {
+          setViews((prev) => ({
+            ...prev,
+            [post.id]: Math.max(Number(prev[post.id]) || 0, count),
+          }));
+        }}
       />
 
       {previewAttachment && (

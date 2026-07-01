@@ -14,6 +14,7 @@
 //     fetchLog={async () => recordList}
 //     resolveName={(uid, fallback) => 真名}  // 可选：用真名覆盖日志中的 userName
 //     resolveAvatar={(uid) => 头像 URL}      // 可选：显示用户当前设置的头像
+//     onResolvedTotalCount={(n) => ...}      // 可选：用明细条数校正外部卡片计数
 //   />
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -53,6 +54,7 @@ export default function ViewLogPopover({
   fetchLog,
   resolveName,
   resolveAvatar,
+  onResolvedTotalCount,
 }) {
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState([]);
@@ -146,6 +148,13 @@ export default function ViewLogPopover({
     const propCount = Number(totalCount) || 0;
     return Math.max(propCount, logs.length);
   }, [logs.length, totalCount]);
+
+  useEffect(() => {
+    if (!open || loading || error) return;
+    if (effectiveTotalCount > (Number(totalCount) || 0)) {
+      onResolvedTotalCount?.(effectiveTotalCount);
+    }
+  }, [effectiveTotalCount, error, loading, onResolvedTotalCount, open, totalCount]);
 
   if (!open) return null;
 

@@ -931,6 +931,13 @@ export default function MemberSharing() {
         }
         resolveName={resolveVisitorName}
         resolveAvatar={resolveVisitorAvatar}
+        onResolvedTotalCount={(count) => {
+          if (!viewLogPost) return;
+          setViews((prev) => ({
+            ...prev,
+            [viewLogPost.id]: Math.max(Number(prev[viewLogPost.id]) || 0, count),
+          }));
+        }}
       />
     </div>
   );

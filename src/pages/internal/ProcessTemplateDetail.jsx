@@ -2018,6 +2018,14 @@ export default function ProcessTemplateDetail() {
         fetchLog={() => fetchViewLog(String(doc.id))}
         resolveName={resolveContributorName}
         resolveAvatar={resolveVisitorAvatar}
+        onResolvedTotalCount={(count) => {
+          const localViews = loadViews();
+          const currentCount = (Number(localViews[doc.id]) || 0) + (Number(doc.viewCount) || 0);
+          if (count <= currentCount) return;
+          localViews[doc.id] = Math.max(Number(localViews[doc.id]) || 0, count - (Number(doc.viewCount) || 0));
+          saveViews(localViews);
+          setDocsVersion((v) => v + 1);
+        }}
       />
 
       {previewAttachment && (
