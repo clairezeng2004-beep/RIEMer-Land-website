@@ -137,6 +137,7 @@ export default function TextAnnotation({
 
   // 活跃高亮
   const [activeCommentId, setActiveCommentId] = useState(null);
+  const [commentAnchors, setCommentAnchors] = useState({});
 
   const toolbarRef = useRef(null);
   const panelRef = useRef(null);
@@ -180,6 +181,18 @@ export default function TextAnnotation({
       } catch {
         // 文本可能已变化，忽略
       }
+    });
+
+    requestAnimationFrame(() => {
+      const containerRect = container.getBoundingClientRect();
+      const next = {};
+      activeComments.forEach((comment) => {
+        const mark = container.querySelector(`.ta-highlight[data-comment-id="${comment.id}"]`);
+        if (!mark) return;
+        const rect = mark.getBoundingClientRect();
+        next[comment.id] = Math.max(0, rect.top - containerRect.top + container.scrollTop);
+      });
+      setCommentAnchors(next);
     });
   }, [comments, contentRef]);
 
@@ -390,8 +403,21 @@ export default function TextAnnotation({
   };
 
   // ---- 分组 ----
+  const generalComments = comments.filter((c) => !c.selectedText && !c.resolved);
+  const anchoredComments = comments.filter((c) => c.selectedText && !c.resolved);
   const unresolvedComments = comments.filter((c) => !c.resolved);
   const resolvedComments = comments.filter((c) => c.resolved);
+  const anchoredCommentsForReading = anchoredComments
+    .map((comment) => ({
+      comment,
+      anchorTop: Number.isFinite(commentAnchors[comment.id]) ? commentAnchors[comment.id] : null,
+    }))
+    .sort((a, b) => {
+      if (a.anchorTop !== null && b.anchorTop !== null) return a.anchorTop - b.anchorTop;
+      if (a.anchorTop !== null) return -1;
+      if (b.anchorTop !== null) return 1;
+      return new Date(b.comment.createdAt || 0) - new Date(a.comment.createdAt || 0);
+    });
 
   // ---- 渲染头像 ----
   const renderAvatar = (name, avatar, size = 28) => {
@@ -546,6 +572,24 @@ export default function TextAnnotation({
     );
   };
 
+  const renderAnchoredComment = (entry, index) => {
+    const previous = anchoredCommentsForReading[index - 1];
+    const previousTop = previous?.anchorTop ?? null;
+    const currentTop = entry.anchorTop;
+    const gap = currentTop !== null && previousTop !== null
+      ? Math.max(12, Math.min(120, currentTop - previousTop))
+      : 16;
+    return (
+      <div
+        key={entry.comment.id}
+        className="ta-anchored-comment"
+        style={{ marginTop: index === 0 ? 8 : gap }}
+      >
+        {renderComment(entry.comment)}
+      </div>
+    );
+  };
+
   if (!user) return null;
 
   // ---- 共享的"面板内部"内容（输入框 + 列表） ----
@@ -594,7 +638,24 @@ export default function TextAnnotation({
             </div>
           )}
 
-        {unresolvedComments.map(renderComment)}
+        {inline ? (
+          <>
+            {generalComments.length > 0 && (
+              <div className="ta-panel__section">
+                <div className="ta-panel__section-title">整体评论</div>
+                {generalComments.map(renderComment)}
+              </div>
+            )}
+            {anchoredCommentsForReading.length > 0 && (
+              <div className="ta-panel__section ta-panel__section--anchored">
+                <div className="ta-panel__section-title">划词评论</div>
+                {anchoredCommentsForReading.map(renderAnchoredComment)}
+              </div>
+            )}
+          </>
+        ) : (
+          unresolvedComments.map(renderComment)
+        )}
 
         {/* 已解决评论折叠 */}
         {resolvedComments.length > 0 && (
