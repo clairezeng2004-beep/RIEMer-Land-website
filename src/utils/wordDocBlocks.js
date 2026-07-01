@@ -180,7 +180,7 @@ function ensureColumnMeta(container) {
   const cols = getColumns(container);
   const n = cols.length;
   container.setAttribute('data-cols', String(n));
-  container.setAttribute('data-cols-label', `${n}栏`);
+  container.removeAttribute('data-cols-label');
   // 先给一个等分百分比兜底；布局完成后 updateColumnLabels 会按真实宽度刷新
   cols.forEach((col) => {
     if (!col.getAttribute('data-col-label')) {
@@ -412,7 +412,13 @@ export async function insertColumnsIntoEditor(editor, { count = 2, files = [] } 
     removeEmptyParagraphAfter(container);
     layoutColumnResizers(container);
     layoutColumnAdders(container);
-    placeCaretAtStart(container.querySelector('.msc-col p') || container);
+    try {
+      const range = document.createRange();
+      range.selectNode(container);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+    } catch { /* ignore */ }
     restoreScrollSnapshot(scrollSnapshot);
   });
 }

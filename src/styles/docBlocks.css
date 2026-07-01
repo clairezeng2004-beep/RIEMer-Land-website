@@ -37,10 +37,10 @@
 .msc-cols--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .msc-cols--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 
-/* 编辑器内：分栏块本身只负责布局和栏数标签，视觉边界交给每一栏。
+/* 编辑器内：分栏块本身只负责布局，视觉边界交给每一栏。
    这样不会出现外层框与最右栏框线错位，也避免多层矩形叠在一起。 */
 [contenteditable="true"] .msc-cols {
-  padding: 26px 0 0;
+  padding: 0;
   border-radius: var(--radius-md, 8px);
   background: transparent;
   box-shadow: none;
@@ -48,22 +48,7 @@
 }
 
 [contenteditable="true"] .msc-cols::before {
-  content: attr(data-cols-label);
-  position: absolute;
-  top: 6px;
-  left: 8px;
-  z-index: 3;
-  display: inline-flex;
-  align-items: center;
-  height: 18px;
-  padding: 0 7px;
-  border-radius: 999px;
-  background: rgba(91, 140, 62, 0.14);
-  color: var(--color-primary, #5B8C3E);
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-  pointer-events: none;
+  display: none;
 }
 
 .msc-col {
