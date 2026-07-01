@@ -142,6 +142,11 @@ export default function ViewLogPopover({
     return arr;
   }, [logs]);
 
+  const effectiveTotalCount = useMemo(() => {
+    const propCount = Number(totalCount) || 0;
+    return Math.max(propCount, logs.length);
+  }, [logs.length, totalCount]);
+
   if (!open) return null;
 
   return (
@@ -163,7 +168,7 @@ export default function ViewLogPopover({
           <div className="vlp-header__title">
             <Eye size={18} />
             <span>访问记录</span>
-            <span className="vlp-header__count">共 {totalCount} 次浏览 · {groupedVisitors.length} 位访客</span>
+            <span className="vlp-header__count">共 {effectiveTotalCount} 次浏览 · {groupedVisitors.length} 位访客</span>
           </div>
           <button
             type="button"
