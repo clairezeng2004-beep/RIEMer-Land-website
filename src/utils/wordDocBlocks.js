@@ -527,16 +527,36 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     getColumns(container).forEach((item) => item.classList.toggle('msc-col--selected', item === col));
   };
 
-  const ensureCaretInColumn = (col) => {
+  const clearColumnSelection = () => {
+    editor.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
+  };
+
+  const ensureCaretInColumn = (col, { force = false } = {}) => {
     if (!col || !editor.contains(col)) return;
     const sel = window.getSelection();
     const anchor = sel?.anchorNode;
-    if (anchor && col.contains(anchor)) return;
+    if (!force && anchor && col.contains(anchor)) return;
     const target =
       col.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote')
       || col;
     placeCaretAtStart(target);
   };
+
+  const syncSelectedColumnFromCaret = () => {
+    const sel = window.getSelection();
+    const anchor =
+      sel?.anchorNode?.nodeType === 1 ? sel.anchorNode : sel?.anchorNode?.parentElement;
+    const col = anchor?.closest?.('.msc-col');
+    if (col && editor.contains(col)) {
+      selectColumn(col);
+      return;
+    }
+    if (anchor && editor.contains(anchor)) clearColumnSelection();
+  };
+
+  const isColumnControlTarget = (target) => (
+    target?.closest?.('.msc-col-resizer, .msc-col-adder, .msc-col__act, .msc-col__placeholder')
+  );
 
   const handler = (e) => {
     const t = e.target;
@@ -564,7 +584,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
         layoutColumnResizers(col.closest('.msc-cols'));
       });
     } else if (editor.contains(t)) {
-      editor.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
+      clearColumnSelection();
     }
 
     // 1) 历史文档里的「输入文字」按钮
@@ -616,6 +636,12 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const pressedCol = target?.closest('.msc-col');
     if (pressedCol && editor.contains(pressedCol)) {
       selectColumn(pressedCol);
+      if (!isColumnControlTarget(target) && !target.closest('img')) {
+        requestAnimationFrame(() => {
+          ensureCaretInColumn(pressedCol, { force: true });
+          syncSelectedColumnFromCaret();
+        });
+      }
     }
 
     const handle = e.target instanceof HTMLElement ? e.target.closest('.msc-col-resizer') : null;
@@ -731,7 +757,10 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
   const onScrollOrResize = () => refreshAll();
 
   refreshAll();
+  document.addEventListener('selectionchange', syncSelectedColumnFromCaret);
   editor.addEventListener('click', handler);
+  editor.addEventListener('keyup', syncSelectedColumnFromCaret);
+  editor.addEventListener('input', syncSelectedColumnFromCaret);
   editor.addEventListener('keydown', onKeyDown);
   editor.addEventListener('mouseover', onMouseOver);
   editor.addEventListener('pointerdown', onPointerDown);
@@ -742,7 +771,10 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
   editor.parentElement?.addEventListener('scroll', onScrollOrResize);
 
   return () => {
+    document.removeEventListener('selectionchange', syncSelectedColumnFromCaret);
     editor.removeEventListener('click', handler);
+    editor.removeEventListener('keyup', syncSelectedColumnFromCaret);
+    editor.removeEventListener('input', syncSelectedColumnFromCaret);
     editor.removeEventListener('keydown', onKeyDown);
     editor.removeEventListener('mouseover', onMouseOver);
     editor.removeEventListener('pointerdown', onPointerDown);
