@@ -52,6 +52,7 @@ import {
 import './MemberSharingDetail.css';
 
 const MEMBER_SHARING_VIEWED_KEY = 'riemer_member_sharing_viewed_v2';
+const VIEW_TARGET_TYPE = 'member-sharing';
 
 function buildCategoryMaps(cats) {
   const labels = { history: '历史会议' };
@@ -238,7 +239,7 @@ export default function MemberSharingDetail() {
 
   const [sharings, setSharings] = useState(() => getCachedSharings());
   const [loaded, setLoaded] = useState(false);
-  const [views, setViews] = useState(() => loadLocalViews());
+  const [views, setViews] = useState(() => loadLocalViews(VIEW_TARGET_TYPE));
   const post = sharings.find((s) => String(s.id) === String(id));
 
   // 浏览器标签页标题：新窗口里直观显示这是成员分享的文档
@@ -272,7 +273,7 @@ export default function MemberSharingDetail() {
       const [listResult, catsResult, viewsResult] = await Promise.allSettled([
         fetchSharings(),
         fetchCategories(),
-        fetchViewsFromCloud(),
+        fetchViewsFromCloud(VIEW_TARGET_TYPE),
       ]);
       if (cancelled) return;
       if (listResult.status === 'fulfilled' && Array.isArray(listResult.value)) {
@@ -320,14 +321,14 @@ export default function MemberSharingDetail() {
     if (!post) return;
     try {
       if (hasCountedViewToday(String(post.id), user)) return;
-      incrementView(String(post.id)).then((result) => {
+      incrementView(String(post.id), VIEW_TARGET_TYPE).then((result) => {
         setViews((prev) => ({
           ...prev,
           [post.id]: Number(result?.count) || (Number(prev[post.id]) || 0) + 1,
         }));
       });
       // 访问日志（云端 + 本地兜底）
-      recordViewLog(String(post.id), user).catch((err) => {
+      recordViewLog(String(post.id), user, VIEW_TARGET_TYPE).catch((err) => {
         console.warn('[MemberSharingDetail] 访问日志写入失败:', err);
       });
     } catch { /* ignore */ }
@@ -729,7 +730,7 @@ export default function MemberSharingDetail() {
         open={viewLogOpen}
         onClose={() => setViewLogOpen(false)}
         totalCount={views[post.id] || 0}
-        fetchLog={() => fetchViewLog(String(post.id))}
+        fetchLog={() => fetchViewLog(String(post.id), VIEW_TARGET_TYPE)}
         resolveName={resolveVisitorName}
         resolveAvatar={resolveVisitorAvatar}
         onResolvedTotalCount={(count) => {

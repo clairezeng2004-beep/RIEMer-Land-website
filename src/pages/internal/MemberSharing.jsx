@@ -43,6 +43,7 @@ import {
 import './MemberSharing.css';
 
 const HIDDEN_CATEGORY_KEYS = new Set(['history']);
+const VIEW_TARGET_TYPE = 'member-sharing';
 
 // 预设颜色供选择
 const PRESET_COLORS = [
@@ -183,7 +184,7 @@ export default function MemberSharing() {
   const [loaded, setLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
-  const [views, setViews] = useState(() => loadLocalViews());
+  const [views, setViews] = useState(() => loadLocalViews(VIEW_TARGET_TYPE));
 
   // 动态分类管理
   const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
@@ -202,7 +203,7 @@ export default function MemberSharing() {
         const [list, cats, cloudViews] = await Promise.all([
           fetchSharings(),
           fetchCategories(),
-          fetchViewsFromCloud(),
+          fetchViewsFromCloud(VIEW_TARGET_TYPE),
         ]);
         if (cancelled) return;
         setSharings(list);
@@ -927,7 +928,7 @@ export default function MemberSharing() {
         onClose={() => setViewLogPost(null)}
         totalCount={viewLogPost ? (views[viewLogPost.id] || 0) : 0}
         fetchLog={
-          viewLogPost ? () => fetchViewLog(String(viewLogPost.id)) : undefined
+          viewLogPost ? () => fetchViewLog(String(viewLogPost.id), VIEW_TARGET_TYPE) : undefined
         }
         resolveName={resolveVisitorName}
         resolveAvatar={resolveVisitorAvatar}

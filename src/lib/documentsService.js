@@ -26,6 +26,7 @@ const DOCUMENTS_BUCKET = 'documents';
 const DOCUMENTS_CLOUD_TIMEOUT_MS = 25000;
 const VIEW_COUNT_TIMEOUT_MS = 8000;
 const VIEW_LOG_TIMEOUT_MS = 8000;
+const DEFAULT_VIEW_TARGET_TYPE = 'process-template';
 
 /**
  * 判断当前是否可以使用 Supabase（已配置 + 健康检测通过）
@@ -43,6 +44,17 @@ function withTimeout(promise, ms, label) {
     timeoutId = setTimeout(() => reject(new Error(`${label} 超时`)), ms);
   });
   return Promise.race([promise, timeout]).finally(() => clearTimeout(timeoutId));
+}
+
+function makeViewTargetKey(documentId, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const type = String(targetType || DEFAULT_VIEW_TARGET_TYPE).trim();
+  return `${type}:${String(documentId)}`;
+}
+
+function parseViewTargetKey(key, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const prefix = `${String(targetType || DEFAULT_VIEW_TARGET_TYPE).trim()}:`;
+  const str = String(key || '');
+  return str.startsWith(prefix) ? str.slice(prefix.length) : null;
 }
 
 /* ============ Row ↔ Doc 对象互转 ============ */
@@ -602,12 +614,22 @@ export async function markDefaultDeleted(defaultId) {
 
 /* ============ 浏览计数（document_views） ============ */
 
-export function loadLocalViews() {
+function loadStoredViews() {
   try {
     const stored = localStorage.getItem(DOC_VIEWS_KEY);
     if (stored) return JSON.parse(stored);
   } catch { /* ignore */ }
   return {};
+}
+
+export function loadLocalViews(targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const stored = loadStoredViews();
+  const scoped = {};
+  Object.entries(stored).forEach(([key, value]) => {
+    const id = parseViewTargetKey(key, targetType);
+    if (id) scoped[id] = value;
+  });
+  return scoped;
 }
 
 export function saveLocalViews(map) {
@@ -620,15 +642,17 @@ export function saveLocalViews(map) {
  * 从云端拉取所有文档的浏览计数，合并到本地视图。
  * 合并策略：取两边较大值，避免掉线期间本地累计的数据被云端旧数据覆盖。
  */
-export async function fetchViewsFromCloud() {
+export async function fetchViewsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE) {
   if (!canUseSupabase() || !supabase) return null;
   try {
     // 只拉需要的两个字段（document_id + view_count）——避免被新加列或大字段
     // （比如后续若加 metadata jsonb）拖慢全表扫描。
+    const prefix = `${String(targetType || DEFAULT_VIEW_TARGET_TYPE).trim()}:%`;
     const { data, error } = await withTimeout(
       supabase
         .from('document_views')
-        .select('document_id,view_count'),
+        .select('document_id,view_count')
+        .like('document_id', prefix),
       VIEW_COUNT_TIMEOUT_MS,
       '加载浏览计数',
     );
@@ -638,15 +662,17 @@ export async function fetchViewsFromCloud() {
     }
     const cloudMap = {};
     (data || []).forEach((r) => {
-      cloudMap[r.document_id] = r.view_count || 0;
+      const id = parseViewTargetKey(r.document_id, targetType);
+      if (id) cloudMap[id] = r.view_count || 0;
     });
-    const localMap = loadLocalViews();
+    const localMap = loadStoredViews();
     const merged = { ...localMap };
     Object.entries(cloudMap).forEach(([k, v]) => {
-      merged[k] = Math.max(Number(merged[k]) || 0, Number(v) || 0);
+      const localKey = makeViewTargetKey(k, targetType);
+      merged[localKey] = Math.max(Number(merged[localKey]) || 0, Number(v) || 0);
     });
     saveLocalViews(merged);
-    return merged;
+    return loadLocalViews(targetType);
   } catch (err) {
     console.warn('[documentsService] fetchViewsFromCloud 异常:', err.message);
     return null;
@@ -657,11 +683,13 @@ export async function fetchViewsFromCloud() {
  * 浏览计数 +1。
  * 云端用 upsert 增量更新；本地缓存同步 +1。
  */
-export async function incrementView(documentId) {
+export async function incrementView(documentId, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const targetKey = makeViewTargetKey(documentId, targetType);
+
   // 本地 +1
   try {
-    const map = loadLocalViews();
-    map[documentId] = (map[documentId] || 0) + 1;
+    const map = loadStoredViews();
+    map[targetKey] = (map[targetKey] || 0) + 1;
     saveLocalViews(map);
   } catch { /* ignore */ }
 
@@ -675,7 +703,7 @@ export async function incrementView(documentId) {
     //    自动降级到下面的 select + upsert 路径，保持向后兼容。
     const rpc = await withTimeout(
       supabase.rpc('increment_document_view', {
-        p_document_id: documentId,
+        p_document_id: targetKey,
       }),
       VIEW_COUNT_TIMEOUT_MS,
       '更新浏览计数',
@@ -695,7 +723,7 @@ export async function incrementView(documentId) {
       supabase
         .from('document_views')
         .select('view_count')
-        .eq('document_id', documentId)
+        .eq('document_id', targetKey)
         .maybeSingle(),
       VIEW_COUNT_TIMEOUT_MS,
       '读取浏览计数',
@@ -705,7 +733,7 @@ export async function incrementView(documentId) {
       supabase
         .from('document_views')
         .upsert(
-          { document_id: documentId, view_count: nextCount, updated_at: new Date().toISOString() },
+          { document_id: targetKey, view_count: nextCount, updated_at: new Date().toISOString() },
           { onConflict: 'document_id' }
         ),
       VIEW_COUNT_TIMEOUT_MS,
@@ -753,7 +781,8 @@ function saveLocalViewLogs(map) {
  * @param {string} documentId
  * @param {{id?:string,name?:string,nickname?:string}|null} user 当前登录用户（可为空）
  */
-export async function recordViewLog(documentId, user) {
+export async function recordViewLog(documentId, user, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const targetKey = makeViewTargetKey(documentId, targetType);
   const userId = user?.id || null;
   const userName = user?.name || user?.nickname || user?.email || '访客';
   const viewedAt = new Date().toISOString();
@@ -761,9 +790,9 @@ export async function recordViewLog(documentId, user) {
   // 本地写一条
   try {
     const all = loadLocalViewLogs();
-    const list = Array.isArray(all[documentId]) ? all[documentId] : [];
+    const list = Array.isArray(all[targetKey]) ? all[targetKey] : [];
     list.push({ userId, userName, viewedAt });
-    all[documentId] = list;
+    all[targetKey] = list;
     saveLocalViewLogs(all);
   } catch { /* ignore */ }
 
@@ -771,7 +800,7 @@ export async function recordViewLog(documentId, user) {
 
   try {
     const { error } = await supabase.from('document_view_logs').insert({
-      document_id: documentId,
+      document_id: targetKey,
       user_id: userId,
       user_name: userName,
       viewed_at: viewedAt,
@@ -794,14 +823,16 @@ export async function recordViewLog(documentId, user) {
  * @param {string} documentId
  * @returns {Promise<Array<{userId:string|null,userName:string,viewedAt:string}>>}
  */
-export async function fetchViewLog(documentId) {
+export async function fetchViewLog(documentId, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const targetKey = makeViewTargetKey(documentId, targetType);
+
   if (canUseSupabase() && supabase) {
     try {
       const { data, error } = await withTimeout(
         supabase
           .from('document_view_logs')
           .select('user_id,user_name,viewed_at')
-          .eq('document_id', documentId)
+          .eq('document_id', targetKey)
           .order('viewed_at', { ascending: false })
           .limit(500),
         VIEW_LOG_TIMEOUT_MS,
@@ -823,7 +854,7 @@ export async function fetchViewLog(documentId) {
   }
   // 本地兜底：按时间倒序
   const all = loadLocalViewLogs();
-  const list = Array.isArray(all[documentId]) ? [...all[documentId]] : [];
+  const list = Array.isArray(all[targetKey]) ? [...all[targetKey]] : [];
   list.sort((a, b) => new Date(b.viewedAt || 0) - new Date(a.viewedAt || 0));
   return list;
 }
