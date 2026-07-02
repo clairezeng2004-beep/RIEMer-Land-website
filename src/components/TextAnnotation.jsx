@@ -15,6 +15,7 @@ import './TextAnnotation.css';
 const AVATAR_BG = '#5B8C3E';
 const FLOATING_COMMENT_WIDTH = 360;
 const FLOATING_COMMENT_MAX_HEIGHT = 220;
+const MOBILE_COMMENT_BREAKPOINT = 768;
 
 function timeAgo(dateStr) {
   const now = new Date();
@@ -55,6 +56,34 @@ function autoGrowTextarea(el) {
   if (!el) return;
   el.style.height = 'auto';
   el.style.height = `${Math.min(140, Math.max(36, el.scrollHeight))}px`;
+}
+
+function getAnnotationGroupKey(text) {
+  return String(text || '').trim();
+}
+
+function groupAnchoredComments(commentList) {
+  const groups = [];
+  const groupMap = new Map();
+
+  commentList.forEach((comment) => {
+    const key = getAnnotationGroupKey(comment.selectedText);
+    if (!key) return;
+
+    if (!groupMap.has(key)) {
+      const group = {
+        key,
+        selectedText: comment.selectedText,
+        comments: [],
+      };
+      groupMap.set(key, group);
+      groups.push(group);
+    }
+
+    groupMap.get(key).comments.push(comment);
+  });
+
+  return groups;
 }
 
 /**
@@ -138,6 +167,7 @@ export default function TextAnnotation({
   // 活跃高亮
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentAnchors, setCommentAnchors] = useState({});
+  const [mobileThread, setMobileThread] = useState(null);
 
   const toolbarRef = useRef(null);
   const panelRef = useRef(null);
@@ -172,12 +202,13 @@ export default function TextAnnotation({
       parent.normalize();
     });
 
-    // 只高亮有选中文本的、未解决的评论
+    // 只高亮有选中文本的、未解决的评论；同一段文字只标一次，并显示该处评论数
     const activeComments = comments.filter((c) => c.selectedText && !c.resolved);
+    const activeGroups = groupAnchoredComments(activeComments);
 
-    activeComments.forEach((comment) => {
+    activeGroups.forEach((group) => {
       try {
-        highlightText(container, comment.selectedText, comment.id);
+        highlightText(container, group.selectedText, group.key, group.comments.length);
       } catch {
         // 文本可能已变化，忽略
       }
@@ -186,14 +217,47 @@ export default function TextAnnotation({
     requestAnimationFrame(() => {
       const containerRect = container.getBoundingClientRect();
       const next = {};
-      activeComments.forEach((comment) => {
-        const mark = container.querySelector(`.ta-highlight[data-comment-id="${comment.id}"]`);
+      const marks = Array.from(container.querySelectorAll('.ta-highlight'));
+      activeGroups.forEach((group) => {
+        const mark = marks.find((el) => el.dataset.commentGroup === group.key);
         if (!mark) return;
         const rect = mark.getBoundingClientRect();
-        next[comment.id] = Math.max(0, rect.top - containerRect.top + container.scrollTop);
+        const top = Math.max(0, rect.top - containerRect.top + container.scrollTop);
+        group.comments.forEach((comment) => {
+          next[comment.id] = top;
+        });
       });
       setCommentAnchors(next);
     });
+  }, [comments, contentRef]);
+
+  // 手机端阅读：点击划词标记，展开该位置对应的评论
+  useEffect(() => {
+    if (!contentRef?.current) return;
+    const container = contentRef.current;
+
+    const handleHighlightClick = (e) => {
+      const mark = e.target.closest?.('.ta-highlight');
+      if (!mark || !container.contains(mark)) return;
+      if ((window.innerWidth || document.documentElement.clientWidth || 0) > MOBILE_COMMENT_BREAKPOINT) {
+        return;
+      }
+
+      const key = mark.dataset.commentGroup;
+      const groups = groupAnchoredComments(comments.filter((c) => c.selectedText && !c.resolved));
+      const group = groups.find((item) => item.key === key);
+      if (!group) return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      setMobileThread(group);
+      setActiveCommentId(group.comments[0]?.id || null);
+    };
+
+    container.addEventListener('click', handleHighlightClick);
+    return () => {
+      container.removeEventListener('click', handleHighlightClick);
+    };
   }, [comments, contentRef]);
 
   // ---- 划词检测 ----
@@ -731,6 +795,44 @@ export default function TextAnnotation({
     </div>
   );
 
+  const mobileThreadOverlay = mobileThread && (
+    <div
+      className="ta-mobile-thread-overlay"
+      onClick={() => setMobileThread(null)}
+    >
+      <div
+        className="ta-mobile-thread"
+        role="dialog"
+        aria-modal="true"
+        aria-label="划词评论"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="ta-mobile-thread__header">
+          <div>
+            <div className="ta-mobile-thread__title">
+              划词评论 ({mobileThread.comments.length})
+            </div>
+            <div className="ta-mobile-thread__quote">
+              &ldquo;{mobileThread.selectedText.length > 48
+                ? mobileThread.selectedText.slice(0, 48) + '…'
+                : mobileThread.selectedText}&rdquo;
+            </div>
+          </div>
+          <button
+            className="ta-mobile-thread__close"
+            onClick={() => setMobileThread(null)}
+            aria-label="关闭"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="ta-mobile-thread__list">
+          {mobileThread.comments.map(renderComment)}
+        </div>
+      </div>
+    </div>
+  );
+
   // ================================================================
   // 渲染：inline 模式 —— 作为子元素直接输出一个面板
   // ================================================================
@@ -738,6 +840,7 @@ export default function TextAnnotation({
     return (
       <div className="ta-inline">
         {floatingToolbar}
+        {mobileThreadOverlay}
         <div className="ta-panel ta-panel--inline ta-panel--open">
           <div className="ta-panel__header">
             <h4>
@@ -757,6 +860,7 @@ export default function TextAnnotation({
   return (
     <>
       {floatingToolbar}
+      {mobileThreadOverlay}
 
       {/* 评论面板入口按钮 */}
       <button
@@ -796,7 +900,7 @@ export default function TextAnnotation({
 // ============================================
 // 辅助函数：文本高亮
 // ============================================
-function highlightText(container, searchText, commentId) {
+function highlightText(container, searchText, groupKey, count) {
   if (!searchText || !container) return;
 
   const walker = document.createTreeWalker(
@@ -819,8 +923,9 @@ function highlightText(container, searchText, commentId) {
 
       const mark = document.createElement('mark');
       mark.className = 'ta-highlight';
-      mark.dataset.commentId = commentId;
-      mark.title = '点击查看评论';
+      mark.dataset.commentGroup = groupKey;
+      mark.dataset.commentCount = String(count || 1);
+      mark.title = `点击查看 ${count || 1} 条评论`;
 
       range.surroundContents(mark);
       found = true;
