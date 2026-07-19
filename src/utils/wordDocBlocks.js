@@ -1315,7 +1315,7 @@ export function attachTableControls(editor, onChange) {
   overlay.style.display = 'none';
   overlay.innerHTML = `
     <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--select" data-act="select-table" title="全选表格">✣</button>
-    <button type="button" class="msc-table-ctl__merge" data-act="merge-cells" title="合并选中的单元格">合并</button>
+    <button type="button" class="msc-table-ctl__merge" data-act="merge-cells" title="合并选中的单元格">合并单元格</button>
     <div class="msc-table-ctl__col-actions" aria-hidden="true">
       <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--insert-col" data-act="insert-col" title="在此处插入列">+</button>
       <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--remove-col" data-act="remove-col" title="删除左侧列">−</button>
