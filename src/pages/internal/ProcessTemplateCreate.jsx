@@ -72,6 +72,15 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function withPublishTimeout(promise, ms = 15000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      window.setTimeout(() => reject(new Error('发布超时，请稍后再试')), ms);
+    }),
+  ]);
+}
+
 function inferFileType(fileName) {
   if (!fileName) return 'pdf';
   const ext = (fileName.split('.').pop() || '').toLowerCase();
@@ -527,7 +536,7 @@ export default function ProcessTemplateCreate() {
     try {
       setIsPublishing(true);
       draft.flush();
-      await createDoc(doc);
+      await withPublishTimeout(createDoc(doc));
     } catch (err) {
       setIsPublishing(false);
       console.error('[ProcessTemplateCreate] 发布失败:', err);
