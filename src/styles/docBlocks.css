@@ -510,6 +510,7 @@
 }
 
 .msc-callout__emoji {
+  grid-column: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -534,7 +535,14 @@
 }
 
 .msc-callout__body {
+  grid-column: 2;
   min-width: 0;
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+.msc-callout__body > * {
+  max-width: 100%;
 }
 
 [contenteditable="true"] .msc-callout__body[data-placeholder][data-empty]::before {

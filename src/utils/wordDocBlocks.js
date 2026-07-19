@@ -163,14 +163,95 @@ function ensureCalloutEditableBody(body) {
   }
 }
 
-function updateCalloutPlaceholders(editor) {
-  editor?.querySelectorAll?.('.msc-callout__body').forEach(ensureCalloutEditableBody);
+function normalizeCalloutStructure(callout) {
+  if (!callout) return false;
+  let changed = false;
+
+  let emoji = callout.querySelector(':scope > .msc-callout__emoji');
+  if (!emoji) {
+    emoji = document.createElement('span');
+    emoji.className = 'msc-callout__emoji';
+    emoji.setAttribute('contenteditable', 'false');
+    emoji.setAttribute('role', 'button');
+    emoji.setAttribute('tabindex', '0');
+    emoji.setAttribute('title', '选择 Emoji');
+    emoji.textContent = '💡';
+    callout.insertBefore(emoji, callout.firstChild);
+    changed = true;
+  }
+
+  let body = callout.querySelector(':scope > .msc-callout__body');
+  if (!body) {
+    body = document.createElement('div');
+    body.className = 'msc-callout__body';
+    callout.appendChild(body);
+    changed = true;
+  }
+
+  const strayNodes = Array.from(callout.childNodes).filter((node) => {
+    if (node === emoji || node === body) return false;
+    if (node.nodeType === Node.TEXT_NODE) {
+      return Boolean(String(node.textContent || '').replace(/\u200B/g, '').trim());
+    }
+    return true;
+  });
+
+  strayNodes.forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = String(node.textContent || '').replace(/\s+/g, ' ').trim();
+      node.remove();
+      if (!text) return;
+      const p = document.createElement('p');
+      p.textContent = text;
+      body.appendChild(p);
+    } else {
+      body.appendChild(node);
+    }
+    changed = true;
+  });
+
+  Array.from(callout.childNodes).forEach((node) => {
+    if (node.nodeType === Node.TEXT_NODE && !String(node.textContent || '').trim()) {
+      node.remove();
+      changed = true;
+    }
+  });
+
+  ensureCalloutEditableBody(body);
+  return changed;
 }
 
-function focusCalloutBody(body) {
+function updateCalloutPlaceholders(editor) {
+  let changed = false;
+  editor?.querySelectorAll?.('.msc-callout').forEach((callout) => {
+    if (normalizeCalloutStructure(callout)) changed = true;
+  });
+  editor?.querySelectorAll?.('.msc-callout__body').forEach(ensureCalloutEditableBody);
+  return changed;
+}
+
+function focusCalloutBody(body, { atEnd = false } = {}) {
   ensureCalloutEditableBody(body);
   const target = body.querySelector('p, h1, h2, h3, h4, li, blockquote') || body;
-  placeCaretAtStart(target);
+  if (atEnd) placeCaretAtEnd(target);
+  else placeCaretAtStart(target);
+}
+
+function removeCalloutAtCaret(editor) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
+  const anchor = sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
+  const callout = anchor?.closest?.('.msc-callout');
+  if (!callout || !editor.contains(callout)) return false;
+  const body = callout.querySelector('.msc-callout__body');
+  if (body && !getCalloutBodyEmpty(body)) return false;
+
+  const p = document.createElement('p');
+  p.innerHTML = '<br />';
+  callout.parentNode?.insertBefore(p, callout.nextSibling);
+  callout.remove();
+  placeCaretAtStart(p);
+  return true;
 }
 
 function insertTextAtSelection(text) {
@@ -1110,15 +1191,21 @@ export function attachWordEditingNormalizer(editor, onChange) {
 
   const onClick = (e) => {
     const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
-    const body = target?.closest?.('.msc-callout__body');
-    if (!body || !editor.contains(body)) return;
-    if (!getCalloutBodyEmpty(body)) return;
-    focusCalloutBody(body);
+    const callout = target?.closest?.('.msc-callout');
+    if (!callout || !editor.contains(callout)) return;
+    normalizeCalloutStructure(callout);
+    const body = target?.closest?.('.msc-callout__body') || callout.querySelector('.msc-callout__body');
+    if (!body) return;
+    if (target?.closest?.('.msc-callout__emoji')) return;
+    if (getCalloutBodyEmpty(body)) focusCalloutBody(body);
+    else if (!target?.closest?.('.msc-callout__body')) focusCalloutBody(body, { atEnd: true });
   };
 
   const onPaste = (e) => {
     const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
-    const body = target?.closest?.('.msc-callout__body');
+    const callout = target?.closest?.('.msc-callout');
+    if (callout && editor.contains(callout)) normalizeCalloutStructure(callout);
+    const body = target?.closest?.('.msc-callout__body') || callout?.querySelector?.('.msc-callout__body');
     if (!body || !editor.contains(body)) return;
     const rawText = e.clipboardData?.getData('text/plain') || '';
     if (!rawText) return;
@@ -1162,6 +1249,14 @@ export function attachWordEditingNormalizer(editor, onChange) {
   };
 
   const onKeyDown = (e) => {
+    if ((e.key === 'Backspace' || e.key === 'Delete') && !e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (removeCalloutAtCaret(editor)) {
+        e.preventDefault();
+        onChange?.();
+        return;
+      }
+    }
+
     if (e.key === ' ' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
       if (convertTypedOrderedListMarker()) {
         e.preventDefault();
@@ -1206,13 +1301,13 @@ export function attachWordEditingNormalizer(editor, onChange) {
     requestAnimationFrame(() => {
       normalizeLists();
       ensureEmptyCaretLeftAligned();
-      updateCalloutPlaceholders(editor);
+      if (updateCalloutPlaceholders(editor)) onChange?.();
     });
   };
 
   normalizeLists();
   ensureEmptyCaretLeftAligned();
-  updateCalloutPlaceholders(editor);
+  if (updateCalloutPlaceholders(editor)) onChange?.();
   editor.addEventListener('click', onClick);
   editor.addEventListener('paste', onPaste);
   editor.addEventListener('keydown', onKeyDown);
