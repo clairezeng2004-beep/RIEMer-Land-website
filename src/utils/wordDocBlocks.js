@@ -1204,8 +1204,25 @@ export function attachTableControls(editor, onChange) {
   let currentWrap = null;
   let hoveredRow = null;
   let hoveredRowIndex = -1;
+  let hideRowTimer = null;
   const insertLine = overlay.querySelector('.msc-table-ctl__insert-line');
   const insertRowBtn = overlay.querySelector('[data-act="insert-row"]');
+  const ROW_INSERT_Y_TOLERANCE = 28;
+  const ROW_INSERT_X_TOLERANCE = 56;
+
+  function clearHideRowTimer() {
+    if (!hideRowTimer) return;
+    window.clearTimeout(hideRowTimer);
+    hideRowTimer = null;
+  }
+
+  function scheduleHideRowInsert() {
+    clearHideRowTimer();
+    hideRowTimer = window.setTimeout(() => {
+      hideRowTimer = null;
+      hideRowInsert();
+    }, 220);
+  }
 
   function layout() {
     if (!currentWrap || !editor.parentElement) {
@@ -1223,6 +1240,7 @@ export function attachTableControls(editor, onChange) {
   }
 
   function hideRowInsert() {
+    clearHideRowTimer();
     hoveredRow = null;
     hoveredRowIndex = -1;
     if (insertLine) insertLine.style.display = 'none';
@@ -1253,6 +1271,7 @@ export function attachTableControls(editor, onChange) {
     if (!(t instanceof HTMLElement)) return;
     const wrap = t.closest('.msc-table-wrap');
     if (wrap && editor.contains(wrap)) {
+      clearHideRowTimer();
       currentWrap = wrap;
       layout();
     }
@@ -1260,29 +1279,39 @@ export function attachTableControls(editor, onChange) {
   function onMouseMove(e) {
     const t = e.target;
     if (!(t instanceof HTMLElement)) return;
-    const wrap = t.closest('.msc-table-wrap');
-    if (!wrap || !editor.contains(wrap)) {
-      hideRowInsert();
+    const directWrap = t.closest('.msc-table-wrap');
+    let wrap = directWrap && editor.contains(directWrap) ? directWrap : null;
+    if (!wrap && currentWrap && editor.contains(currentWrap)) {
+      const rect = currentWrap.getBoundingClientRect();
+      const withinLooseWrap =
+        e.clientX >= rect.left - ROW_INSERT_X_TOLERANCE &&
+        e.clientX <= rect.right + ROW_INSERT_X_TOLERANCE &&
+        e.clientY >= rect.top - ROW_INSERT_Y_TOLERANCE &&
+        e.clientY <= rect.bottom + ROW_INSERT_Y_TOLERANCE;
+      if (withinLooseWrap) wrap = currentWrap;
+    }
+    if (!wrap) {
+      scheduleHideRowInsert();
       return;
     }
+    clearHideRowTimer();
     currentWrap = wrap;
     const rows = Array.from(wrap.querySelectorAll('tbody > tr'));
     const table = wrap.querySelector('table');
     const tableRect = table?.getBoundingClientRect?.();
     if (!rows.length || !tableRect) {
-      hideRowInsert();
+      scheduleHideRowInsert();
       return;
     }
-    const threshold = 10;
     const nearest = rows
       .map((row, index) => {
         const rect = row.getBoundingClientRect();
         return { row, index, distance: Math.abs(e.clientY - rect.bottom) };
       })
-      .filter((item) => item.distance <= threshold)
+      .filter((item) => item.distance <= ROW_INSERT_Y_TOLERANCE)
       .sort((a, b) => a.distance - b.distance)[0];
-    if (!nearest || e.clientX < tableRect.left - 24 || e.clientX > tableRect.right + 24) {
-      hideRowInsert();
+    if (!nearest || e.clientX < tableRect.left - ROW_INSERT_X_TOLERANCE || e.clientX > tableRect.right + ROW_INSERT_X_TOLERANCE) {
+      scheduleHideRowInsert();
       return;
     }
     hoveredRow = nearest.row;
@@ -1389,6 +1418,7 @@ export function attachTableControls(editor, onChange) {
     window.removeEventListener('resize', onScrollOrResize);
     editor.removeEventListener('scroll', onScrollOrResize);
     editor.parentElement?.removeEventListener('scroll', onScrollOrResize);
+    clearHideRowTimer();
     overlay.remove();
   };
 }

@@ -333,7 +333,6 @@ export default function WordEditorToolbar({
             </div>
             <div
               className="wet__grid"
-              onMouseLeave={() => setGrid({ r: 0, c: 0 })}
             >
               {Array.from({ length: GRID_ROWS }).map((_, r) => (
                 <div key={r} className="wet__grid-row">
