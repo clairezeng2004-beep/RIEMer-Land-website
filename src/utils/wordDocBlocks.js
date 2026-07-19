@@ -1463,9 +1463,11 @@ export function attachWordEditingNormalizer(editor, onChange) {
     const heading = anchor?.closest?.('h1, h2, h3');
     if (heading && editor.contains(heading)) {
       e.preventDefault();
+      const range = sel.getRangeAt(0);
       const p = document.createElement('p');
       p.innerHTML = '<br />';
-      heading.parentNode?.insertBefore(p, heading.nextSibling);
+      const beforeHeading = isRangeAtStartOfElement(range, heading);
+      heading.parentNode?.insertBefore(p, beforeHeading ? heading : heading.nextSibling);
       placeCaretAtStart(p);
       onChange?.();
       return;
