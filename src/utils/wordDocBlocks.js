@@ -54,6 +54,7 @@ import {
 import { normalizeOrderedListNumbering } from './orderedListNumbering';
 
 const CALLOUT_PENDING_DELETE_CLASS = 'msc-callout--pending-delete';
+const ZERO_WIDTH_SPACE = '\u200B';
 
 function imageFileToEditorDataUrl(file) {
   return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
@@ -155,13 +156,18 @@ function ensureCalloutEditableBody(body) {
   const placeholder = body.getAttribute('data-placeholder') || '在这里输入高亮内容';
   body.setAttribute('data-placeholder', placeholder);
   if (String(body.textContent || '').trim() === placeholder && !body.querySelector?.('img, video, table, iframe')) {
-    body.innerHTML = '<p><br /></p>';
+    body.innerHTML = `<p>${ZERO_WIDTH_SPACE}</p>`;
   }
   body.toggleAttribute('data-empty', getCalloutBodyEmpty(body));
   if (!body.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote')) {
     const p = document.createElement('p');
-    p.innerHTML = '<br />';
+    p.textContent = ZERO_WIDTH_SPACE;
     body.appendChild(p);
+  } else if (getCalloutBodyEmpty(body)) {
+    const first = body.querySelector('p, h1, h2, h3, h4, li, blockquote');
+    if (first && !first.querySelector?.('img, video, table, iframe')) {
+      first.textContent = ZERO_WIDTH_SPACE;
+    }
   }
 }
 
@@ -235,6 +241,25 @@ function updateCalloutPlaceholders(editor) {
 function focusCalloutBody(body, { atEnd = false } = {}) {
   ensureCalloutEditableBody(body);
   const target = body.querySelector('p, h1, h2, h3, h4, li, blockquote') || body;
+  if (getCalloutBodyEmpty(body)) {
+    try {
+      let textNode = Array.from(target.childNodes).find((node) => node.nodeType === Node.TEXT_NODE);
+      if (!textNode) {
+        textNode = document.createTextNode(ZERO_WIDTH_SPACE);
+        target.insertBefore(textNode, target.firstChild);
+      }
+      const range = document.createRange();
+      range.setStart(textNode, 0);
+      range.collapse(true);
+      const sel = window.getSelection();
+      sel?.removeAllRanges();
+      sel?.addRange(range);
+      target.focus?.();
+      return;
+    } catch {
+      /* fall through */
+    }
+  }
   if (atEnd) placeCaretAtEnd(target);
   else placeCaretAtStart(target);
 }
@@ -1371,6 +1396,19 @@ export function attachWordEditingNormalizer(editor, onChange) {
     else if (!target?.closest?.('.msc-callout__body')) focusCalloutBody(body, { atEnd: true });
   };
 
+  const onMouseDown = (e) => {
+    const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
+    const callout = target?.closest?.('.msc-callout');
+    if (!callout || !editor.contains(callout)) return;
+    if (target?.closest?.('.msc-callout__emoji')) return;
+    normalizeCalloutStructure(callout);
+    const body = target?.closest?.('.msc-callout__body') || callout.querySelector('.msc-callout__body');
+    if (!body || !getCalloutBodyEmpty(body)) return;
+    e.preventDefault();
+    clearPendingCalloutSelection(editor, callout);
+    focusCalloutBody(body);
+  };
+
   const onPaste = (e) => {
     const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
     const callout = target?.closest?.('.msc-callout');
@@ -1497,11 +1535,13 @@ export function attachWordEditingNormalizer(editor, onChange) {
   ensureEmptyCaretLeftAligned();
   if (updateCalloutPlaceholders(editor)) onChange?.();
   editor.addEventListener('click', onClick);
+  editor.addEventListener('mousedown', onMouseDown);
   editor.addEventListener('paste', onPaste);
   editor.addEventListener('keydown', onKeyDown);
   editor.addEventListener('input', onInput);
   return () => {
     editor.removeEventListener('click', onClick);
+    editor.removeEventListener('mousedown', onMouseDown);
     editor.removeEventListener('paste', onPaste);
     editor.removeEventListener('keydown', onKeyDown);
     editor.removeEventListener('input', onInput);
