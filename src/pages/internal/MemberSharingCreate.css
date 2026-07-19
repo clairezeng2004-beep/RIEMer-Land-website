@@ -1045,6 +1045,12 @@
   line-height: 1.7;
 }
 
+.msc-form__word-editor li:has(> h1),
+.msc-form__word-editor li:has(> h2),
+.msc-form__word-editor li:has(> h3) {
+  list-style: none;
+}
+
 .msc-form__word-editor blockquote {
   margin: 0.6em 0;
   padding: 8px 14px;

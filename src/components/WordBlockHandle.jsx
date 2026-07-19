@@ -117,6 +117,33 @@ function applyTextAlignToBlock(block, key) {
   }
 }
 
+function getCurrentListItem(editor) {
+  const sel = window.getSelection();
+  if (!editor || !sel || sel.rangeCount === 0) return null;
+  const anchor = sel.anchorNode?.nodeType === Node.ELEMENT_NODE
+    ? sel.anchorNode
+    : sel.anchorNode?.parentElement;
+  const li = anchor?.closest?.('li');
+  return li && editor.contains(li) ? li : null;
+}
+
+function replaceListItemWithBlock(li, tag) {
+  const list = li?.parentElement;
+  if (!li || !list || !['ul', 'ol'].includes(list.tagName?.toLowerCase())) return null;
+  const next = document.createElement(tag);
+  Array.from(li.childNodes).forEach((child) => {
+    if (child.nodeType === Node.ELEMENT_NODE && ['ul', 'ol'].includes(child.tagName?.toLowerCase())) return;
+    next.appendChild(child.cloneNode(true));
+  });
+  if (!String(next.textContent || '').replace(/\u200B/g, '').trim() && !next.querySelector('img, video, table, iframe')) {
+    next.innerHTML = '<br />';
+  }
+  list.parentNode?.insertBefore(next, list.nextSibling);
+  li.remove();
+  if (!list.querySelector('li')) list.remove();
+  return next;
+}
+
 function getBlockFormatKey(block) {
   if (!block) return '';
   const tag = String(block.tagName || '').toLowerCase();
@@ -299,7 +326,13 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       if (!value) { setMenuOpen(false); return; }
     }
     try {
-      document.execCommand(opt.cmd, false, value);
+      const shouldExitListForBlock = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(opt.key);
+      const listItem = shouldExitListForBlock ? getCurrentListItem(editorRef?.current) : null;
+      if (listItem) {
+        blockRef.current = replaceListItemWithBlock(listItem, opt.key);
+      } else {
+        document.execCommand(opt.cmd, false, value);
+      }
       if (opt.key === 'ol') normalizeOrderedListNumbering(editorRef?.current);
       if (opt.key === 'alignLeft' || opt.key === 'alignCenter' || opt.key === 'alignRight') {
         applyTextAlignToBlock(blockRef.current, opt.key);

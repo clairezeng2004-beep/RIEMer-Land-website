@@ -62,17 +62,37 @@ function replaceBlockTag(block, tag) {
   return next;
 }
 
+function replaceListItemWithBlock(li, tag) {
+  const list = li?.parentElement;
+  if (!li || !list || !['ul', 'ol'].includes(list.tagName?.toLowerCase())) return null;
+  const next = document.createElement(tag);
+  Array.from(li.childNodes).forEach((child) => {
+    if (child.nodeType === Node.ELEMENT_NODE && ['ul', 'ol'].includes(child.tagName?.toLowerCase())) return;
+    next.appendChild(child.cloneNode(true));
+  });
+  if (!String(next.textContent || '').replace(/\u200B/g, '').trim() && !next.querySelector('img, video, table, iframe')) {
+    next.innerHTML = '<br />';
+  }
+  list.parentNode?.insertBefore(next, list.nextSibling);
+  li.remove();
+  if (!list.querySelector('li')) list.remove();
+  return next;
+}
+
 function applyBlockTagToSelection(editor, tag) {
   const blocks = getSelectedTextBlocks(editor)
     .filter((block) => {
       const blockTag = block.tagName?.toLowerCase();
-      if (!['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'div'].includes(blockTag)) return false;
+      if (!['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'div', 'li'].includes(blockTag)) return false;
       if (block.closest?.('td, th, .msc-callout, .msc-cols')) return false;
       if (block.querySelector?.('table, .msc-table-wrap, .msc-cols')) return false;
       return true;
     });
   if (!blocks.length) return false;
-  blocks.forEach((block) => replaceBlockTag(block, tag));
+  blocks.forEach((block) => {
+    if (block.tagName?.toLowerCase() === 'li') replaceListItemWithBlock(block, tag);
+    else replaceBlockTag(block, tag);
+  });
   return true;
 }
 
