@@ -412,6 +412,33 @@
   word-break: break-word;
 }
 
+.msc-col > p:first-child,
+.msc-col > h1:first-child,
+.msc-col > h2:first-child,
+.msc-col > h3:first-child,
+.msc-col > h4:first-child,
+.msc-col > ul:first-child,
+.msc-col > ol:first-child,
+.msc-col > blockquote:first-child {
+  margin-top: 0;
+}
+
+.msc-col > p:last-child,
+.msc-col > h1:last-child,
+.msc-col > h2:last-child,
+.msc-col > h3:last-child,
+.msc-col > h4:last-child,
+.msc-col > ul:last-child,
+.msc-col > ol:last-child,
+.msc-col > blockquote:last-child {
+  margin-bottom: 0;
+}
+
+.msc-col > ul,
+.msc-col > ol {
+  padding-left: 1.25em;
+}
+
 .msc-col > .msc-img-wrap {
   margin: 0 0 0.2em;
   line-height: 1;

@@ -523,6 +523,28 @@ function isEmptyColumn(col) {
   return (col.textContent || '').replace(ZERO_WIDTH, '').trim() === '';
 }
 
+function isEmptyColumnTextBlock(node) {
+  if (!node || !['P', 'DIV'].includes(node.tagName)) return false;
+  if (node.querySelector?.('img, video, table, iframe, .msc-callout, .msc-cols')) return false;
+  const ZERO_WIDTH = new RegExp(String.fromCharCode(0x200B), 'g');
+  return (node.textContent || '').replace(ZERO_WIDTH, '').trim() === '';
+}
+
+function normalizeColumnTextFlow(container) {
+  if (!container) return;
+  getColumns(container).forEach((col) => {
+    let children = Array.from(col.children || []);
+    while (children.length > 1 && isEmptyColumnTextBlock(children[0])) {
+      children[0].remove();
+      children = Array.from(col.children || []);
+    }
+    while (children.length > 1 && isEmptyColumnTextBlock(children[children.length - 1])) {
+      children[children.length - 1].remove();
+      children = Array.from(col.children || []);
+    }
+  });
+}
+
 /** 把光标放到某节点内容末尾 */
 function placeCaretAtEnd(node) {
   try {
@@ -802,6 +824,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
 
   const refreshAll = () => {
     editor.querySelectorAll('.msc-cols').forEach((container) => {
+      normalizeColumnTextFlow(container);
       ensureColumnResizers(container);
       ensureColumnAdders(container);
       layoutColumnResizers(container);
@@ -829,6 +852,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
         sel?.addRange(range);
       } catch { /* ignore */ }
       const container = col.closest('.msc-cols');
+      normalizeColumnTextFlow(container);
       ensureColumnMeta(container);
       requestAnimationFrame(() => layoutColumnResizers(container));
       onChange?.();
@@ -854,6 +878,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
       sel?.addRange(range);
     } catch { /* ignore */ }
     const container = col.closest('.msc-cols');
+    normalizeColumnTextFlow(container);
     ensureColumnMeta(container);
     requestAnimationFrame(() => layoutColumnResizers(container));
     onChange?.();
@@ -963,6 +988,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     if (!(t instanceof HTMLElement)) return;
     const container = t.closest('.msc-cols');
     if (!container || !editor.contains(container)) return;
+    normalizeColumnTextFlow(container);
     ensureColumnResizers(container);
     ensureColumnAdders(container);
     layoutColumnResizers(container);
@@ -1046,6 +1072,7 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
 
   const finishDrag = () => {
     if (!dragState) return;
+    normalizeColumnTextFlow(dragState.container);
     dragState.container.classList.remove('msc-cols--resizing');
     dragState.container.querySelectorAll('.msc-col-resizer--active').forEach((el) => {
       el.classList.remove('msc-col-resizer--active');
