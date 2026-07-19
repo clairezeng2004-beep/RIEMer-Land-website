@@ -764,7 +764,7 @@
 .msc-md-split__preview > :last-child { margin-bottom: 0; }
 
 .msc-md-split__preview > p {
-  margin: 0 0 0.9em;
+  margin: 0 0 0.45em;
   line-height: 1.7;
 }
 
@@ -1040,7 +1040,7 @@
 .msc-form__word-editor h3 { font-size: 17px; }
 
 .msc-form__word-editor > p {
-  margin: 0 0 0.9em;
+  margin: 0 0 0.45em;
   line-height: 1.7;
 }
 

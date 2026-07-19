@@ -509,7 +509,7 @@
 .word-preview__content > br {
   content: "";
   display: block;
-  margin-bottom: 0.9em;
+  margin-bottom: 0.45em;
 }
 
 [contenteditable="true"] a[href],
