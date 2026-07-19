@@ -289,6 +289,20 @@
   text-align: center;
 }
 
+[contenteditable="true"] .msc-img-caption,
+.msc-form__word-editor .msc-img-caption {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+  min-height: 1.5em;
+}
+
+[contenteditable="true"] .msc-img-caption:focus,
+.msc-form__word-editor .msc-img-caption:focus {
+  outline: 1px dashed rgba(91, 140, 62, 0.45);
+  outline-offset: 2px;
+}
+
 .msd-article__content .msc-cols,
 .ptd-article__content .msc-cols,
 .doc-preview__text .msc-cols,

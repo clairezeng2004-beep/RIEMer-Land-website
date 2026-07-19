@@ -614,17 +614,18 @@ export default function FloatingTextToolbar({
     if (!caption?.classList?.contains('msc-img-caption')) {
       caption = document.createElement('p');
       caption.className = 'msc-img-caption';
+      caption.setAttribute('contenteditable', 'true');
       caption.textContent = '图片注释';
       wrap.parentNode.insertBefore(caption, wrap.nextSibling);
     }
     caption.style.textAlign = wrap.style.textAlign || 'center';
     try {
+      editor.focus();
       const range = document.createRange();
       range.selectNodeContents(caption);
       const sel = window.getSelection();
       sel?.removeAllRanges();
       sel?.addRange(range);
-      editor.focus();
     } catch { /* ignore */ }
     setVisible(false);
     fireChangeRich();

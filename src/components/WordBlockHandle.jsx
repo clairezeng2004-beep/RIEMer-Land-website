@@ -551,6 +551,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     if (!caption || !caption.classList || !caption.classList.contains('msc-img-caption')) {
       caption = document.createElement('p');
       caption.className = 'msc-img-caption';
+      caption.setAttribute('contenteditable', 'true');
       caption.textContent = '图片注释';
       wrap.parentNode.insertBefore(caption, wrap.nextSibling);
     }
@@ -558,12 +559,12 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     caption.style.textAlign = wrap.style.textAlign || 'center';
     // 选中注释文字，输入即替换
     try {
+      editor.focus();
       const range = document.createRange();
       range.selectNodeContents(caption);
       const sel = window.getSelection();
       sel.removeAllRanges();
       sel.addRange(range);
-      editor.focus();
     } catch { /* ignore */ }
     fireChange();
     setMenuOpen(false);

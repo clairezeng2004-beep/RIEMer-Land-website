@@ -192,6 +192,14 @@ function placeCaretAtStart(node) {
   } catch { /* ignore */ }
 }
 
+function ensureCaptionEditable(caption) {
+  if (!caption) return;
+  caption.setAttribute('contenteditable', 'true');
+  if (!caption.textContent.replace(/\u200B/g, '').trim() && !caption.querySelector('br')) {
+    caption.innerHTML = '<br />';
+  }
+}
+
 function placeCaretAfter(node) {
   try {
     const range = document.createRange();
@@ -551,6 +559,15 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
 
   function onEditorClick(e) {
     const target = e.target;
+    const caption = target instanceof HTMLElement ? target.closest('.msc-img-caption') : null;
+    if (caption && editor.contains(caption)) {
+      selectImage(null);
+      ensureCaptionEditable(caption);
+      if (!String(caption.textContent || '').replace(/\u200B/g, '').trim()) {
+        placeCaretAtStart(caption);
+      }
+      return;
+    }
     if (target instanceof HTMLImageElement && target.classList.contains('msc-img')) {
       selectImage(target);
     } else {
