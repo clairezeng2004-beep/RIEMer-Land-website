@@ -1322,9 +1322,10 @@ export function attachTableControls(editor, onChange) {
       <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--remove-col" data-act="remove-col" title="删除左侧列">−</button>
     </div>
     <div class="msc-table-ctl__insert-line" aria-hidden="true"></div>
-    <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--insert-row" data-act="insert-row" title="插入行">
-      <span class="msc-table-ctl__h">+</span>
-    </button>
+    <div class="msc-table-ctl__row-actions" aria-hidden="true">
+      <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--insert-row" data-act="insert-row" title="在此处插入行">+</button>
+      <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--remove-row" data-act="remove-row" title="删除上方行">−</button>
+    </div>
   `;
   editor.parentElement?.appendChild(overlay);
 
@@ -1337,7 +1338,7 @@ export function attachTableControls(editor, onChange) {
   let hoveredColInsertIndex = -1;
   let hoveredColDeleteIndex = -1;
   const insertLine = overlay.querySelector('.msc-table-ctl__insert-line');
-  const insertRowBtn = overlay.querySelector('[data-act="insert-row"]');
+  const rowActions = overlay.querySelector('.msc-table-ctl__row-actions');
   const colActions = overlay.querySelector('.msc-table-ctl__col-actions');
   const mergeBtn = overlay.querySelector('[data-act="merge-cells"]');
   const ROW_INSERT_Y_TOLERANCE = 28;
@@ -1379,7 +1380,35 @@ export function attachTableControls(editor, onChange) {
 
   function getVisualColumnCount(table) {
     const { grid } = getTableGrid(table);
-    return Math.max(0, ...grid.map((row) => row.length));
+    const gridCount = Math.max(0, ...grid.map((row) => row.length));
+    const colgroupCount = table?.querySelector(':scope > colgroup')?.children?.length || 0;
+    return Math.max(gridCount, colgroupCount);
+  }
+
+  function repairMissingTableCells(table) {
+    if (!table) return false;
+    const { grid, meta } = getTableGrid(table);
+    const columnCount = getVisualColumnCount(table);
+    let changed = false;
+    Array.from(table.rows || []).forEach((row, rowIndex) => {
+      let rowChanged = false;
+      const entries = Array.from(row.cells).map((cell) => ({
+        cell,
+        col: meta.get(cell)?.col ?? Number.MAX_SAFE_INTEGER,
+      }));
+      for (let col = 0; col < columnCount; col += 1) {
+        if (grid[rowIndex]?.[col]) continue;
+        const td = document.createElement('td');
+        td.innerHTML = '<br />';
+        entries.push({ cell: td, col });
+        changed = true;
+        rowChanged = true;
+      }
+      if (rowChanged) {
+        entries.sort((a, b) => a.col - b.col).forEach(({ cell }) => row.appendChild(cell));
+      }
+    });
+    return changed;
   }
 
   function ensureTableColgroup(wrap) {
@@ -1648,11 +1677,11 @@ export function attachTableControls(editor, onChange) {
     hoveredRow = null;
     hoveredRowIndex = -1;
     if (insertLine) insertLine.style.display = 'none';
-    if (insertRowBtn) insertRowBtn.style.display = 'none';
+    if (rowActions) rowActions.style.display = 'none';
   }
 
   function layoutRowInsert() {
-    if (!currentWrap || !hoveredRow || !insertLine || !insertRowBtn) {
+    if (!currentWrap || !hoveredRow || !insertLine || !rowActions) {
       hideRowInsert();
       return;
     }
@@ -1665,9 +1694,9 @@ export function attachTableControls(editor, onChange) {
     insertLine.style.left = `${Math.max(0, tableRect.left - wrapRect.left)}px`;
     insertLine.style.top = `${y}px`;
     insertLine.style.width = `${tableRect.width}px`;
-    insertRowBtn.style.display = 'inline-flex';
-    insertRowBtn.style.left = `${Math.max(0, tableRect.left - wrapRect.left) - 11}px`;
-    insertRowBtn.style.top = `${y}px`;
+    rowActions.style.display = 'inline-flex';
+    rowActions.style.left = `${Math.max(0, tableRect.left - wrapRect.left)}px`;
+    rowActions.style.top = `${y}px`;
   }
 
   function onMouseOver(e) {
@@ -1792,11 +1821,20 @@ export function attachTableControls(editor, onChange) {
     const tbody = currentWrap.querySelector('tbody');
     const rows = Array.from(tbody?.querySelectorAll('tr') || []);
     const refRow = rows[index];
-    const firstRow = rows[0];
-    if (!tbody || !firstRow || !refRow) return;
-    const colCount = firstRow.children.length;
+    const table = currentWrap.querySelector('table');
+    if (!tbody || !table || !refRow) return;
+    const colCount = getVisualColumnCount(table);
+    const { meta } = getTableGrid(table);
+    const coveredColumns = new Set();
+    meta.forEach((item, cell) => {
+      if (item.row <= index && item.row + item.rowspan - 1 > index) {
+        cell.rowSpan = item.rowspan + 1;
+        for (let col = item.col; col < item.col + item.colspan; col += 1) coveredColumns.add(col);
+      }
+    });
     const tr = document.createElement('tr');
     for (let i = 0; i < colCount; i++) {
+      if (coveredColumns.has(i)) continue;
       const td = document.createElement('td');
       td.innerHTML = '<br />';
       tr.appendChild(td);
@@ -1804,6 +1842,44 @@ export function attachTableControls(editor, onChange) {
     tbody.insertBefore(tr, refRow.nextSibling);
     hoveredRow = tr;
     hoveredRowIndex = index + 1;
+    layout();
+    onChange?.();
+  }
+  function removeRowAt(index) {
+    if (!currentWrap) return;
+    clearCellSelection();
+    const table = currentWrap.querySelector('table');
+    const rows = Array.from(table?.rows || []);
+    const row = rows[index];
+    if (!table || !row || rows.length <= 1) return;
+    const nextRow = rows[index + 1] || null;
+    const { meta } = getTableGrid(table);
+
+    meta.forEach((item, cell) => {
+      if (item.row < index && item.row + item.rowspan - 1 >= index) {
+        cell.rowSpan = Math.max(1, item.rowspan - 1);
+      }
+    });
+
+    if (nextRow) {
+      const moving = Array.from(row.cells)
+        .map((cell) => ({ cell, item: meta.get(cell) }))
+        .filter(({ item }) => item?.rowspan > 1)
+        .sort((a, b) => a.item.col - b.item.col);
+      moving.forEach(({ cell, item }) => {
+        cell.rowSpan = item.rowspan - 1;
+        const reference = Array.from(nextRow.cells).find((candidate) => {
+          const candidateMeta = meta.get(candidate);
+          return candidateMeta && candidateMeta.col > item.col;
+        });
+        nextRow.insertBefore(cell, reference || null);
+      });
+    }
+
+    row.remove();
+    ensureTableColgroup(currentWrap);
+    hoveredRowIndex = Math.max(0, Math.min(index - 1, table.rows.length - 1));
+    hoveredRow = table.rows[hoveredRowIndex] || null;
     layout();
     onChange?.();
   }
@@ -1986,12 +2062,18 @@ export function attachTableControls(editor, onChange) {
     else if (act === 'merge-cells') mergeSelectedCells();
     else if (act === 'insert-col') insertColAt(hoveredColInsertIndex);
     else if (act === 'insert-row') insertRowAfter(hoveredRowIndex);
+    else if (act === 'remove-row') removeRowAt(hoveredRowIndex);
     else if (act === 'remove-col') removeColAt(hoveredColDeleteIndex);
   }
 
   function onScrollOrResize() {
     if (currentWrap) layout();
   }
+
+  const repairedExistingTables = Array.from(editor.querySelectorAll('.msc-table'))
+    .map((table) => repairMissingTableCells(table))
+    .some(Boolean);
+  if (repairedExistingTables) onChange?.();
 
   editor.addEventListener('mousedown', onEditorMouseDown);
   editor.addEventListener('mouseover', onEditorMouseOverCell);
