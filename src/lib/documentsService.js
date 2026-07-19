@@ -624,10 +624,16 @@ function loadStoredViews() {
 
 export function loadLocalViews(targetType = DEFAULT_VIEW_TARGET_TYPE) {
   const stored = loadStoredViews();
+  const localLogs = loadLocalViewLogs();
   const scoped = {};
   Object.entries(stored).forEach(([key, value]) => {
     const id = parseViewTargetKey(key, targetType);
     if (id) scoped[id] = value;
+  });
+  Object.entries(localLogs).forEach(([key, list]) => {
+    const id = parseViewTargetKey(key, targetType);
+    if (!id || !Array.isArray(list)) return;
+    scoped[id] = Math.max(Number(scoped[id]) || 0, list.length);
   });
   return scoped;
 }
@@ -665,6 +671,14 @@ export async function fetchViewsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE)
       const id = parseViewTargetKey(r.document_id, targetType);
       if (id) cloudMap[id] = r.view_count || 0;
     });
+    try {
+      const logCounts = await fetchViewLogCountsFromCloud(targetType);
+      Object.entries(logCounts).forEach(([id, count]) => {
+        cloudMap[id] = Math.max(Number(cloudMap[id]) || 0, Number(count) || 0);
+      });
+    } catch (err) {
+      console.warn('[documentsService] 拉取访问明细计数失败:', err.message);
+    }
     const localMap = loadStoredViews();
     const merged = { ...localMap };
     Object.entries(cloudMap).forEach(([k, v]) => {
@@ -677,6 +691,36 @@ export async function fetchViewsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE)
     console.warn('[documentsService] fetchViewsFromCloud 异常:', err.message);
     return null;
   }
+}
+
+async function fetchViewLogCountsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  const prefix = `${String(targetType || DEFAULT_VIEW_TARGET_TYPE).trim()}:%`;
+  const counts = {};
+  const pageSize = 1000;
+  let from = 0;
+
+  while (true) {
+    const { data, error } = await withTimeout(
+      supabase
+        .from('document_view_logs')
+        .select('document_id')
+        .like('document_id', prefix)
+        .range(from, from + pageSize - 1),
+      VIEW_LOG_TIMEOUT_MS,
+      '加载访问明细计数',
+    );
+    if (error) throw error;
+    if (!Array.isArray(data) || data.length === 0) break;
+    data.forEach((r) => {
+      const id = parseViewTargetKey(r.document_id, targetType);
+      if (!id) return;
+      counts[id] = (counts[id] || 0) + 1;
+    });
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return counts;
 }
 
 /**
@@ -828,25 +872,38 @@ export async function fetchViewLog(documentId, targetType = DEFAULT_VIEW_TARGET_
 
   if (canUseSupabase() && supabase) {
     try {
-      const { data, error } = await withTimeout(
-        supabase
-          .from('document_view_logs')
-          .select('user_id,user_name,viewed_at')
-          .eq('document_id', targetKey)
-          .order('viewed_at', { ascending: false })
-          .limit(500),
-        VIEW_LOG_TIMEOUT_MS,
-        '加载访问记录',
-      );
-      if (!error && Array.isArray(data)) {
-        return data.map((r) => ({
+      const rows = [];
+      const pageSize = 1000;
+      let from = 0;
+
+      while (true) {
+        const { data, error } = await withTimeout(
+          supabase
+            .from('document_view_logs')
+            .select('user_id,user_name,viewed_at')
+            .eq('document_id', targetKey)
+            .order('viewed_at', { ascending: false })
+            .range(from, from + pageSize - 1),
+          VIEW_LOG_TIMEOUT_MS,
+          '加载访问记录',
+        );
+        if (error) {
+          console.warn('[documentsService] fetchViewLog 云端失败，回退本地:', error.message);
+          rows.length = 0;
+          break;
+        }
+        if (!Array.isArray(data) || data.length === 0) break;
+        rows.push(...data);
+        if (data.length < pageSize) break;
+        from += pageSize;
+      }
+
+      if (rows.length > 0) {
+        return rows.map((r) => ({
           userId: r.user_id || null,
           userName: r.user_name || '访客',
           viewedAt: r.viewed_at,
         }));
-      }
-      if (error) {
-        console.warn('[documentsService] fetchViewLog 云端失败，回退本地:', error.message);
       }
     } catch (err) {
       console.warn('[documentsService] fetchViewLog 异常，回退本地:', err.message);

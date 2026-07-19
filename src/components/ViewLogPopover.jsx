@@ -148,6 +148,8 @@ export default function ViewLogPopover({
     const propCount = Number(totalCount) || 0;
     return Math.max(propCount, logs.length);
   }, [logs.length, totalCount]);
+  const untrackedCount = Math.max(0, effectiveTotalCount - logs.length);
+  const visibleVisitorCount = groupedVisitors.length + (untrackedCount > 0 ? 1 : 0);
 
   useEffect(() => {
     if (!open || loading || error) return;
@@ -177,7 +179,7 @@ export default function ViewLogPopover({
           <div className="vlp-header__title">
             <Eye size={18} />
             <span>访问记录</span>
-            <span className="vlp-header__count">共 {effectiveTotalCount} 次浏览 · {groupedVisitors.length} 位访客</span>
+            <span className="vlp-header__count">共 {effectiveTotalCount} 次浏览 · {visibleVisitorCount} 位访客</span>
           </div>
           <button
             type="button"
@@ -192,10 +194,10 @@ export default function ViewLogPopover({
         <div className="vlp-body">
           {loading && <div className="vlp-state">加载中…</div>}
           {!loading && error && <div className="vlp-state vlp-state--error">{error}</div>}
-          {!loading && !error && groupedVisitors.length === 0 && (
+          {!loading && !error && groupedVisitors.length === 0 && untrackedCount === 0 && (
             <div className="vlp-state">暂无访问记录</div>
           )}
-          {!loading && !error && groupedVisitors.length > 0 && (
+          {!loading && !error && (groupedVisitors.length > 0 || untrackedCount > 0) && (
             <ul className="vlp-list">
               {groupedVisitors.map((v) => {
                 const displayName =
@@ -229,6 +231,25 @@ export default function ViewLogPopover({
                   </li>
                 );
               })}
+              {untrackedCount > 0 && (
+                <li className="vlp-item vlp-item--untracked">
+                  <div className="vlp-item__avatar">
+                    <UserIcon size={14} />
+                  </div>
+                  <div className="vlp-item__main">
+                    <div className="vlp-item__name">
+                      未记录访客
+                      <span className="vlp-item__times" title={`有 ${untrackedCount} 次访问缺少访客明细`}>
+                        ×{untrackedCount}
+                      </span>
+                    </div>
+                    <div className="vlp-item__time">
+                      <Clock size={12} />
+                      <span>历史访问或明细暂未同步</span>
+                    </div>
+                  </div>
+                </li>
+              )}
             </ul>
           )}
         </div>
