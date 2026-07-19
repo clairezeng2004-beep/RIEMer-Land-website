@@ -142,6 +142,7 @@ function getImageAtPoint(editor, x, y) {
 
 function isEmptyParagraph(node) {
   if (!node || node.nodeType !== 1 || node.tagName.toLowerCase() !== 'p') return false;
+  if (node.hasAttribute('data-msc-image-line')) return false;
   if (node.querySelector('img, video, table, iframe')) return false;
   const text = String(node.textContent || '').replace(/\u200B/g, '').trim();
   if (text) return false;
@@ -190,6 +191,29 @@ function placeCaretAtStart(node) {
     sel?.removeAllRanges();
     sel?.addRange(range);
   } catch { /* ignore */ }
+}
+
+function createImageAdjacentParagraph(img, position = 'after') {
+  const col = img?.closest?.('.msc-col');
+  if (!col) return null;
+  const wrap = getImageWrap(img) || img;
+  const caption = getImageCaption(img);
+  const reference = position === 'before' ? wrap : (caption || wrap);
+  const sibling = position === 'before' ? reference.previousElementSibling : reference.nextElementSibling;
+  if (sibling?.matches?.('p[data-msc-image-line]')) {
+    placeCaretAtStart(sibling);
+    return sibling;
+  }
+
+  const paragraph = document.createElement('p');
+  paragraph.setAttribute('data-msc-image-line', '1');
+  paragraph.style.textAlign = 'left';
+  paragraph.setAttribute('align', 'left');
+  paragraph.innerHTML = '<br />';
+  if (position === 'before') col.insertBefore(paragraph, reference);
+  else reference.insertAdjacentElement('afterend', paragraph);
+  placeCaretAtStart(paragraph);
+  return paragraph;
 }
 
 function ensureCaptionEditable(caption) {
@@ -815,6 +839,22 @@ export function attachWordImageEditor(editor, { onChange } = {}) {
 
   // 删除选中图片
   function onKeyDown(e) {
+    if (selectedImg && selectedImg.closest('.msc-col') && (
+      e.key === 'Enter' || e.key === 'ArrowUp' || e.key === 'ArrowDown'
+    )) {
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const position = e.key === 'ArrowUp' || (e.key === 'Enter' && e.shiftKey)
+        ? 'before'
+        : 'after';
+      const paragraph = createImageAdjacentParagraph(selectedImg, position);
+      if (paragraph) {
+        selectImage(null);
+        fireChange();
+      }
+      return;
+    }
+
     if ((e.key === 'Delete' || e.key === 'Backspace') && selectedImg) {
       e.preventDefault();
       // 阻止同一编辑器上后挂载的「分栏退格」处理器接着把空栏/整块删掉

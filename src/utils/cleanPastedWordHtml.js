@@ -266,6 +266,7 @@ export function cleanPastedWordHtml(html, {
           'data-cols',
           'data-col-widths',
           'data-col-label',
+          'data-msc-image-line',
           'contenteditable',
           'colspan',
           'rowspan',

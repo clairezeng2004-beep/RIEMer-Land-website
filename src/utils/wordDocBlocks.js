@@ -601,6 +601,7 @@ function isEmptyColumn(col) {
 
 function isEmptyColumnTextBlock(node) {
   if (!node || !['P', 'DIV'].includes(node.tagName)) return false;
+  if (node.hasAttribute('data-msc-image-line')) return false;
   if (node.querySelector?.('img, video, table, iframe, .msc-callout, .msc-cols')) return false;
   const ZERO_WIDTH = new RegExp(String.fromCharCode(0x200B), 'g');
   return (node.textContent || '').replace(ZERO_WIDTH, '').trim() === '';
