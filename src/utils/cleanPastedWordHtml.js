@@ -30,7 +30,7 @@ function toSemanticInlineTags(doc) {
   });
 }
 
-function sanitizeStyle(el, { preserveTextAlign, preserveImageSize }) {
+function sanitizeStyle(el, { preserveTextAlign, preserveImageSize, preserveEditorLayout }) {
   const tag = el.tagName.toLowerCase();
   const style = el.style;
   const kept = [];
@@ -54,6 +54,18 @@ function sanitizeStyle(el, { preserveTextAlign, preserveImageSize }) {
     if (/^\d+(?:\.\d+)?(px|%)$/.test(width)) kept.push(`width: ${width}`);
     if (/^\d+(?:\.\d+)?(px|%)$/.test(height)) kept.push(`height: ${height}`);
     if (/^\d+(?:\.\d+)?(px|%)$/.test(maxWidth)) kept.push(`max-width: ${maxWidth}`);
+  }
+
+  if (preserveEditorLayout && tag === 'col') {
+    const width = String(style.width || '').trim();
+    if (/^\d+(?:\.\d+)?(px|%)$/.test(width)) kept.push(`width: ${width}`);
+  }
+
+  if (preserveEditorLayout && el.classList.contains('msc-cols')) {
+    const tracks = String(style.gridTemplateColumns || '').trim();
+    if (/^\d+(?:\.\d+)?(?:fr|%)(?:\s+\d+(?:\.\d+)?(?:fr|%))*$/.test(tracks)) {
+      kept.push(`grid-template-columns: ${tracks}`);
+    }
   }
 
   if (kept.length > 0) el.setAttribute('style', kept.join('; '));
@@ -117,10 +129,12 @@ function isExternalColumnLayout(el) {
   return /column-count\s*:|columns\s*:|grid-template-columns\s*:/.test(style);
 }
 
-function flattenPastedColumns(doc) {
+function flattenPastedColumns(doc, { preserveEditorColumns = false } = {}) {
   doc
     .querySelectorAll('.msc-col-resizer, .msc-col-adder, .msc-col__empty, .msc-col__act, .msc-col__placeholder')
     .forEach((el) => el.remove());
+
+  if (preserveEditorColumns) return;
 
   doc.querySelectorAll('.msc-cols, [data-cols]').forEach((container) => {
     const frag = doc.createDocumentFragment();
@@ -136,6 +150,21 @@ function flattenPastedColumns(doc) {
 
   [...doc.querySelectorAll('div, section, article')].reverse().forEach((el) => {
     if (isExternalColumnLayout(el)) unwrapElement(el);
+  });
+}
+
+function normalizeEditorClipboardBlocks(doc) {
+  doc.querySelectorAll('.msc-table__cell--selected').forEach((cell) => {
+    cell.classList.remove('msc-table__cell--selected');
+  });
+
+  doc.querySelectorAll('table.msc-table').forEach((table) => {
+    if (table.closest('.msc-table-wrap')) return;
+    const wrap = doc.createElement('div');
+    wrap.className = 'msc-table-wrap';
+    wrap.setAttribute('data-msc-table', '1');
+    table.replaceWith(wrap);
+    wrap.appendChild(table);
   });
 }
 
@@ -207,14 +236,23 @@ export function cleanPastedWordHtml(html, {
 } = {}) {
   const doc = new DOMParser().parseFromString(html || '', 'text/html');
   doc.querySelectorAll('script, style, meta, link, title, head').forEach((el) => el.remove());
+  const containsEditorBlocks = Boolean(doc.querySelector(
+    '.msc-cols, [data-cols], .msc-table-wrap, table.msc-table'
+  ));
+  const preserveInternalStructure = preserveEditorAttrs || containsEditorBlocks;
 
   toSemanticInlineTags(doc);
-  flattenPastedColumns(doc);
+  flattenPastedColumns(doc, { preserveEditorColumns: preserveInternalStructure });
+  if (preserveInternalStructure) normalizeEditorClipboardBlocks(doc);
   unwrapNumberedHeadingLists(doc);
 
   doc.querySelectorAll('*').forEach((el) => {
-    sanitizeStyle(el, { preserveTextAlign, preserveImageSize: true });
-    sanitizeClass(el, { preserveEditorAttrs });
+    sanitizeStyle(el, {
+      preserveTextAlign,
+      preserveImageSize: true,
+      preserveEditorLayout: preserveInternalStructure,
+    });
+    sanitizeClass(el, { preserveEditorAttrs: preserveInternalStructure });
 
     const tag = el.tagName.toLowerCase();
     const allowed = tag === 'img'
@@ -222,7 +260,17 @@ export function cleanPastedWordHtml(html, {
       : new Set([
         'href',
         ...(preserveTextAlign && el.hasAttribute('style') ? ['style', 'align'] : []),
-        ...(preserveEditorAttrs ? ['class', 'data-msc-table', 'data-cols', 'data-col-widths', 'contenteditable'] : []),
+        ...(preserveInternalStructure ? [
+          'class',
+          'data-msc-table',
+          'data-cols',
+          'data-col-widths',
+          'data-col-label',
+          'contenteditable',
+          'colspan',
+          'rowspan',
+          'style',
+        ] : []),
       ]);
 
     [...el.attributes].forEach((attr) => {
@@ -248,7 +296,7 @@ export function cleanPastedWordHtml(html, {
   });
 
   let cleaned = doc.body.innerHTML;
-  if (normalizeDivs) {
+  if (normalizeDivs && !preserveInternalStructure) {
     normalizeDivElements(doc);
     cleaned = doc.body.innerHTML;
   }
