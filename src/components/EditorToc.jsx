@@ -1,7 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { List, X } from 'lucide-react';
 import useTocScroll from '../hooks/useTocScroll';
 import './EditorToc.css';
+
+const TOC_POSITION_KEY = 'riemer_editor_toc_position';
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
 
 /**
  * EditorToc —— 文档编辑器里的「可点击目录」
@@ -36,14 +42,101 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
     scrollOffset,
   });
   const [open, setOpen] = useState(defaultOpen);
+  const rootRef = useRef(null);
+  const dragRef = useRef(null);
+  const [dragPos, setDragPos] = useState(() => {
+    try {
+      const saved = JSON.parse(window.localStorage.getItem(TOC_POSITION_KEY) || 'null');
+      if (saved && Number.isFinite(saved.left) && Number.isFinite(saved.top)) return saved;
+    } catch {
+      /* ignore */
+    }
+    return null;
+  });
+  const [dragging, setDragging] = useState(false);
+
+  const persistPosition = (next) => {
+    setDragPos(next);
+    try {
+      window.localStorage.setItem(TOC_POSITION_KEY, JSON.stringify(next));
+    } catch {
+      /* ignore */
+    }
+  };
+
+  const startDrag = (e) => {
+    if (e.button !== undefined && e.button !== 0) return;
+    if (e.target?.closest?.('button:not(.etoc__fab)')) return;
+    const root = rootRef.current;
+    if (!root) return;
+    const rect = root.getBoundingClientRect();
+    dragRef.current = {
+      startX: e.clientX,
+      startY: e.clientY,
+      startLeft: rect.left,
+      startTop: rect.top,
+      width: rect.width,
+      height: rect.height,
+      moved: false,
+    };
+    setDragging(true);
+    root.setPointerCapture?.(e.pointerId);
+  };
+
+  const moveDrag = (e) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const dx = e.clientX - drag.startX;
+    const dy = e.clientY - drag.startY;
+    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    const margin = 8;
+    const next = {
+      left: clamp(drag.startLeft + dx, margin, window.innerWidth - drag.width - margin),
+      top: clamp(drag.startTop + dy, margin, window.innerHeight - drag.height - margin),
+    };
+    setDragPos(next);
+  };
+
+  const endDrag = (e) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const root = rootRef.current;
+    root?.releasePointerCapture?.(e.pointerId);
+    const rect = root?.getBoundingClientRect();
+    if (rect) persistPosition({
+      left: clamp(rect.left, 8, window.innerWidth - rect.width - 8),
+      top: clamp(rect.top, 8, window.innerHeight - rect.height - 8),
+    });
+    window.setTimeout(() => {
+      dragRef.current = null;
+      setDragging(false);
+    }, 0);
+  };
+
+  useEffect(() => {
+    if (!dragPos || !rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const next = {
+      left: clamp(dragPos.left, 8, window.innerWidth - rect.width - 8),
+      top: clamp(dragPos.top, 8, window.innerHeight - rect.height - 8),
+    };
+    if (next.left !== dragPos.left || next.top !== dragPos.top) setDragPos(next);
+  }, [dragPos, open]);
 
   if (!toc.length) return null;
 
   return (
-    <div className={`etoc ${open ? 'etoc--open' : 'etoc--collapsed'}`}>
+    <div
+      ref={rootRef}
+      className={`etoc ${open ? 'etoc--open' : 'etoc--collapsed'} ${dragging ? 'etoc--dragging' : ''}`}
+      style={dragPos ? { left: `${dragPos.left}px`, top: `${dragPos.top}px`, right: 'auto', bottom: 'auto' } : undefined}
+      onPointerMove={moveDrag}
+      onPointerUp={endDrag}
+      onPointerCancel={endDrag}
+    >
       {open ? (
         <nav className="etoc__panel" aria-label="文档目录">
-          <div className="etoc__header">
+          <div className="etoc__header" onPointerDown={startDrag} title="拖动目录">
             <List size={14} />
             <span className="etoc__title">目录</span>
             <button
@@ -75,7 +168,11 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
         <button
           type="button"
           className="etoc__fab"
-          onClick={() => setOpen(true)}
+          onPointerDown={startDrag}
+          onClick={() => {
+            if (dragRef.current?.moved) return;
+            setOpen(true);
+          }}
           title="展开文档目录"
           aria-label="展开文档目录"
         >
