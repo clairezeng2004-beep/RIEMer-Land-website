@@ -1220,6 +1220,7 @@ export function attachTableControls(editor, onChange) {
   const mergeBtn = overlay.querySelector('[data-act="merge-cells"]');
   const ROW_INSERT_Y_TOLERANCE = 28;
   const ROW_INSERT_X_TOLERANCE = 56;
+  const CONTROL_HIT_PADDING = 36;
 
   function clearHideRowTimer() {
     if (!hideRowTimer) return;
@@ -1349,6 +1350,29 @@ export function attachTableControls(editor, onChange) {
     mergeBtn.style.top = `${Math.max(-34, top - 36)}px`;
   }
 
+  function isPointInRect(x, y, rect, padding = 0) {
+    if (!rect) return false;
+    return (
+      x >= rect.left - padding &&
+      x <= rect.right + padding &&
+      y >= rect.top - padding &&
+      y <= rect.bottom + padding
+    );
+  }
+
+  function isPointInTableControlZone(x, y) {
+    if (!currentWrap || overlay.style.display === 'none') return false;
+    const table = currentWrap.querySelector('table');
+    if (isPointInRect(x, y, table?.getBoundingClientRect?.(), CONTROL_HIT_PADDING)) return true;
+    if (isPointInRect(x, y, overlay.getBoundingClientRect(), CONTROL_HIT_PADDING)) return true;
+    return Array.from(overlay.querySelectorAll('[data-act], .msc-table-ctl__insert-line'))
+      .some((el) => {
+        const rect = el.getBoundingClientRect?.();
+        if (!rect || rect.width === 0 || rect.height === 0) return false;
+        return isPointInRect(x, y, rect, CONTROL_HIT_PADDING);
+      });
+  }
+
   function hideRowInsert() {
     clearHideRowTimer();
     hoveredRow = null;
@@ -1428,7 +1452,8 @@ export function attachTableControls(editor, onChange) {
     hoveredRowIndex = nearest.index;
     layout();
   }
-  function onMouseLeaveEditor() {
+  function onMouseLeaveEditor(e) {
+    if (isPointInTableControlZone(e.clientX, e.clientY)) return;
     currentWrap = null;
     hideRowInsert();
     overlay.style.display = 'none';
@@ -1438,6 +1463,20 @@ export function attachTableControls(editor, onChange) {
     if (!currentWrap) return;
     clearHideRowTimer();
     layout();
+  }
+
+  function onDocumentMouseMove(e) {
+    if (!currentWrap) return;
+    if (isPointInTableControlZone(e.clientX, e.clientY)) {
+      clearHideRowTimer();
+      layout();
+      return;
+    }
+    if (!isPointInRect(e.clientX, e.clientY, editor.getBoundingClientRect())) {
+      currentWrap = null;
+      hideRowInsert();
+      overlay.style.display = 'none';
+    }
   }
 
   function addCol() {
@@ -1597,6 +1636,7 @@ export function attachTableControls(editor, onChange) {
   overlay.addEventListener('pointermove', onOverlayPointerMove);
   overlay.addEventListener('click', onOverlayClick);
   window.addEventListener('resize', onScrollOrResize);
+  document.addEventListener('mousemove', onDocumentMouseMove);
   document.addEventListener('mouseup', onDocumentMouseUp);
   editor.addEventListener('scroll', onScrollOrResize);
   editor.parentElement?.addEventListener('scroll', onScrollOrResize);
@@ -1611,6 +1651,7 @@ export function attachTableControls(editor, onChange) {
     overlay.removeEventListener('pointermove', onOverlayPointerMove);
     overlay.removeEventListener('click', onOverlayClick);
     window.removeEventListener('resize', onScrollOrResize);
+    document.removeEventListener('mousemove', onDocumentMouseMove);
     editor.removeEventListener('scroll', onScrollOrResize);
     editor.parentElement?.removeEventListener('scroll', onScrollOrResize);
     document.removeEventListener('mouseup', onDocumentMouseUp);
