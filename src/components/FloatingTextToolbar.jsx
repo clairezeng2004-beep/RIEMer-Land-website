@@ -481,20 +481,22 @@ export default function FloatingTextToolbar({
   // 在编辑器里用 Tab / Shift+Tab 缩进到多级（见 utils/editorTabIndent.js）。
   const applyListRich = useCallback((cmd) => {
     const editor = editorRef.current;
+    restoreRichSelection();
     document.execCommand(cmd, false, null);
     if (cmd === 'insertOrderedList') normalizeOrderedListNumbering(editor);
     detectActiveRich();
     fireChangeRich();
-  }, [detectActiveRich, editorRef, fireChangeRich]);
+  }, [detectActiveRich, editorRef, fireChangeRich, restoreRichSelection]);
 
   // 对齐（富文本）：justifyLeft / justifyCenter / justifyRight，作用在当前块上。
   const applyAlignRich = useCallback((cmd) => {
     const editor = editorRef.current;
+    restoreRichSelection();
     document.execCommand(cmd, false, null);
     applyTextAlignToSelection(editor, cmd);
     detectActiveRich();
     fireChangeRich();
-  }, [detectActiveRich, editorRef, fireChangeRich]);
+  }, [detectActiveRich, editorRef, fireChangeRich, restoreRichSelection]);
 
   const addImageCaptionRich = useCallback(() => {
     const editor = editorRef.current;

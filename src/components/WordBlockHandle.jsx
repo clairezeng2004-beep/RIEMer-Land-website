@@ -156,6 +156,46 @@ function replaceBlockTag(block, tag) {
   return next;
 }
 
+function replaceBlockWithList(block, listTag) {
+  if (!block || !['ul', 'ol'].includes(listTag)) return null;
+  const currentTag = block.tagName?.toLowerCase();
+  if (currentTag === listTag) {
+    const p = document.createElement('p');
+    const items = Array.from(block.querySelectorAll(':scope > li'));
+    if (items.length) {
+      items.forEach((li, index) => {
+        if (index > 0) p.appendChild(document.createElement('br'));
+        Array.from(li.childNodes).forEach((child) => {
+          if (child.nodeType === Node.ELEMENT_NODE && ['ul', 'ol'].includes(child.tagName?.toLowerCase())) return;
+          p.appendChild(child);
+        });
+      });
+    } else {
+      p.innerHTML = '<br />';
+    }
+    block.parentNode?.replaceChild(p, block);
+    return p;
+  }
+
+  if (currentTag === 'ul' || currentTag === 'ol') {
+    const next = document.createElement(listTag);
+    while (block.firstChild) next.appendChild(block.firstChild);
+    block.parentNode?.replaceChild(next, block);
+    return next;
+  }
+
+  if (!['p', 'h1', 'h2', 'h3', 'blockquote', 'div'].includes(currentTag)) return null;
+  const list = document.createElement(listTag);
+  const li = document.createElement('li');
+  while (block.firstChild) li.appendChild(block.firstChild);
+  if (!String(li.textContent || '').replace(/\u200B/g, '').trim() && !li.querySelector('img, video, table, iframe')) {
+    li.innerHTML = '<br />';
+  }
+  list.appendChild(li);
+  block.parentNode?.replaceChild(list, block);
+  return li;
+}
+
 function placeCaretAtEnd(node) {
   try {
     const range = document.createRange();
@@ -352,10 +392,20 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     }
     try {
       const shouldExitListForBlock = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(opt.key);
+      const shouldApplyList = opt.key === 'ul' || opt.key === 'ol';
       const listItem = shouldExitListForBlock ? getCurrentListItem(editorRef?.current) : null;
       if (listItem) {
         blockRef.current = replaceListItemWithBlock(listItem, opt.key);
         if (blockRef.current) placeCaretAtEnd(blockRef.current);
+      } else if (shouldApplyList) {
+        const nextBlock = replaceBlockWithList(blockRef.current, opt.key);
+        if (nextBlock) {
+          blockRef.current = nextBlock;
+          placeCaretAtEnd(nextBlock);
+          if (opt.key === 'ol') normalizeOrderedListNumbering(editorRef?.current);
+        } else {
+          document.execCommand(opt.cmd, false, value);
+        }
       } else if (shouldExitListForBlock) {
         const nextBlock = replaceBlockTag(blockRef.current, opt.key);
         if (nextBlock) {
