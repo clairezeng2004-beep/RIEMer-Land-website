@@ -143,6 +143,49 @@ function hasBlockChild(el) {
   return !!el.querySelector?.('address, article, aside, blockquote, div, dl, fieldset, figure, h1, h2, h3, h4, h5, h6, hr, ol, p, pre, table, ul');
 }
 
+function getOnlyMeaningfulElement(el) {
+  const meaningful = [...(el?.childNodes || [])].filter((node) => {
+    if (node.nodeType === Node.TEXT_NODE) return Boolean(String(node.textContent || '').trim());
+    if (node.nodeType === Node.ELEMENT_NODE) return true;
+    return false;
+  });
+  return meaningful.length === 1 && meaningful[0].nodeType === Node.ELEMENT_NODE
+    ? meaningful[0]
+    : null;
+}
+
+function getOrderedListMarker(list, li, index) {
+  const rawStart = parseInt(list.getAttribute('start') || '1', 10);
+  const rawValue = parseInt(li.getAttribute('value') || '', 10);
+  const value = Number.isFinite(rawValue)
+    ? rawValue
+    : (Number.isFinite(rawStart) ? rawStart : 1) + index;
+  return `${value}. `;
+}
+
+function unwrapNumberedHeadingLists(doc) {
+  doc.querySelectorAll('ol').forEach((list) => {
+    const items = [...list.children].filter((child) => child.tagName?.toLowerCase() === 'li');
+    if (items.length === 0) return;
+    const headings = items.map((li) => {
+      const only = getOnlyMeaningfulElement(li);
+      return /^h[1-6]$/.test(only?.tagName?.toLowerCase?.() || '') ? only : null;
+    });
+    if (headings.some((heading) => !heading)) return;
+
+    const frag = doc.createDocumentFragment();
+    items.forEach((li, index) => {
+      const heading = headings[index];
+      const nextHeading = doc.createElement(heading.tagName.toLowerCase());
+      [...heading.attributes].forEach((attr) => nextHeading.setAttribute(attr.name, attr.value));
+      nextHeading.appendChild(doc.createTextNode(getOrderedListMarker(list, li, index)));
+      while (heading.firstChild) nextHeading.appendChild(heading.firstChild);
+      frag.appendChild(nextHeading);
+    });
+    list.replaceWith(frag);
+  });
+}
+
 function normalizeDivElements(doc) {
   [...doc.querySelectorAll('div')].reverse().forEach((div) => {
     if (hasBlockChild(div)) {
@@ -167,6 +210,7 @@ export function cleanPastedWordHtml(html, {
 
   toSemanticInlineTags(doc);
   flattenPastedColumns(doc);
+  unwrapNumberedHeadingLists(doc);
 
   doc.querySelectorAll('*').forEach((el) => {
     sanitizeStyle(el, { preserveTextAlign, preserveImageSize: true });
