@@ -127,6 +127,18 @@ function getCurrentListItem(editor) {
   return li && editor.contains(li) ? li : null;
 }
 
+function getCurrentFormatTarget(editor, fallback = null) {
+  const sel = window.getSelection();
+  if (!editor || !sel || sel.rangeCount === 0) return fallback;
+  const anchor = sel.anchorNode?.nodeType === Node.ELEMENT_NODE
+    ? sel.anchorNode
+    : sel.anchorNode?.parentElement;
+  const target = anchor?.closest?.('li, p, h1, h2, h3, blockquote, div');
+  if (!target || target === editor || !editor.contains(target)) return fallback;
+  if (target.closest?.('td, th, .msc-callout, .msc-cols')) return fallback;
+  return target;
+}
+
 function replaceListItemWithBlock(li, tag) {
   const list = li?.parentElement;
   if (!li || !list || !['ul', 'ol'].includes(list.tagName?.toLowerCase())) return null;
@@ -443,6 +455,9 @@ export default function WordBlockHandle({ editorRef, onChange }) {
     const editor = editorRef?.current;
     const shouldExitListForBlock = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(opt.key);
     const shouldApplyList = opt.key === 'ul' || opt.key === 'ol';
+    if (shouldExitListForBlock || shouldApplyList) {
+      blockRef.current = getCurrentFormatTarget(editor, blockRef.current);
+    }
     if ((shouldExitListForBlock || shouldApplyList) && blockRef.current && !getCurrentListItem(editor)) {
       blockRef.current = splitBlockAtCaretLine(editor, blockRef.current);
     }
