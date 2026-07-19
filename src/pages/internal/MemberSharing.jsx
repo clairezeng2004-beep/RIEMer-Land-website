@@ -404,21 +404,23 @@ export default function MemberSharing() {
   const handleLike = (id, e) => {
     if (e) e.preventDefault();
     if (!user) return;
-    let newLikes = null;
+    const target = sharings.find((s) => String(s.id) === String(id));
+    if (!target) return;
+    const likes = Array.isArray(target.likes) ? target.likes : [];
+    const already = likes.some((l) => l.userId === user.id);
+    const newLikes = already
+      ? likes.filter((l) => l.userId !== user.id)
+      : [...likes, { userId: user.id, userName: user.name || user.nickname || user.email }];
+
     setSharings((prev) =>
-      prev.map((s) => {
-        if (s.id !== id) return s;
-        const likes = s.likes || [];
-        const already = likes.some((l) => l.userId === user.id);
-        newLikes = already
-          ? likes.filter((l) => l.userId !== user.id)
-          : [...likes, { userId: user.id, userName: user.name || user.nickname || user.email }];
-        return { ...s, likes: newLikes };
-      }),
+      prev.map((s) => (String(s.id) === String(id) ? { ...s, likes: newLikes } : s)),
     );
-    if (newLikes) {
-      updateSharing(id, { likes: newLikes }).catch(() => { /* ignore */ });
-    }
+    updateSharing(id, { likes: newLikes }).catch((err) => {
+      console.warn('[MemberSharing] 点赞同步失败:', err);
+      setSharings((prev) =>
+        prev.map((s) => (String(s.id) === String(id) ? { ...s, likes } : s)),
+      );
+    });
   };
 
   const hasLiked = (post) => {
