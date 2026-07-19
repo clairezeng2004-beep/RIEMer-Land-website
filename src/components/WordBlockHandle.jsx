@@ -144,6 +144,18 @@ function replaceListItemWithBlock(li, tag) {
   return next;
 }
 
+function replaceBlockTag(block, tag) {
+  if (!block || block.tagName?.toLowerCase() === tag) return block;
+  if (!['p', 'h1', 'h2', 'h3', 'blockquote', 'div'].includes(block.tagName?.toLowerCase())) return null;
+  const next = document.createElement(tag);
+  Array.from(block.attributes || []).forEach((attr) => {
+    next.setAttribute(attr.name, attr.value);
+  });
+  while (block.firstChild) next.appendChild(block.firstChild);
+  block.parentNode?.replaceChild(next, block);
+  return next;
+}
+
 function placeCaretAtEnd(node) {
   try {
     const range = document.createRange();
@@ -344,6 +356,14 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       if (listItem) {
         blockRef.current = replaceListItemWithBlock(listItem, opt.key);
         if (blockRef.current) placeCaretAtEnd(blockRef.current);
+      } else if (shouldExitListForBlock) {
+        const nextBlock = replaceBlockTag(blockRef.current, opt.key);
+        if (nextBlock) {
+          blockRef.current = nextBlock;
+          placeCaretAtEnd(nextBlock);
+        } else {
+          document.execCommand(opt.cmd, false, value);
+        }
       } else {
         document.execCommand(opt.cmd, false, value);
       }
