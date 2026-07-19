@@ -1344,10 +1344,28 @@ export function attachTableControls(editor, onChange) {
     const wrapRect = currentWrap.getBoundingClientRect();
     const left = Math.min(...rects.map((r) => r.left)) - wrapRect.left;
     const top = Math.min(...rects.map((r) => r.top)) - wrapRect.top;
+    const bottom = Math.max(...rects.map((r) => r.bottom)) - wrapRect.top;
     const width = Math.max(...rects.map((r) => r.right)) - Math.min(...rects.map((r) => r.left));
+    const buttonWidth = Math.max(52, mergeBtn.offsetWidth || 52);
+    const buttonHeight = Math.max(28, mergeBtn.offsetHeight || 28);
+    const buttonLeft = left + width / 2;
+    const topCandidate = Math.max(-34, top - 36);
+    const topCandidateRect = {
+      left: wrapRect.left + buttonLeft - buttonWidth / 2,
+      right: wrapRect.left + buttonLeft + buttonWidth / 2,
+      top: wrapRect.top + topCandidate,
+      bottom: wrapRect.top + topCandidate + buttonHeight,
+    };
+    const toolbarRect = document.querySelector('.ftt')?.getBoundingClientRect?.();
+    const overlapsToolbar = toolbarRect && !(
+      topCandidateRect.right < toolbarRect.left ||
+      topCandidateRect.left > toolbarRect.right ||
+      topCandidateRect.bottom < toolbarRect.top ||
+      topCandidateRect.top > toolbarRect.bottom
+    );
     mergeBtn.style.display = 'inline-flex';
-    mergeBtn.style.left = `${left + width / 2}px`;
-    mergeBtn.style.top = `${Math.max(-34, top - 36)}px`;
+    mergeBtn.style.left = `${buttonLeft}px`;
+    mergeBtn.style.top = `${overlapsToolbar ? bottom + 10 : topCandidate}px`;
   }
 
   function isPointInRect(x, y, rect, padding = 0) {
