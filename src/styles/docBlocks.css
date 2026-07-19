@@ -479,6 +479,11 @@
   box-shadow: 0 1px 0 rgba(31, 41, 55, 0.04);
 }
 
+.msc-callout--pending-delete {
+  outline: 2px solid var(--msc-callout-accent);
+  outline-offset: 3px;
+}
+
 .msc-callout--sage {
   --msc-callout-bg: #dfeee4;
   --msc-callout-border: #8fbc9a;

@@ -53,6 +53,8 @@ import {
 } from './imageCompression';
 import { normalizeOrderedListNumbering } from './orderedListNumbering';
 
+const CALLOUT_PENDING_DELETE_CLASS = 'msc-callout--pending-delete';
+
 function imageFileToEditorDataUrl(file) {
   return imageFileToCompressedDataUrl(file, EDITOR_IMAGE_COMPRESSION_OPTIONS);
 }
@@ -237,8 +239,53 @@ function focusCalloutBody(body, { atEnd = false } = {}) {
   else placeCaretAtStart(target);
 }
 
-function removeCalloutAtCaret(editor) {
+function clearPendingCalloutSelection(editor, except = null) {
+  editor?.querySelectorAll?.(`.${CALLOUT_PENDING_DELETE_CLASS}`).forEach((callout) => {
+    if (callout !== except) callout.classList.remove(CALLOUT_PENDING_DELETE_CLASS);
+  });
+}
+
+function insertParagraphAfterRemovedCallout(callout) {
+  const p = document.createElement('p');
+  p.innerHTML = '<br />';
+  callout.parentNode?.insertBefore(p, callout.nextSibling);
+  callout.remove();
+  placeCaretAtStart(p);
+}
+
+function getPendingSelectedCallout(editor) {
   const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || sel.isCollapsed) return null;
+  const pending = editor?.querySelector?.(`.${CALLOUT_PENDING_DELETE_CLASS}`);
+  if (!pending) return null;
+  const range = sel.getRangeAt(0);
+  try {
+    return range.intersectsNode(pending) ? pending : null;
+  } catch {
+    return null;
+  }
+}
+
+function selectCalloutForDeletion(editor, callout) {
+  if (!callout || !editor?.contains?.(callout)) return false;
+  clearPendingCalloutSelection(editor, callout);
+  callout.classList.add(CALLOUT_PENDING_DELETE_CLASS);
+  const range = document.createRange();
+  range.selectNode(callout);
+  const sel = window.getSelection();
+  sel?.removeAllRanges();
+  sel?.addRange(range);
+  return true;
+}
+
+function handleCalloutDeleteKey(editor) {
+  const sel = window.getSelection();
+  const pending = getPendingSelectedCallout(editor);
+  if (pending) {
+    insertParagraphAfterRemovedCallout(pending);
+    return 'removed';
+  }
+
   if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
   const anchor = sel.anchorNode?.nodeType === 1 ? sel.anchorNode : sel.anchorNode?.parentElement;
   const callout = anchor?.closest?.('.msc-callout');
@@ -246,12 +293,13 @@ function removeCalloutAtCaret(editor) {
   const body = callout.querySelector('.msc-callout__body');
   if (body && !getCalloutBodyEmpty(body)) return false;
 
-  const p = document.createElement('p');
-  p.innerHTML = '<br />';
-  callout.parentNode?.insertBefore(p, callout.nextSibling);
-  callout.remove();
-  placeCaretAtStart(p);
-  return true;
+  if (callout.classList.contains(CALLOUT_PENDING_DELETE_CLASS)) {
+    insertParagraphAfterRemovedCallout(callout);
+    return 'removed';
+  }
+
+  selectCalloutForDeletion(editor, callout);
+  return 'selected';
 }
 
 function insertTextAtSelection(text) {
@@ -1192,7 +1240,11 @@ export function attachWordEditingNormalizer(editor, onChange) {
   const onClick = (e) => {
     const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
     const callout = target?.closest?.('.msc-callout');
-    if (!callout || !editor.contains(callout)) return;
+    if (!callout || !editor.contains(callout)) {
+      clearPendingCalloutSelection(editor);
+      return;
+    }
+    clearPendingCalloutSelection(editor, callout);
     normalizeCalloutStructure(callout);
     const body = target?.closest?.('.msc-callout__body') || callout.querySelector('.msc-callout__body');
     if (!body) return;
@@ -1204,6 +1256,7 @@ export function attachWordEditingNormalizer(editor, onChange) {
   const onPaste = (e) => {
     const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
     const callout = target?.closest?.('.msc-callout');
+    clearPendingCalloutSelection(editor);
     if (callout && editor.contains(callout)) normalizeCalloutStructure(callout);
     const body = target?.closest?.('.msc-callout__body') || callout?.querySelector?.('.msc-callout__body');
     if (!body || !editor.contains(body)) return;
@@ -1250,12 +1303,15 @@ export function attachWordEditingNormalizer(editor, onChange) {
 
   const onKeyDown = (e) => {
     if ((e.key === 'Backspace' || e.key === 'Delete') && !e.altKey && !e.ctrlKey && !e.metaKey) {
-      if (removeCalloutAtCaret(editor)) {
+      const calloutDeleteResult = handleCalloutDeleteKey(editor);
+      if (calloutDeleteResult) {
         e.preventDefault();
-        onChange?.();
+        if (calloutDeleteResult === 'removed') onChange?.();
         return;
       }
     }
+
+    clearPendingCalloutSelection(editor);
 
     if (e.key === ' ' && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
       if (convertTypedOrderedListMarker()) {
@@ -1298,6 +1354,7 @@ export function attachWordEditingNormalizer(editor, onChange) {
   };
 
   const onInput = () => {
+    clearPendingCalloutSelection(editor);
     requestAnimationFrame(() => {
       normalizeLists();
       ensureEmptyCaretLeftAligned();
