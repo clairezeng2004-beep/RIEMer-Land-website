@@ -2,7 +2,6 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
-import { stripUnderline } from '../../utils/stripUnderline';
 import {
   ChevronLeft,
   Clock,
@@ -762,11 +761,11 @@ export default function ProcessTemplateDetail() {
     if (!doc || !doc.content) return '';
     if (doc.format === 'markdown') {
       return hydrateInlineImageStorageRefs(
-        stripUnderline(markdownToHtml(stripUnderline(doc.content))),
+        markdownToHtml(doc.content),
         'documents',
       );
     }
-    return hydrateInlineImageStorageRefs(stripUnderline(doc.content), 'documents'); // word 格式：已是 HTML
+    return hydrateInlineImageStorageRefs(doc.content, 'documents'); // word 格式：已是 HTML
   }, [doc]);
 
   useEffect(() => {
@@ -1058,7 +1057,7 @@ export default function ProcessTemplateDetail() {
     if (!ptdWordEditorRef.current) return undefined;
 
     const editor = ptdWordEditorRef.current;
-    const syncHtml = () => setEditContent(stripUnderline(editor.innerHTML));
+    const syncHtml = () => setEditContent(editor.innerHTML);
     const api = attachWordImageEditor(editor, { onChange: syncHtml });
     ptdWordImageApiRef.current = api;
     const detachTable = attachTableControls(editor, syncHtml);
@@ -1133,7 +1132,7 @@ export default function ProcessTemplateDetail() {
       setEditContent((prevContent) => (
         format === 'markdown'
           ? htmlToMarkdown(prevContent)
-          : stripUnderline(markdownToHtml(prevContent))
+          : markdownToHtml(prevContent)
       ));
       return format;
     });
@@ -1187,7 +1186,7 @@ export default function ProcessTemplateDetail() {
     }
 
     if (ptdWordEditorRef.current) {
-      setEditContent(stripUnderline(ptdWordEditorRef.current.innerHTML));
+      setEditContent(ptdWordEditorRef.current.innerHTML);
     }
   }, []);
 
@@ -1245,7 +1244,7 @@ export default function ProcessTemplateDetail() {
   const editMarkdownPreview = useMemo(() => {
     if (!doc || editFormat !== 'markdown') return '';
     if (!editContent || !editContent.trim()) return '';
-    return stripUnderline(markdownToHtml(stripUnderline(editContent)));
+    return markdownToHtml(editContent);
   }, [editContent, editFormat, doc]);
 
   /* ========== 目录（TOC） ==========
@@ -1299,7 +1298,7 @@ export default function ProcessTemplateDetail() {
       alert('标题不能为空');
       return;
     }
-    const cleanContent = stripUnderline(editContent);
+    const cleanContent = editContent;
     setSaving(true);
     try {
       const userDocs = loadUserDocs();
@@ -1766,7 +1765,7 @@ export default function ProcessTemplateDetail() {
                       <WordEditorToolbar
                         editorRef={ptdWordEditorRef}
                         imageApiRef={ptdWordImageApiRef}
-                        onChange={(html) => setEditContent(stripUnderline(html))}
+                        onChange={(html) => setEditContent(html)}
                       />
                       <div
                         ref={ptdWordEditorRef}
@@ -1777,7 +1776,7 @@ export default function ProcessTemplateDetail() {
                         onPaste={handleWordPaste}
                         onInput={() => {
                           if (ptdWordEditorRef.current) {
-                            setEditContent(stripUnderline(ptdWordEditorRef.current.innerHTML));
+                            setEditContent(ptdWordEditorRef.current.innerHTML);
                           }
                         }}
                         data-placeholder="从 Word / 网页复制内容后，直接 Ctrl+V / ⌘+V 粘贴；可以直接拖拽/粘贴图片，图片插入后居中显示，点击图片可以拖动手柄调整大小"
@@ -1785,11 +1784,11 @@ export default function ProcessTemplateDetail() {
                       />
                       <FloatingTextToolbar
                         editorRef={ptdWordEditorRef}
-                        onChange={(html) => setEditContent(stripUnderline(html))}
+                        onChange={(html) => setEditContent(html)}
                       />
                       <WordBlockHandle
                         editorRef={ptdWordEditorRef}
-                        onChange={(html) => setEditContent(stripUnderline(html))}
+                        onChange={(html) => setEditContent(html)}
                       />
                       <EditorToc editorRef={ptdWordEditorRef} content={editContent} />
                     </div>

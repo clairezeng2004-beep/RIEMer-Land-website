@@ -484,6 +484,17 @@
   justify-content: flex-start;
 }
 
+[contenteditable="true"] u,
+.ptd-article__content u,
+.msd-article__content u,
+.doc-preview__text u,
+.word-preview__content u,
+.msc-md-split__preview u {
+  text-decoration-line: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.14em;
+}
+
 [contenteditable="true"] a[href],
 .ptd-article__content a[href],
 .msd-article__content a[href],

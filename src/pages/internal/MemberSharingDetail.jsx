@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Navigate, useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { stripUnderline } from '../../utils/stripUnderline';
 import { markdownToHtml } from '../../utils/markdownWordInterop';
 import {
   ChevronLeft,
@@ -341,12 +340,11 @@ export default function MemberSharingDetail() {
     const rawContent = String(post.content || '');
     if (post.format === 'markdown') {
       return hydrateInlineImageStorageRefs(
-        stripUnderline(markdownToHtml(stripUnderline(rawContent))),
+        markdownToHtml(rawContent),
         'member-sharing-attachments',
       );
     }
-    // word (HTML) 格式直接返回（清掉下划线）
-    return hydrateInlineImageStorageRefs(stripUnderline(rawContent), 'member-sharing-attachments');
+    return hydrateInlineImageStorageRefs(rawContent, 'member-sharing-attachments');
   }, [post]);
 
   useEffect(() => {

@@ -38,7 +38,6 @@ import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
-import { stripUnderline } from '../../utils/stripUnderline';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
 import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle, isSelectionInImageCaption } from '../../utils/pasteMatchStyle';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
@@ -336,7 +335,7 @@ export default function ProcessTemplateCreate() {
       if (format === 'markdown') {
         return { ...prev, format, content: htmlToMarkdown(prev.content) };
       }
-      return { ...prev, format, content: stripUnderline(markdownToHtml(prev.content)) };
+      return { ...prev, format, content: markdownToHtml(prev.content) };
     });
   }, []);
 
@@ -502,7 +501,7 @@ export default function ProcessTemplateCreate() {
         }
       })(),
       format: newDoc.format,
-      content: stripUnderline(newDoc.content),
+      content: newDoc.content,
       attachments: newDoc.attachments.map((f) => ({
         id: f.id,
         name: f.name,

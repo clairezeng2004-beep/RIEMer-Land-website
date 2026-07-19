@@ -41,7 +41,6 @@ import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
-import { stripUnderline } from '../../utils/stripUnderline';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
 import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle, isSelectionInImageCaption } from '../../utils/pasteMatchStyle';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
@@ -726,7 +725,7 @@ export default function MemberSharingCreate() {
       if (format === 'markdown') {
         return { ...prev, format, content: htmlToMarkdown(prev.content) };
       }
-      return { ...prev, format, content: stripUnderline(markdownToHtml(prev.content)) };
+      return { ...prev, format, content: markdownToHtml(prev.content) };
     });
   }, []);
 
@@ -736,7 +735,7 @@ export default function MemberSharingCreate() {
   }, []);
 
   const cleanEditorHtmlForSave = useCallback((html) => {
-    if (!html || typeof DOMParser === 'undefined') return stripUnderline(html || '');
+    if (!html || typeof DOMParser === 'undefined') return html || '';
     try {
       const doc = new DOMParser().parseFromString(String(html), 'text/html');
       doc.querySelectorAll('.msc-img-expired-note').forEach((node) => node.remove());
@@ -755,9 +754,9 @@ export default function MemberSharingCreate() {
           img.removeAttribute('data-storage-retry-count');
         }
       });
-      return stripUnderline(doc.body.innerHTML);
+      return doc.body.innerHTML;
     } catch {
-      return stripUnderline(html || '');
+      return html || '';
     }
   }, []);
 

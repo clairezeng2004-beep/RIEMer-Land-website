@@ -39,6 +39,7 @@ function inlineToMarkdown(node) {
   if (tag === 'br') return '\n';
   if (tag === 'strong' || tag === 'b') return `**${children()}**`;
   if (tag === 'em' || tag === 'i') return `*${children()}*`;
+  if (tag === 'u') return `<u>${children()}</u>`;
   if (tag === 'code') return `\`${node.textContent || ''}\``;
   if (tag === 'a') {
     const label = children() || escapeMarkdownText(node.getAttribute('href') || '');
