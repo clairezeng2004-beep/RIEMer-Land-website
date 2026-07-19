@@ -75,6 +75,63 @@ function placeCaretAtEnd(node) {
   }
 }
 
+function cloneBlockShell(block) {
+  const next = document.createElement(block.tagName.toLowerCase());
+  Array.from(block.attributes || []).forEach((attr) => {
+    next.setAttribute(attr.name, attr.value);
+  });
+  return next;
+}
+
+function appendNodesOrBreak(target, nodes) {
+  if (!target) return;
+  nodes.forEach((node) => target.appendChild(node));
+  if (!target.childNodes.length) target.innerHTML = '<br />';
+}
+
+function rangeTouchesNode(range, node) {
+  try {
+    return range.intersectsNode(node);
+  } catch {
+    return false;
+  }
+}
+
+function splitBlockBySelectedLines(editor, block, selectionRange) {
+  if (!editor || !block || !editor.contains(block)) return [block].filter(Boolean);
+  const tag = block.tagName?.toLowerCase();
+  if (!['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'div'].includes(tag)) return [block];
+  if (!block.querySelector?.('br')) return [block];
+
+  const childNodes = Array.from(block.childNodes);
+  const segments = [];
+  let start = 0;
+  childNodes.forEach((node, index) => {
+    if (node.nodeName === 'BR') {
+      segments.push({ start, end: index });
+      start = index + 1;
+    }
+  });
+  segments.push({ start, end: childNodes.length });
+
+  const selectedSegments = segments.filter(({ start: from, end: to }) => {
+    const nodes = childNodes.slice(from, to);
+    if (!nodes.length) return false;
+    return nodes.some((node) => rangeTouchesNode(selectionRange, node));
+  });
+  if (selectedSegments.length === 0 || selectedSegments.length === segments.length) return [block];
+
+  const selectedBlocks = [];
+  segments.forEach((segment, index) => {
+    const next = cloneBlockShell(block);
+    appendNodesOrBreak(next, childNodes.slice(segment.start, segment.end));
+    block.parentNode?.insertBefore(next, block);
+    if (selectedSegments.includes(segment)) selectedBlocks.push(next);
+  });
+  block.remove();
+  return selectedBlocks;
+}
+
 function replaceListItemWithBlock(li, tag) {
   const list = li?.parentElement;
   if (!li || !list || !['ul', 'ol'].includes(list.tagName?.toLowerCase())) return null;
@@ -93,6 +150,8 @@ function replaceListItemWithBlock(li, tag) {
 }
 
 function applyBlockTagToSelection(editor, tag) {
+  const sel = window.getSelection();
+  const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
   const blocks = getSelectedTextBlocks(editor)
     .filter((block) => {
       const blockTag = block.tagName?.toLowerCase();
@@ -100,7 +159,10 @@ function applyBlockTagToSelection(editor, tag) {
       if (block.closest?.('td, th, .msc-callout, .msc-cols')) return false;
       if (block.querySelector?.('table, .msc-table-wrap, .msc-cols')) return false;
       return true;
-    });
+    })
+    .flatMap((block) => (range && block.tagName?.toLowerCase() !== 'li'
+      ? splitBlockBySelectedLines(editor, block, range)
+      : [block]));
   if (!blocks.length) return false;
   let lastBlock = null;
   blocks.forEach((block) => {
