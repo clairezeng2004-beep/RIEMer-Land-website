@@ -1414,6 +1414,57 @@ export function attachWordEditingNormalizer(editor, onChange) {
     });
   };
 
+  const isEmptyTextBlock = (node) => {
+    if (!node || node.nodeType !== Node.ELEMENT_NODE) return false;
+    const tag = node.tagName?.toLowerCase();
+    if (!['p', 'h1', 'h2', 'h3', 'blockquote'].includes(tag)) return false;
+    if (node.classList?.contains('msc-img-wrap') || node.classList?.contains('msc-img-caption')) return false;
+    if (node.closest?.('td, th, .msc-callout, .msc-cols')) return false;
+    if (node.querySelector?.('img, video, table, iframe')) return false;
+    const text = String(node.textContent || '').replace(/\u200B/g, '').trim();
+    if (text) return false;
+    return [...node.childNodes].every((child) => {
+      if (child.nodeType === Node.TEXT_NODE) return !String(child.textContent || '').replace(/\u200B/g, '').trim();
+      if (child.nodeType !== Node.ELEMENT_NODE) return true;
+      return child.tagName?.toLowerCase() === 'br';
+    });
+  };
+
+  const getCaretTextBlock = () => {
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
+    const node = sel.anchorNode?.nodeType === Node.ELEMENT_NODE
+      ? sel.anchorNode
+      : sel.anchorNode?.parentElement;
+    const block = node?.closest?.('p, h1, h2, h3, blockquote');
+    return block && editor.contains(block) ? block : null;
+  };
+
+  const normalizeEmptyHeadingBlocks = () => {
+    let changed = false;
+    const caretBlock = getCaretTextBlock();
+    editor.querySelectorAll('h1, h2, h3').forEach((heading) => {
+      if (!isEmptyTextBlock(heading)) return;
+      const p = document.createElement('p');
+      p.innerHTML = '<br />';
+      heading.parentNode?.replaceChild(p, heading);
+      if (heading === caretBlock) placeCaretAtStart(p);
+      changed = true;
+    });
+    return changed;
+  };
+
+  const removeCurrentEmptyTextBlock = () => {
+    const block = getCaretTextBlock();
+    if (!block || !isEmptyTextBlock(block)) return false;
+    if (!block.previousElementSibling && !block.nextElementSibling) return false;
+    const nextTarget = block.previousElementSibling || block.nextElementSibling;
+    block.remove();
+    if (nextTarget) placeCaretAtEnd(nextTarget);
+    onChange?.();
+    return true;
+  };
+
   const ensureEmptyCaretLeftAligned = () => {
     let changed = false;
     if (!String(editor.textContent || '').replace(/\u200B/g, '').trim()
@@ -1437,6 +1488,7 @@ export function attachWordEditingNormalizer(editor, onChange) {
         changed = true;
       }
     });
+    if (normalizeEmptyHeadingBlocks()) changed = true;
     if (changed) onChange?.();
   };
 
@@ -1557,6 +1609,10 @@ export function attachWordEditingNormalizer(editor, onChange) {
       if (calloutDeleteResult) {
         e.preventDefault();
         if (calloutDeleteResult === 'removed') onChange?.();
+        return;
+      }
+      if (removeCurrentEmptyTextBlock()) {
+        e.preventDefault();
         return;
       }
     }
