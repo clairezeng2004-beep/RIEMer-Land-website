@@ -1232,11 +1232,10 @@ export function attachTableControls(editor, onChange) {
   overlay.innerHTML = `
     <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--select" data-act="select-table" title="全选表格">✣</button>
     <button type="button" class="msc-table-ctl__merge" data-act="merge-cells" title="合并选中的单元格">合并</button>
-    <button type="button" class="msc-table-ctl__btn" data-act="add-col" title="在右侧添加列">
-      <span class="msc-table-ctl__v">+</span>
-    </button>
-    <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--del-col" data-act="del-col" title="删除最后一列">−</button>
-    <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--del-row" data-act="del-row" title="删除最后一行">−</button>
+    <div class="msc-table-ctl__col-actions" aria-hidden="true">
+      <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--insert-col" data-act="insert-col" title="在此处插入列">+</button>
+      <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--remove-col" data-act="remove-col" title="删除左侧列">−</button>
+    </div>
     <div class="msc-table-ctl__insert-line" aria-hidden="true"></div>
     <button type="button" class="msc-table-ctl__btn msc-table-ctl__btn--insert-row" data-act="insert-row" title="插入行">
       <span class="msc-table-ctl__h">+</span>
@@ -1250,8 +1249,11 @@ export function attachTableControls(editor, onChange) {
   let hideRowTimer = null;
   let cellSelection = null;
   let colResizeState = null;
+  let hoveredColInsertIndex = -1;
+  let hoveredColDeleteIndex = -1;
   const insertLine = overlay.querySelector('.msc-table-ctl__insert-line');
   const insertRowBtn = overlay.querySelector('[data-act="insert-row"]');
+  const colActions = overlay.querySelector('.msc-table-ctl__col-actions');
   const mergeBtn = overlay.querySelector('[data-act="merge-cells"]');
   const ROW_INSERT_Y_TOLERANCE = 28;
   const ROW_INSERT_X_TOLERANCE = 56;
@@ -1285,6 +1287,7 @@ export function attachTableControls(editor, onChange) {
     overlay.style.height = `${r.height}px`;
     ensureTableColgroup(currentWrap);
     layoutColumnResizeHandles();
+    layoutColumnActions();
     layoutRowInsert();
     layoutMergeButton();
   }
@@ -1365,6 +1368,37 @@ export function attachTableControls(editor, onChange) {
       handle.style.height = `${tableRect.height}px`;
       handle.setAttribute('data-col-resizer-index', String(index));
     });
+  }
+
+  function hideColumnActions() {
+    hoveredColInsertIndex = -1;
+    hoveredColDeleteIndex = -1;
+    if (colActions) colActions.style.display = 'none';
+  }
+
+  function layoutColumnActions() {
+    if (!currentWrap || !colActions || hoveredColInsertIndex < 0) {
+      hideColumnActions();
+      return;
+    }
+    const table = currentWrap.querySelector('table');
+    const tableRect = table?.getBoundingClientRect?.();
+    const wrapRect = currentWrap.getBoundingClientRect();
+    const count = getVisualColumnCount(table);
+    if (!tableRect || count < 2) {
+      hideColumnActions();
+      return;
+    }
+    const boundaries = getColumnBoundaryXs(currentWrap);
+    const x = boundaries[hoveredColInsertIndex - 1];
+    if (x == null) {
+      hideColumnActions();
+      return;
+    }
+    hoveredColDeleteIndex = Math.max(0, hoveredColInsertIndex - 1);
+    colActions.style.display = 'inline-flex';
+    colActions.style.left = `${x}px`;
+    colActions.style.top = `${Math.max(0, tableRect.top - wrapRect.top) - 32}px`;
   }
 
   function getTableGrid(table) {
@@ -1563,6 +1597,12 @@ export function attachTableControls(editor, onChange) {
     }
     clearHideRowTimer();
     currentWrap = wrap;
+    const boundaries = getColumnBoundaryXs(wrap);
+    const nearestColBoundary = boundaries
+      .map((x, index) => ({ index, distance: Math.abs(e.clientX - (wrap.getBoundingClientRect().left + x)) }))
+      .filter((item) => item.distance <= ROW_INSERT_X_TOLERANCE)
+      .sort((a, b) => a.distance - b.distance)[0];
+    hoveredColInsertIndex = nearestColBoundary ? nearestColBoundary.index + 1 : -1;
     const rows = Array.from(wrap.querySelectorAll('tbody > tr'));
     const table = wrap.querySelector('table');
     const tableRect = table?.getBoundingClientRect?.();
@@ -1589,12 +1629,14 @@ export function attachTableControls(editor, onChange) {
     if (isPointInTableControlZone(e.clientX, e.clientY)) return;
     currentWrap = null;
     hideRowInsert();
+    hideColumnActions();
     overlay.style.display = 'none';
   }
 
   function onOverlayPointerMove() {
     if (!currentWrap) return;
     clearHideRowTimer();
+    if (hoveredColInsertIndex >= 0) layoutColumnActions();
     layout();
   }
 
@@ -1609,23 +1651,33 @@ export function attachTableControls(editor, onChange) {
     if (!isPointInRect(e.clientX, e.clientY, editor.getBoundingClientRect())) {
       currentWrap = null;
       hideRowInsert();
+      hideColumnActions();
       overlay.style.display = 'none';
     }
   }
 
-  function addCol() {
+  function insertColAt(index) {
     if (!currentWrap) return;
     clearCellSelection();
     const table = currentWrap.querySelector('table');
     const beforeWidths = getColWidthsPx(table);
-    const average = beforeWidths.reduce((sum, width) => sum + width, 0) / (beforeWidths.length || 1);
+    const safeIndex = Math.max(0, Math.min(beforeWidths.length, Number(index) || 0));
+    const insertWidth = beforeWidths[safeIndex] || beforeWidths[safeIndex - 1] || beforeWidths[0] || 120;
     currentWrap.querySelectorAll('tr').forEach((tr) => {
       const td = document.createElement('td');
       td.innerHTML = '<br />';
-      tr.appendChild(td);
+      const refCell = tr.children[safeIndex];
+      if (refCell) tr.insertBefore(td, refCell);
+      else tr.appendChild(td);
     });
     ensureTableColgroup(currentWrap);
-    setTableColumnWidths(table, [...beforeWidths, average || 120]);
+    const nextWidths = [
+      ...beforeWidths.slice(0, safeIndex),
+      insertWidth,
+      ...beforeWidths.slice(safeIndex),
+    ];
+    setTableColumnWidths(table, nextWidths);
+    hoveredColInsertIndex = safeIndex;
     layout();
     onChange?.();
   }
@@ -1650,31 +1702,25 @@ export function attachTableControls(editor, onChange) {
     layout();
     onChange?.();
   }
-  function delCol() {
+  function removeColAt(index) {
     if (!currentWrap) return;
     clearCellSelection();
     const table = currentWrap.querySelector('table');
     const firstRow = currentWrap.querySelector('tr');
     if (!firstRow || firstRow.children.length <= 1) return; // 至少保留 1 列
-    const nextWidths = getColWidthsPx(table).slice(0, -1);
+    const widths = getColWidthsPx(table);
+    const safeIndex = Math.max(0, Math.min(widths.length - 1, Number(index) || 0));
+    const nextWidths = widths.filter((_, widthIndex) => widthIndex !== safeIndex);
     currentWrap.querySelectorAll('tr').forEach((tr) => {
-      if (tr.lastElementChild) tr.removeChild(tr.lastElementChild);
+      const cell = tr.children[safeIndex] || tr.lastElementChild;
+      if (cell) tr.removeChild(cell);
     });
     ensureTableColgroup(currentWrap);
     setTableColumnWidths(table, nextWidths);
+    hideColumnActions();
     layout();
     onChange?.();
   }
-  function delRow() {
-    if (!currentWrap) return;
-    clearCellSelection();
-    const tbody = currentWrap.querySelector('tbody');
-    if (!tbody || tbody.children.length <= 1) return; // 至少保留 1 行
-    tbody.removeChild(tbody.lastElementChild);
-    layout();
-    onChange?.();
-  }
-
   function selectTable() {
     if (!currentWrap) return;
     const table = currentWrap.querySelector('table');
@@ -1833,10 +1879,9 @@ export function attachTableControls(editor, onChange) {
     const act = btn.getAttribute('data-act');
     if (act === 'select-table') selectTable();
     else if (act === 'merge-cells') mergeSelectedCells();
-    else if (act === 'add-col') addCol();
+    else if (act === 'insert-col') insertColAt(hoveredColInsertIndex);
     else if (act === 'insert-row') insertRowAfter(hoveredRowIndex);
-    else if (act === 'del-col') delCol();
-    else if (act === 'del-row') delRow();
+    else if (act === 'remove-col') removeColAt(hoveredColDeleteIndex);
   }
 
   function onScrollOrResize() {

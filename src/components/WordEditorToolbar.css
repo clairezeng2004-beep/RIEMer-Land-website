@@ -339,42 +339,35 @@
   cursor: col-resize;
 }
 
-/* 加列：右侧居中 */
-.msc-table-ctl__btn[data-act="add-col"] {
-  right: -12px;
-  top: 50%;
-  transform: translateY(-50%);
-}
-.msc-table-ctl__btn[data-act="add-col"]:hover {
-  transform: translateY(-50%) scale(1.08);
+.msc-table-ctl__col-actions {
+  position: absolute;
+  display: none;
+  align-items: center;
+  gap: 5px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid rgba(91, 140, 62, 0.24);
+  box-shadow: 0 8px 20px rgba(91, 140, 62, 0.16);
+  pointer-events: auto;
+  transform: translateX(-50%);
+  z-index: 3;
 }
 
-/* 删列：右上，更小更淡 */
-.msc-table-ctl__btn--del-col {
-  top: -12px !important;
-  right: -12px !important;
-  border-color: var(--color-danger, #dc2626);
-  color: var(--color-danger, #dc2626);
+.msc-table-ctl__btn--insert-col,
+.msc-table-ctl__btn--remove-col {
+  position: static;
   width: 20px;
   height: 20px;
   font-size: 14px;
 }
-.msc-table-ctl__btn--del-col:hover {
-  background: var(--color-danger, #dc2626);
-  color: #fff;
-}
 
-/* 删行：左下 */
-.msc-table-ctl__btn--del-row {
-  bottom: -12px !important;
-  left: -12px !important;
+.msc-table-ctl__btn--remove-col {
   border-color: var(--color-danger, #dc2626);
   color: var(--color-danger, #dc2626);
-  width: 20px;
-  height: 20px;
-  font-size: 14px;
 }
-.msc-table-ctl__btn--del-row:hover {
+
+.msc-table-ctl__btn--remove-col:hover {
   background: var(--color-danger, #dc2626);
   color: #fff;
 }
