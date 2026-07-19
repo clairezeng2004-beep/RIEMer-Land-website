@@ -594,11 +594,6 @@
   line-height: 1.5;
 }
 
-.msc-table tr:first-child td {
-  background: var(--color-bg-alt, #f9fafb);
-  font-weight: 600;
-}
-
 /* 手机端不展示分栏形态：按普通正文块纵向排列，图片宽度与正文内容区一致。 */
 @media (max-width: 640px) {
   .msc-cols,
