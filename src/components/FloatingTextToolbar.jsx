@@ -62,13 +62,26 @@ function replaceBlockTag(block, tag) {
   return next;
 }
 
+function placeCaretAtEnd(node) {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch {
+    /* ignore */
+  }
+}
+
 function replaceListItemWithBlock(li, tag) {
   const list = li?.parentElement;
   if (!li || !list || !['ul', 'ol'].includes(list.tagName?.toLowerCase())) return null;
   const next = document.createElement(tag);
   Array.from(li.childNodes).forEach((child) => {
     if (child.nodeType === Node.ELEMENT_NODE && ['ul', 'ol'].includes(child.tagName?.toLowerCase())) return;
-    next.appendChild(child.cloneNode(true));
+    next.appendChild(child);
   });
   if (!String(next.textContent || '').replace(/\u200B/g, '').trim() && !next.querySelector('img, video, table, iframe')) {
     next.innerHTML = '<br />';
@@ -89,10 +102,13 @@ function applyBlockTagToSelection(editor, tag) {
       return true;
     });
   if (!blocks.length) return false;
+  let lastBlock = null;
   blocks.forEach((block) => {
-    if (block.tagName?.toLowerCase() === 'li') replaceListItemWithBlock(block, tag);
-    else replaceBlockTag(block, tag);
+    lastBlock = block.tagName?.toLowerCase() === 'li'
+      ? replaceListItemWithBlock(block, tag)
+      : replaceBlockTag(block, tag);
   });
+  if (lastBlock) placeCaretAtEnd(lastBlock);
   return true;
 }
 

@@ -133,7 +133,7 @@ function replaceListItemWithBlock(li, tag) {
   const next = document.createElement(tag);
   Array.from(li.childNodes).forEach((child) => {
     if (child.nodeType === Node.ELEMENT_NODE && ['ul', 'ol'].includes(child.tagName?.toLowerCase())) return;
-    next.appendChild(child.cloneNode(true));
+    next.appendChild(child);
   });
   if (!String(next.textContent || '').replace(/\u200B/g, '').trim() && !next.querySelector('img, video, table, iframe')) {
     next.innerHTML = '<br />';
@@ -142,6 +142,19 @@ function replaceListItemWithBlock(li, tag) {
   li.remove();
   if (!list.querySelector('li')) list.remove();
   return next;
+}
+
+function placeCaretAtEnd(node) {
+  try {
+    const range = document.createRange();
+    range.selectNodeContents(node);
+    range.collapse(false);
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
+  } catch {
+    /* ignore */
+  }
 }
 
 function getBlockFormatKey(block) {
@@ -330,6 +343,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       const listItem = shouldExitListForBlock ? getCurrentListItem(editorRef?.current) : null;
       if (listItem) {
         blockRef.current = replaceListItemWithBlock(listItem, opt.key);
+        if (blockRef.current) placeCaretAtEnd(blockRef.current);
       } else {
         document.execCommand(opt.cmd, false, value);
       }

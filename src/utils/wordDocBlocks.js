@@ -1460,6 +1460,17 @@ export function attachWordEditingNormalizer(editor, onChange) {
       return;
     }
     if (e.shiftKey) return;
+    const heading = anchor?.closest?.('h1, h2, h3');
+    if (heading && editor.contains(heading)) {
+      e.preventDefault();
+      const p = document.createElement('p');
+      p.innerHTML = '<br />';
+      heading.parentNode?.insertBefore(p, heading.nextSibling);
+      placeCaretAtStart(p);
+      onChange?.();
+      return;
+    }
+
     const quote = anchor?.closest?.('blockquote');
     if (!quote || !editor.contains(quote)) return;
 
