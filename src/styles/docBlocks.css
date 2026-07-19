@@ -36,6 +36,10 @@
 .msc-cols--2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .msc-cols--3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .msc-cols--4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.msc-cols--5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.msc-cols--6 { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.msc-cols--7 { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.msc-cols--8 { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 
 /* 编辑器内：分栏块本身只负责布局，视觉边界交给每一栏。
    这样不会出现外层框与最右栏框线错位，也避免多层矩形叠在一起。 */
@@ -605,7 +609,11 @@
   .msc-cols,
   .msc-cols--2,
   .msc-cols--3,
-  .msc-cols--4 {
+  .msc-cols--4,
+  .msc-cols--5,
+  .msc-cols--6,
+  .msc-cols--7,
+  .msc-cols--8 {
     display: block;
     margin: 0.4em 0;
   }

@@ -421,6 +421,15 @@ function getColumns(container) {
   return [...container.children].filter((el) => el.classList?.contains('msc-col'));
 }
 
+const MAX_COLUMN_COUNT = 8;
+const COLUMN_COUNT_CLASSES = Array.from({ length: MAX_COLUMN_COUNT }, (_, index) => `msc-cols--${index + 1}`);
+
+function setColumnCountClass(container, count) {
+  if (!container) return;
+  container.classList.remove(...COLUMN_COUNT_CLASSES);
+  container.classList.add(`msc-cols--${count}`);
+}
+
 function ensureColumnMeta(container) {
   if (!container) return [];
   const cols = getColumns(container);
@@ -606,8 +615,7 @@ export function attachEditableLinkOpener(editor) {
 function redistributeColumns(container) {
   const cols = getColumns(container);
   const n = cols.length;
-  container.classList.remove('msc-cols--1', 'msc-cols--2', 'msc-cols--3', 'msc-cols--4');
-  container.classList.add(`msc-cols--${n}`);
+  setColumnCountClass(container, n);
   // 清掉拖拽时写入的内联宽度，交回 .msc-cols--N 的等分规则
   container.style.gridTemplateColumns = '';
   ensureColumnMeta(container);
@@ -619,11 +627,11 @@ function redistributeColumns(container) {
   });
 }
 
-/** 生成/校正「新增一栏」加号按钮：左端、各栏之间、右端各一个（最多 4 栏） */
+/** 生成/校正「新增一栏」加号按钮：左端、各栏之间、右端各一个 */
 function ensureColumnAdders(container) {
   if (!container) return;
   const cols = getColumns(container);
-  const needed = cols.length >= 4 ? 0 : cols.length + 1; // 最多 4 栏
+  const needed = cols.length >= MAX_COLUMN_COUNT ? 0 : cols.length + 1;
   const existing = [...container.querySelectorAll(':scope > .msc-col-adder')];
   // 幂等：数量正确就复用（仅校正索引），不每次 hover 都销毁重建。
   // 否则鼠标移动到加号上时按钮被重建，click 落在已脱离 DOM 的旧节点上 → 点击无效。
@@ -669,7 +677,7 @@ function layoutColumnAdders(container) {
 /** 在第 index 个位置插入一个空栏（index===栏数时追加到末尾） */
 function insertEmptyColumnAt(container, index) {
   const cols = getColumns(container);
-  if (cols.length >= 4) return;
+  if (cols.length >= MAX_COLUMN_COUNT) return;
   const col = document.createElement('div');
   col.className = 'msc-col';
   col.appendChild(buildEmptyColumnContent());
