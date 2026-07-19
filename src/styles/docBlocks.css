@@ -621,9 +621,12 @@
 .msc-table td {
   border: 1px solid var(--color-border, #d1d5db);
   padding: 8px 12px;
-  min-width: 80px;
+  min-width: 0;
   vertical-align: top;
   line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 [contenteditable="true"] .msc-table td.msc-table__cell--selected,
