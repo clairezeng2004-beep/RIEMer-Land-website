@@ -142,6 +142,51 @@ function placeCaretAtStart(node) {
   } catch { /* ignore */ }
 }
 
+function getCalloutBodyEmpty(body) {
+  if (!body) return true;
+  return !String(body.textContent || '').replace(/\u200B/g, '').trim()
+    && !body.querySelector?.('img, video, table, iframe');
+}
+
+function ensureCalloutEditableBody(body) {
+  if (!body) return;
+  const placeholder = body.getAttribute('data-placeholder') || '在这里输入高亮内容';
+  body.setAttribute('data-placeholder', placeholder);
+  if (String(body.textContent || '').trim() === placeholder && !body.querySelector?.('img, video, table, iframe')) {
+    body.innerHTML = '<p><br /></p>';
+  }
+  body.toggleAttribute('data-empty', getCalloutBodyEmpty(body));
+  if (!body.querySelector('p, h1, h2, h3, h4, ul, ol, blockquote')) {
+    const p = document.createElement('p');
+    p.innerHTML = '<br />';
+    body.appendChild(p);
+  }
+}
+
+function updateCalloutPlaceholders(editor) {
+  editor?.querySelectorAll?.('.msc-callout__body').forEach(ensureCalloutEditableBody);
+}
+
+function focusCalloutBody(body) {
+  ensureCalloutEditableBody(body);
+  const target = body.querySelector('p, h1, h2, h3, h4, li, blockquote') || body;
+  placeCaretAtStart(target);
+}
+
+function insertTextAtSelection(text) {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return false;
+  const range = sel.getRangeAt(0);
+  range.deleteContents();
+  const node = document.createTextNode(text);
+  range.insertNode(node);
+  range.setStartAfter(node);
+  range.collapse(true);
+  sel.removeAllRanges();
+  sel.addRange(range);
+  return true;
+}
+
 function buildEmptyColumnContent() {
   // 只放一个空段落：避免图片插入后其前/后出现多余空行（栏高度由 CSS min-height 控制）
   const frag = document.createDocumentFragment();
@@ -461,8 +506,10 @@ export function insertCalloutIntoEditor(editor, { tone = 'sage' } = {}) {
 
   const body = document.createElement('div');
   body.className = 'msc-callout__body';
+  body.setAttribute('data-placeholder', '在这里输入高亮内容');
+  body.setAttribute('data-empty', '');
   const p = document.createElement('p');
-  p.textContent = '在这里输入高亮内容';
+  p.innerHTML = '<br />';
   body.appendChild(p);
 
   block.appendChild(emoji);
@@ -1061,6 +1108,29 @@ export function attachWordEditingNormalizer(editor, onChange) {
     if (changed) onChange?.();
   };
 
+  const onClick = (e) => {
+    const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
+    const body = target?.closest?.('.msc-callout__body');
+    if (!body || !editor.contains(body)) return;
+    if (!getCalloutBodyEmpty(body)) return;
+    focusCalloutBody(body);
+  };
+
+  const onPaste = (e) => {
+    const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
+    const body = target?.closest?.('.msc-callout__body');
+    if (!body || !editor.contains(body)) return;
+    const rawText = e.clipboardData?.getData('text/plain') || '';
+    if (!rawText) return;
+    const text = rawText.replace(/\s+/g, ' ').trim();
+    e.preventDefault();
+    if (!text) return;
+    if (getCalloutBodyEmpty(body)) focusCalloutBody(body);
+    insertTextAtSelection(text);
+    body.removeAttribute('data-empty');
+    onChange?.();
+  };
+
   const convertTypedOrderedListMarker = () => {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
@@ -1136,14 +1206,20 @@ export function attachWordEditingNormalizer(editor, onChange) {
     requestAnimationFrame(() => {
       normalizeLists();
       ensureEmptyCaretLeftAligned();
+      updateCalloutPlaceholders(editor);
     });
   };
 
   normalizeLists();
   ensureEmptyCaretLeftAligned();
+  updateCalloutPlaceholders(editor);
+  editor.addEventListener('click', onClick);
+  editor.addEventListener('paste', onPaste);
   editor.addEventListener('keydown', onKeyDown);
   editor.addEventListener('input', onInput);
   return () => {
+    editor.removeEventListener('click', onClick);
+    editor.removeEventListener('paste', onPaste);
     editor.removeEventListener('keydown', onKeyDown);
     editor.removeEventListener('input', onInput);
   };

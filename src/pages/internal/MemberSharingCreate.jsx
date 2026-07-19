@@ -355,7 +355,7 @@ function buildMarkdownTable(rows = 3, cols = 3) {
 
 function buildMarkdownCallout(tone = 'sage') {
   const safeTone = ['sage', 'sun', 'rose', 'sky', 'lavender'].includes(tone) ? tone : 'sage';
-  return `\n<div class="msc-callout msc-callout--${safeTone}" data-callout-tone="${safeTone}">\n  <span class="msc-callout__emoji">💡</span>\n  <div class="msc-callout__body">\n    <p>在这里输入高亮内容</p>\n  </div>\n</div>\n`;
+  return `\n<div class="msc-callout msc-callout--${safeTone}" data-callout-tone="${safeTone}">\n  <span class="msc-callout__emoji">💡</span>\n  <div class="msc-callout__body" data-placeholder="在这里输入高亮内容" data-empty>\n    <p><br /></p>\n  </div>\n</div>\n`;
 }
 
 function MarkdownInsertToolbar({ textareaRef, value, onChange }) {

@@ -537,6 +537,22 @@
   min-width: 0;
 }
 
+[contenteditable="true"] .msc-callout__body[data-placeholder][data-empty]::before {
+  content: attr(data-placeholder);
+  display: block;
+  width: 100%;
+  min-height: 1.7em;
+  padding: 0.1em 0.25em;
+  border-radius: 6px;
+  background: rgba(107, 114, 128, 0.12);
+  color: rgba(55, 65, 81, 0.62);
+  pointer-events: none;
+}
+
+[contenteditable="true"] .msc-callout__body[data-placeholder][data-empty] > p {
+  margin: 0;
+}
+
 .msc-callout__body > :first-child {
   margin-top: 0;
 }
