@@ -104,12 +104,12 @@ function getActiveColumn(editor) {
   return selected && editor.contains(selected) ? selected : null;
 }
 
-function getFirstColumnContent(col) {
-  return [...col.children].find((child) => {
-    if (child.classList?.contains('msc-col-resizer')) return false;
-    if (child.classList?.contains('msc-col-adder')) return false;
-    return true;
-  }) || null;
+function appendColumnContent(col, node) {
+  const firstAux = [...col.children].find((child) => (
+    child.classList?.contains('msc-col-resizer') || child.classList?.contains('msc-col-adder')
+  ));
+  if (firstAux) col.insertBefore(node, firstAux);
+  else col.appendChild(node);
 }
 
 function isColumnEmptyForImage(col) {
@@ -258,13 +258,6 @@ function normalizeColumnImageInsertion(editor, wrap, img) {
         node.remove();
       }
     });
-    const firstContent = [...col.children].find((child) => (
-      child === wrap
-      || (!isEmptyParagraph(child) && !child.classList?.contains('msc-col-resizer') && !child.classList?.contains('msc-col-adder'))
-    ));
-    if (firstContent && firstContent !== wrap) {
-      col.insertBefore(wrap, firstContent);
-    }
   }
 
   container.querySelectorAll('.msc-col--selected').forEach((item) => item.classList.remove('msc-col--selected'));
@@ -322,9 +315,9 @@ async function insertImageHtmlAtCaret(editor, dataUrl, { initialWidthRatio = 1 }
   if (activeCol) {
     if (isColumnEmptyForImage(activeCol)) {
       activeCol.innerHTML = '';
-      activeCol.appendChild(wrap);
+      appendColumnContent(activeCol, wrap);
     } else {
-      activeCol.insertBefore(wrap, getFirstColumnContent(activeCol));
+      appendColumnContent(activeCol, wrap);
     }
     await whenImgLoaded(img);
     normalizeColumnImageInsertion(editor, wrap, img);

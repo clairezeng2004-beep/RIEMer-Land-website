@@ -914,20 +914,27 @@ export function attachColumnPlaceholderHandler(editor, onChange) {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = 'image/*';
+    input.multiple = true;
     input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const url = await imageFileToEditorDataUrl(file);
-      col.innerHTML = '';
-      const img = appendColumnImage(col, url);
-      // 分栏图片不再自动追加空行；选区停在图片节点上，避免生成右侧光标。
-      try {
-        const range = document.createRange();
-        range.selectNode(img);
-        const sel = window.getSelection();
-        sel?.removeAllRanges();
-        sel?.addRange(range);
-      } catch { /* ignore */ }
+      const files = Array.from(input.files || []).filter((file) => file.type?.startsWith('image/'));
+      if (files.length === 0) return;
+      if (isEmptyColumn(col)) col.innerHTML = '';
+      let lastImg = null;
+      for (const file of files) {
+        // eslint-disable-next-line no-await-in-loop
+        const url = await imageFileToEditorDataUrl(file);
+        lastImg = appendColumnImage(col, url);
+      }
+      if (lastImg) {
+        // 分栏图片不再自动追加空行；选区停在最后插入的图片节点上，避免生成右侧光标。
+        try {
+          const range = document.createRange();
+          range.selectNode(lastImg);
+          const sel = window.getSelection();
+          sel?.removeAllRanges();
+          sel?.addRange(range);
+        } catch { /* ignore */ }
+      }
       const container = col.closest('.msc-cols');
       normalizeColumnTextFlow(container);
       ensureColumnMeta(container);
