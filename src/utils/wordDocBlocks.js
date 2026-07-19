@@ -2119,6 +2119,39 @@ export function attachTableControls(editor, onChange) {
 export function attachWordEditingNormalizer(editor, onChange) {
   if (!editor) return () => {};
 
+  const isSpecialFormatBlock = (node) => node?.matches?.(
+    'blockquote, .msc-callout, .msc-cols, .msc-table-wrap, .msc-img-wrap'
+  );
+
+  const getSpecialBlockGapAtPoint = (clientX, clientY) => {
+    const editorRect = editor.getBoundingClientRect();
+    if (clientX < editorRect.left || clientX > editorRect.right) return null;
+    const blocks = Array.from(editor.children).filter((node) => node instanceof HTMLElement);
+    for (let index = 0; index < blocks.length - 1; index += 1) {
+      const before = blocks[index];
+      const after = blocks[index + 1];
+      if (!isSpecialFormatBlock(before) || !isSpecialFormatBlock(after)) continue;
+      const beforeRect = before.getBoundingClientRect();
+      const afterRect = after.getBoundingClientRect();
+      const gapTop = Math.min(beforeRect.bottom, afterRect.top);
+      const gapBottom = Math.max(beforeRect.bottom, afterRect.top);
+      if (clientY >= gapTop && clientY <= gapBottom) return { before, after };
+    }
+    return null;
+  };
+
+  const insertParagraphIntoSpecialBlockGap = (gap) => {
+    if (!gap?.after?.parentNode) return false;
+    const paragraph = document.createElement('p');
+    paragraph.style.textAlign = 'left';
+    paragraph.setAttribute('align', 'left');
+    paragraph.innerHTML = '<br />';
+    gap.after.parentNode.insertBefore(paragraph, gap.after);
+    placeCaretAtStart(paragraph);
+    onChange?.();
+    return true;
+  };
+
   const normalizeLists = () => {
     if (normalizeOrderedListNumbering(editor)) onChange?.();
   };
@@ -2232,6 +2265,15 @@ export function attachWordEditingNormalizer(editor, onChange) {
 
   const onMouseDown = (e) => {
     const target = e.target instanceof HTMLElement ? e.target : e.target?.parentElement;
+    if (e.button === 0 && target === editor) {
+      const gap = getSpecialBlockGapAtPoint(e.clientX, e.clientY);
+      if (gap) {
+        e.preventDefault();
+        clearPendingCalloutSelection(editor);
+        insertParagraphIntoSpecialBlockGap(gap);
+        return;
+      }
+    }
     const callout = target?.closest?.('.msc-callout');
     if (!callout || !editor.contains(callout)) return;
     if (target?.closest?.('.msc-callout__emoji')) return;
