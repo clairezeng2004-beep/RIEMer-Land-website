@@ -88,7 +88,7 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
     if (!drag) return;
     const dx = e.clientX - drag.startX;
     const dy = e.clientY - drag.startY;
-    if (Math.abs(dx) + Math.abs(dy) > 3) drag.moved = true;
+    if (Math.abs(dx) + Math.abs(dy) > 8) drag.moved = true;
     const margin = 8;
     const next = {
       left: clamp(drag.startLeft + dx, margin, window.innerWidth - drag.width - margin),
@@ -107,6 +107,7 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
       left: clamp(rect.left, 8, window.innerWidth - rect.width - 8),
       top: clamp(rect.top, 8, window.innerHeight - rect.height - 8),
     });
+    if (!open && !drag.moved) setOpen(true);
     window.setTimeout(() => {
       dragRef.current = null;
       setDragging(false);
@@ -170,7 +171,7 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
           className="etoc__fab"
           onPointerDown={startDrag}
           onClick={() => {
-            if (dragRef.current?.moved) return;
+            if (dragRef.current?.moved || open) return;
             setOpen(true);
           }}
           title="展开文档目录"
