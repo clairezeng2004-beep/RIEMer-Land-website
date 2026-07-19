@@ -31,6 +31,7 @@ export default function useDraftAutosave({
 }) {
   const storageKey = key ? `riemer_draft:${key}` : null
   const timerRef = useRef(null)
+  const savingResetTimerRef = useRef(null)
   const lastSerializedRef = useRef(null)
   const [saving, setSaving] = useState(false)
   const [lastSavedAt, setLastSavedAt] = useState(null)
@@ -97,10 +98,16 @@ export default function useDraftAutosave({
 
     setSaving(true)
     if (timerRef.current) clearTimeout(timerRef.current)
+    if (savingResetTimerRef.current) clearTimeout(savingResetTimerRef.current)
     timerRef.current = setTimeout(() => {
       writeDraft(values)
       setSaving(false)
+      savingResetTimerRef.current = null
     }, delay)
+    savingResetTimerRef.current = setTimeout(() => {
+      setSaving(false)
+      savingResetTimerRef.current = null
+    }, Math.max(delay + 1000, 5000))
 
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current)
@@ -118,6 +125,11 @@ export default function useDraftAutosave({
     return () => window.removeEventListener('beforeunload', handler)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [enabled, storageKey, values])
+
+  useEffect(() => () => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    if (savingResetTimerRef.current) clearTimeout(savingResetTimerRef.current)
+  }, [])
 
   const loadDraft = useCallback(() => {
     if (!storage || !storageKey) return null
@@ -147,8 +159,10 @@ export default function useDraftAutosave({
   const flush = useCallback(() => {
     if (!enabled || checkEmpty(values)) return
     if (timerRef.current) clearTimeout(timerRef.current)
+    if (savingResetTimerRef.current) clearTimeout(savingResetTimerRef.current)
     writeDraft(values)
     setSaving(false)
+    savingResetTimerRef.current = null
   }, [enabled, values, writeDraft, checkEmpty])
 
   return { saving, lastSavedAt, hasDraft, loadDraft, clearDraft, flush }

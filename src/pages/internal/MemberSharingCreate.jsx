@@ -662,6 +662,7 @@ export default function MemberSharingCreate() {
   const [cloudSaveError, setCloudSaveError] = useState('');
   const [lastCloudSaveAt, setLastCloudSaveAt] = useState(null);
   const autosaveTimerRef = useRef(null);
+  const cloudSaveSeqRef = useRef(0);
 
   useEffect(() => {
     if (!editId || !isAuthenticated) return;
@@ -975,6 +976,8 @@ export default function MemberSharingCreate() {
   const saveToCloud = ({ silent = true } = {}) => {
     const post = buildPost();
     if (!post) {
+      cloudSaveSeqRef.current += 1;
+      setCloudSaveState((state) => (state === 'saving' ? null : state));
       if (!silent) alert('请先填写标题，并提供正文内容或上传至少一个附件');
       return false;
     }
@@ -983,8 +986,23 @@ export default function MemberSharingCreate() {
       format: post.format, content: post.content, period: post.period, attachments: post.attachments,
       author: post.author, authorId: post.authorId, contributorIds: post.contributorIds,
     };
-    const onOk = () => { setCloudSaveState('saved'); setCloudSaveError(''); setLastCloudSaveAt(new Date()); };
+    const saveSeq = cloudSaveSeqRef.current + 1;
+    cloudSaveSeqRef.current = saveSeq;
+    const isLatestSave = () => cloudSaveSeqRef.current === saveSeq;
+    const withTimeout = (promise) => Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        window.setTimeout(() => reject(new Error('保存超时，请稍后再试')), 15000);
+      }),
+    ]);
+    const onOk = () => {
+      if (!isLatestSave()) return;
+      setCloudSaveState('saved');
+      setCloudSaveError('');
+      setLastCloudSaveAt(new Date());
+    };
     const onErr = (err) => {
+      if (!isLatestSave()) return;
       const message = err?.message || String(err || '未知错误');
       console.warn('[MemberSharingCreate] 云端保存失败:', message);
       setCloudSaveError(message);
@@ -993,10 +1011,10 @@ export default function MemberSharingCreate() {
     setCloudSaveState('saving');
     const existingId = isEditingPost ? post.id : savedIdRef.current;
     if (existingId) {
-      updateSharing(existingId, fields).then(onOk).catch(onErr);
+      withTimeout(updateSharing(existingId, fields)).then(onOk).catch(onErr);
     } else {
       savedIdRef.current = post.id; // 先记下，避免快速连续保存重复插入
-      addSharing(post).then(onOk).catch(onErr);
+      withTimeout(addSharing(post)).then(onOk).catch(onErr);
     }
     return true;
   };
