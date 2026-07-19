@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions, RotateCcw, Check } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, List, ListOrdered, Bold, Underline, Link as LinkIcon, AlignLeft, AlignCenter, AlignRight, Captions, RotateCcw, Check } from 'lucide-react';
 import './WordBlockHandle.css';
 import {
   getCurrentOrderedList,
@@ -47,6 +47,7 @@ const BLOCK_OPTIONS = [
   { key: 'ul', label: '无序列表', icon: List, cmd: 'insertUnorderedList' },
   { key: 'ol', label: '有序列表', icon: ListOrdered, cmd: 'insertOrderedList' },
   { key: 'bold', label: '加粗', icon: Bold, cmd: 'bold', selectAll: true },
+  { key: 'underline', label: '下划线', icon: Underline, cmd: 'underline', selectAll: true },
   { key: 'link', label: '链接', icon: LinkIcon, cmd: 'createLink', selectAll: true, prompt: true },
   // 对齐：作用在整块上，折叠光标即可生效，无需 selectAll
   { key: 'alignLeft', label: '左对齐', icon: AlignLeft, cmd: 'justifyLeft' },

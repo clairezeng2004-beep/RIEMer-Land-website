@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { Type, Heading1, Heading2, Heading3, Quote, Bold, Link as LinkIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
+import { Type, Heading1, Heading2, Heading3, Quote, Bold, Underline, Link as LinkIcon, List, ListOrdered, AlignLeft, AlignCenter, AlignRight, Captions } from 'lucide-react';
 import './FloatingTextToolbar.css';
 import { normalizeOrderedListNumbering } from '../utils/orderedListNumbering';
 
@@ -309,6 +309,7 @@ export default function FloatingTextToolbar({
   const detectActiveRich = useCallback(() => {
     const next = {
       bold: document.queryCommandState('bold'),
+      underline: document.queryCommandState('underline'),
       paragraph: false,
       h1: false,
       h2: false,
@@ -555,13 +556,13 @@ export default function FloatingTextToolbar({
     const sel = window.getSelection();
     const savedRange = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
     document.execCommand(cmd, false, val);
-    if (cmd === 'bold' && savedRange && !savedRange.collapsed) {
+    if ((cmd === 'bold' || cmd === 'underline') && savedRange && !savedRange.collapsed) {
       const after = savedRange.cloneRange();
       after.collapse(false);
       sel?.removeAllRanges();
       sel?.addRange(after);
-      if (document.queryCommandState('bold')) {
-        document.execCommand('bold', false, null);
+      if (document.queryCommandState(cmd)) {
+        document.execCommand(cmd, false, null);
       }
     }
     detectActiveRich();
@@ -873,6 +874,9 @@ export default function FloatingTextToolbar({
   const onBold = isMarkdown
     ? () => applyMarkdown(wrap('**', '**'))
     : () => applyInlineRich('bold');
+  const onUnderline = isMarkdown
+    ? () => applyMarkdown(wrap('<u>', '</u>'))
+    : () => applyInlineRich('underline');
   const onLink = isMarkdown ? applyLinkMarkdown : applyLinkRich;
   const onUL = isMarkdown ? () => applyLinePrefixV2('ul') : () => applyListRich('insertUnorderedList');
   const onOL = isMarkdown ? () => applyLinePrefixV2('ol') : () => applyListRich('insertOrderedList');
@@ -921,6 +925,9 @@ export default function FloatingTextToolbar({
       )}
       <Btn onClick={onBold} title="加粗 (Ctrl/Cmd+B)" activeFlag={active.bold}>
         <Bold size={16} />
+      </Btn>
+      <Btn onClick={onUnderline} title="下划线 (Ctrl/Cmd+U)" activeFlag={active.underline}>
+        <Underline size={16} />
       </Btn>
       <Btn
         onClick={onLink}
