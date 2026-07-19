@@ -1665,10 +1665,16 @@ export function attachWordEditingNormalizer(editor, onChange) {
     if (!quote || !editor.contains(quote)) return;
 
     e.preventDefault();
-    const p = document.createElement('p');
-    p.innerHTML = '<br />';
-    quote.parentNode?.insertBefore(p, quote.nextSibling);
-    placeCaretAtStart(p);
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+    const br = document.createElement('br');
+    const spacer = document.createTextNode(ZERO_WIDTH_SPACE);
+    range.insertNode(br);
+    br.parentNode?.insertBefore(spacer, br.nextSibling);
+    range.setStart(spacer, 1);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
     onChange?.();
   };
 

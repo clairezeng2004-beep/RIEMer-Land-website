@@ -149,6 +149,45 @@ function replaceListItemWithBlock(li, tag) {
   return next;
 }
 
+function appendBlockContentToQuote(quote, block, { addBreakBefore = false } = {}) {
+  if (!quote || !block) return;
+  if (addBreakBefore) quote.appendChild(document.createElement('br'));
+  if (block.tagName?.toLowerCase() === 'li') {
+    Array.from(block.childNodes).forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE && ['ul', 'ol'].includes(child.tagName?.toLowerCase())) return;
+      quote.appendChild(child);
+    });
+    return;
+  }
+  while (block.firstChild) quote.appendChild(block.firstChild);
+}
+
+function replaceBlocksWithQuote(blocks) {
+  const ordered = [...blocks].sort((a, b) => {
+    if (a === b) return 0;
+    return a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_PRECEDING ? 1 : -1;
+  });
+  const first = ordered[0];
+  if (!first) return null;
+  const quote = document.createElement('blockquote');
+  Array.from(first.attributes || []).forEach((attr) => {
+    if (attr.name !== 'class') quote.setAttribute(attr.name, attr.value);
+  });
+  ordered.forEach((block, index) => {
+    appendBlockContentToQuote(quote, block, { addBreakBefore: index > 0 });
+  });
+  first.parentNode?.insertBefore(quote, first);
+  ordered.forEach((block) => {
+    const list = block.tagName?.toLowerCase() === 'li' ? block.parentElement : null;
+    block.remove();
+    if (list && !list.querySelector('li')) list.remove();
+  });
+  if (!String(quote.textContent || '').replace(/\u200B/g, '').trim() && !quote.querySelector('img, video, table, iframe')) {
+    quote.innerHTML = '<br />';
+  }
+  return quote;
+}
+
 function applyBlockTagToSelection(editor, tag) {
   const sel = window.getSelection();
   const range = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).cloneRange() : null;
@@ -164,6 +203,11 @@ function applyBlockTagToSelection(editor, tag) {
       ? splitBlockBySelectedLines(editor, block, range)
       : [block]));
   if (!blocks.length) return false;
+  if (tag === 'blockquote') {
+    const quote = replaceBlocksWithQuote(blocks);
+    if (quote) placeCaretAtEnd(quote);
+    return Boolean(quote);
+  }
   let lastBlock = null;
   blocks.forEach((block) => {
     lastBlock = block.tagName?.toLowerCase() === 'li'
