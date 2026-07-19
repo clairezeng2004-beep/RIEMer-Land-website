@@ -35,6 +35,39 @@ async function sbGet(url, key, path) {
   return res.json();
 }
 
+/** PostgREST 分页读取，避免通知/已读记录超过 limit 后被截断，导致邮件未读数失真 */
+async function sbGetAll(url, key, path, { pageSize = 1000 } = {}) {
+  const all = [];
+  let from = 0;
+
+  while (true) {
+    const to = from + pageSize - 1;
+    const res = await fetch(`${url}/rest/v1/${path}`, {
+      headers: {
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Range: `${from}-${to}`,
+        Prefer: 'count=exact',
+      },
+    });
+    if (!res.ok) throw new Error(`Supabase GET ${path} → HTTP ${res.status}`);
+    const page = await res.json();
+    if (!Array.isArray(page) || page.length === 0) break;
+    all.push(...page);
+    if (page.length < pageSize) break;
+    from += pageSize;
+  }
+
+  return all;
+}
+
+function canUserSeeNotification(notification, profile) {
+  const role = notification.target_role;
+  if (!role) return true;
+  if (profile.role === 'admin') return true;
+  return role === profile.role;
+}
+
 async function sendDigest({ resendApiKey, fromAddress, to, name, unread, siteUrl }) {
   const items = unread
     .slice(0, MAX_LIST)
@@ -126,9 +159,9 @@ export default async function handler(req, res) {
 
   try {
     const [profiles, notifications, reads, logRows] = await Promise.all([
-      sbGet(supabaseUrl, serviceKey, 'profiles?select=id,email,role,nickname,name&authorized=eq.true'),
-      sbGet(supabaseUrl, serviceKey, 'notifications?select=id,title,message,type,target_role,created_at&order=created_at.desc&limit=500'),
-      sbGet(supabaseUrl, serviceKey, 'notification_reads?select=notification_id,user_id&limit=50000'),
+      sbGetAll(supabaseUrl, serviceKey, 'profiles?select=id,email,role,nickname,name&authorized=eq.true'),
+      sbGetAll(supabaseUrl, serviceKey, 'notifications?select=id,title,message,type,target_role,created_at&order=created_at.desc'),
+      sbGetAll(supabaseUrl, serviceKey, 'notification_reads?select=notification_id,user_id'),
       sbGet(supabaseUrl, serviceKey, 'notification_email_log?select=user_id,last_sent_at').catch(() => []),
     ]);
 
@@ -148,11 +181,13 @@ export default async function handler(req, res) {
     for (const p of profiles) {
       if (!p.email) { skipped += 1; continue; }
 
-      // 该用户可见的未读：target_role 为空=所有人，或与其角色一致；且没有已读记录
+      // 与站内通知保持一致：
+      // - target_role 为空：所有人可见
+      // - 普通成员：只看自己角色对应通知
+      // - 管理员：站内可看全部通知，邮件也按同一规则统计
+      // - 已读状态只以 notification_reads 为准，分页完整拉取，避免把已读误算为未读
       const unread = notifications.filter((n) => {
-        const role = n.target_role;
-        const visible = !role || role === p.role;
-        if (!visible) return false;
+        if (!canUserSeeNotification(n, p)) return false;
         return !readSet.has(`${n.id}|${p.id}`);
       });
       if (unread.length === 0) { skipped += 1; continue; }
