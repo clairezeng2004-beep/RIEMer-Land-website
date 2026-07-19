@@ -3,13 +3,13 @@ const DEFAULT_MAX_HEIGHT = 1600;
 const DEFAULT_QUALITY = 0.78;
 
 export const EDITOR_IMAGE_COMPRESSION_OPTIONS = {
-  maxWidth: 820,
-  maxHeight: 820,
-  quality: 0.58,
+  maxWidth: 1400,
+  maxHeight: 1400,
+  quality: 0.86,
   outputType: 'image/webp',
   minInputBytes: 300 * 1024,
   minScaleOversize: 1.15,
-  minSavingsRatio: 0.12,
+  minSavingsRatio: 0.08,
 };
 
 function fileToDataUrl(file) {
