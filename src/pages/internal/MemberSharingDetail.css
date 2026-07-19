@@ -934,9 +934,16 @@
   }
 
   .msd-article__content {
+    --mobile-table-left-offset: var(--space-lg);
     padding: var(--space-lg);
     font-size: var(--text-base);
     line-height: 1.7;
+  }
+
+  .msd-article__content > .msc-table-wrap,
+  .msd-article__content > table {
+    width: calc(100% + var(--mobile-table-left-offset));
+    margin-left: calc(-1 * var(--mobile-table-left-offset));
   }
 
   .msd-article__content > p {
@@ -977,6 +984,7 @@
   }
 
   .msd-article__content {
+    --mobile-table-left-offset: var(--space-md);
     padding: var(--space-md);
     font-size: var(--text-base);
     line-height: 1.7;
