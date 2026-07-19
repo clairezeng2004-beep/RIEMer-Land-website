@@ -266,6 +266,45 @@ function getPendingSelectedCallout(editor) {
   }
 }
 
+function getCaretContainerElement() {
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return null;
+  const range = sel.getRangeAt(0);
+  return {
+    range,
+    element: range.startContainer?.nodeType === Node.ELEMENT_NODE
+      ? range.startContainer
+      : range.startContainer?.parentElement,
+  };
+}
+
+function isRangeAtStartOfElement(range, element) {
+  if (!range || !element) return false;
+  const probe = document.createRange();
+  probe.selectNodeContents(element);
+  try {
+    probe.setEnd(range.startContainer, range.startOffset);
+  } catch {
+    return false;
+  }
+  return !String(probe.toString() || '').replace(/\u200B/g, '').trim();
+}
+
+function getPreviousEmptyCalloutFromCaret(editor) {
+  const caret = getCaretContainerElement();
+  if (!caret?.element || !editor?.contains?.(caret.element)) return null;
+  if (caret.element.closest?.('.msc-callout')) return null;
+
+  const block = caret.element.closest?.('p, h1, h2, h3, h4, li, blockquote, div');
+  if (!block || block === editor || !editor.contains(block)) return null;
+  if (!isRangeAtStartOfElement(caret.range, block)) return null;
+
+  const previous = block.previousElementSibling;
+  if (!previous?.classList?.contains('msc-callout')) return null;
+  const body = previous.querySelector('.msc-callout__body');
+  return getCalloutBodyEmpty(body) ? previous : null;
+}
+
 function selectCalloutForDeletion(editor, callout) {
   if (!callout || !editor?.contains?.(callout)) return false;
   clearPendingCalloutSelection(editor, callout);
@@ -278,12 +317,20 @@ function selectCalloutForDeletion(editor, callout) {
   return true;
 }
 
-function handleCalloutDeleteKey(editor) {
+function handleCalloutDeleteKey(editor, key) {
   const sel = window.getSelection();
   const pending = getPendingSelectedCallout(editor);
   if (pending) {
     insertParagraphAfterRemovedCallout(pending);
     return 'removed';
+  }
+
+  if (key === 'Backspace') {
+    const previousEmptyCallout = getPreviousEmptyCalloutFromCaret(editor);
+    if (previousEmptyCallout) {
+      selectCalloutForDeletion(editor, previousEmptyCallout);
+      return 'selected';
+    }
   }
 
   if (!sel || sel.rangeCount === 0 || !sel.isCollapsed) return false;
@@ -1303,7 +1350,7 @@ export function attachWordEditingNormalizer(editor, onChange) {
 
   const onKeyDown = (e) => {
     if ((e.key === 'Backspace' || e.key === 'Delete') && !e.altKey && !e.ctrlKey && !e.metaKey) {
-      const calloutDeleteResult = handleCalloutDeleteKey(editor);
+      const calloutDeleteResult = handleCalloutDeleteKey(editor, e.key);
       if (calloutDeleteResult) {
         e.preventDefault();
         if (calloutDeleteResult === 'removed') onChange?.();
