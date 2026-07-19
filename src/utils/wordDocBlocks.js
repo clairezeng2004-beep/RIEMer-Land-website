@@ -1581,9 +1581,9 @@ export function attachTableControls(editor, onChange) {
   }
 
   function clearCellSelection() {
-    if (cellSelection?.cells) {
-      cellSelection.cells.forEach((cell) => cell.classList.remove('msc-table__cell--selected'));
-    }
+    editor.querySelectorAll('.msc-table__cell--selected').forEach((cell) => {
+      cell.classList.remove('msc-table__cell--selected');
+    });
     cellSelection = null;
     if (mergeBtn) mergeBtn.style.display = 'none';
   }
@@ -2030,6 +2030,7 @@ export function attachTableControls(editor, onChange) {
     }
     const wrap = cell.closest('.msc-table-wrap');
     if (!wrap || !editor.contains(wrap)) return;
+    clearCellSelection();
     currentWrap = wrap;
     cellSelection = { startCell: cell, endCell: cell, cells: new Set([cell]), dragging: true, moved: false };
   }
@@ -2070,12 +2071,21 @@ export function attachTableControls(editor, onChange) {
     if (currentWrap) layout();
   }
 
+  const hadStaleCellSelection = Boolean(editor.querySelector('.msc-table__cell--selected'));
+  if (hadStaleCellSelection) clearCellSelection();
   const repairedExistingTables = Array.from(editor.querySelectorAll('.msc-table'))
     .map((table) => repairMissingTableCells(table))
     .some(Boolean);
-  if (repairedExistingTables) onChange?.();
+  if (hadStaleCellSelection || repairedExistingTables) onChange?.();
+
+  const clearLateRestoredCellSelection = window.requestAnimationFrame(() => {
+    if (!editor.querySelector('.msc-table__cell--selected')) return;
+    clearCellSelection();
+    onChange?.();
+  });
 
   editor.addEventListener('mousedown', onEditorMouseDown);
+  editor.addEventListener('input', clearCellSelection);
   editor.addEventListener('mouseover', onEditorMouseOverCell);
   editor.addEventListener('mouseover', onMouseOver);
   editor.addEventListener('mousemove', onMouseMove);
@@ -2095,6 +2105,7 @@ export function attachTableControls(editor, onChange) {
   return () => {
     editor.removeEventListener('mouseover', onMouseOver);
     editor.removeEventListener('mousedown', onEditorMouseDown);
+    editor.removeEventListener('input', clearCellSelection);
     editor.removeEventListener('mouseover', onEditorMouseOverCell);
     editor.removeEventListener('mousemove', onMouseMove);
     editor.removeEventListener('mouseleave', onMouseLeaveEditor);
@@ -2109,6 +2120,7 @@ export function attachTableControls(editor, onChange) {
     editor.removeEventListener('scroll', onScrollOrResize);
     editor.parentElement?.removeEventListener('scroll', onScrollOrResize);
     document.removeEventListener('mouseup', onDocumentMouseUp);
+    window.cancelAnimationFrame(clearLateRestoredCellSelection);
     clearHideRowTimer();
     clearCellSelection();
     overlay.remove();
