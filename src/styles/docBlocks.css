@@ -594,6 +594,12 @@
   line-height: 1.5;
 }
 
+[contenteditable="true"] .msc-table td.msc-table__cell--selected,
+[contenteditable="true"] .msc-table th.msc-table__cell--selected {
+  background: rgba(91, 140, 62, 0.14);
+  box-shadow: inset 0 0 0 2px rgba(91, 140, 62, 0.48);
+}
+
 /* 手机端不展示分栏形态：按普通正文块纵向排列，图片宽度与正文内容区一致。 */
 @media (max-width: 640px) {
   .msc-cols,
