@@ -1465,12 +1465,40 @@ export function attachTableControls(editor, onChange) {
     return hidden;
   }
 
+  function getColumnBoundarySegments(table, boundaryIndex, wrapRect) {
+    if (!table) return [];
+    const { grid } = getTableGrid(table);
+    const rows = Array.from(table.rows || []);
+    const segments = [];
+    rows.forEach((row, rowIndex) => {
+      const leftCell = grid[rowIndex]?.[boundaryIndex];
+      const rightCell = grid[rowIndex]?.[boundaryIndex + 1];
+      if (!leftCell || !rightCell || leftCell === rightCell) return;
+      const rect = row.getBoundingClientRect();
+      const top = rect.top - wrapRect.top;
+      const bottom = rect.bottom - wrapRect.top;
+      const previous = segments[segments.length - 1];
+      if (previous && Math.abs(previous.bottom - top) < 1) {
+        previous.bottom = bottom;
+      } else {
+        segments.push({ top, bottom });
+      }
+    });
+    return segments;
+  }
+
   function layoutColumnResizeHandles() {
     if (!currentWrap) return;
     const table = currentWrap.querySelector('table');
     const colgroup = ensureTableColgroup(currentWrap);
     const count = colgroup?.children?.length || 0;
-    const needed = Math.max(0, count - 1);
+    const boundaries = getColumnBoundaryXs(currentWrap);
+    const tableRect = table?.getBoundingClientRect?.();
+    const wrapRect = currentWrap.getBoundingClientRect();
+    const descriptors = boundaries.flatMap((x, index) => (
+      getColumnBoundarySegments(table, index, wrapRect).map((segment) => ({ x, index, ...segment }))
+    ));
+    const needed = descriptors.length;
     let handles = Array.from(overlay.querySelectorAll('.msc-table-ctl__col-resizer'));
     while (handles.length < needed) {
       const handle = document.createElement('span');
@@ -1481,21 +1509,17 @@ export function attachTableControls(editor, onChange) {
       handles.push(handle);
     }
     while (handles.length > needed) handles.pop()?.remove();
-    const boundaries = getColumnBoundaryXs(currentWrap);
-    const tableRect = table?.getBoundingClientRect?.();
-    const wrapRect = currentWrap.getBoundingClientRect();
-    const suppressedBoundaries = getSuppressedColumnBoundaryIndexes(table);
-    handles.forEach((handle, index) => {
-      const x = boundaries[index];
-      if (x == null || !tableRect || suppressedBoundaries.has(index)) {
+    handles.forEach((handle, handleIndex) => {
+      const descriptor = descriptors[handleIndex];
+      if (!descriptor || !tableRect) {
         handle.style.display = 'none';
         return;
       }
       handle.style.display = 'block';
-      handle.style.left = `${x}px`;
-      handle.style.top = `${Math.max(0, tableRect.top - wrapRect.top)}px`;
-      handle.style.height = `${tableRect.height}px`;
-      handle.setAttribute('data-col-resizer-index', String(index));
+      handle.style.left = `${descriptor.x}px`;
+      handle.style.top = `${descriptor.top}px`;
+      handle.style.height = `${Math.max(0, descriptor.bottom - descriptor.top)}px`;
+      handle.setAttribute('data-col-resizer-index', String(descriptor.index));
     });
   }
 
