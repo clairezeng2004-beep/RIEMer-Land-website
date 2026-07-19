@@ -763,7 +763,10 @@
 .msc-md-split__preview > :first-child { margin-top: 0; }
 .msc-md-split__preview > :last-child { margin-bottom: 0; }
 
-.msc-md-split__preview p { margin: 0.6em 0; }
+.msc-md-split__preview > p {
+  margin: 0 0 0.9em;
+  line-height: 1.7;
+}
 
 .msc-md-split__preview strong { font-weight: 700; color: var(--color-text, #1f2937); }
 .msc-md-split__preview em { font-style: italic; }
@@ -1036,8 +1039,8 @@
 .msc-form__word-editor h2 { font-size: 20px; }
 .msc-form__word-editor h3 { font-size: 17px; }
 
-.msc-form__word-editor p {
-  margin: 0.4em 0;
+.msc-form__word-editor > p {
+  margin: 0 0 0.9em;
   line-height: 1.7;
 }
 

@@ -626,8 +626,9 @@
   margin: 18px 0 10px;
 }
 
-.ptd-article__content p {
-  margin: 10px 0;
+.ptd-article__content > p {
+  margin: 0 0 0.9em;
+  line-height: 1.7;
   text-align: justify;
 }
 
@@ -1075,7 +1076,11 @@
     line-height: 1.7;
   }
 
-  .ptd-article__content p,
+  .ptd-article__content > p {
+    margin: 0 0 0.9em;
+    line-height: 1.7;
+  }
+
   .ptd-article__content li {
     margin: 0 0 0.7em;
     line-height: 1.7;

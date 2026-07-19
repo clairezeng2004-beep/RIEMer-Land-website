@@ -1059,7 +1059,8 @@
 .doc-preview__text-body h3 { font-size: 1.2em; }
 
 .doc-preview__text-body p {
-  margin: 0 0 1em;
+  margin: 0 0 0.9em;
+  line-height: 1.7;
 }
 
 .doc-preview__text-body ul,

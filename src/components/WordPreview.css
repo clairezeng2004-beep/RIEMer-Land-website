@@ -127,8 +127,9 @@
   margin: 16px 0 10px;
 }
 
-.word-preview__content p {
-  margin: 8px 0;
+.word-preview__content > p {
+  margin: 0 0 0.9em;
+  line-height: 1.7;
   text-align: justify;
 }
 

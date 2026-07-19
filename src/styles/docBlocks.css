@@ -495,6 +495,23 @@
   text-underline-offset: 0.14em;
 }
 
+/* 外部内容常用单个 <br> 代替段落。只处理普通正文的非唯一换行，
+   让历史内容和新粘贴内容保持与默认段落一致的纵向节奏。 */
+.msc-form__word-editor > p > br:not(:only-child),
+.ptd-article__content > p > br:not(:only-child),
+.msd-article__content > p > br:not(:only-child),
+.doc-preview__text-body > p > br:not(:only-child),
+.word-preview__content > p > br:not(:only-child),
+.msc-md-split__preview > p > br:not(:only-child),
+.ptd-article__content > br,
+.msd-article__content > br,
+.doc-preview__text-body > br,
+.word-preview__content > br {
+  content: "";
+  display: block;
+  margin-bottom: 0.9em;
+}
+
 [contenteditable="true"] a[href],
 .ptd-article__content a[href],
 .msd-article__content a[href],
