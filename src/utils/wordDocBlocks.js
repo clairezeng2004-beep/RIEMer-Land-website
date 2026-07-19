@@ -1329,6 +1329,7 @@ export function attachTableControls(editor, onChange) {
 
   let currentWrap = null;
   let hoveredRow = null;
+  let hoveredCell = null;
   let hoveredRowIndex = -1;
   let hideRowTimer = null;
   let cellSelection = null;
@@ -1421,6 +1422,18 @@ export function attachTableControls(editor, onChange) {
     return boundaries;
   }
 
+  function getSuppressedColumnBoundaryIndexes(table) {
+    if (!hoveredCell || !table || !table.contains(hoveredCell)) return new Set();
+    const { meta } = getTableGrid(table);
+    const item = meta.get(hoveredCell);
+    if (!item || item.colspan <= 1) return new Set();
+    const hidden = new Set();
+    for (let index = item.col; index < item.col + item.colspan - 1; index += 1) {
+      hidden.add(index);
+    }
+    return hidden;
+  }
+
   function layoutColumnResizeHandles() {
     if (!currentWrap) return;
     const table = currentWrap.querySelector('table');
@@ -1440,9 +1453,10 @@ export function attachTableControls(editor, onChange) {
     const boundaries = getColumnBoundaryXs(currentWrap);
     const tableRect = table?.getBoundingClientRect?.();
     const wrapRect = currentWrap.getBoundingClientRect();
+    const suppressedBoundaries = getSuppressedColumnBoundaryIndexes(table);
     handles.forEach((handle, index) => {
       const x = boundaries[index];
-      if (x == null || !tableRect) {
+      if (x == null || !tableRect || suppressedBoundaries.has(index)) {
         handle.style.display = 'none';
         return;
       }
@@ -1470,6 +1484,10 @@ export function attachTableControls(editor, onChange) {
     const wrapRect = currentWrap.getBoundingClientRect();
     const count = getVisualColumnCount(table);
     if (!tableRect || count < 2) {
+      hideColumnActions();
+      return;
+    }
+    if (getSuppressedColumnBoundaryIndexes(table).has(hoveredColInsertIndex - 1)) {
       hideColumnActions();
       return;
     }
@@ -1681,14 +1699,18 @@ export function attachTableControls(editor, onChange) {
     }
     clearHideRowTimer();
     currentWrap = wrap;
+    hoveredCell = t.closest('td, th');
+    if (hoveredCell && !wrap.contains(hoveredCell)) hoveredCell = null;
     const boundaries = getColumnBoundaryXs(wrap);
+    const table = wrap.querySelector('table');
+    const suppressedBoundaries = getSuppressedColumnBoundaryIndexes(table);
     const nearestColBoundary = boundaries
       .map((x, index) => ({ index, distance: Math.abs(e.clientX - (wrap.getBoundingClientRect().left + x)) }))
       .filter((item) => item.distance <= ROW_INSERT_X_TOLERANCE)
+      .filter((item) => !suppressedBoundaries.has(item.index))
       .sort((a, b) => a.distance - b.distance)[0];
     hoveredColInsertIndex = nearestColBoundary ? nearestColBoundary.index + 1 : -1;
     const rows = Array.from(wrap.querySelectorAll('tbody > tr'));
-    const table = wrap.querySelector('table');
     const tableRect = table?.getBoundingClientRect?.();
     if (!rows.length || !tableRect) {
       scheduleHideRowInsert();
@@ -1712,6 +1734,7 @@ export function attachTableControls(editor, onChange) {
   function onMouseLeaveEditor(e) {
     if (isPointInTableControlZone(e.clientX, e.clientY)) return;
     currentWrap = null;
+    hoveredCell = null;
     hideRowInsert();
     hideColumnActions();
     overlay.style.display = 'none';
@@ -1734,6 +1757,7 @@ export function attachTableControls(editor, onChange) {
     }
     if (!isPointInRect(e.clientX, e.clientY, editor.getBoundingClientRect())) {
       currentWrap = null;
+      hoveredCell = null;
       hideRowInsert();
       hideColumnActions();
       overlay.style.display = 'none';
