@@ -40,6 +40,9 @@ import {
   fetchAllFromCloud,
   fetchViewsFromCloud,
   fetchViewLog,
+  DOC_VIEWS_KEY,
+  loadLocalViews,
+  ensureLocalViewCount,
   deleteUserDoc,
   markDefaultDeleted,
   updateDoc as cloudUpdateDoc,
@@ -156,15 +159,8 @@ function mergeDocuments({ userDocs, deletedIds, filterTypes }) {
   });
 }
 
-// 流程模板 / 文档详情页共享的浏览计数（与 ProcessTemplateDetail 完全一致）
-const PTD_VIEWS_KEY = 'riemer_process_template_views';
-
 function loadDocViews() {
-  try {
-    const stored = localStorage.getItem(PTD_VIEWS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return {};
+  return loadLocalViews();
 }
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
@@ -544,7 +540,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
     // 跨标签页通信：详情页在另一个标签写 localStorage 会触发 storage 事件
     const onStorage = (e) => {
-      if (e.key === PTD_VIEWS_KEY) {
+      if (e.key === DOC_VIEWS_KEY) {
         setDocViews(loadDocViews());
       }
       if (e.key === DOCUMENTS_KEY || e.key === DELETED_DEFAULT_IDS_KEY) {
@@ -811,49 +807,42 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleLike = (docId, e) => {
     if (e) e.stopPropagation();
     if (!user) return;
+    const target = documents.find((d) => String(d.id) === String(docId));
+    if (!target) return;
     const likeData = {
       userId: user.id,
       userName: user.name || user.nickname || user.email,
       userAvatar: user.avatar || null,
     };
-
-    let nextLikesSnapshot = null;
+    const currentLikes = Array.isArray(target.likes) ? target.likes : [];
+    const alreadyLiked = currentLikes.some((l) => l.userId === user.id);
+    const nextLikes = alreadyLiked
+      ? currentLikes.filter((l) => l.userId !== user.id)
+      : [...currentLikes, likeData];
 
     setDocuments((prev) =>
-      prev.map((d) => {
-        if (d.id !== docId) return d;
-        const likes = d.likes || [];
-        const alreadyLiked = likes.some((l) => l.userId === user.id);
-        const nextLikes = alreadyLiked
-          ? likes.filter((l) => l.userId !== user.id)
-          : [...likes, likeData];
-        nextLikesSnapshot = nextLikes;
-        return { ...d, likes: nextLikes };
-      })
+      prev.map((d) => (String(d.id) === String(docId) ? { ...d, likes: nextLikes } : d))
     );
     // 同步更新 previewDoc
     if (previewDoc && previewDoc.id === docId) {
-      setPreviewDoc((prev) => {
-        if (!prev) return prev;
-        const likes = prev.likes || [];
-        const alreadyLiked = likes.some((l) => l.userId === user.id);
-        return {
-          ...prev,
-          likes: alreadyLiked
-            ? likes.filter((l) => l.userId !== user.id)
-            : [...likes, likeData],
-        };
-      });
+      setPreviewDoc((prev) => (prev ? { ...prev, likes: nextLikes } : prev));
     }
 
     // 流程模板模式：点赞同步到 Supabase（仅对用户文档 doc-* 有效）
     if (
       shouldUseCloudDocs &&
-      String(docId).startsWith('doc-') &&
-      nextLikesSnapshot
+      String(docId).startsWith('doc-')
     ) {
-      cloudUpdateDoc(docId, { likes: nextLikesSnapshot }).catch((err) => {
+      cloudUpdateDoc(docId, { likes: nextLikes }).then((result) => {
+        if (result?.error) throw result.error;
+      }).catch((err) => {
         console.warn('[Documents] 云端点赞同步失败:', err);
+        setDocuments((prev) =>
+          prev.map((d) => (String(d.id) === String(docId) ? { ...d, likes: currentLikes } : d))
+        );
+        if (previewDoc && previewDoc.id === docId) {
+          setPreviewDoc((prev) => (prev ? { ...prev, likes: currentLikes } : prev));
+        }
       });
     }
   };
@@ -1638,6 +1627,14 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
           viewLogDoc ? () => fetchViewLog(String(viewLogDoc.id)) : undefined
         }
         resolveName={resolveContributorName}
+        onResolvedTotalCount={(count) => {
+          if (!viewLogDoc) return;
+          const nextViews = ensureLocalViewCount(
+            String(viewLogDoc.id),
+            count - (Number(viewLogDoc.viewCount) || 0),
+          );
+          setDocViews(nextViews);
+        }}
       />
     </div>
   );

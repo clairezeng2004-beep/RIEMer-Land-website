@@ -644,6 +644,18 @@ export function saveLocalViews(map) {
   } catch { /* ignore */ }
 }
 
+export function ensureLocalViewCount(documentId, count, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  try {
+    const targetKey = makeViewTargetKey(documentId, targetType);
+    const map = loadStoredViews();
+    map[targetKey] = Math.max(Number(map[targetKey]) || 0, Number(count) || 0);
+    saveLocalViews(map);
+    return loadLocalViews(targetType);
+  } catch {
+    return loadLocalViews(targetType);
+  }
+}
+
 /**
  * 从云端拉取所有文档的浏览计数，合并到本地视图。
  * 合并策略：取两边较大值，避免掉线期间本地累计的数据被云端旧数据覆盖。

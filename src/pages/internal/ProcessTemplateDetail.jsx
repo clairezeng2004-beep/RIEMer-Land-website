@@ -47,6 +47,8 @@ import {
   incrementView,
   recordViewLog,
   fetchViewLog,
+  loadLocalViews,
+  ensureLocalViewCount,
   recordEditLog,
   fetchEditLog,
   subscribeEditLog,
@@ -88,7 +90,6 @@ import './DraftAutosave.css';
 
 const DOCUMENTS_KEY = 'riemer_documents';
 const DELETED_DEFAULT_IDS_KEY = 'riemer_documents_deleted_default_ids';
-const PROCESS_VIEWS_KEY = 'riemer_process_template_views';
 const PROCESS_TEMPLATE_VIEWED_KEY = 'riemer_process_template_viewed_v2';
 
 const DEFAULT_TYPE_LABELS = {
@@ -420,17 +421,7 @@ function loadDeletedDefaultIds() {
 }
 
 function loadViews() {
-  try {
-    const stored = localStorage.getItem(PROCESS_VIEWS_KEY);
-    if (stored) return JSON.parse(stored);
-  } catch { /* ignore */ }
-  return {};
-}
-
-function saveViews(data) {
-  try {
-    localStorage.setItem(PROCESS_VIEWS_KEY, JSON.stringify(data));
-  } catch { /* ignore */ }
+  return loadLocalViews();
 }
 
 function saveUserDocs(data) {
@@ -989,9 +980,17 @@ export default function ProcessTemplateDetail() {
       );
       saveUserDocs(userDocs);
       // 云端
-      if (canUseSupabase()) {
-        cloudUpdateDoc(doc.id, { likes: nextLikes }).catch((err) => {
+    if (canUseSupabase()) {
+        cloudUpdateDoc(doc.id, { likes: nextLikes }).then((result) => {
+          if (result?.error) throw result.error;
+        }).catch((err) => {
           console.warn('[ProcessTemplateDetail] 云端点赞同步失败:', err);
+          setLikes(likes);
+          setLiked(liked);
+          const userDocs = loadUserDocs().map((d) =>
+            d.id === doc.id ? { ...d, likes } : d
+          );
+          saveUserDocs(userDocs);
         });
       }
     }
@@ -2023,11 +2022,9 @@ export default function ProcessTemplateDetail() {
         resolveName={resolveContributorName}
         resolveAvatar={resolveVisitorAvatar}
         onResolvedTotalCount={(count) => {
-          const localViews = loadViews();
-          const currentCount = (Number(localViews[doc.id]) || 0) + (Number(doc.viewCount) || 0);
+          const currentCount = (Number(views[doc.id]) || 0) + (Number(doc.viewCount) || 0);
           if (count <= currentCount) return;
-          localViews[doc.id] = Math.max(Number(localViews[doc.id]) || 0, count - (Number(doc.viewCount) || 0));
-          saveViews(localViews);
+          ensureLocalViewCount(String(doc.id), count - (Number(doc.viewCount) || 0));
           setDocsVersion((v) => v + 1);
         }}
       />
