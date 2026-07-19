@@ -268,6 +268,8 @@
 [contenteditable="true"] .msc-col .msc-img-wrap .msc-img,
 .msc-form__word-editor .msc-col .msc-img-wrap .msc-img {
   display: block;
+  opacity: 1;
+  filter: none;
 }
 
 .msc-col .msc-img-wrap + .msc-img-caption,

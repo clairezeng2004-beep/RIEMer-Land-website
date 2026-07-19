@@ -424,6 +424,70 @@ function getColumns(container) {
 const MAX_COLUMN_COUNT = 8;
 const COLUMN_COUNT_CLASSES = Array.from({ length: MAX_COLUMN_COUNT }, (_, index) => `msc-cols--${index + 1}`);
 
+function normalizeColumnPercents(values) {
+  const positive = values.map((value) => Math.max(0, Number(value) || 0));
+  const total = positive.reduce((sum, value) => sum + value, 0);
+  const count = Math.max(1, values.length);
+  if (!total) {
+    const base = Math.floor(100 / count);
+    const rest = 100 - base * count;
+    return values.map((_, index) => base + (index < rest ? 1 : 0));
+  }
+  const raw = positive.map((value) => (value / total) * 100);
+  const next = raw.map((value) => Math.max(1, Math.round(value)));
+  let diff = 100 - next.reduce((sum, value) => sum + value, 0);
+  while (diff !== 0) {
+    const candidates = next
+      .map((value, index) => ({ index, value, error: next[index] - raw[index] }))
+      .filter((item) => diff > 0 || item.value > 1)
+      .sort((a, b) => (diff > 0 ? a.error - b.error : b.error - a.error));
+    const target = candidates[0]?.index;
+    if (target == null) break;
+    if (diff > 0) {
+      next[target] += 1;
+      diff -= 1;
+    } else {
+      next[target] -= 1;
+      diff += 1;
+    }
+  }
+  return next;
+}
+
+function getStoredColumnPercents(container) {
+  const cols = getColumns(container);
+  const raw = (container?.getAttribute('data-col-widths') || '')
+    .split(',')
+    .map((value) => Number(value.trim()));
+  if (raw.length !== cols.length || raw.some((value) => !Number.isFinite(value) || value <= 0)) {
+    return null;
+  }
+  return normalizeColumnPercents(raw);
+}
+
+function getInlineColumnTrackNumbers(container) {
+  const cols = getColumns(container);
+  const raw = container?.style?.gridTemplateColumns || '';
+  if (!raw || !/(fr|%)/.test(raw)) return null;
+  const values = raw
+    .split(/\s+/)
+    .map((part) => {
+      const match = part.match(/([\d.]+)(?:fr|%)/);
+      return match ? Number(match[1]) : NaN;
+    });
+  if (values.length !== cols.length || values.some((value) => !Number.isFinite(value) || value <= 0)) {
+    return null;
+  }
+  return normalizeColumnPercents(values);
+}
+
+function syncIntegerColumnTracks(container) {
+  const percents = getStoredColumnPercents(container) || getInlineColumnTrackNumbers(container);
+  if (!percents) return false;
+  setColumnTrackFractions(container, percents);
+  return true;
+}
+
 function setColumnCountClass(container, count) {
   if (!container) return;
   container.classList.remove(...COLUMN_COUNT_CLASSES);
@@ -450,22 +514,34 @@ function updateColumnLabels(container) {
   if (!container) return;
   const cols = getColumns(container);
   if (cols.length === 0) return;
+  const storedPercents = getStoredColumnPercents(container) || getInlineColumnTrackNumbers(container);
+  if (storedPercents) {
+    cols.forEach((col, i) => {
+      col.setAttribute('data-col-label', `${storedPercents[i]}%`);
+    });
+    return;
+  }
   const widths = cols.map((c) => c.getBoundingClientRect().width);
-  const total = widths.reduce((s, w) => s + w, 0) || 1;
+  const percents = normalizeColumnPercents(widths);
   cols.forEach((col, i) => {
-    col.setAttribute('data-col-label', `${Math.round((widths[i] / total) * 100)}%`);
+    col.setAttribute('data-col-label', `${percents[i]}%`);
   });
 }
 
 function setColumnTrackFractions(container, widths) {
-  const total = widths.reduce((sum, width) => sum + Math.max(0, width), 0) || 1;
-  container.style.gridTemplateColumns = widths
-    .map((width) => `${Math.max(0.001, width / total).toFixed(6)}fr`)
+  const percents = normalizeColumnPercents(widths);
+  container.setAttribute('data-col-widths', percents.join(','));
+  container.style.gridTemplateColumns = percents
+    .map((percent) => `${percent}fr`)
     .join(' ');
+  getColumns(container).forEach((col, index) => {
+    col.setAttribute('data-col-label', `${percents[index] || 0}%`);
+  });
 }
 
 function normalizePercentColumnTracks(container) {
-  if (!container || !/%/.test(container.style.gridTemplateColumns || '')) return;
+  if (!container) return;
+  if (syncIntegerColumnTracks(container)) return;
   const cols = getColumns(container);
   if (cols.length === 0) return;
   const widths = cols.map((col) => col.getBoundingClientRect().width);
@@ -640,6 +716,7 @@ function redistributeColumns(container) {
   setColumnCountClass(container, n);
   // 清掉拖拽时写入的内联宽度，交回 .msc-cols--N 的等分规则
   container.style.gridTemplateColumns = '';
+  container.removeAttribute('data-col-widths');
   ensureColumnMeta(container);
   ensureColumnResizers(container);
   ensureColumnAdders(container);

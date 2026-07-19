@@ -222,7 +222,7 @@ export function cleanPastedWordHtml(html, {
       : new Set([
         'href',
         ...(preserveTextAlign && el.hasAttribute('style') ? ['style', 'align'] : []),
-        ...(preserveEditorAttrs ? ['class', 'data-msc-table', 'data-cols', 'contenteditable'] : []),
+        ...(preserveEditorAttrs ? ['class', 'data-msc-table', 'data-cols', 'data-col-widths', 'contenteditable'] : []),
       ]);
 
     [...el.attributes].forEach((attr) => {
