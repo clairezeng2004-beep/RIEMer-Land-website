@@ -1324,6 +1324,12 @@ export function attachTableControls(editor, onChange) {
     overlay.style.display = 'none';
   }
 
+  function onOverlayPointerMove() {
+    if (!currentWrap) return;
+    clearHideRowTimer();
+    layout();
+  }
+
   function addCol() {
     if (!currentWrap) return;
     currentWrap.querySelectorAll('tr').forEach((tr) => {
@@ -1405,6 +1411,8 @@ export function attachTableControls(editor, onChange) {
   editor.addEventListener('mouseover', onMouseOver);
   editor.addEventListener('mousemove', onMouseMove);
   editor.addEventListener('mouseleave', onMouseLeaveEditor);
+  overlay.addEventListener('pointerenter', onOverlayPointerMove);
+  overlay.addEventListener('pointermove', onOverlayPointerMove);
   overlay.addEventListener('click', onOverlayClick);
   window.addEventListener('resize', onScrollOrResize);
   editor.addEventListener('scroll', onScrollOrResize);
@@ -1414,6 +1422,8 @@ export function attachTableControls(editor, onChange) {
     editor.removeEventListener('mouseover', onMouseOver);
     editor.removeEventListener('mousemove', onMouseMove);
     editor.removeEventListener('mouseleave', onMouseLeaveEditor);
+    overlay.removeEventListener('pointerenter', onOverlayPointerMove);
+    overlay.removeEventListener('pointermove', onOverlayPointerMove);
     overlay.removeEventListener('click', onOverlayClick);
     window.removeEventListener('resize', onScrollOrResize);
     editor.removeEventListener('scroll', onScrollOrResize);

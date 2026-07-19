@@ -334,6 +334,13 @@
   box-shadow: 0 8px 18px rgba(91, 140, 62, 0.24);
 }
 
+.msc-table-ctl__btn--insert-row::after {
+  content: "";
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+}
+
 .msc-table-ctl__btn--insert-row::before {
   content: "插入行";
   position: absolute;
