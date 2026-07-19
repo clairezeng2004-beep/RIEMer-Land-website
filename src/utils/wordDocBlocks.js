@@ -1165,6 +1165,13 @@ function buildTableEl(rows, cols) {
 
   const table = document.createElement('table');
   table.className = 'msc-table';
+  const colgroup = document.createElement('colgroup');
+  for (let c = 0; c < cols; c++) {
+    const col = document.createElement('col');
+    col.style.width = `${(100 / cols).toFixed(4)}%`;
+    colgroup.appendChild(col);
+  }
+  table.appendChild(colgroup);
   const tbody = document.createElement('tbody');
   for (let r = 0; r < rows; r++) {
     const tr = document.createElement('tr');
@@ -1242,6 +1249,7 @@ export function attachTableControls(editor, onChange) {
   let hoveredRowIndex = -1;
   let hideRowTimer = null;
   let cellSelection = null;
+  let colResizeState = null;
   const insertLine = overlay.querySelector('.msc-table-ctl__insert-line');
   const insertRowBtn = overlay.querySelector('[data-act="insert-row"]');
   const mergeBtn = overlay.querySelector('[data-act="merge-cells"]');
@@ -1275,8 +1283,88 @@ export function attachTableControls(editor, onChange) {
     overlay.style.top = `${r.top - wrapRect.top}px`;
     overlay.style.width = `${r.width}px`;
     overlay.style.height = `${r.height}px`;
+    ensureTableColgroup(currentWrap);
+    layoutColumnResizeHandles();
     layoutRowInsert();
     layoutMergeButton();
+  }
+
+  function getVisualColumnCount(table) {
+    const { grid } = getTableGrid(table);
+    return Math.max(0, ...grid.map((row) => row.length));
+  }
+
+  function ensureTableColgroup(wrap) {
+    const table = wrap?.querySelector('table');
+    if (!table) return null;
+    const count = getVisualColumnCount(table);
+    if (!count) return null;
+    let colgroup = table.querySelector(':scope > colgroup');
+    if (!colgroup) {
+      colgroup = document.createElement('colgroup');
+      table.insertBefore(colgroup, table.firstChild);
+    }
+    while (colgroup.children.length < count) colgroup.appendChild(document.createElement('col'));
+    while (colgroup.children.length > count) colgroup.lastElementChild?.remove();
+    const cols = Array.from(colgroup.children);
+    const missingWidths = cols.some((col) => !col.style.width);
+    if (missingWidths) {
+      cols.forEach((col) => {
+        if (!col.style.width) col.style.width = `${(100 / count).toFixed(4)}%`;
+      });
+    }
+    return colgroup;
+  }
+
+  function getColumnBoundaryXs(wrap) {
+    const table = wrap?.querySelector('table');
+    const colgroup = ensureTableColgroup(wrap);
+    if (!table || !colgroup) return [];
+    const wrapRect = wrap.getBoundingClientRect();
+    const tableRect = table.getBoundingClientRect();
+    const cols = Array.from(colgroup.children || []);
+    const widths = cols.map((col) => parseFloat(col.style.width || ''));
+    const total = widths.reduce((sum, width) => sum + (Number.isFinite(width) ? width : 0), 0) || cols.length || 1;
+    const boundaries = [];
+    let acc = 0;
+    widths.slice(0, -1).forEach((width) => {
+      acc += Number.isFinite(width) && width > 0 ? width : 100 / cols.length;
+      boundaries.push((tableRect.left - wrapRect.left) + tableRect.width * (acc / total));
+    });
+    return boundaries;
+  }
+
+  function layoutColumnResizeHandles() {
+    if (!currentWrap) return;
+    const table = currentWrap.querySelector('table');
+    const colgroup = ensureTableColgroup(currentWrap);
+    const count = colgroup?.children?.length || 0;
+    const needed = Math.max(0, count - 1);
+    let handles = Array.from(overlay.querySelectorAll('.msc-table-ctl__col-resizer'));
+    while (handles.length < needed) {
+      const handle = document.createElement('span');
+      handle.className = 'msc-table-ctl__col-resizer';
+      handle.setAttribute('contenteditable', 'false');
+      handle.setAttribute('title', '拖动调整列宽');
+      overlay.appendChild(handle);
+      handles.push(handle);
+    }
+    while (handles.length > needed) handles.pop()?.remove();
+    const boundaries = getColumnBoundaryXs(currentWrap);
+    const tableRect = table?.getBoundingClientRect?.();
+    const wrapRect = currentWrap.getBoundingClientRect();
+    handles.forEach((handle, index) => {
+      const x = boundaries[index];
+      if (x == null || !tableRect) {
+        handle.style.display = 'none';
+        return;
+      }
+      handle.style.display = 'block';
+      handle.style.left = `${x}px`;
+      handle.style.top = `${Math.max(0, tableRect.top - wrapRect.top)}px`;
+      handle.style.height = `${tableRect.height}px`;
+      handle.setAttribute('data-col-resizer-index', String(index));
+    });
   }
 
   function getTableGrid(table) {
@@ -1512,6 +1600,7 @@ export function attachTableControls(editor, onChange) {
 
   function onDocumentMouseMove(e) {
     if (!currentWrap) return;
+    if (colResizeState) return;
     if (isPointInTableControlZone(e.clientX, e.clientY)) {
       clearHideRowTimer();
       layout();
@@ -1527,11 +1616,16 @@ export function attachTableControls(editor, onChange) {
   function addCol() {
     if (!currentWrap) return;
     clearCellSelection();
+    const table = currentWrap.querySelector('table');
+    const beforeWidths = getColWidthsPx(table);
+    const average = beforeWidths.reduce((sum, width) => sum + width, 0) / (beforeWidths.length || 1);
     currentWrap.querySelectorAll('tr').forEach((tr) => {
       const td = document.createElement('td');
       td.innerHTML = '<br />';
       tr.appendChild(td);
     });
+    ensureTableColgroup(currentWrap);
+    setTableColumnWidths(table, [...beforeWidths, average || 120]);
     layout();
     onChange?.();
   }
@@ -1559,11 +1653,15 @@ export function attachTableControls(editor, onChange) {
   function delCol() {
     if (!currentWrap) return;
     clearCellSelection();
+    const table = currentWrap.querySelector('table');
     const firstRow = currentWrap.querySelector('tr');
     if (!firstRow || firstRow.children.length <= 1) return; // 至少保留 1 列
+    const nextWidths = getColWidthsPx(table).slice(0, -1);
     currentWrap.querySelectorAll('tr').forEach((tr) => {
       if (tr.lastElementChild) tr.removeChild(tr.lastElementChild);
     });
+    ensureTableColgroup(currentWrap);
+    setTableColumnWidths(table, nextWidths);
     layout();
     onChange?.();
   }
@@ -1624,6 +1722,79 @@ export function attachTableControls(editor, onChange) {
     onChange?.();
   }
 
+  function getColWidthsPx(table) {
+    const count = getVisualColumnCount(table);
+    const tableRect = table?.getBoundingClientRect?.();
+    if (!count || !tableRect) return [];
+    const cols = Array.from(table.querySelectorAll(':scope > colgroup > col'));
+    const explicit = cols.map((col) => parseFloat(col.style.width || ''));
+    if (explicit.every((value) => Number.isFinite(value) && value > 0)) {
+      const total = explicit.reduce((sum, value) => sum + value, 0) || 100;
+      return explicit.map((value) => (value / total) * tableRect.width);
+    }
+    const firstRow = table.querySelector('tbody > tr');
+    const cells = Array.from(firstRow?.cells || []);
+    if (cells.length === count && cells.every((cell) => Math.max(1, Number(cell.colSpan) || 1) === 1)) {
+      return cells.map((cell) => cell.getBoundingClientRect().width);
+    }
+    return Array.from({ length: count }, () => tableRect.width / count);
+  }
+
+  function setTableColumnWidths(table, widths) {
+    const colgroup = ensureTableColgroup(table?.closest('.msc-table-wrap'));
+    if (!colgroup || !widths.length) return;
+    const total = widths.reduce((sum, width) => sum + Math.max(0, width), 0) || 1;
+    Array.from(colgroup.children).forEach((col, index) => {
+      const pct = (Math.max(24, widths[index] || 0) / total) * 100;
+      col.style.width = `${pct.toFixed(4)}%`;
+    });
+  }
+
+  function onTableColResizeDown(e) {
+    const handle = e.target instanceof HTMLElement ? e.target.closest('.msc-table-ctl__col-resizer') : null;
+    if (!handle || !currentWrap) return;
+    const table = currentWrap.querySelector('table');
+    const index = Number(handle.getAttribute('data-col-resizer-index'));
+    const widths = getColWidthsPx(table);
+    if (!table || index < 0 || index >= widths.length - 1) return;
+    e.preventDefault();
+    e.stopPropagation();
+    clearCellSelection();
+    colResizeState = {
+      table,
+      handle,
+      index,
+      startX: e.clientX,
+      widths,
+      pairTotal: widths[index] + widths[index + 1],
+    };
+    overlay.classList.add('msc-table-ctl--resizing');
+    handle.classList.add('msc-table-ctl__col-resizer--active');
+    handle.setPointerCapture?.(e.pointerId);
+  }
+
+  function onTableColResizeMove(e) {
+    if (!colResizeState) return;
+    const { table, index, startX, widths, pairTotal } = colResizeState;
+    const minWidth = Math.min(160, Math.max(56, pairTotal * 0.18));
+    const delta = e.clientX - startX;
+    const nextLeft = Math.max(minWidth, Math.min(pairTotal - minWidth, widths[index] + delta));
+    const next = [...widths];
+    next[index] = nextLeft;
+    next[index + 1] = pairTotal - nextLeft;
+    setTableColumnWidths(table, next);
+    layout();
+  }
+
+  function finishTableColResize() {
+    if (!colResizeState) return;
+    colResizeState.handle?.classList.remove('msc-table-ctl__col-resizer--active');
+    overlay.classList.remove('msc-table-ctl--resizing');
+    colResizeState = null;
+    layout();
+    onChange?.();
+  }
+
   function onEditorMouseDown(e) {
     const cell = e.target instanceof HTMLElement ? e.target.closest('td, th') : null;
     if (!cell || !editor.contains(cell)) {
@@ -1679,8 +1850,11 @@ export function attachTableControls(editor, onChange) {
   editor.addEventListener('mouseleave', onMouseLeaveEditor);
   overlay.addEventListener('pointerenter', onOverlayPointerMove);
   overlay.addEventListener('pointermove', onOverlayPointerMove);
+  overlay.addEventListener('pointerdown', onTableColResizeDown);
   overlay.addEventListener('click', onOverlayClick);
   window.addEventListener('resize', onScrollOrResize);
+  window.addEventListener('pointermove', onTableColResizeMove);
+  window.addEventListener('pointerup', finishTableColResize);
   document.addEventListener('mousemove', onDocumentMouseMove);
   document.addEventListener('mouseup', onDocumentMouseUp);
   editor.addEventListener('scroll', onScrollOrResize);
@@ -1694,8 +1868,11 @@ export function attachTableControls(editor, onChange) {
     editor.removeEventListener('mouseleave', onMouseLeaveEditor);
     overlay.removeEventListener('pointerenter', onOverlayPointerMove);
     overlay.removeEventListener('pointermove', onOverlayPointerMove);
+    overlay.removeEventListener('pointerdown', onTableColResizeDown);
     overlay.removeEventListener('click', onOverlayClick);
     window.removeEventListener('resize', onScrollOrResize);
+    window.removeEventListener('pointermove', onTableColResizeMove);
+    window.removeEventListener('pointerup', finishTableColResize);
     document.removeEventListener('mousemove', onDocumentMouseMove);
     editor.removeEventListener('scroll', onScrollOrResize);
     editor.parentElement?.removeEventListener('scroll', onScrollOrResize);

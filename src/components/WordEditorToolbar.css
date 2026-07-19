@@ -301,6 +301,44 @@
   box-shadow: 0 10px 22px rgba(91, 140, 62, 0.28);
 }
 
+.msc-table-ctl__col-resizer {
+  position: absolute;
+  display: none;
+  width: 14px;
+  min-height: 24px;
+  transform: translateX(-50%);
+  cursor: col-resize;
+  pointer-events: auto;
+  user-select: none;
+  touch-action: none;
+  z-index: 1;
+}
+
+.msc-table-ctl__col-resizer::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 2px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background: rgba(91, 140, 62, 0.34);
+  transition: width 0.15s, background 0.15s, box-shadow 0.15s;
+}
+
+.msc-table-ctl__col-resizer:hover::before,
+.msc-table-ctl__col-resizer--active::before,
+.msc-table-ctl--resizing .msc-table-ctl__col-resizer::before {
+  width: 4px;
+  background: var(--color-primary, #5B8C3E);
+  box-shadow: 0 0 0 3px rgba(91, 140, 62, 0.14);
+}
+
+.msc-table-ctl--resizing {
+  cursor: col-resize;
+}
+
 /* 加列：右侧居中 */
 .msc-table-ctl__btn[data-act="add-col"] {
   right: -12px;
