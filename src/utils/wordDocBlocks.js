@@ -1330,7 +1330,6 @@ export function attachTableControls(editor, onChange) {
 
   let currentWrap = null;
   let hoveredRow = null;
-  let hoveredCell = null;
   let hoveredRowIndex = -1;
   let hideRowTimer = null;
   let cellSelection = null;
@@ -1424,14 +1423,15 @@ export function attachTableControls(editor, onChange) {
   }
 
   function getSuppressedColumnBoundaryIndexes(table) {
-    if (!hoveredCell || !table || !table.contains(hoveredCell)) return new Set();
+    if (!table) return new Set();
     const { meta } = getTableGrid(table);
-    const item = meta.get(hoveredCell);
-    if (!item || item.colspan <= 1) return new Set();
     const hidden = new Set();
-    for (let index = item.col; index < item.col + item.colspan - 1; index += 1) {
-      hidden.add(index);
-    }
+    meta.forEach((item) => {
+      if (!item || item.colspan <= 1) return;
+      for (let index = item.col; index < item.col + item.colspan - 1; index += 1) {
+        hidden.add(index);
+      }
+    });
     return hidden;
   }
 
@@ -1700,8 +1700,6 @@ export function attachTableControls(editor, onChange) {
     }
     clearHideRowTimer();
     currentWrap = wrap;
-    hoveredCell = t.closest('td, th');
-    if (hoveredCell && !wrap.contains(hoveredCell)) hoveredCell = null;
     const boundaries = getColumnBoundaryXs(wrap);
     const table = wrap.querySelector('table');
     const suppressedBoundaries = getSuppressedColumnBoundaryIndexes(table);
@@ -1735,7 +1733,6 @@ export function attachTableControls(editor, onChange) {
   function onMouseLeaveEditor(e) {
     if (isPointInTableControlZone(e.clientX, e.clientY)) return;
     currentWrap = null;
-    hoveredCell = null;
     hideRowInsert();
     hideColumnActions();
     overlay.style.display = 'none';
@@ -1758,7 +1755,6 @@ export function attachTableControls(editor, onChange) {
     }
     if (!isPointInRect(e.clientX, e.clientY, editor.getBoundingClientRect())) {
       currentWrap = null;
-      hoveredCell = null;
       hideRowInsert();
       hideColumnActions();
       overlay.style.display = 'none';
