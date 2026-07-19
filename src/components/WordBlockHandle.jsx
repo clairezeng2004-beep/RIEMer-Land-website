@@ -156,6 +156,66 @@ function replaceBlockTag(block, tag) {
   return next;
 }
 
+function cloneBlockShell(block) {
+  const next = document.createElement(block.tagName.toLowerCase());
+  Array.from(block.attributes || []).forEach((attr) => {
+    next.setAttribute(attr.name, attr.value);
+  });
+  return next;
+}
+
+function appendNodesOrBreak(target, nodes) {
+  if (!target) return;
+  nodes.forEach((node) => target.appendChild(node));
+  if (!target.childNodes.length) target.innerHTML = '<br />';
+}
+
+function getDirectChildWithin(parent, node) {
+  let current = node;
+  while (current && current.parentNode !== parent) current = current.parentNode;
+  return current || null;
+}
+
+function splitBlockAtCaretLine(editor, block) {
+  if (!editor || !block || !editor.contains(block)) return block;
+  const tag = block.tagName?.toLowerCase();
+  if (!['p', 'h1', 'h2', 'h3', 'blockquote', 'div'].includes(tag)) return block;
+  if (!block.querySelector?.('br')) return block;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return block;
+  const anchor = sel.anchorNode;
+  if (!anchor || !block.contains(anchor)) return block;
+  const directChild = anchor === block ? block.childNodes[sel.anchorOffset] : getDirectChildWithin(block, anchor);
+  const childNodes = Array.from(block.childNodes);
+  let cursorIndex = directChild ? childNodes.indexOf(directChild) : sel.anchorOffset;
+  if (cursorIndex < 0) cursorIndex = Math.max(0, Math.min(childNodes.length - 1, sel.anchorOffset));
+
+  let start = cursorIndex;
+  while (start > 0 && childNodes[start - 1]?.nodeName !== 'BR') start -= 1;
+  let end = cursorIndex;
+  while (end < childNodes.length && childNodes[end]?.nodeName !== 'BR') end += 1;
+
+  const beforeNodes = childNodes.slice(0, start);
+  const currentNodes = childNodes.slice(start, end);
+  const afterNodes = childNodes.slice(end + 1);
+  if (!beforeNodes.length && !afterNodes.length) return block;
+
+  const beforeBlock = beforeNodes.length ? cloneBlockShell(block) : null;
+  const currentBlock = cloneBlockShell(block);
+  const afterBlock = afterNodes.length ? cloneBlockShell(block) : null;
+  appendNodesOrBreak(beforeBlock, beforeNodes);
+  appendNodesOrBreak(currentBlock, currentNodes);
+  appendNodesOrBreak(afterBlock, afterNodes);
+
+  if (beforeBlock) block.parentNode?.insertBefore(beforeBlock, block);
+  block.parentNode?.insertBefore(currentBlock, block);
+  if (afterBlock) block.parentNode?.insertBefore(afterBlock, block);
+  block.remove();
+  placeCaretAtEnd(currentBlock);
+  return currentBlock;
+}
+
 function replaceBlockWithList(block, listTag) {
   if (!block || !['ul', 'ol'].includes(listTag)) return null;
   const currentTag = block.tagName?.toLowerCase();
@@ -380,6 +440,12 @@ export default function WordBlockHandle({ editorRef, onChange }) {
   }, [editorRef]);
 
   const applyOption = useCallback((opt) => {
+    const editor = editorRef?.current;
+    const shouldExitListForBlock = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(opt.key);
+    const shouldApplyList = opt.key === 'ul' || opt.key === 'ol';
+    if ((shouldExitListForBlock || shouldApplyList) && blockRef.current && !getCurrentListItem(editor)) {
+      blockRef.current = splitBlockAtCaretLine(editor, blockRef.current);
+    }
     if (!restoreCaret(opt.selectAll)) { setMenuOpen(false); return; }
     let value = opt.value || null;
     if (opt.prompt) {
@@ -391,9 +457,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       if (!value) { setMenuOpen(false); return; }
     }
     try {
-      const shouldExitListForBlock = ['p', 'h1', 'h2', 'h3', 'blockquote'].includes(opt.key);
-      const shouldApplyList = opt.key === 'ul' || opt.key === 'ol';
-      const listItem = shouldExitListForBlock ? getCurrentListItem(editorRef?.current) : null;
+      const listItem = shouldExitListForBlock ? getCurrentListItem(editor) : null;
       if (listItem) {
         blockRef.current = replaceListItemWithBlock(listItem, opt.key);
         if (blockRef.current) placeCaretAtEnd(blockRef.current);
@@ -402,7 +466,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
         if (nextBlock) {
           blockRef.current = nextBlock;
           placeCaretAtEnd(nextBlock);
-          if (opt.key === 'ol') normalizeOrderedListNumbering(editorRef?.current);
+          if (opt.key === 'ol') normalizeOrderedListNumbering(editor);
         } else {
           document.execCommand(opt.cmd, false, value);
         }
@@ -417,7 +481,7 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       } else {
         document.execCommand(opt.cmd, false, value);
       }
-      if (opt.key === 'ol') normalizeOrderedListNumbering(editorRef?.current);
+      if (opt.key === 'ol') normalizeOrderedListNumbering(editor);
       if (opt.key === 'alignLeft' || opt.key === 'alignCenter' || opt.key === 'alignRight') {
         applyTextAlignToBlock(blockRef.current, opt.key);
       }
@@ -428,7 +492,6 @@ export default function WordBlockHandle({ editorRef, onChange }) {
       }
       // 链接补 target，安全打开
       if (opt.key === 'link' && value) {
-        const editor = editorRef?.current;
         const sel = window.getSelection();
         let n = sel && sel.rangeCount > 0 ? sel.getRangeAt(0).commonAncestorContainer : null;
         n = n && n.nodeType === 1 ? n : n?.parentElement;
