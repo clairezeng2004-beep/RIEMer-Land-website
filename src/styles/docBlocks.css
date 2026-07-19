@@ -550,14 +550,9 @@
   max-width: 100%;
 }
 
-[contenteditable="true"] .msc-callout__body[data-placeholder][data-empty]::before {
+[contenteditable="true"] .msc-callout__body[data-placeholder][data-empty] > p:first-child::before {
   content: attr(data-placeholder);
-  display: block;
-  width: 100%;
-  min-height: 1.7em;
-  padding: 0.1em 0.25em;
-  border-radius: 6px;
-  background: rgba(107, 114, 128, 0.12);
+  display: inline;
   color: rgba(55, 65, 81, 0.62);
   pointer-events: none;
 }
