@@ -282,16 +282,6 @@
   transform: translateY(-50%) scale(1.08);
 }
 
-/* 加行：底部居中 */
-.msc-table-ctl__btn[data-act="add-row"] {
-  bottom: -12px;
-  left: 50%;
-  transform: translateX(-50%);
-}
-.msc-table-ctl__btn[data-act="add-row"]:hover {
-  transform: translateX(-50%) scale(1.08);
-}
-
 /* 删列：右上，更小更淡 */
 .msc-table-ctl__btn--del-col {
   top: -12px !important;
@@ -320,6 +310,55 @@
 .msc-table-ctl__btn--del-row:hover {
   background: var(--color-danger, #dc2626);
   color: #fff;
+}
+
+.msc-table-ctl__insert-line {
+  position: absolute;
+  display: none;
+  height: 2px;
+  background: var(--color-primary, #5B8C3E);
+  border-radius: 999px;
+  pointer-events: none;
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(91, 140, 62, 0.12);
+}
+
+.msc-table-ctl__btn--insert-row {
+  display: none;
+  width: 24px;
+  height: 24px;
+  border-width: 0;
+  background: var(--color-primary, #5B8C3E);
+  color: #fff;
+  transform: translate(-50%, -50%);
+  box-shadow: 0 8px 18px rgba(91, 140, 62, 0.24);
+}
+
+.msc-table-ctl__btn--insert-row::before {
+  content: "插入行";
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  white-space: nowrap;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(31, 41, 55, 0.96);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s ease;
+}
+
+.msc-table-ctl__btn--insert-row:hover {
+  transform: translate(-50%, -50%) scale(1.08);
+}
+
+.msc-table-ctl__btn--insert-row:hover::before {
+  opacity: 1;
 }
 
 .msc-table-ctl__v,
