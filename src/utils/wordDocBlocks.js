@@ -526,6 +526,66 @@ function placeCaretAtEnd(node) {
   } catch { /* ignore */ }
 }
 
+function cloneBlockShell(block) {
+  const next = document.createElement(block.tagName.toLowerCase());
+  Array.from(block.attributes || []).forEach((attr) => {
+    next.setAttribute(attr.name, attr.value);
+  });
+  return next;
+}
+
+function appendNodesOrBreak(target, nodes) {
+  if (!target) return;
+  nodes.forEach((node) => target.appendChild(node));
+  if (!target.childNodes.length) target.innerHTML = '<br />';
+}
+
+function getDirectChildWithin(parent, node) {
+  let current = node;
+  while (current && current.parentNode !== parent) current = current.parentNode;
+  return current || null;
+}
+
+function splitBlockAtCaretLine(editor, block) {
+  if (!editor || !block || !editor.contains(block)) return block;
+  const tag = block.tagName?.toLowerCase();
+  if (!['p', 'h1', 'h2', 'h3', 'blockquote', 'div'].includes(tag)) return block;
+  if (!block.querySelector?.('br')) return block;
+
+  const sel = window.getSelection();
+  if (!sel || sel.rangeCount === 0) return block;
+  const anchor = sel.anchorNode;
+  if (!anchor || !block.contains(anchor)) return block;
+  const directChild = anchor === block ? block.childNodes[sel.anchorOffset] : getDirectChildWithin(block, anchor);
+  const childNodes = Array.from(block.childNodes);
+  let cursorIndex = directChild ? childNodes.indexOf(directChild) : sel.anchorOffset;
+  if (cursorIndex < 0) cursorIndex = Math.max(0, Math.min(childNodes.length - 1, sel.anchorOffset));
+
+  let start = cursorIndex;
+  while (start > 0 && childNodes[start - 1]?.nodeName !== 'BR') start -= 1;
+  let end = cursorIndex;
+  while (end < childNodes.length && childNodes[end]?.nodeName !== 'BR') end += 1;
+
+  const beforeNodes = childNodes.slice(0, start);
+  const currentNodes = childNodes.slice(start, end);
+  const afterNodes = childNodes.slice(end + 1);
+  if (!beforeNodes.length && !afterNodes.length) return block;
+
+  const beforeBlock = beforeNodes.length ? cloneBlockShell(block) : null;
+  const currentBlock = cloneBlockShell(block);
+  const afterBlock = afterNodes.length ? cloneBlockShell(block) : null;
+  appendNodesOrBreak(beforeBlock, beforeNodes);
+  appendNodesOrBreak(currentBlock, currentNodes);
+  appendNodesOrBreak(afterBlock, afterNodes);
+
+  if (beforeBlock) block.parentNode?.insertBefore(beforeBlock, block);
+  block.parentNode?.insertBefore(currentBlock, block);
+  if (afterBlock) block.parentNode?.insertBefore(afterBlock, block);
+  block.remove();
+  placeCaretAtEnd(currentBlock);
+  return currentBlock;
+}
+
 export function attachEditableLinkOpener(editor) {
   if (!editor) return () => {};
   const handler = (e) => {
@@ -1446,10 +1506,44 @@ export function attachWordEditingNormalizer(editor, onChange) {
       return false;
     }
     const before = String(probe.toString() || '').replace(/\u200B/g, '');
-    if (!/^\s*(?:\d+|[a-zA-Z]|[ivxlcdmIVXLCDM]+)\.$/.test(before)) return false;
+    const lineText = before.split(/\n/).pop() || '';
+    const markerMatch = lineText.match(/^(\s*)(?:\d+|[a-zA-Z]|[ivxlcdmIVXLCDM]+)\.$/);
+    if (!markerMatch) return false;
 
-    probe.deleteContents();
-    if (block.tagName?.toLowerCase() !== 'li') {
+    const lineBlock = splitBlockAtCaretLine(editor, block);
+    const lineRange = document.createRange();
+    lineRange.selectNodeContents(lineBlock);
+    const lineSel = window.getSelection();
+    lineSel?.removeAllRanges();
+    lineSel?.addRange(lineRange);
+
+    const markerLength = markerMatch[0].length;
+    const markerRange = document.createRange();
+    markerRange.selectNodeContents(lineBlock);
+    const walker = document.createTreeWalker(lineBlock, NodeFilter.SHOW_TEXT);
+    let remaining = markerLength;
+    let endNode = null;
+    let endOffset = 0;
+    while (walker.nextNode()) {
+      const node = walker.currentNode;
+      const length = String(node.textContent || '').replace(/\u200B/g, '').length;
+      if (remaining <= length) {
+        endNode = node;
+        endOffset = remaining;
+        break;
+      }
+      remaining -= length;
+    }
+    if (endNode) {
+      markerRange.setStart(lineBlock, 0);
+      markerRange.setEnd(endNode, endOffset);
+      markerRange.deleteContents();
+    } else {
+      lineBlock.innerHTML = '<br />';
+    }
+
+    placeCaretAtEnd(lineBlock);
+    if (lineBlock.tagName?.toLowerCase() !== 'li') {
       document.execCommand('insertOrderedList', false, null);
     }
     normalizeOrderedListNumbering(editor);
