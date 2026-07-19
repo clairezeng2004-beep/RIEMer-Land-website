@@ -48,8 +48,27 @@
   cursor: grabbing;
 }
 
-.etoc__title {
+.etoc__title-toggle {
   flex: 1;
+  min-width: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.etoc__title-toggle:hover {
+  color: var(--color-primary, #5B8C3E);
+}
+
+.etoc__title {
+  min-width: 0;
 }
 
 .etoc__close {

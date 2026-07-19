@@ -138,8 +138,16 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
       {open ? (
         <nav className="etoc__panel" aria-label="文档目录">
           <div className="etoc__header" onPointerDown={startDrag} title="拖动目录">
-            <List size={14} />
-            <span className="etoc__title">目录</span>
+            <button
+              type="button"
+              className="etoc__title-toggle"
+              onClick={() => setOpen(false)}
+              title="收起目录"
+              aria-label="收起目录"
+            >
+              <List size={14} />
+              <span className="etoc__title">目录</span>
+            </button>
             <button
               type="button"
               className="etoc__close"
