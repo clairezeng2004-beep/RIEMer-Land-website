@@ -1341,7 +1341,8 @@ export function attachTableControls(editor, onChange) {
   const rowActions = overlay.querySelector('.msc-table-ctl__row-actions');
   const colActions = overlay.querySelector('.msc-table-ctl__col-actions');
   const mergeBtn = overlay.querySelector('[data-act="merge-cells"]');
-  const ROW_INSERT_Y_TOLERANCE = 28;
+  const ROW_BOUNDARY_HIT_TOLERANCE = 7;
+  const TABLE_LOOSE_Y_TOLERANCE = 28;
   const ROW_INSERT_X_TOLERANCE = 56;
   const CONTROL_HIT_PADDING = 36;
 
@@ -1356,7 +1357,7 @@ export function attachTableControls(editor, onChange) {
     hideRowTimer = window.setTimeout(() => {
       hideRowTimer = null;
       hideRowInsert();
-    }, 220);
+    }, 80);
   }
 
   function layout() {
@@ -1719,8 +1720,8 @@ export function attachTableControls(editor, onChange) {
       const withinLooseWrap =
         e.clientX >= rect.left - ROW_INSERT_X_TOLERANCE &&
         e.clientX <= rect.right + ROW_INSERT_X_TOLERANCE &&
-        e.clientY >= rect.top - ROW_INSERT_Y_TOLERANCE &&
-        e.clientY <= rect.bottom + ROW_INSERT_Y_TOLERANCE;
+        e.clientY >= rect.top - TABLE_LOOSE_Y_TOLERANCE &&
+        e.clientY <= rect.bottom + TABLE_LOOSE_Y_TOLERANCE;
       if (withinLooseWrap) wrap = currentWrap;
     }
     if (!wrap) {
@@ -1749,7 +1750,7 @@ export function attachTableControls(editor, onChange) {
         const rect = row.getBoundingClientRect();
         return { row, index, distance: Math.abs(e.clientY - rect.bottom) };
       })
-      .filter((item) => item.distance <= ROW_INSERT_Y_TOLERANCE)
+      .filter((item) => item.distance <= ROW_BOUNDARY_HIT_TOLERANCE)
       .sort((a, b) => a.distance - b.distance)[0];
     if (!nearest || e.clientX < tableRect.left - ROW_INSERT_X_TOLERANCE || e.clientX > tableRect.right + ROW_INSERT_X_TOLERANCE) {
       scheduleHideRowInsert();
