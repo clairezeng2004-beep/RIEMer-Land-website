@@ -51,6 +51,31 @@ function applyTextAlignToSelection(editor, cmd) {
   });
 }
 
+function replaceBlockTag(block, tag) {
+  if (!block || block.tagName?.toLowerCase() === tag) return block;
+  const next = document.createElement(tag);
+  Array.from(block.attributes || []).forEach((attr) => {
+    next.setAttribute(attr.name, attr.value);
+  });
+  while (block.firstChild) next.appendChild(block.firstChild);
+  block.parentNode?.replaceChild(next, block);
+  return next;
+}
+
+function applyBlockTagToSelection(editor, tag) {
+  const blocks = getSelectedTextBlocks(editor)
+    .filter((block) => {
+      const blockTag = block.tagName?.toLowerCase();
+      if (!['p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'blockquote', 'div'].includes(blockTag)) return false;
+      if (block.closest?.('td, th, .msc-callout, .msc-cols')) return false;
+      if (block.querySelector?.('table, .msc-table-wrap, .msc-cols')) return false;
+      return true;
+    });
+  if (!blocks.length) return false;
+  blocks.forEach((block) => replaceBlockTag(block, tag));
+  return true;
+}
+
 function getSelectedImage(editor) {
   const sel = window.getSelection();
   if (!editor || !sel || sel.rangeCount === 0) return null;
@@ -85,6 +110,7 @@ export default function FloatingTextToolbar({
   const [pos, setPos] = useState({ top: 0, left: 0 });
   const [active, setActive] = useState({});
   const toolbarRef = useRef(null);
+  const savedRichRangeRef = useRef(null);
   const isMarkdown = mode === 'markdown';
 
   /* =================================================================
@@ -121,7 +147,21 @@ export default function FloatingTextToolbar({
       commonAncestorContainer.nodeType === 1
         ? commonAncestorContainer
         : commonAncestorContainer.parentElement;
-    return !!node && editor.contains(node);
+    const inside = !!node && editor.contains(node);
+    if (inside) savedRichRangeRef.current = range.cloneRange();
+    return inside;
+  }, [editorRef]);
+
+  const restoreRichSelection = useCallback(() => {
+    const editor = editorRef.current;
+    const savedRange = savedRichRangeRef.current;
+    if (!editor || !savedRange) return false;
+    if (!editor.contains(savedRange.commonAncestorContainer)) return false;
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(savedRange.cloneRange());
+    editor.focus?.();
+    return true;
   }, [editorRef]);
 
   const detectActiveRich = useCallback(() => {
@@ -387,16 +427,18 @@ export default function FloatingTextToolbar({
   }, [detectActiveRich, fireChangeRich]);
 
   const applyBlockRich = useCallback((tag) => {
+    restoreRichSelection();
     const isActive =
       (tag === 'h1' && active.h1) ||
       (tag === 'h2' && active.h2) ||
       (tag === 'h3' && active.h3) ||
       (tag === 'blockquote' && active.blockquote);
     const target = isActive ? 'p' : tag;
-    document.execCommand('formatBlock', false, `<${target}>`);
+    const applied = applyBlockTagToSelection(editorRef.current, target);
+    if (!applied) document.execCommand('formatBlock', false, `<${target}>`);
     detectActiveRich();
     fireChangeRich();
-  }, [active, detectActiveRich, fireChangeRich]);
+  }, [active, detectActiveRich, editorRef, fireChangeRich, restoreRichSelection]);
 
   // 列表（富文本）：有序 insertOrderedList / 无序 insertUnorderedList。
   // 再次点击同类型可取消列表（execCommand 自带切换）。生成的 <ul>/<ol> 支持
