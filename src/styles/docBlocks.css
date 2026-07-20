@@ -495,8 +495,30 @@
   text-underline-offset: 0.14em;
 }
 
-/* 外部内容常用单个 <br> 代替段落。只处理普通正文的非唯一换行，
-   让历史内容和新粘贴内容保持与默认段落一致的纵向节奏。 */
+/* 存量内容可能混有嵌套段落、无 class 的 div 和内联 Word 段距。
+   在所有编辑/阅读入口统一正文节奏，避免同一篇文章中段距忽宽忽窄。 */
+.msc-form__word-editor p:not(.msc-img-wrap):not(.msc-img-caption),
+.ptd-article__content p:not(.msc-img-wrap):not(.msc-img-caption),
+.msd-article__content p:not(.msc-img-wrap):not(.msc-img-caption),
+.doc-preview__text-body p:not(.msc-img-wrap):not(.msc-img-caption),
+.word-preview__content p:not(.msc-img-wrap):not(.msc-img-caption),
+.msc-md-split__preview p:not(.msc-img-wrap):not(.msc-img-caption) {
+  margin-top: 0 !important;
+  margin-bottom: 0.45em !important;
+  line-height: 1.7;
+}
+
+.msc-form__word-editor > div:not([class]):not(:has(> p, > div, > table, > ul, > ol, > blockquote)),
+.ptd-article__content > div:not([class]):not(:has(> p, > div, > table, > ul, > ol, > blockquote)),
+.msd-article__content > div:not([class]):not(:has(> p, > div, > table, > ul, > ol, > blockquote)),
+.doc-preview__text-body > div:not([class]):not(:has(> p, > div, > table, > ul, > ol, > blockquote)),
+.word-preview__content > div:not([class]):not(:has(> p, > div, > table, > ul, > ol, > blockquote)),
+.msc-md-split__preview > div:not([class]):not(:has(> p, > div, > table, > ul, > ol, > blockquote)) {
+  margin: 0 0 0.45em !important;
+  line-height: 1.7;
+}
+
+/* br 只是同一段内换行，不再额外模拟一个段落间距。 */
 .msc-form__word-editor > p > br:not(:only-child),
 .ptd-article__content > p > br:not(:only-child),
 .msd-article__content > p > br:not(:only-child),
@@ -509,7 +531,15 @@
 .word-preview__content > br {
   content: "";
   display: block;
-  margin-bottom: 0.45em;
+  margin-bottom: 0;
+}
+
+.msc-table p {
+  margin: 0 !important;
+}
+
+.msc-callout__body p {
+  margin: 0.25em 0 !important;
 }
 
 [contenteditable="true"] a[href],
