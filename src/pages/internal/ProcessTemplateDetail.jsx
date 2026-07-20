@@ -33,6 +33,7 @@ import {
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
 import TextAnnotation from '../../components/TextAnnotation';
+import { ensureResponsiveTableWrappers } from '../../utils/responsiveTables';
 import ImageLightbox from '../../components/ImageLightbox';
 import FloatingTextToolbar from '../../components/FloatingTextToolbar';
 import WordEditorToolbar from '../../components/WordEditorToolbar';
@@ -770,6 +771,7 @@ export default function ProcessTemplateDetail() {
 
   useEffect(() => {
     if (!contentRef.current || isEditing) return;
+    ensureResponsiveTableWrappers(contentRef.current);
     const imgs = Array.from(contentRef.current.querySelectorAll('img'));
     imgs.forEach((img, index) => {
       img.decoding = 'async';

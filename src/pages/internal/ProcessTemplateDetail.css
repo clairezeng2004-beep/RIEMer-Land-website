@@ -1087,6 +1087,24 @@
     padding-left: 0;
   }
 
+  .ptd-article__content .msc-table-wrap {
+    overflow-x: auto;
+    overscroll-behavior-inline: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x pan-y;
+  }
+
+  .ptd-article__content .msc-table-wrap > table {
+    width: max-content;
+    min-width: 100%;
+    max-width: none;
+  }
+
+  .ptd-article__content .msc-table-wrap th,
+  .ptd-article__content .msc-table-wrap td {
+    min-width: 120px;
+  }
+
   .ptd-article__content > p {
     margin: 0 0 0.45em;
     line-height: 1.7;

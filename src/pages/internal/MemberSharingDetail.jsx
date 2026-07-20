@@ -21,6 +21,7 @@ import {
   Pencil,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
+import { ensureResponsiveTableWrappers } from '../../utils/responsiveTables';
 import ImageLightbox from '../../components/ImageLightbox';
 import WordPreview from '../../components/WordPreview';
 import ViewLogPopover from '../../components/ViewLogPopover';
@@ -349,6 +350,7 @@ export default function MemberSharingDetail() {
 
   useEffect(() => {
     if (!contentRef.current) return;
+    ensureResponsiveTableWrappers(contentRef.current);
     const imgs = Array.from(contentRef.current.querySelectorAll('img'));
     imgs.forEach((img, index) => {
       img.decoding = 'async';
