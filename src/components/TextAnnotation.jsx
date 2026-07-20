@@ -15,6 +15,7 @@ import './TextAnnotation.css';
 const AVATAR_BG = '#5B8C3E';
 const FLOATING_COMMENT_WIDTH = 360;
 const FLOATING_COMMENT_MAX_HEIGHT = 220;
+const FLOATING_TRIGGER_WIDTH = 86;
 const MOBILE_COMMENT_BREAKPOINT = 768;
 
 function timeAgo(dateStr) {
@@ -31,13 +32,32 @@ function timeAgo(dateStr) {
   return d.toLocaleDateString('zh-CN');
 }
 
-function getSelectionToolbarPosition(rect) {
+function getSelectionEndRect(range) {
+  if (!range) return null;
+  const caretRange = range.cloneRange();
+  caretRange.collapse(false);
+  const caretRect = caretRange.getBoundingClientRect();
+  if (caretRect && (caretRect.height > 0 || caretRect.width > 0)) return caretRect;
+
+  const rects = Array.from(range.getClientRects()).filter((rect) => rect.height > 0);
+  const lastRect = rects[rects.length - 1] || range.getBoundingClientRect();
+  return {
+    left: lastRect.right,
+    right: lastRect.right,
+    top: lastRect.top,
+    bottom: lastRect.bottom,
+    width: 0,
+    height: lastRect.height,
+  };
+}
+
+function getSelectionToolbarPosition(rect, toolbarWidth = FLOATING_TRIGGER_WIDTH) {
   const viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
   const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
   const safeGap = 10;
   const safeEdge = 12;
-  const width = Math.min(FLOATING_COMMENT_WIDTH, Math.max(260, viewportWidth - safeEdge * 2));
-  const rawCenter = rect.left + rect.width / 2;
+  const width = Math.min(toolbarWidth, Math.max(1, viewportWidth - safeEdge * 2));
+  const rawCenter = rect.right;
   const minX = safeEdge + width / 2;
   const maxX = Math.max(minX, viewportWidth - safeEdge - width / 2);
   const x = Math.min(maxX, Math.max(minX, rawCenter));
@@ -282,7 +302,8 @@ export default function TextAnnotation({
         if (!contentRef.current.contains(sel.anchorNode)) return;
 
         const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
+        const rect = getSelectionEndRect(range);
+        if (!rect) return;
         const nextPos = getSelectionToolbarPosition(rect);
 
         setSelection({
@@ -337,8 +358,12 @@ export default function TextAnnotation({
       if (!sel || !sel.rangeCount || !sel.toString().trim()) return;
       try {
         const range = sel.getRangeAt(0);
-        const rect = range.getBoundingClientRect();
-        const nextPos = getSelectionToolbarPosition(rect);
+        const rect = getSelectionEndRect(range);
+        if (!rect) return;
+        const nextPos = getSelectionToolbarPosition(
+          rect,
+          isCommenting ? FLOATING_COMMENT_WIDTH : FLOATING_TRIGGER_WIDTH,
+        );
         setToolbar((prev) => ({
           ...prev,
           ...nextPos,
@@ -353,7 +378,7 @@ export default function TextAnnotation({
       window.removeEventListener('scroll', recomputePosition, true);
       window.removeEventListener('resize', recomputePosition);
     };
-  }, [toolbar.visible, contentRef]);
+  }, [toolbar.visible, contentRef, isCommenting]);
 
   // ---- 提交评论（划中文本） ----
   const handleSubmitComment = async () => {

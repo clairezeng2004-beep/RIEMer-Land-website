@@ -21,9 +21,14 @@ mark.ta-highlight:hover {
 .ta-toolbar {
   position: fixed;
   z-index: 800;
-  width: min(360px, calc(100vw - 24px));
+  width: max-content;
+  max-width: calc(100vw - 24px);
   transform: translate(-50%, 0);
   animation: ta-toolbar-in 0.15s ease;
+}
+
+.ta-toolbar--commenting {
+  width: min(360px, calc(100vw - 24px));
 }
 
 .ta-toolbar[data-placement="top"] {
