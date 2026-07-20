@@ -940,10 +940,14 @@
     line-height: 1.7;
   }
 
-  .msd-article__content > .msc-table-wrap,
+  .msd-article__content .msc-table-wrap,
   .msd-article__content > table {
     width: calc(100% + var(--mobile-table-left-offset));
     margin-left: calc(-1 * var(--mobile-table-left-offset));
+  }
+
+  .msd-article__content table tr > :first-child {
+    padding-left: 0;
   }
 
   .msd-article__content > p {
