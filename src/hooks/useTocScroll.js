@@ -145,11 +145,11 @@ export default function useTocScroll({
       .filter(Boolean);
     if (!headings.length) return;
 
-    const scrollParent = findScrollParent(contentRef.current);
     let ticking = false;
 
     const updateActive = () => {
       ticking = false;
+      const scrollParent = findScrollParent(root);
       const rootRect = root.getBoundingClientRect();
       const viewportBottom = scrollParent
         ? scrollParent.getBoundingClientRect().bottom
@@ -176,8 +176,9 @@ export default function useTocScroll({
       img.addEventListener('load', requestUpdate, { once: true });
       img.addEventListener('error', requestUpdate, { once: true });
     });
-    const target = scrollParent || window;
-    target.addEventListener('scroll', requestUpdate, { passive: true });
+    // scroll 不冒泡；用捕获阶段监听 window，才能同时覆盖 window、主内容区、
+    // 编辑器内部滚动层等不同页面结构。滚动容器会在 updateActive 中实时重算。
+    window.addEventListener('scroll', requestUpdate, { passive: true, capture: true });
     window.addEventListener('resize', requestUpdate);
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
@@ -186,7 +187,7 @@ export default function useTocScroll({
         img.removeEventListener('load', requestUpdate);
         img.removeEventListener('error', requestUpdate);
       });
-      target.removeEventListener('scroll', requestUpdate);
+      window.removeEventListener('scroll', requestUpdate, { capture: true });
       window.removeEventListener('resize', requestUpdate);
     };
   }, [toc, contentRef, findHeadingInRoot, findScrollParent, pickActiveHeading]);
