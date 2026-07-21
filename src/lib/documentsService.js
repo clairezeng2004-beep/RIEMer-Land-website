@@ -860,6 +860,40 @@ export async function incrementView(documentId, targetType = DEFAULT_VIEW_TARGET
 // 在 Supabase 不可用 / 未登录 / 表不存在时也能展示本设备的访问者。
 
 export const DOC_VIEW_LOGS_KEY = 'riemer_document_view_logs'; // { [documentId]: [{userId,userName,viewedAt}] }
+const VIEW_LOG_CACHE_TTL_MS = 60_000;
+const viewLogCache = new Map();
+const viewLogRequests = new Map();
+
+function getViewLogSessionKey(targetKey) {
+  return `riemer_view_log_cache:${targetKey}`;
+}
+
+function readCachedViewLog(targetKey) {
+  const memory = viewLogCache.get(targetKey);
+  if (memory && Date.now() - memory.cachedAt < VIEW_LOG_CACHE_TTL_MS) return memory.logs;
+  try {
+    const stored = JSON.parse(sessionStorage.getItem(getViewLogSessionKey(targetKey)) || 'null');
+    if (stored && Array.isArray(stored.logs) && Date.now() - stored.cachedAt < VIEW_LOG_CACHE_TTL_MS) {
+      viewLogCache.set(targetKey, stored);
+      return stored.logs;
+    }
+  } catch { /* ignore */ }
+  return null;
+}
+
+function cacheViewLog(targetKey, logs) {
+  const entry = { logs, cachedAt: Date.now() };
+  viewLogCache.set(targetKey, entry);
+  try {
+    sessionStorage.setItem(getViewLogSessionKey(targetKey), JSON.stringify(entry));
+  } catch { /* ignore */ }
+  return logs;
+}
+
+function invalidateViewLogCache(targetKey) {
+  viewLogCache.delete(targetKey);
+  try { sessionStorage.removeItem(getViewLogSessionKey(targetKey)); } catch { /* ignore */ }
+}
 
 function loadLocalViewLogs() {
   try {
@@ -882,6 +916,7 @@ function saveLocalViewLogs(map) {
  */
 export async function recordViewLog(documentId, user, targetType = DEFAULT_VIEW_TARGET_TYPE) {
   const targetKey = makeViewTargetKey(documentId, targetType);
+  invalidateViewLogCache(targetKey);
   const userId = user?.id || null;
   const userName = user?.name || user?.nickname || user?.email || '访客';
   const viewedAt = new Date().toISOString();
@@ -907,11 +942,14 @@ export async function recordViewLog(documentId, user, targetType = DEFAULT_VIEW_
     if (error) {
       // 表不存在 / 无权限 → 静默降级
       console.warn('[documentsService] 访问日志写入失败:', error.message);
+      invalidateViewLogCache(targetKey);
       return { remote: false, error };
     }
+    invalidateViewLogCache(targetKey);
     return { remote: true };
   } catch (err) {
     console.warn('[documentsService] recordViewLog 异常:', err.message);
+    invalidateViewLogCache(targetKey);
     return { remote: false, error: err };
   }
 }
@@ -924,51 +962,67 @@ export async function recordViewLog(documentId, user, targetType = DEFAULT_VIEW_
  */
 export async function fetchViewLog(documentId, targetType = DEFAULT_VIEW_TARGET_TYPE) {
   const targetKey = makeViewTargetKey(documentId, targetType);
+  const cached = readCachedViewLog(targetKey);
+  if (cached) return cached;
+  if (viewLogRequests.has(targetKey)) return viewLogRequests.get(targetKey);
 
-  if (canUseSupabase() && supabase) {
-    try {
-      const rows = [];
-      const pageSize = 1000;
-      let from = 0;
+  const request = (async () => {
+    if (canUseSupabase() && supabase) {
+      try {
+        const rows = [];
+        const pageSize = 1000;
+        let from = 0;
 
-      while (true) {
-        const { data, error } = await withTimeout(
-          supabase
-            .from('document_view_logs')
-            .select('user_id,user_name,viewed_at')
-            .eq('document_id', targetKey)
-            .order('viewed_at', { ascending: false })
-            .range(from, from + pageSize - 1),
-          VIEW_LOG_TIMEOUT_MS,
-          '加载访问记录',
-        );
-        if (error) {
-          console.warn('[documentsService] fetchViewLog 云端失败，回退本地:', error.message);
-          rows.length = 0;
-          break;
+        while (true) {
+          const { data, error } = await withTimeout(
+            supabase
+              .from('document_view_logs')
+              .select('user_id,user_name,viewed_at')
+              .eq('document_id', targetKey)
+              .order('viewed_at', { ascending: false })
+              .range(from, from + pageSize - 1),
+            VIEW_LOG_TIMEOUT_MS,
+            '加载访问记录',
+          );
+          if (error) {
+            console.warn('[documentsService] fetchViewLog 云端失败，回退本地:', error.message);
+            rows.length = 0;
+            break;
+          }
+          if (!Array.isArray(data) || data.length === 0) break;
+          rows.push(...data);
+          if (data.length < pageSize) break;
+          from += pageSize;
         }
-        if (!Array.isArray(data) || data.length === 0) break;
-        rows.push(...data);
-        if (data.length < pageSize) break;
-        from += pageSize;
-      }
 
-      if (rows.length > 0) {
-        return rows.map((r) => ({
-          userId: r.user_id || null,
-          userName: r.user_name || '访客',
-          viewedAt: r.viewed_at,
-        }));
+        if (rows.length > 0) {
+          return cacheViewLog(targetKey, rows.map((r) => ({
+            userId: r.user_id || null,
+            userName: r.user_name || '访客',
+            viewedAt: r.viewed_at,
+          })));
+        }
+      } catch (err) {
+        console.warn('[documentsService] fetchViewLog 异常，回退本地:', err.message);
       }
-    } catch (err) {
-      console.warn('[documentsService] fetchViewLog 异常，回退本地:', err.message);
     }
+    // 本地兜底：按时间倒序
+    const all = loadLocalViewLogs();
+    const list = Array.isArray(all[targetKey]) ? [...all[targetKey]] : [];
+    list.sort((a, b) => new Date(b.viewedAt || 0) - new Date(a.viewedAt || 0));
+    return cacheViewLog(targetKey, list);
+  })();
+
+  viewLogRequests.set(targetKey, request);
+  try {
+    return await request;
+  } finally {
+    viewLogRequests.delete(targetKey);
   }
-  // 本地兜底：按时间倒序
-  const all = loadLocalViewLogs();
-  const list = Array.isArray(all[targetKey]) ? [...all[targetKey]] : [];
-  list.sort((a, b) => new Date(b.viewedAt || 0) - new Date(a.viewedAt || 0));
-  return list;
+}
+
+export function prefetchViewLog(documentId, targetType = DEFAULT_VIEW_TARGET_TYPE) {
+  return fetchViewLog(documentId, targetType).catch(() => []);
 }
 
 /* ============ 编辑历史（document_edit_logs） ============ */

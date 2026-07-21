@@ -36,6 +36,7 @@ import {
 import {
   recordViewLog,
   fetchViewLog,
+  prefetchViewLog,
   fetchViewCountFromCloud,
   incrementView,
   loadLocalViews,
@@ -337,6 +338,14 @@ export default function MemberSharingDetail() {
     } catch { /* ignore */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [post?.id, user?.id]);
+
+  useEffect(() => {
+    if (!post?.id) return undefined;
+    const timer = window.setTimeout(() => {
+      prefetchViewLog(String(post.id), VIEW_TARGET_TYPE);
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [post?.id]);
 
   // Markdown / Word-HTML 渲染
   const renderedContent = useMemo(() => {

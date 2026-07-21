@@ -47,6 +47,7 @@ import {
   incrementView,
   recordViewLog,
   fetchViewLog,
+  prefetchViewLog,
   loadLocalViews,
   ensureLocalViewCount,
   recordEditLog,
@@ -717,6 +718,14 @@ export default function ProcessTemplateDetail() {
     } catch { /* ignore */ }
     return undefined;
   }, [doc?.id, user?.id]);
+
+  useEffect(() => {
+    if (!doc?.id) return undefined;
+    const timer = window.setTimeout(() => {
+      prefetchViewLog(String(doc.id));
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [doc?.id]);
 
   /* 编辑历史：拉取 + 订阅实时新增。
      延迟 400ms 启动，避让文档主内容 / 评论 / 用户目录的首屏请求——
