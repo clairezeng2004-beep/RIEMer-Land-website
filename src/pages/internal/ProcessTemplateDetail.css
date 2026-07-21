@@ -1095,14 +1095,10 @@
   }
 
   .ptd-article__content .msc-table-wrap > table {
-    width: max-content;
+    width: max(100%, var(--msc-table-mobile-width, 100%)) !important;
     min-width: 100%;
     max-width: none;
-  }
-
-  .ptd-article__content .msc-table-wrap th,
-  .ptd-article__content .msc-table-wrap td {
-    min-width: 120px;
+    table-layout: fixed;
   }
 
   .ptd-article__content > p {
@@ -1124,7 +1120,7 @@
   }
 
   .ptd-article__content table {
-    font-size: 12px;
+    font-size: 14px;
   }
 
   .ptd-article__footer {
