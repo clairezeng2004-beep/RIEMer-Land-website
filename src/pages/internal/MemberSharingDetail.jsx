@@ -36,7 +36,7 @@ import {
 import {
   recordViewLog,
   fetchViewLog,
-  fetchViewsFromCloud,
+  fetchViewCountFromCloud,
   incrementView,
   loadLocalViews,
 } from '../../lib/documentsService';
@@ -273,7 +273,7 @@ export default function MemberSharingDetail() {
       const [listResult, catsResult, viewsResult] = await Promise.allSettled([
         fetchSharings(),
         fetchCategories(),
-        fetchViewsFromCloud(VIEW_TARGET_TYPE),
+        fetchViewCountFromCloud(id, VIEW_TARGET_TYPE),
       ]);
       if (cancelled) return;
       if (listResult.status === 'fulfilled' && Array.isArray(listResult.value)) {
@@ -288,8 +288,11 @@ export default function MemberSharingDetail() {
       if (catsResult.status === 'fulfilled' && Array.isArray(catsResult.value)) {
         setCategoryList(catsResult.value);
       }
-      if (viewsResult.status === 'fulfilled' && viewsResult.value) {
-        setViews(viewsResult.value);
+      if (viewsResult.status === 'fulfilled') {
+        setViews((prev) => ({
+          ...prev,
+          [id]: Math.max(Number(prev[id]) || 0, Number(viewsResult.value) || 0),
+        }));
       }
     })();
 

@@ -465,8 +465,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       if (cloud) {
         applyCloudDocs(cloud.docs, cloud.deletedIds);
         if (refreshSeqRef.current === seq) setCloudLoading(false);
-        fetchViewsFromCloud().then((mergedViews) => {
+        fetchViewsFromCloud(undefined, { includeLogCounts: false }).then((mergedViews) => {
           if (refreshSeqRef.current === seq && mergedViews) setDocViews(mergedViews);
+        });
+        fetchViewsFromCloud().then((reconciledViews) => {
+          if (refreshSeqRef.current === seq && reconciledViews) setDocViews(reconciledViews);
         });
         return;
       }

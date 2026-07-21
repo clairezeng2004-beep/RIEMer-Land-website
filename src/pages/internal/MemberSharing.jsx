@@ -203,11 +203,14 @@ export default function MemberSharing() {
         const [list, cats, cloudViews] = await Promise.all([
           fetchSharings(),
           fetchCategories(),
-          fetchViewsFromCloud(VIEW_TARGET_TYPE),
+          fetchViewsFromCloud(VIEW_TARGET_TYPE, { includeLogCounts: false }),
         ]);
         if (cancelled) return;
         setSharings(list);
         if (cloudViews) setViews(cloudViews);
+        fetchViewsFromCloud(VIEW_TARGET_TYPE).then((reconciledViews) => {
+          if (!cancelled && reconciledViews) setViews(reconciledViews);
+        }).catch(() => {});
         // ⚠️ 必须兼容"空数组"—— 若只有云端可用且用户已在另一设备把分类全删光，
         // fetchCategories 会返回 []，直接同步给 UI；若 cats 为 null/undefined
         // （服务层意外分支）才保留默认列表不动。

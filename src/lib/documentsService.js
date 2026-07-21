@@ -660,7 +660,10 @@ export function ensureLocalViewCount(documentId, count, targetType = DEFAULT_VIE
  * 从云端拉取所有文档的浏览计数，合并到本地视图。
  * 合并策略：取两边较大值，避免掉线期间本地累计的数据被云端旧数据覆盖。
  */
-export async function fetchViewsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE) {
+export async function fetchViewsFromCloud(
+  targetType = DEFAULT_VIEW_TARGET_TYPE,
+  { includeLogCounts = true } = {},
+) {
   if (!canUseSupabase() || !supabase) return null;
   try {
     // 只拉需要的两个字段（document_id + view_count）——避免被新加列或大字段
@@ -683,13 +686,15 @@ export async function fetchViewsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE)
       const id = parseViewTargetKey(r.document_id, targetType);
       if (id) cloudMap[id] = r.view_count || 0;
     });
-    try {
+    if (includeLogCounts) {
+      try {
       const logCounts = await fetchViewLogCountsFromCloud(targetType);
       Object.entries(logCounts).forEach(([id, count]) => {
         cloudMap[id] = Math.max(Number(cloudMap[id]) || 0, Number(count) || 0);
       });
-    } catch (err) {
-      console.warn('[documentsService] 拉取访问明细计数失败:', err.message);
+      } catch (err) {
+        console.warn('[documentsService] 拉取访问明细计数失败:', err.message);
+      }
     }
     const localMap = loadStoredViews();
     const merged = { ...localMap };
@@ -702,6 +707,44 @@ export async function fetchViewsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE)
   } catch (err) {
     console.warn('[documentsService] fetchViewsFromCloud 异常:', err.message);
     return null;
+  }
+}
+
+export async function fetchViewCountFromCloud(
+  documentId,
+  targetType = DEFAULT_VIEW_TARGET_TYPE,
+) {
+  const localCount = Number(loadLocalViews(targetType)[String(documentId)]) || 0;
+  if (!canUseSupabase() || !supabase) return localCount;
+  const targetKey = makeViewTargetKey(documentId, targetType);
+  try {
+    const [summaryResult, logsResult] = await Promise.all([
+      withTimeout(
+        supabase
+          .from('document_views')
+          .select('view_count')
+          .eq('document_id', targetKey)
+          .maybeSingle(),
+        VIEW_COUNT_TIMEOUT_MS,
+        '加载当前浏览计数',
+      ),
+      withTimeout(
+        supabase
+          .from('document_view_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('document_id', targetKey),
+        VIEW_LOG_TIMEOUT_MS,
+        '加载当前访问明细计数',
+      ),
+    ]);
+    const summaryCount = summaryResult.error ? 0 : Number(summaryResult.data?.view_count) || 0;
+    const logCount = logsResult.error ? 0 : Number(logsResult.count) || 0;
+    const count = Math.max(localCount, summaryCount, logCount);
+    ensureLocalViewCount(documentId, count, targetType);
+    return count;
+  } catch (err) {
+    console.warn('[documentsService] 加载当前浏览计数失败:', err.message);
+    return localCount;
   }
 }
 

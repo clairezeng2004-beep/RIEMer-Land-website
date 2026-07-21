@@ -43,7 +43,7 @@ import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import {
   fetchAllFromCloud,
   fetchDocFromCloud,
-  fetchViewsFromCloud,
+  fetchViewCountFromCloud,
   incrementView,
   recordViewLog,
   fetchViewLog,
@@ -619,7 +619,7 @@ export default function ProcessTemplateDetail() {
           setCloudData({ userDocs, deletedIds: cloud.deletedIds.map(String) });
         }
         // 浏览数不阻塞正文首屏；慢网络下让内容先出来。
-        fetchViewsFromCloud()
+        fetchViewCountFromCloud(id)
           .then(() => {
             if (!cancelled) setDocsVersion((v) => v + 1);
           })
