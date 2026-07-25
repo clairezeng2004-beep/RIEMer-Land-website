@@ -423,10 +423,24 @@ mark.ta-highlight:hover {
 
 .ta-panel__section--anchored {
   padding-bottom: 8px;
+  border-bottom: none;
+}
+
+.ta-anchored-map {
+  position: relative;
+  min-height: 240px;
+}
+
+.ta-anchored-comment {
+  position: absolute;
+  left: 0;
+  right: 0;
+  padding: 0 0 8px;
 }
 
 .ta-anchored-comment .ta-comment {
   border-top: 1px solid var(--color-border-light);
+  border-bottom: 1px solid var(--color-border-light);
 }
 
 /* ---- 单条评论 ---- */

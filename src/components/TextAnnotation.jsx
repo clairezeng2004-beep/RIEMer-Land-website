@@ -187,10 +187,12 @@ export default function TextAnnotation({
   // 活跃高亮
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentAnchors, setCommentAnchors] = useState({});
+  const [contentHeight, setContentHeight] = useState(0);
   const [mobileThread, setMobileThread] = useState(null);
 
   const toolbarRef = useRef(null);
   const panelRef = useRef(null);
+  const anchoredMapRef = useRef(null);
 
   // ---- 加载评论（异步） ----
   const loadComments = useCallback(async () => {
@@ -238,6 +240,7 @@ export default function TextAnnotation({
       const containerRect = container.getBoundingClientRect();
       const next = {};
       const marks = Array.from(container.querySelectorAll('.ta-highlight'));
+      setContentHeight(Math.max(container.scrollHeight || 0, containerRect.height || 0));
       activeGroups.forEach((group) => {
         const mark = marks.find((el) => el.dataset.commentGroup === group.key);
         if (!mark) return;
@@ -250,6 +253,63 @@ export default function TextAnnotation({
       setCommentAnchors(next);
     });
   }, [comments, contentRef]);
+
+  // 图片/折叠内容加载、窗口变化或页面滚动时，重新量一次高亮位置，
+  // 让右侧评论卡片始终跟随它对应的下划线段落。
+  useEffect(() => {
+    if (!inline || !contentRef?.current) return;
+    const container = contentRef.current;
+    let frame = null;
+
+    const measureAnchors = () => {
+      if (frame) cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        const containerRect = container.getBoundingClientRect();
+        const mapRect = anchoredMapRef.current?.getBoundingClientRect?.() || null;
+        const next = {};
+        setContentHeight(Math.max(container.scrollHeight || 0, containerRect.height || 0));
+        const activeComments = comments.filter((c) => c.selectedText && !c.resolved);
+        const activeGroups = groupAnchoredComments(activeComments);
+        const marks = Array.from(container.querySelectorAll('.ta-highlight'));
+        activeGroups.forEach((group) => {
+          const mark = marks.find((el) => el.dataset.commentGroup === group.key);
+          if (!mark) return;
+          const rect = mark.getBoundingClientRect();
+          const top = mapRect
+            ? rect.top - mapRect.top
+            : rect.top - containerRect.top + container.scrollTop;
+          group.comments.forEach((comment) => {
+            next[comment.id] = top;
+          });
+        });
+        setCommentAnchors(next);
+      });
+    };
+
+    measureAnchors();
+    const resizeObserver = typeof ResizeObserver !== 'undefined'
+      ? new ResizeObserver(measureAnchors)
+      : null;
+    try { resizeObserver?.observe(container); } catch { /* ignore */ }
+    const imgs = Array.from(container.querySelectorAll('img'));
+    imgs.forEach((img) => {
+      img.addEventListener('load', measureAnchors);
+      img.addEventListener('error', measureAnchors);
+    });
+    window.addEventListener('scroll', measureAnchors, { passive: true, capture: true });
+    window.addEventListener('resize', measureAnchors);
+
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      resizeObserver?.disconnect();
+      imgs.forEach((img) => {
+        img.removeEventListener('load', measureAnchors);
+        img.removeEventListener('error', measureAnchors);
+      });
+      window.removeEventListener('scroll', measureAnchors, { capture: true });
+      window.removeEventListener('resize', measureAnchors);
+    };
+  }, [comments, contentRef, inline]);
 
   // 手机端阅读：点击划词标记，展开该位置对应的评论
   useEffect(() => {
@@ -496,16 +556,23 @@ export default function TextAnnotation({
   const anchoredComments = comments.filter((c) => c.selectedText && !c.resolved);
   const unresolvedComments = comments.filter((c) => !c.resolved);
   const resolvedComments = comments.filter((c) => c.resolved);
-  const anchoredCommentsForReading = anchoredComments
-    .map((comment) => ({
-      comment,
-      anchorTop: Number.isFinite(commentAnchors[comment.id]) ? commentAnchors[comment.id] : null,
-    }))
+  const anchoredGroupsForReading = groupAnchoredComments(anchoredComments)
+    .map((group) => {
+      const tops = group.comments
+        .map((comment) => commentAnchors[comment.id])
+        .filter(Number.isFinite);
+      return {
+        ...group,
+        anchorTop: tops.length ? Math.min(...tops) : null,
+      };
+    })
     .sort((a, b) => {
       if (a.anchorTop !== null && b.anchorTop !== null) return a.anchorTop - b.anchorTop;
       if (a.anchorTop !== null) return -1;
       if (b.anchorTop !== null) return 1;
-      return new Date(b.comment.createdAt || 0) - new Date(a.comment.createdAt || 0);
+      const aTime = Math.max(...a.comments.map((comment) => new Date(comment.createdAt || 0).getTime()));
+      const bTime = Math.max(...b.comments.map((comment) => new Date(comment.createdAt || 0).getTime()));
+      return bTime - aTime;
     });
 
   // ---- 渲染头像 ----
@@ -661,20 +728,17 @@ export default function TextAnnotation({
     );
   };
 
-  const renderAnchoredComment = (entry, index) => {
-    const previous = anchoredCommentsForReading[index - 1];
-    const previousTop = previous?.anchorTop ?? null;
-    const currentTop = entry.anchorTop;
-    const gap = currentTop !== null && previousTop !== null
-      ? Math.max(12, Math.min(120, currentTop - previousTop))
-      : 16;
+  const renderAnchoredGroup = (group, index) => {
+    const currentTop = group.anchorTop;
+    const fallbackTop = index * 180;
+    const top = currentTop !== null ? currentTop : fallbackTop;
     return (
       <div
-        key={entry.comment.id}
+        key={group.key}
         className="ta-anchored-comment"
-        style={{ marginTop: index === 0 ? 8 : gap }}
+        style={inline ? { top: `${top}px` } : undefined}
       >
-        {renderComment(entry.comment)}
+        {group.comments.map(renderComment)}
       </div>
     );
   };
@@ -735,10 +799,16 @@ export default function TextAnnotation({
                 {generalComments.map(renderComment)}
               </div>
             )}
-            {anchoredCommentsForReading.length > 0 && (
+            {anchoredGroupsForReading.length > 0 && (
               <div className="ta-panel__section ta-panel__section--anchored">
                 <div className="ta-panel__section-title">划词评论</div>
-                {anchoredCommentsForReading.map(renderAnchoredComment)}
+                <div
+                  ref={anchoredMapRef}
+                  className="ta-anchored-map"
+                  style={{ minHeight: `${Math.max(contentHeight, 240)}px` }}
+                >
+                  {anchoredGroupsForReading.map(renderAnchoredGroup)}
+                </div>
               </div>
             )}
           </>
