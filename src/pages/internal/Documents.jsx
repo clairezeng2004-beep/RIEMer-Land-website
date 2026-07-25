@@ -42,6 +42,7 @@ import {
   DOC_VIEWS_KEY,
   loadLocalViews,
   ensureLocalViewCount,
+  subscribeViewCounts,
   deleteUserDoc,
   markDefaultDeleted,
   updateDoc as cloudUpdateDoc,
@@ -160,6 +161,24 @@ function mergeDocuments({ userDocs, deletedIds, filterTypes }) {
 
 function loadDocViews() {
   return loadLocalViews();
+}
+
+function mergeLikesForRealtime(currentDoc, incomingDoc, pendingLike) {
+  const current = Array.isArray(currentDoc?.likes) ? currentDoc.likes : [];
+  const incoming = Array.isArray(incomingDoc?.likes) ? incomingDoc.likes : [];
+  if (!pendingLike) {
+    const currentTime = new Date(currentDoc?._updatedAt || 0).getTime();
+    const incomingTime = new Date(incomingDoc?._updatedAt || 0).getTime();
+    if (incomingTime && currentTime && incomingTime < currentTime) return current;
+    if (!incomingTime && incoming.length < current.length) return current;
+    return incoming;
+  }
+
+  const pendingUserId = String(pendingLike.userId || '');
+  const incomingHasPendingUser = incoming.some((like) => String(like?.userId || '') === pendingUserId);
+  if (pendingLike.action === 'remove' && incomingHasPendingUser) return current;
+  if (pendingLike.action === 'add' && !incomingHasPendingUser) return current;
+  return incoming;
 }
 
 export default function Documents({ filterTypes, customTitle, customDesc, configSection }) {
@@ -425,6 +444,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       filterTypes,
     });
   });
+  const documentsRef = useRef(documents);
+  useEffect(() => {
+    documentsRef.current = documents;
+  }, [documents]);
   const [cloudLoading, setCloudLoading] = useState(() => canUseSupabase());
   const pendingDeletedIdsRef = useRef(new Set());
   const [pendingDeletedIds, setPendingDeletedIds] = useState([]);
@@ -435,6 +458,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
   // 与 ProcessTemplateDetail 共享的浏览计数（在列表卡片上实时展示）
   const [docViews, setDocViews] = useState(() => loadDocViews());
+  const pendingLikesRef = useRef(new Map());
 
   const shouldUseCloudDocs = canUseSupabase();
   const refreshSeqRef = useRef(0);
@@ -444,6 +468,14 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
       userDocs: cloudDocs,
       deletedIds: cloudDeletedIds,
       filterTypes,
+    }).map((incoming) => {
+      const current = documentsRef.current.find((doc) => String(doc.id) === String(incoming.id));
+      if (!current) return incoming;
+      const pendingLike = pendingLikesRef.current.get(String(incoming.id));
+      return {
+        ...incoming,
+        likes: mergeLikesForRealtime(current, incoming, pendingLike),
+      };
     });
     setDocuments(hidePendingDeletedDocs(sorted));
     try {
@@ -516,11 +548,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
     const unsubDocs = subscribeDocuments(() => refetch());
     const unsubDeleted = subscribeDeletedDefaults(() => refetch());
+    const unsubViews = subscribeViewCounts(undefined, (nextViews) => {
+      setDocViews((prev) => ({ ...prev, ...nextViews }));
+    });
 
     return () => {
       if (timer) clearTimeout(timer);
       unsubDocs();
       unsubDeleted();
+      unsubViews();
     };
   }, [shouldUseCloudDocs, refreshDocs]);
 
@@ -821,6 +857,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const nextLikes = alreadyLiked
       ? currentLikes.filter((l) => l.userId !== user.id)
       : [...currentLikes, likeData];
+    const pendingKey = String(docId);
+    pendingLikesRef.current.set(pendingKey, {
+      userId: user.id,
+      action: alreadyLiked ? 'remove' : 'add',
+    });
 
     setDocuments((prev) =>
       prev.map((d) => (String(d.id) === String(docId) ? { ...d, likes: nextLikes } : d))
@@ -845,7 +886,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         if (previewDoc && previewDoc.id === docId) {
           setPreviewDoc((prev) => (prev ? { ...prev, likes: currentLikes } : prev));
         }
+      }).finally(() => {
+        setTimeout(() => {
+          pendingLikesRef.current.delete(pendingKey);
+        }, 1200);
       });
+    } else {
+      setTimeout(() => {
+        pendingLikesRef.current.delete(pendingKey);
+      }, 1200);
     }
   };
 

@@ -86,6 +86,7 @@ function rowToDoc(row) {
     likes: Array.isArray(row.likes) ? row.likes : [],
     lastEditedAt: row.last_edited_at || null,
     lastEditedBy: row.last_edited_by || null,
+    _updatedAt: row.updated_at || row.created_at || null,
     _remote: true, // 标记此记录来自云端，便于调试
   };
 }

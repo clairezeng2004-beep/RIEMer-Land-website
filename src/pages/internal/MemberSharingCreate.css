@@ -908,11 +908,11 @@
        否则文字会从工具栏下方透出。
      - padding 纵向加大一点，让工具栏 sticky 时形成完整遮挡带；
        否则编辑器内容滚过顶部时会从"插入图片"这一行上沿透出。
-     - z-index 10：高于编辑器及图片，但低于 FloatingTextToolbar(z-index: 1200)
+     - z-index 80：高于编辑器表格控制线，但低于 FloatingTextToolbar(z-index: 1200)
        和 Navbar(z-index: 1000)，保证浮层仍在它之上。 */
   position: sticky;
   top: 72px; /* msc-topbar 高度（贴在其下方） */
-  z-index: 10;
+  z-index: 80;
   background: var(--color-bg, #f9fafb);
   min-height: 58px;
   padding: 12px 0 10px;
