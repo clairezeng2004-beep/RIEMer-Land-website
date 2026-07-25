@@ -1,11 +1,16 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
 import EditableText from '../../components/EditableText';
 import ViewLogPopover from '../../components/ViewLogPopover';
-import { fetchViewLog, fetchViewsFromCloud, loadLocalViews } from '../../lib/documentsService';
+import {
+  fetchViewLog,
+  fetchViewsFromCloud,
+  loadLocalViews,
+  subscribeViewCounts,
+} from '../../lib/documentsService';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import {
   fetchSharings,
@@ -93,6 +98,24 @@ function getAttachmentTypeSummary(attachments) {
   if (!Array.isArray(attachments) || attachments.length === 0) return '';
   const labels = [...new Set(attachments.map(getAttachmentTypeLabel).filter(Boolean))];
   return labels.join(' / ');
+}
+
+function mergeLikesForRealtime(currentPost, incomingPost, pendingLike) {
+  const current = Array.isArray(currentPost?.likes) ? currentPost.likes : [];
+  const incoming = Array.isArray(incomingPost?.likes) ? incomingPost.likes : [];
+  if (!pendingLike) {
+    const currentTime = new Date(currentPost?._updatedAt || 0).getTime();
+    const incomingTime = new Date(incomingPost?._updatedAt || 0).getTime();
+    if (incomingTime && currentTime && incomingTime < currentTime) return current;
+    if (!incomingTime && incoming.length < current.length) return current;
+    return incoming;
+  }
+
+  const pendingUserId = String(pendingLike.userId || '');
+  const incomingHasPendingUser = incoming.some((like) => String(like?.userId || '') === pendingUserId);
+  if (pendingLike.action === 'remove' && incomingHasPendingUser) return current;
+  if (pendingLike.action === 'add' && !incomingHasPendingUser) return current;
+  return incoming;
 }
 
 export default function MemberSharing() {
@@ -185,6 +208,7 @@ export default function MemberSharing() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCategories, setSelectedCategories] = useState([]);
   const [views, setViews] = useState(() => loadLocalViews(VIEW_TARGET_TYPE));
+  const pendingLikesRef = useRef(new Map());
 
   // 动态分类管理
   const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
@@ -234,11 +258,27 @@ export default function MemberSharing() {
         });
       } else if (type === 'UPDATE' && newItem) {
         setSharings((prev) =>
-          prev.map((s) => (String(s.id) === String(newItem.id) ? { ...s, ...newItem } : s)),
+          prev.map((s) => {
+            if (String(s.id) !== String(newItem.id)) return s;
+            const pendingLike = pendingLikesRef.current.get(String(newItem.id));
+            return {
+              ...s,
+              ...newItem,
+              likes: mergeLikesForRealtime(s, newItem, pendingLike),
+            };
+          }),
         );
       } else if (type === 'DELETE' && oldItem) {
         setSharings((prev) => prev.filter((s) => String(s.id) !== String(oldItem.id)));
       }
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // 订阅访问量/访问明细变化，别人打开分享详情后列表页无需刷新即可更新。
+  useEffect(() => {
+    const unsubscribe = subscribeViewCounts(VIEW_TARGET_TYPE, (nextViews) => {
+      setViews((prev) => ({ ...prev, ...nextViews }));
     });
     return () => unsubscribe();
   }, []);
@@ -414,16 +454,31 @@ export default function MemberSharing() {
     const newLikes = already
       ? likes.filter((l) => l.userId !== user.id)
       : [...likes, { userId: user.id, userName: user.name || user.nickname || user.email }];
+    const postId = String(id);
+    pendingLikesRef.current.set(postId, {
+      userId: user.id,
+      action: already ? 'remove' : 'add',
+    });
 
     setSharings((prev) =>
-      prev.map((s) => (String(s.id) === String(id) ? { ...s, likes: newLikes } : s)),
+      prev.map((s) => (
+        String(s.id) === String(id)
+          ? { ...s, likes: newLikes }
+          : s
+      )),
     );
-    updateSharing(id, { likes: newLikes }).catch((err) => {
-      console.warn('[MemberSharing] 点赞同步失败:', err);
-      setSharings((prev) =>
-        prev.map((s) => (String(s.id) === String(id) ? { ...s, likes } : s)),
-      );
-    });
+    updateSharing(id, { likes: newLikes })
+      .catch((err) => {
+        console.warn('[MemberSharing] 点赞同步失败:', err);
+        setSharings((prev) =>
+          prev.map((s) => (String(s.id) === String(id) ? { ...s, likes } : s)),
+        );
+      })
+      .finally(() => {
+        setTimeout(() => {
+          pendingLikesRef.current.delete(postId);
+        }, 1200);
+      });
   };
 
   const hasLiked = (post) => {

@@ -50,6 +50,7 @@ function dbToFrontend(row) {
         : [],
     createdAt: row.created_at || new Date().toISOString().split('T')[0],
     likes: Array.isArray(row.likes) ? row.likes : [],
+    _updatedAt: row.updated_at || row.created_at || null,
     _fromDb: true,
   };
 }

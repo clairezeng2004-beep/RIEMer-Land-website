@@ -748,6 +748,46 @@ export async function fetchViewCountFromCloud(
   }
 }
 
+/** 订阅浏览计数/访问明细变化，用于列表页免刷新更新访问量。 */
+export function subscribeViewCounts(targetType = DEFAULT_VIEW_TARGET_TYPE, onChange) {
+  if (!canUseSupabase() || !supabase) return () => {};
+  const prefix = `${String(targetType || DEFAULT_VIEW_TARGET_TYPE).trim()}:`;
+  const applyCount = (documentId, count, { increment = false } = {}) => {
+    const id = parseViewTargetKey(documentId, targetType);
+    if (!id) return;
+    const scoped = increment
+      ? ensureLocalViewCount(id, (Number(loadLocalViews(targetType)[id]) || 0) + 1, targetType)
+      : ensureLocalViewCount(id, count, targetType);
+    onChange?.(scoped);
+  };
+
+  const channel = supabase
+    .channel(`document_views_realtime_${String(targetType || DEFAULT_VIEW_TARGET_TYPE)}`)
+    .on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'document_views' },
+      (payload) => {
+        const row = payload.new || payload.old;
+        if (!String(row?.document_id || '').startsWith(prefix)) return;
+        applyCount(row.document_id, Number(row.view_count) || 0);
+      },
+    )
+    .on(
+      'postgres_changes',
+      { event: 'INSERT', schema: 'public', table: 'document_view_logs' },
+      (payload) => {
+        const row = payload.new;
+        if (!String(row?.document_id || '').startsWith(prefix)) return;
+        applyCount(row.document_id, 0, { increment: true });
+      },
+    )
+    .subscribe();
+
+  return () => {
+    try { supabase.removeChannel(channel); } catch { /* ignore */ }
+  };
+}
+
 async function fetchViewLogCountsFromCloud(targetType = DEFAULT_VIEW_TARGET_TYPE) {
   const prefix = `${String(targetType || DEFAULT_VIEW_TARGET_TYPE).trim()}:%`;
   const counts = {};
