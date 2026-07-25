@@ -24,7 +24,7 @@ function clamp(value, min, max) {
  *   content      — 编辑器当前 HTML（内容变化时重新扫描标题）
  *   scrollOffset — 顶部 sticky 顶栏的高度补偿，默认 64
  */
-export default function EditorToc({ editorRef, content, scrollOffset = 0, defaultOpen = true }) {
+export default function EditorToc({ editorRef, content, scrollOffset = 144, defaultOpen = true }) {
   // 防抖：编辑过程中不要每个按键都重新扫描标题并往编辑器 DOM 写 id，
   // 否则在 contentEditable 里会扰动光标/滚动，表现为"每次输入窗口往上跳一下"。
   // 停止输入 ~400ms 后再扫描一次目录即可。
@@ -40,6 +40,7 @@ export default function EditorToc({ editorRef, content, scrollOffset = 0, defaul
     headingSelector: 'h1, h2, h3',
     anchorClassName: 'msc-doc-anchor',
     scrollOffset,
+    scrollContainer: 'window',
   });
   const [open, setOpen] = useState(defaultOpen);
   const rootRef = useRef(null);

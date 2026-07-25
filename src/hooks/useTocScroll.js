@@ -28,6 +28,7 @@ import { useCallback, useEffect, useState } from 'react';
  * @param {string} [params.anchorClassName] - 给标题元素加的 class（便于 CSS 设
  *                                            scroll-margin-top），可选
  * @param {number} [params.scrollOffset=80] - 顶部 sticky topbar 的高度补偿
+ * @param {'auto'|'window'} [params.scrollContainer='auto'] - 滚动容器策略
  */
 export default function useTocScroll({
   contentRef,
@@ -35,6 +36,7 @@ export default function useTocScroll({
   headingSelector = 'h1, h2, h3',
   anchorClassName,
   scrollOffset = 80,
+  scrollContainer = 'auto',
 }) {
   const [toc, setToc] = useState([]); // [{ id, text, level }]
   const [activeTocId, setActiveTocId] = useState('');
@@ -55,6 +57,7 @@ export default function useTocScroll({
   }, [contentRef]);
 
   const findScrollParent = useCallback((node) => {
+    if (scrollContainer === 'window') return null;
     let p = node?.parentElement;
     while (p && p !== document.body) {
       const style = window.getComputedStyle(p);
@@ -65,7 +68,7 @@ export default function useTocScroll({
       p = p.parentElement;
     }
     return null;
-  }, []);
+  }, [scrollContainer]);
 
   const getHeadingTop = useCallback((heading, scrollParent) => {
     if (scrollParent) {
