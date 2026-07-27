@@ -43,6 +43,7 @@ import {
   Pencil,
   Palette,
   Paperclip,
+  FolderOpen,
   Loader2,
 } from 'lucide-react';
 import './MemberSharing.css';
@@ -84,6 +85,7 @@ function getAttachmentExtension(file = {}) {
 }
 
 function getAttachmentTypeLabel(file) {
+  if (file?.kind === 'link' || file?.type === 'link') return '在线链接';
   const ext = getAttachmentExtension(file);
   if (ext === 'pdf') return 'PDF';
   if (['doc', 'docx'].includes(ext)) return 'Word';
@@ -503,6 +505,10 @@ export default function MemberSharing() {
     if (manualSummary) {
       return manualSummary.length > 120 ? manualSummary.slice(0, 120) + '…' : manualSummary;
     }
+    if (post.format === 'folder') {
+      const count = Array.isArray(post.attachments) ? post.attachments.length : 0;
+      return count > 0 ? `包含 ${count} 个文件或在线文档链接` : '文件夹内容待补充';
+    }
 
     let text = String(post.content || '');
     if (post.format === 'word') {
@@ -886,7 +892,8 @@ export default function MemberSharing() {
                   {Array.isArray(post.attachments) && post.attachments.length > 0 && (
                     <div className="ms-card__top">
                       <span className="ms-card__attach-tag">
-                        <Paperclip size={11} /> {post.attachments.length} 个附件
+                        {post.format === 'folder' ? <FolderOpen size={11} /> : <Paperclip size={11} />}
+                        {post.format === 'folder' ? `文件夹 · ${post.attachments.length} 项` : `${post.attachments.length} 个附件`}
                       </span>
                     </div>
                   )}
@@ -950,7 +957,11 @@ export default function MemberSharing() {
                       >
                         {categoryLabels[post.category] || post.category}
                       </span>
-                      {getAttachmentTypeSummary(post.attachments) && (
+                      {post.format === 'folder' ? (
+                        <span className="ms-card__format-tag">
+                          <FolderOpen size={13} /> 文件夹
+                        </span>
+                      ) : getAttachmentTypeSummary(post.attachments) && (
                         <span className="ms-card__format-tag">
                           <FileText size={13} /> {getAttachmentTypeSummary(post.attachments)}
                         </span>

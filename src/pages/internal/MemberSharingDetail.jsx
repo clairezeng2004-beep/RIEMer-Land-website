@@ -19,6 +19,8 @@ import {
   List,
   X,
   Pencil,
+  FolderOpen,
+  Link as LinkIcon,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
 import { ensureResponsiveTableWrappers } from '../../utils/responsiveTables';
@@ -83,6 +85,20 @@ function formatFileSize(bytes) {
   return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
 }
 
+function isLinkAttachment(attachment) {
+  return attachment?.kind === 'link' || attachment?.type === 'link';
+}
+
+function openAttachment(attachment) {
+  const href = attachment?.url || attachment?.dataUrl;
+  if (!href) return;
+  if (isLinkAttachment(attachment)) {
+    window.open(href, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  downloadFile(attachment);
+}
+
 function downloadFile(attachment) {
   const href = attachment?.url || attachment?.dataUrl;
   if (!href) return;
@@ -95,6 +111,7 @@ function downloadFile(attachment) {
 }
 
 function getPreviewableAttachmentType(file) {
+  if (isLinkAttachment(file)) return null;
   const name = String(file?.name || '').toLowerCase();
   const type = String(file?.type || '').toLowerCase();
   const href = file?.dataUrl || file?.url;
@@ -589,12 +606,13 @@ export default function MemberSharingDetail() {
             {Array.isArray(post.attachments) && post.attachments.length > 0 && (
               <div className="msd-attachments">
                 <div className="msd-attachments__header">
-                  <Paperclip size={16} />
-                  <span>附件（{post.attachments.length}）</span>
+                  {post.format === 'folder' ? <FolderOpen size={16} /> : <Paperclip size={16} />}
+                  <span>{post.format === 'folder' ? '文件夹内容' : '附件'}（{post.attachments.length}）</span>
                 </div>
                 <div className="msd-attachments__list">
                   {post.attachments.map((file) => {
-                    const IconComp = getFileIcon(file?.name);
+                    const isLink = isLinkAttachment(file);
+                    const IconComp = isLink ? LinkIcon : getFileIcon(file?.name);
                     const previewType = getPreviewableAttachmentType(file);
                     return (
                       <div
@@ -602,30 +620,30 @@ export default function MemberSharingDetail() {
                         className="msd-attachments__item"
                         role="button"
                         tabIndex={0}
-                        onClick={() => (previewType ? setPreviewAttachment({ ...file, previewType }) : downloadFile(file))}
+                        onClick={() => (previewType ? setPreviewAttachment({ ...file, previewType }) : openAttachment(file))}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            previewType ? setPreviewAttachment({ ...file, previewType }) : downloadFile(file);
+                            previewType ? setPreviewAttachment({ ...file, previewType }) : openAttachment(file);
                           }
                         }}
-                        title={previewType ? `预览 ${file?.name || '附件'}` : `下载 ${file?.name || '附件'}`}
+                        title={previewType ? `预览 ${file?.name || '附件'}` : `${isLink ? '打开' : '下载'} ${file?.name || '附件'}`}
                       >
                         <IconComp size={20} className="msd-attachments__item-icon" />
                         <div className="msd-attachments__item-info">
                           <span className="msd-attachments__item-name">{file?.name || '未命名附件'}</span>
-                          <span className="msd-attachments__item-size">{formatFileSize(file?.size)}</span>
+                          <span className="msd-attachments__item-size">{isLink ? '在线文档链接' : formatFileSize(file?.size)}</span>
                         </div>
                         <button
                           type="button"
                           className="msd-attachments__item-dl"
                           onClick={(e) => {
                             e.stopPropagation();
-                            downloadFile(file);
+                            openAttachment(file);
                           }}
-                          title={`下载 ${file?.name || '附件'}`}
+                          title={`${isLink ? '打开' : '下载'} ${file?.name || '附件'}`}
                         >
-                          <Download size={16} />
+                          {isLink ? <LinkIcon size={16} /> : <Download size={16} />}
                         </button>
                       </div>
                     );

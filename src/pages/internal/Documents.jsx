@@ -77,6 +77,7 @@ const fileTypeIcons = {
   xlsx: FileSpreadsheet,
   pptx: Presentation,
   image: Image,
+  folder: FolderOpen,
 };
 
 const fileTypeLabels = {
@@ -85,6 +86,7 @@ const fileTypeLabels = {
   xlsx: 'Excel 表格',
   pptx: 'PPT 演示',
   image: '图片',
+  folder: '文件夹',
 };
 
 // 从文件名推断类型
@@ -925,8 +927,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (e) e.stopPropagation();
     if (!doc) return;
 
+    const isFolderDoc = doc.format === 'folder' || doc.fileType === 'folder';
+
     // 1) 有主文件
-    if (doc.fileUrl) {
+    if (doc.fileUrl && !isFolderDoc) {
       triggerDownload(doc.fileUrl, doc.title);
       return;
     }
@@ -934,8 +938,16 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     // 2) 有附件列表
     const atts = Array.isArray(doc.attachments) ? doc.attachments.filter((a) => a?.dataUrl || a?.url) : [];
     if (atts.length > 0) {
+      if (isFolderDoc) {
+        const firstLink = atts.find((item) => item?.kind === 'link' || item?.type === 'link');
+        if (firstLink?.url) {
+          window.open(firstLink.url, '_blank', 'noopener,noreferrer');
+          return;
+        }
+      }
       // 多个附件时按顺序触发（浏览器会弹"是否允许下载多个文件"一次，之后静默）
       atts.forEach((f, idx) => {
+        if (f?.kind === 'link' || f?.type === 'link') return;
         setTimeout(() => triggerDownload(f.dataUrl || f.url, f.name || `${doc.title}-${idx + 1}`), idx * 150);
       });
       return;
@@ -978,6 +990,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const canPreview = (doc) => {
     // 1) 外链文件（PDF/图片/Word）可在线预览
     if (doc.fileUrl && ['pdf', 'image', 'docx'].includes(doc.fileType)) return true;
+    if (doc.format === 'folder' || doc.fileType === 'folder') return true;
     // 2) 以文本形式输入的文档（Word/HTML 或 Markdown）同样可在线预览
     if (doc.content && String(doc.content).trim().length > 0) return true;
     return false;
@@ -1517,30 +1530,38 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                         <span>附件（{previewDoc.attachments.length}）</span>
                       </div>
                       <ul className="doc-preview__attachments-list">
-                        {previewDoc.attachments.map((f) => (
-                          <li key={f.id || f.name} className="doc-preview__attachments-item">
-                            <FileText size={16} />
-                            <span className="doc-preview__attachments-name">{f.name}</span>
-                            {typeof f.size === 'number' && (
-                              <span className="doc-preview__attachments-size">
-                                {f.size < 1024
-                                  ? `${f.size} B`
-                                  : f.size < 1024 * 1024
-                                    ? `${(f.size / 1024).toFixed(1)} KB`
-                                    : `${(f.size / (1024 * 1024)).toFixed(1)} MB`}
-                              </span>
-                            )}
-                            {(f.dataUrl || f.url) && (
-                              <a
-                                className="doc-preview__attachments-download"
-                                href={f.dataUrl || f.url}
-                                download={f.name}
-                              >
-                                <Download size={14} /> 下载
-                              </a>
-                            )}
-                          </li>
-                        ))}
+                        {previewDoc.attachments.map((f) => {
+                          const isLink = f?.kind === 'link' || f?.type === 'link';
+                          return (
+                            <li key={f.id || f.name} className="doc-preview__attachments-item">
+                              {isLink ? <FolderOpen size={16} /> : <FileText size={16} />}
+                              <span className="doc-preview__attachments-name">{f.name}</span>
+                              {isLink ? (
+                                <span className="doc-preview__attachments-size">在线文档链接</span>
+                              ) : typeof f.size === 'number' && (
+                                <span className="doc-preview__attachments-size">
+                                  {f.size < 1024
+                                    ? `${f.size} B`
+                                    : f.size < 1024 * 1024
+                                      ? `${(f.size / 1024).toFixed(1)} KB`
+                                      : `${(f.size / (1024 * 1024)).toFixed(1)} MB`}
+                                </span>
+                              )}
+                              {(f.dataUrl || f.url) && (
+                                <a
+                                  className="doc-preview__attachments-download"
+                                  href={f.dataUrl || f.url}
+                                  download={isLink ? undefined : f.name}
+                                  target={isLink ? '_blank' : undefined}
+                                  rel={isLink ? 'noopener noreferrer' : undefined}
+                                >
+                                  {isLink ? <FolderOpen size={14} /> : <Download size={14} />}
+                                  {isLink ? '打开' : '下载'}
+                                </a>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     </div>
                   )}

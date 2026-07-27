@@ -24,6 +24,7 @@ import {
   Highlighter,
   FileSpreadsheet,
   FileArchive,
+  FolderOpen,
   Loader2,
 } from 'lucide-react';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
@@ -39,6 +40,7 @@ import WordBlockHandle from '../../components/WordBlockHandle';
 import EditorToc from '../../components/EditorToc';
 import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
+import FolderItemsEditor from '../../components/FolderItemsEditor';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
@@ -722,6 +724,8 @@ export default function MemberSharingCreate() {
   const handleFormatChange = useCallback((format) => {
     setNewPost((prev) => {
       if (prev.format === format) return prev;
+      if (format === 'folder') return { ...prev, format, content: '' };
+      if (prev.format === 'folder') return { ...prev, format, content: '' };
       if (format === 'markdown') {
         return { ...prev, format, content: htmlToMarkdown(prev.content) };
       }
@@ -938,7 +942,13 @@ export default function MemberSharingCreate() {
     }
 
     const attachments = newPost.attachments.map((f) => ({
-      id: f.id, name: f.name, size: f.size, type: f.type, dataUrl: f.dataUrl,
+      id: f.id,
+      kind: f.kind,
+      name: f.name,
+      size: f.size,
+      type: f.type,
+      dataUrl: f.dataUrl,
+      url: f.url,
     }));
 
     // 贡献者：主贡献者 = contributorIds[0]（默认当前用户）。
@@ -1218,6 +1228,13 @@ export default function MemberSharingCreate() {
                 >
                   <Code2 size={14} /> Markdown
                 </button>
+                <button
+                  type="button"
+                  className={`msc-form__format-btn ${newPost.format === 'folder' ? 'msc-form__format-btn--active' : ''}`}
+                  onClick={() => handleFormatChange('folder')}
+                >
+                  <FolderOpen size={14} /> 文件夹
+                </button>
 
                 <div className="msc-form__format-divider" />
 
@@ -1277,12 +1294,19 @@ export default function MemberSharingCreate() {
               <label>
                 内容
                 <span className="msc-form__hint">
-                  {newPost.format === 'markdown'
-                    ? '支持 Markdown 语法：标题用 #，加粗用 **，列表用 -'
-                    : '支持从 Word 直接粘贴，自动保留格式'}
+                  {newPost.format === 'folder'
+                    ? '可添加具体文件或在线文档链接'
+                    : newPost.format === 'markdown'
+                      ? '支持 Markdown 语法：标题用 #，加粗用 **，列表用 -'
+                      : '支持从 Word 直接粘贴，自动保留格式'}
                 </span>
               </label>
-              {newPost.format === 'markdown' ? (
+              {newPost.format === 'folder' ? (
+                <FolderItemsEditor
+                  items={newPost.attachments}
+                  onChange={(items) => setNewPost((prev) => ({ ...prev, attachments: items }))}
+                />
+              ) : newPost.format === 'markdown' ? (
                 <>
                 <div className="msc-md-split">
                   <div className="msc-md-split__pane">
@@ -1374,7 +1398,7 @@ export default function MemberSharingCreate() {
             </div>
 
             {/* 已上传附件列表 */}
-            {newPost.attachments.length > 0 && (
+            {newPost.format !== 'folder' && newPost.attachments.length > 0 && (
               <div className="msc-form__field">
                 <label>
                   <Paperclip size={14} /> 已上传附件

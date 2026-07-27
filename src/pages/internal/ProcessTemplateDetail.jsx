@@ -29,6 +29,7 @@ import {
   ChevronUp,
   RotateCcw,
   Loader2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import WordPreview from '../../components/WordPreview';
@@ -156,6 +157,20 @@ function hasCountedViewToday(docId, user) {
   }
 }
 
+function isLinkAttachment(attachment) {
+  return attachment?.kind === 'link' || attachment?.type === 'link';
+}
+
+function openAttachment(attachment) {
+  const href = attachment?.url || attachment?.dataUrl;
+  if (!href) return;
+  if (isLinkAttachment(attachment)) {
+    window.open(href, '_blank', 'noopener,noreferrer');
+    return;
+  }
+  downloadFile(attachment);
+}
+
 function downloadFile({ dataUrl, url, name }) {
   const href = dataUrl || url;
   if (!href) return;
@@ -168,6 +183,7 @@ function downloadFile({ dataUrl, url, name }) {
 }
 
 function getPreviewableAttachmentType(file) {
+  if (isLinkAttachment(file)) return null;
   const name = String(file?.name || '').toLowerCase();
   const type = String(file?.type || '').toLowerCase();
   const href = file?.dataUrl || file?.url;
@@ -1871,12 +1887,13 @@ export default function ProcessTemplateDetail() {
             {hasAttachments && (
               <div className="ptd-attachments">
                 <div className="ptd-attachments__header">
-                  <Paperclip size={16} />
-                  <span>附件（{doc.attachments.length}）</span>
+                  {doc.format === 'folder' || doc.fileType === 'folder' ? <FolderOpen size={16} /> : <Paperclip size={16} />}
+                  <span>{doc.format === 'folder' || doc.fileType === 'folder' ? '文件夹内容' : '附件'}（{doc.attachments.length}）</span>
                 </div>
                 <div className="ptd-attachments__list">
                   {doc.attachments.map((f) => {
-                    const IconComp = getFileIcon(f.name);
+                    const isLink = isLinkAttachment(f);
+                    const IconComp = isLink ? LinkIcon : getFileIcon(f.name);
                     const previewType = getPreviewableAttachmentType(f);
                     return (
                       <div
@@ -1884,30 +1901,30 @@ export default function ProcessTemplateDetail() {
                         className="ptd-attachments__item"
                         role="button"
                         tabIndex={0}
-                        onClick={() => (previewType ? setPreviewAttachment({ ...f, previewType }) : downloadFile(f))}
+                        onClick={() => (previewType ? setPreviewAttachment({ ...f, previewType }) : openAttachment(f))}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
-                            previewType ? setPreviewAttachment({ ...f, previewType }) : downloadFile(f);
+                            previewType ? setPreviewAttachment({ ...f, previewType }) : openAttachment(f);
                           }
                         }}
-                        title={previewType ? `预览 ${f.name}` : `下载 ${f.name}`}
+                        title={previewType ? `预览 ${f.name}` : `${isLink ? '打开' : '下载'} ${f.name}`}
                       >
                         <IconComp size={20} className="ptd-attachments__item-icon" />
                         <div className="ptd-attachments__item-info">
                           <span className="ptd-attachments__item-name">{f.name}</span>
-                          <span className="ptd-attachments__item-size">{formatFileSize(f.size)}</span>
+                          <span className="ptd-attachments__item-size">{isLink ? '在线文档链接' : formatFileSize(f.size)}</span>
                         </div>
                         <button
                           type="button"
                           className="ptd-attachments__item-dl"
                           onClick={(e) => {
                             e.stopPropagation();
-                            downloadFile(f);
+                            openAttachment(f);
                           }}
-                          title={`下载 ${f.name}`}
+                          title={`${isLink ? '打开' : '下载'} ${f.name}`}
                         >
-                          <Download size={16} />
+                          {isLink ? <LinkIcon size={16} /> : <Download size={16} />}
                         </button>
                       </div>
                     );

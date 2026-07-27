@@ -36,6 +36,7 @@ import WordBlockHandle from '../../components/WordBlockHandle';
 import EditorToc from '../../components/EditorToc';
 import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
+import FolderItemsEditor from '../../components/FolderItemsEditor';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
@@ -332,6 +333,8 @@ export default function ProcessTemplateCreate() {
   const handleFormatChange = useCallback((format) => {
     setNewDoc((prev) => {
       if (prev.format === format) return prev;
+      if (format === 'folder') return { ...prev, format, content: '' };
+      if (prev.format === 'folder') return { ...prev, format, content: '' };
       if (format === 'markdown') {
         return { ...prev, format, content: htmlToMarkdown(prev.content) };
       }
@@ -504,15 +507,19 @@ export default function ProcessTemplateCreate() {
       content: newDoc.content,
       attachments: newDoc.attachments.map((f) => ({
         id: f.id,
+        kind: f.kind,
         name: f.name,
         size: f.size,
         type: f.type,
         dataUrl: f.dataUrl,
+        url: f.url,
       })),
       // 兼容 Documents.jsx 原有字段
-      fileType: primaryAttachment ? inferFileType(primaryAttachment.name) : 'docx',
-      fileUrl: primaryAttachment ? primaryAttachment.dataUrl : null,
-      size: primaryAttachment ? formatFileSize(primaryAttachment.size) : '—',
+      fileType: newDoc.format === 'folder' ? 'folder' : primaryAttachment ? inferFileType(primaryAttachment.name) : 'docx',
+      fileUrl: primaryAttachment ? (primaryAttachment.dataUrl || primaryAttachment.url || null) : null,
+      size: newDoc.format === 'folder'
+        ? `${newDoc.attachments.length} 项`
+        : primaryAttachment ? formatFileSize(primaryAttachment.size) : '—',
       // 贡献者：主贡献者 = contributorIds[0]（默认是当前用户），
       // uploadedBy/uploadedById 保留为主贡献者，兼容旧字段；
       // contributorIds 新增，列表和预览会完整展示多位贡献者。
@@ -698,6 +705,13 @@ export default function ProcessTemplateCreate() {
                 >
                   <Code2 size={14} /> Markdown
                 </button>
+                <button
+                  type="button"
+                  className={`msc-form__format-btn ${newDoc.format === 'folder' ? 'msc-form__format-btn--active' : ''}`}
+                  onClick={() => handleFormatChange('folder')}
+                >
+                  <FolderOpen size={14} /> 文件夹
+                </button>
 
                 <div className="msc-form__format-divider" />
 
@@ -722,6 +736,7 @@ export default function ProcessTemplateCreate() {
             </div>
 
             {/* 附件拖拽区 —— 独立一块，比按钮更醒目 */}
+            {newDoc.format !== 'folder' && (
             <div className="msc-form__field">
               <label>
                 <Upload size={14} /> 附件拖拽上传
@@ -777,18 +792,26 @@ export default function ProcessTemplateCreate() {
                 </div>
               )}
             </div>
+            )}
 
             {/* 正文编辑器 */}
             <div className="msc-form__field msc-form__field--editor">
               <label>
                 正文内容
                 <span className="msc-form__hint">
-                  {newDoc.format === 'markdown'
-                    ? '支持 Markdown 语法：# 标题、**加粗**、- 列表、```代码块```'
-                    : '支持从 Word/网页直接粘贴，自动保留段落和标题层级'}
+                  {newDoc.format === 'folder'
+                    ? '可添加具体文件或在线文档链接'
+                    : newDoc.format === 'markdown'
+                      ? '支持 Markdown 语法：# 标题、**加粗**、- 列表、```代码块```'
+                      : '支持从 Word/网页直接粘贴，自动保留段落和标题层级'}
                 </span>
               </label>
-              {newDoc.format === 'markdown' ? (
+              {newDoc.format === 'folder' ? (
+                <FolderItemsEditor
+                  items={newDoc.attachments}
+                  onChange={(items) => setNewDoc((prev) => ({ ...prev, attachments: items }))}
+                />
+              ) : newDoc.format === 'markdown' ? (
                 <>
                 <div className="msc-md-split">
                   <div className="msc-md-split__pane">
