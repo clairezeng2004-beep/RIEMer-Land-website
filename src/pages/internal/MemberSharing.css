@@ -47,6 +47,14 @@
   font-size: var(--text-sm);
 }
 
+.ms-page__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
 /* ============ Create Form ============ */
 .ms-create {
   padding: var(--space-xl);
@@ -1072,6 +1080,11 @@
   .ms-page__header {
     flex-direction: column;
     gap: var(--space-md);
+  }
+
+  .ms-page__actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
 
   .ms-page__confidential-note {

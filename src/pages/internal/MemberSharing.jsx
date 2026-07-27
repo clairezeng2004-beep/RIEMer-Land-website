@@ -569,9 +569,14 @@ export default function MemberSharing() {
               </span>
             </p>
           </div>
-          <a href="/internal/member-sharing/create" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
-            <Plus size={18} /> 发布分享
-          </a>
+          <div className="ms-page__actions">
+            <a href="/internal/member-sharing/create?format=folder" target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
+              <FolderOpen size={18} /> 新建文件夹
+            </a>
+            <a href="/internal/member-sharing/create" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
+              <Plus size={18} /> 发布分享
+            </a>
+          </div>
         </div>
 
         {/* Filters */}

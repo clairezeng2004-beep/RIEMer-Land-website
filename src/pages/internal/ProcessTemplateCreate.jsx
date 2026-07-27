@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from 'react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   FolderOpen,
@@ -106,6 +106,7 @@ function fileToDataUrl(file) {
 export default function ProcessTemplateCreate() {
   const { isAuthenticated, user, getAllUsers } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const wordEditorRef = useRef(null);
   const pasteAsPlainTextRef = useRef(false);
   const mdEditorRef = useRef(null);
@@ -158,11 +159,16 @@ export default function ProcessTemplateCreate() {
     }));
   }, [internalConfig, docTypes, typeLabelsMap]);
 
+  const initialFormat = useMemo(() => {
+    const requested = new URLSearchParams(location.search).get('format');
+    return requested === 'folder' ? 'folder' : 'word';
+  }, [location.search]);
+
   const [newDoc, setNewDoc] = useState({
     title: '',
     type: 'process',
     description: '',
-    format: 'word',
+    format: initialFormat,
     content: '',
     attachments: [],
   });
@@ -606,8 +612,14 @@ export default function ProcessTemplateCreate() {
               onDiscard={handleDiscardDraft}
             />
           )}
-          <h2 className="msc-content__title"><FolderOpen size={22} /> 发布流程/模版文件</h2>
-          <p className="msc-content__desc">正文格式请选择 Markdown 或 Word 富文本其中一种；附件可另行上传</p>
+          <h2 className="msc-content__title">
+            <FolderOpen size={22} /> {newDoc.format === 'folder' ? '新建文件夹' : '发布流程/模版文件'}
+          </h2>
+          <p className="msc-content__desc">
+            {newDoc.format === 'folder'
+              ? '把具体文件和在线文档链接整理到同一个文件夹里'
+              : '正文格式请选择 Markdown、Word 富文本或文件夹；附件可另行上传'}
+          </p>
 
           <form id="ptc-create-form" onSubmit={handleCreate} className="msc-form">
             {/* 第一行：标题 + 类型 */}

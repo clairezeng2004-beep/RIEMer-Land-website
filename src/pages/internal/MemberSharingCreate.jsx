@@ -567,6 +567,10 @@ export default function MemberSharingCreate() {
   const mdEditorRef = useRef(null);
   const mdPreviewRef = useRef(null);
   const editId = useMemo(() => new URLSearchParams(location.search).get('edit'), [location.search]);
+  const initialFormat = useMemo(() => {
+    const requested = new URLSearchParams(location.search).get('format');
+    return requested === 'folder' ? 'folder' : 'word';
+  }, [location.search]);
   const isEditingPost = !!editId;
 
   // 浏览器标签页标题：新窗口里更直观地显示当前在编辑什么文档
@@ -614,7 +618,7 @@ export default function MemberSharingCreate() {
     title: '',
     summary: '',
     category: cats.length > 0 ? cats[0].key : 'experience',
-    format: 'word',
+    format: initialFormat,
     content: '',
     period: { startYear: null, startMonth: null, endYear: null, endMonth: null },
     attachments: [],
@@ -1107,8 +1111,17 @@ export default function MemberSharingCreate() {
       {/* 全屏编辑区 */}
       <div className="msc-content">
         <div className="msc-content__inner">
-          <h2 className="msc-content__title"><Plus size={22} /> {isEditingPost ? '编辑分享' : '发布新分享'}</h2>
-          <p className="msc-content__desc">{isEditingPost ? '修改分享内容，保存后会同步更新列表与详情页' : '填写以下内容发布分享，支持 Markdown 和 Word 格式'}</p>
+          <h2 className="msc-content__title">
+            {newPost.format === 'folder' && !isEditingPost ? <FolderOpen size={22} /> : <Plus size={22} />}
+            {isEditingPost ? '编辑分享' : newPost.format === 'folder' ? '新建文件夹' : '发布新分享'}
+          </h2>
+          <p className="msc-content__desc">
+            {isEditingPost
+              ? '修改分享内容，保存后会同步更新列表与详情页'
+              : newPost.format === 'folder'
+                ? '把具体文件和在线文档链接整理到同一个文件夹里'
+                : '填写以下内容发布分享，支持 Markdown、Word 和文件夹'}
+          </p>
 
           <form id="msc-create-form" onSubmit={handleCreate} className="msc-form">
             {/* 第一行：标题 + 分类 */}

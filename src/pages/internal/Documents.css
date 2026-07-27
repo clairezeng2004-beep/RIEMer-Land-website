@@ -34,6 +34,14 @@
   min-height: 38px;
 }
 
+.documents-page__actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+  flex-shrink: 0;
+}
+
 /* ============ Upload Form ============ */
 .documents-upload {
   padding: var(--space-xl);
@@ -1320,6 +1328,11 @@
   .documents-page__header {
     flex-direction: column;
     gap: var(--space-md);
+  }
+
+  .documents-page__actions {
+    justify-content: flex-start;
+    flex-wrap: wrap;
   }
   /* 手机端顶部「上传文档 / 发布新分享」按钮尺寸与「成员内部分享 → 发布分享」
      保持一致（流程模板 TAB 共用 Documents 组件，也一并生效）。基准来自

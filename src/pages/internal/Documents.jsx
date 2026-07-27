@@ -1037,20 +1037,30 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
             // 因为本页 internalConfig.processTemplates 分片里并没有 uploadBtn 字段，
             // 若直接读 dc.uploadBtn 会得到 undefined，EditableText 就会渲染成空字符串
             // ——也就是之前看到的「按钮只剩加号，文字丢失」现象。
-            <a
-              href="/internal/process-templates/create"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="btn btn-primary"
-            >
-              <Plus size={18} />
-              <EditableText
-                value={internalConfig.documents?.uploadBtn || '上传文档'}
-                onChange={(v) => updateInternalConfig({ documents: { uploadBtn: v } })}
-                configKey="documents.uploadBtn"
-                as="span"
-              />
-            </a>
+            <div className="documents-page__actions">
+              <a
+                href="/internal/process-templates/create?format=folder"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-secondary"
+              >
+                <FolderOpen size={18} /> 新建文件夹
+              </a>
+              <a
+                href="/internal/process-templates/create"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-primary"
+              >
+                <Plus size={18} />
+                <EditableText
+                  value={internalConfig.documents?.uploadBtn || '上传文档'}
+                  onChange={(v) => updateInternalConfig({ documents: { uploadBtn: v } })}
+                  configKey="documents.uploadBtn"
+                  as="span"
+                />
+              </a>
+            </div>
           ) : (
             <button
               className="btn btn-primary"
