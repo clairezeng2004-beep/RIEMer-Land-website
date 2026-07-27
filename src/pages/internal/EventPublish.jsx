@@ -1174,45 +1174,34 @@ export default function EventPublish() {
                   </button>
                 )}
                 <div className="ia-card__body">
-                  {/* 始终渲染顶部行（即使没有倒计时徽章也保留固定高度），
-                      保证同一行里「未来活动(有徽章)」与「过去活动(无徽章)」的标题顶端对齐。 */}
-                  <div className="ep-card__top">
-                    {countdownDays && (
+                  {countdownDays && (
+                    <div className="ep-card__top">
                       <span className="ep-card__badge ep-card__badge--upcoming">
                         <Calendar size={12} /> {countdownDays} 天后
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
                   <h3 className="ia-card__title">{event.title}</h3>
                   {event.excerpt && (
                     <p className="ia-card__excerpt">{event.excerpt}</p>
                   )}
-                  {/* 底部信息区：分隔线 + 日期·回放·地点 + 系列标签作为一个整体贴卡片底部，
-                      保证同一行卡片的分隔线处于同一高度（系列行始终占位，无系列也不塌陷）。 */}
-                  <div className="ep-card__bottom">
-                    {/* 信息标签统一排布：日期 · 回放 · 地点 */}
-                    <div className="ia-card__footer ep-card__info">
-                      <span className="ia-card__meta">
-                        <Calendar size={13} /> {event.date}
+                  <div className="ia-card__footer ep-card__info">
+                    <span className="ia-card__meta">
+                      <Calendar size={13} /> {event.date}
+                    </span>
+                    {event.hasReplay && (
+                      <span className="ep-card__badge ep-card__badge--replay">
+                        <Video size={12} /> 回放
                       </span>
-                      <span className="ep-card__info-center">
-                        {event.hasReplay && (
-                          <span className="ep-card__badge ep-card__badge--replay">
-                            <Video size={12} /> 回放
-                          </span>
-                        )}
+                    )}
+                    {event.location && (
+                      <span className="ia-card__meta ep-card__location">
+                        <MapPin size={13} /> {event.location}
                       </span>
-                      {event.location && (
-                        <span className="ia-card__meta ep-card__location">
-                          <MapPin size={13} /> {event.location}
-                        </span>
-                      )}
-                    </div>
-                    <div className="ep-card__category-row">
-                      {normalizeEventCategory(event.category) && (
-                        <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
-                      )}
-                    </div>
+                    )}
+                    {normalizeEventCategory(event.category) && (
+                      <span className="ia-card__category">{normalizeEventCategory(event.category)}</span>
+                    )}
                   </div>
                 </div>
               </div>
