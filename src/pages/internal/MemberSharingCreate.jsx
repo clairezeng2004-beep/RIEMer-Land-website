@@ -928,7 +928,8 @@ export default function MemberSharingCreate() {
     const normalizedContent = cleanEditorHtmlForSave(currentContent || '');
     const hasContent = normalizedContent.trim().length > 0;
     const hasAttachments = newPost.attachments.length > 0;
-    if (!newPost.title.trim() || (!hasContent && !hasAttachments)) return null;
+    const isFolderPost = newPost.format === 'folder';
+    if (!newPost.title.trim() || (!isFolderPost && !hasContent && !hasAttachments)) return null;
 
     // 构建时间段字符串：history=单点；experience=区间；其它分类不带 period
     const { startYear, startMonth, endYear, endMonth } = newPost.period || {};
@@ -991,7 +992,11 @@ export default function MemberSharingCreate() {
     if (!post) {
       cloudSaveSeqRef.current += 1;
       setCloudSaveState((state) => (state === 'saving' ? null : state));
-      if (!silent) alert('请先填写标题，并提供正文内容或上传至少一个附件');
+      if (!silent) {
+        alert(newPost.format === 'folder'
+          ? '请先填写文件夹标题'
+          : '请先填写标题，并提供正文内容或上传至少一个附件');
+      }
       return false;
     }
     const fields = {
@@ -1037,7 +1042,9 @@ export default function MemberSharingCreate() {
     if (isPublishing) return;
     const post = buildPost();
     if (!post) {
-      alert('请填写标题，并提供正文内容或上传至少一个附件');
+      alert(newPost.format === 'folder'
+        ? '请填写文件夹标题'
+        : '请填写标题，并提供正文内容或上传至少一个附件');
       return;
     }
     setIsPublishing(true);

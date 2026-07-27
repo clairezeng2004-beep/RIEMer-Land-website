@@ -486,7 +486,7 @@ export default function ProcessTemplateCreate() {
       alert('请填写文档标题');
       return;
     }
-    if (!hasContent && !hasAttachments) {
+    if (newDoc.format !== 'folder' && !hasContent && !hasAttachments) {
       alert('请至少填写正文内容或上传至少一个附件');
       return;
     }
