@@ -625,6 +625,7 @@ export default function MemberSharingCreate() {
   });
   const [isPublishing, setIsPublishing] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
+  const isSimpleFolderCreate = newPost.format === 'folder' && !isEditingPost;
 
   /* ============ 贡献者多选 ============
      和流程模板文件一致：支持「分享迁移」——发布者本人不一定是贡献者，可多选。
@@ -1126,7 +1127,7 @@ export default function MemberSharingCreate() {
             {isEditingPost
               ? '修改分享内容，保存后会同步更新列表与详情页'
               : newPost.format === 'folder'
-                ? '把具体文件和在线文档链接整理到同一个文件夹里'
+                ? '填写名称后即可创建，文件夹内容可以之后再添加'
                 : '填写以下内容发布分享，支持 Markdown、Word 和文件夹'}
           </p>
 
@@ -1134,28 +1135,31 @@ export default function MemberSharingCreate() {
             {/* 第一行：标题 + 分类 */}
             <div className="msc-form__row">
               <div className="msc-form__field msc-form__field--grow">
-                <label>标题</label>
+                <label>{isSimpleFolderCreate ? '文件夹名称' : '标题'}</label>
                 <input
                   type="text"
                   className="msc-form__input"
                   value={newPost.title}
                   onChange={(e) => setNewPost({ ...newPost, title: e.target.value })}
-                  placeholder="请输入分享标题"
+                  placeholder={isSimpleFolderCreate ? '请输入文件夹名称' : '请输入分享标题'}
                   required
                 />
               </div>
-              <div className="msc-form__field">
-                <label>分类</label>
-                <CategorySelect
-                  cats={cats}
-                  value={newPost.category}
-                  onChange={(key) => setNewPost({ ...newPost, category: key })}
-                  onAddCategory={handleAddCategory}
-                />
-              </div>
+              {!isSimpleFolderCreate && (
+                <div className="msc-form__field">
+                  <label>分类</label>
+                  <CategorySelect
+                    cats={cats}
+                    value={newPost.category}
+                    onChange={(key) => setNewPost({ ...newPost, category: key })}
+                    onAddCategory={handleAddCategory}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 贡献者（可多选）——支持分享迁移场景：发布者 ≠ 贡献者 */}
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field">
               <label>
                 贡献者
@@ -1187,7 +1191,9 @@ export default function MemberSharingCreate() {
                 })()}
               />
             </div>
+            )}
 
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field">
               <label>简介栏</label>
               <textarea
@@ -1198,6 +1204,7 @@ export default function MemberSharingCreate() {
                 rows={3}
               />
             </div>
+            )}
 
             {/* 第二行：时间段 —— 仅对两类分类显示：
                   - 成员经验分享 (experience)：从年月 至 年月（时间范围）
@@ -1206,7 +1213,7 @@ export default function MemberSharingCreate() {
                 切换分类时保留 period state 里已填的 startYear/startMonth，
                 允许用户在两种分类间切换而不丢数据；但提交时由 handleCreate
                 再次按分类裁剪，避免把多余的 endYear/endMonth 带出去。 */}
-            {(newPost.category === 'experience' || newPost.category === 'history') && (
+            {!isSimpleFolderCreate && (newPost.category === 'experience' || newPost.category === 'history') && (
               <div className="msc-form__field">
                 <label>
                   <Calendar size={14} /> {newPost.category === 'history' ? '会议时间' : '经验时间段'}
@@ -1231,6 +1238,7 @@ export default function MemberSharingCreate() {
             )}
 
             {/* 格式切换 + 附件上传（同一行） */}
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field">
               <label>内容格式</label>
               <div className="msc-form__format-toggle">
@@ -1309,7 +1317,9 @@ export default function MemberSharingCreate() {
                 />
               </div>
             </div>
+            )}
 
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field msc-form__field--editor">
               <label>
                 内容
@@ -1416,9 +1426,10 @@ export default function MemberSharingCreate() {
                 </div>
               )}
             </div>
+            )}
 
             {/* 已上传附件列表 */}
-            {newPost.format !== 'folder' && newPost.attachments.length > 0 && (
+            {!isSimpleFolderCreate && newPost.format !== 'folder' && newPost.attachments.length > 0 && (
               <div className="msc-form__field">
                 <label>
                   <Paperclip size={14} /> 已上传附件

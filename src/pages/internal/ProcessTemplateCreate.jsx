@@ -36,7 +36,6 @@ import WordBlockHandle from '../../components/WordBlockHandle';
 import EditorToc from '../../components/EditorToc';
 import { handleEditorKeyDown } from '../../utils/editorTabIndent';
 import SyncScrollToggle from '../../components/SyncScrollToggle';
-import FolderItemsEditor from '../../components/FolderItemsEditor';
 import useMarkdownSyncScroll from '../../hooks/useMarkdownSyncScroll';
 import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
@@ -173,6 +172,7 @@ export default function ProcessTemplateCreate() {
     attachments: [],
   });
   const [isPublishing, setIsPublishing] = useState(false);
+  const isSimpleFolderCreate = newDoc.format === 'folder';
 
   // Markdown 编辑器：高度随内容自动增长，避免被父容器限制（用户要求"不要限制高度"）
   useAutoResizeTextarea(mdEditorRef, newDoc.content, { minHeight: 360 });
@@ -617,7 +617,7 @@ export default function ProcessTemplateCreate() {
           </h2>
           <p className="msc-content__desc">
             {newDoc.format === 'folder'
-              ? '把具体文件和在线文档链接整理到同一个文件夹里'
+              ? '填写名称后即可创建，文件夹内容可以之后再添加'
               : '正文格式请选择 Markdown、Word 富文本或文件夹；附件可另行上传'}
           </p>
 
@@ -625,27 +625,30 @@ export default function ProcessTemplateCreate() {
             {/* 第一行：标题 + 类型 */}
             <div className="msc-form__row">
               <div className="msc-form__field msc-form__field--grow">
-                <label>文档标题</label>
+                <label>{isSimpleFolderCreate ? '文件夹名称' : '文档标题'}</label>
                 <input
                   type="text"
                   className="msc-form__input"
                   value={newDoc.title}
                   onChange={(e) => setNewDoc({ ...newDoc, title: e.target.value })}
-                  placeholder="请输入文档标题"
+                  placeholder={isSimpleFolderCreate ? '请输入文件夹名称' : '请输入文档标题'}
                   required
                 />
               </div>
-              <div className="msc-form__field">
-                <label>文档类型</label>
-                <CustomSelect
-                  value={newDoc.type}
-                  onChange={(val) => setNewDoc({ ...newDoc, type: val })}
-                  options={typeOptions}
-                />
-              </div>
+              {!isSimpleFolderCreate && (
+                <div className="msc-form__field">
+                  <label>文档类型</label>
+                  <CustomSelect
+                    value={newDoc.type}
+                    onChange={(val) => setNewDoc({ ...newDoc, type: val })}
+                    options={typeOptions}
+                  />
+                </div>
+              )}
             </div>
 
             {/* 贡献者（可多选）——支持文档迁移场景：发布者 ≠ 贡献者 */}
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field">
               <label>
                 贡献者
@@ -682,8 +685,10 @@ export default function ProcessTemplateCreate() {
                 })()}
               />
             </div>
+            )}
 
             {/* 简介描述 */}
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field">
               <label>
                 简介
@@ -698,8 +703,10 @@ export default function ProcessTemplateCreate() {
                 maxLength={120}
               />
             </div>
+            )}
 
             {/* 格式切换 + 附件按钮（同一行） */}
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field">
               <label>内容格式</label>
               <div className="msc-form__format-toggle">
@@ -746,6 +753,7 @@ export default function ProcessTemplateCreate() {
                 />
               </div>
             </div>
+            )}
 
             {/* 附件拖拽区 —— 独立一块，比按钮更醒目 */}
             {newDoc.format !== 'folder' && (
@@ -807,6 +815,7 @@ export default function ProcessTemplateCreate() {
             )}
 
             {/* 正文编辑器 */}
+            {!isSimpleFolderCreate && (
             <div className="msc-form__field msc-form__field--editor">
               <label>
                 正文内容
@@ -818,12 +827,7 @@ export default function ProcessTemplateCreate() {
                       : '支持从 Word/网页直接粘贴，自动保留段落和标题层级'}
                 </span>
               </label>
-              {newDoc.format === 'folder' ? (
-                <FolderItemsEditor
-                  items={newDoc.attachments}
-                  onChange={(items) => setNewDoc((prev) => ({ ...prev, attachments: items }))}
-                />
-              ) : newDoc.format === 'markdown' ? (
+              {newDoc.format === 'markdown' ? (
                 <>
                 <div className="msc-md-split">
                   <div className="msc-md-split__pane">
@@ -908,6 +912,7 @@ export default function ProcessTemplateCreate() {
                 </div>
               )}
             </div>
+            )}
           </form>
         </div>
       </div>
