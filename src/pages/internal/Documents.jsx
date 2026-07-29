@@ -33,6 +33,10 @@ import { useSiteContent } from '../../contexts/SiteContentContext';
 import EditableText from '../../components/EditableText';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import { markdownToHtml } from '../../utils/markdownWordInterop';
+import {
+  DEFAULT_DOCUMENT_TYPE_LABELS,
+  getScopedDocumentTypeKeys,
+} from '../../utils/documentTypeScope';
 import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
 import {
@@ -54,14 +58,6 @@ import { moveToRecycleBin } from '../../services/recycleBinService';
 import ViewLogPopover from '../../components/ViewLogPopover';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './Documents.css';
-
-const defaultTypeLabels = {
-  course: '课程及考试资料',
-  history: '历史会议',
-  process: '流程手册及模版文件',
-  regulation: '规章制度',
-  experience: '成员经验分享',
-};
 
 const defaultTypeColors = {
   course: '#5EAD8C',
@@ -293,9 +289,12 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   );
 
   // 从 filterOptions 获取动态文档类型
-  const docTypes = filterOptions.documentTypes || [];
+  const docTypes = useMemo(
+    () => filterOptions.documentTypes || [],
+    [filterOptions.documentTypes]
+  );
   const typeLabels = useMemo(() => {
-    const labels = { ...defaultTypeLabels };
+    const labels = { ...DEFAULT_DOCUMENT_TYPE_LABELS };
     docTypes.forEach((t) => { labels[t.key] = t.label; });
     return labels;
   }, [docTypes]);
@@ -304,6 +303,20 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     docTypes.forEach((t) => { colors[t.key] = t.color; });
     return colors;
   }, [docTypes]);
+  const visibleTypeKeys = useMemo(
+    () => (
+      filterTypes
+        ? getScopedDocumentTypeKeys({
+            builtinKeys: filterTypes,
+            documentTypes: docTypes,
+            extraTypeKeys,
+            hiddenBuiltinKeys,
+            scope: sectionKey,
+          })
+        : docTypes.map((type) => type.key)
+    ),
+    [docTypes, extraTypeKeys, filterTypes, hiddenBuiltinKeys, sectionKey]
+  );
 
   const updateDocs = useCallback(
     (key, val) => updateInternalConfig({ [sectionKey]: { [key]: val } }),
@@ -320,16 +333,14 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   const handleAddType = () => {
     const trimmed = newTypeLabel.trim();
     if (!trimmed) return;
-    // 重名检测：仅与"本页当前真正可见的分类"比较（即 types 数组里渲染出来的那几个）。
+    // 重名检测：仅与本页当前真正可见的分类比较。
     // ⚠️ 不能用全局 docTypes 当基准 —— docTypes 是 filterOptions.documentTypes，
     // 包含所有 Documents 页面（总入口 / 流程模板 / 规章制度）共用的分类池。本页可能
     // 通过 filterTypes 白名单 + hiddenBuiltinKeys 把其中一部分隐藏掉了，那些"看不见
     // 的分类"不应阻止用户在当前 tab 新建同名项，否则会出现"UI 上明明没有该分类，
     // 却弹框说已存在"的矛盾提示。
     const normalized = trimmed.toLowerCase();
-    // types 里 '全部' 是 UI 虚拟项，过滤掉；其余每个 key 通过 typeLabels 解析成 label
-    const visibleLabels = types
-      .filter((k) => k !== '全部')
+    const visibleLabels = visibleTypeKeys
       .map((k) => String(typeLabels[k] || '').trim().toLowerCase())
       .filter(Boolean);
     if (visibleLabels.includes(normalized)) {
@@ -342,9 +353,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const palette = ['#5EAD8C', '#4FBFC4', '#D4A44C', '#8B5CF6', '#EC4899', '#F59E0B', '#3B82F6', '#EF4444', '#10B981', '#6366F1'];
     const color = palette[docTypes.length % palette.length];
     // ① 先在全局文档类型池里注册（保证其它通过 filterOptions 读取的地方拿到 label/color）
+    const nextType = { key, label: trimmed, color };
+    if (filterTypes) nextType.scopes = [sectionKey];
     const nextFilterOptions = {
       ...filterOptions,
-      documentTypes: [...docTypes, { key, label: trimmed, color }],
+      documentTypes: [...docTypes, nextType],
     };
     updateFilterOptions(nextFilterOptions);
     flushFilterOptionsNow(nextFilterOptions);
@@ -373,8 +386,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     // 不把其它 Documents 页独有的分类也纳入对比，理由见 handleAddType 的注释）。
     // 允许改回自己（typeKey === 当前项），也允许只改大小写/空白。
     const normalized = trimmed.toLowerCase();
-    const visibleLabels = types
-      .filter((k) => k !== '全部' && k !== typeKey)
+    const visibleLabels = visibleTypeKeys
+      .filter((k) => k !== typeKey)
       .map((k) => String(typeLabels[k] || '').trim().toLowerCase())
       .filter(Boolean);
     if (visibleLabels.includes(normalized)) {
@@ -634,19 +647,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     return <Navigate to="/login" replace />;
   }
 
-  const types = filterTypes
-    ? [
-        '全部',
-        // 白名单内置分类：必须仍然存在于 docTypes / 默认 typeLabels 中，且未被本页隐藏
-        ...filterTypes.filter(
-          (ft) =>
-            !hiddenBuiltinKeys.includes(ft) &&
-            (docTypes.some((t) => t.key === ft) || defaultTypeLabels[ft])
-        ),
-        // 页面级新增分类：key 需仍在全局 docTypes 中（避免全局被删后此处变成孤儿）
-        ...extraTypeKeys.filter((k) => docTypes.some((t) => t.key === k)),
-      ]
-    : ['全部', ...docTypes.map((t) => t.key)];
+  const types = ['全部', ...visibleTypeKeys];
 
   // 把用户在描述里粘贴进来的 HTML 实体（&nbsp; / &amp; / &lt; 等）还原为真实字符，
   // 并剥掉任何残留的 HTML 标签；空值/非字符串直接返回 ''
@@ -1140,11 +1141,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                   <CustomSelect
                     value={newDoc.type}
                     onChange={(val) => setNewDoc({ ...newDoc, type: val })}
-                    options={Object.entries(typeLabels)
-                      .filter(([key]) => !filterTypes || filterTypes.includes(key))
-                      .map(([key, label]) => ({
+                    options={visibleTypeKeys
+                      .map((key) => ({
                         value: key,
-                        label,
+                        label: typeLabels[key] || key,
                       }))}
                   />
                 </div>

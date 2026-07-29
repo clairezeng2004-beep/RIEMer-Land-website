@@ -41,18 +41,16 @@ import useAutoResizeTextarea from '../../hooks/useAutoResizeTextarea';
 import { cleanPastedWordHtml, insertHtmlReplacingEmptyParagraph, plainTextToEditorHtml } from '../../utils/cleanPastedWordHtml';
 import { attachPasteAndMatchStyleHandler, insertPlainTextMatchingEditorStyle, isSelectionInImageCaption } from '../../utils/pasteMatchStyle';
 import { htmlToMarkdown, markdownToHtml } from '../../utils/markdownWordInterop';
+import {
+  DEFAULT_DOCUMENT_TYPE_LABELS,
+  PROCESS_TEMPLATE_SCOPE,
+  PROCESS_TEMPLATE_TYPE_KEYS,
+  getScopedDocumentTypeKeys,
+} from '../../utils/documentTypeScope';
 import useDraftAutosave from '../../hooks/useDraftAutosave';
 import { getCachedAllUsers } from '../../lib/userDirectoryCache';
 import './MemberSharingCreate.css';
 import './DraftAutosave.css';
-
-const DEFAULT_TYPE_LABELS = {
-  process: '流程手册及模版文件',
-  regulation: '规章制度',
-  course: '课程及考试资料',
-  history: '历史会议',
-  experience: '成员经验分享',
-};
 
 /* ====== 工具函数 ====== */
 function getFileIcon(name) {
@@ -134,25 +132,32 @@ export default function ProcessTemplateCreate() {
   const { filterOptions, internalConfig } = useSiteContent();
 
   // 动态类型（从 siteContent 中读取，兼容管理员自定义）+ 默认的流程/规章类型
-  const docTypes = filterOptions.documentTypes || [];
+  const docTypes = useMemo(
+    () => filterOptions.documentTypes || [],
+    [filterOptions.documentTypes]
+  );
   const typeLabelsMap = useMemo(() => {
-    const labels = { ...DEFAULT_TYPE_LABELS };
+    const labels = { ...DEFAULT_DOCUMENT_TYPE_LABELS };
     docTypes.forEach((t) => { labels[t.key] = t.label; });
     return labels;
   }, [docTypes]);
 
   // 流程模板发布页的类型下拉，必须与 ProcessTemplates 列表页的 tab 一致：
-  //   白名单内置 ['process', 'regulation']（可能被隐藏的除外）
+  //   共享白名单内置分类（可能被隐藏的除外）
   //   + 用户在列表页编辑模式下新增的 extraTypeKeys（custom_*）
-  // 读取来源：internalConfig.processTemplates.extraTypeKeys / hiddenBuiltinKeys
+  // 新增分类也会在 documentTypes.scopes 中记录页面归属，避免两份配置异步加载时漏项。
   const typeOptions = useMemo(() => {
     const pt = internalConfig?.processTemplates || {};
     const extraKeys = Array.isArray(pt.extraTypeKeys) ? pt.extraTypeKeys : [];
     const hiddenBuiltin = Array.isArray(pt.hiddenBuiltinKeys) ? pt.hiddenBuiltinKeys : [];
-    const builtin = ['process', 'regulation'].filter((k) => !hiddenBuiltin.includes(k));
-    // extraKeys 必须仍然存在于全局文档类型池中
-    const extras = extraKeys.filter((k) => docTypes.some((t) => t.key === k));
-    return [...builtin, ...extras].map((key) => ({
+    const keys = getScopedDocumentTypeKeys({
+      builtinKeys: PROCESS_TEMPLATE_TYPE_KEYS,
+      documentTypes: docTypes,
+      extraTypeKeys: extraKeys,
+      hiddenBuiltinKeys: hiddenBuiltin,
+      scope: PROCESS_TEMPLATE_SCOPE,
+    });
+    return keys.map((key) => ({
       value: key,
       label: typeLabelsMap[key] || key,
     }));
@@ -171,6 +176,14 @@ export default function ProcessTemplateCreate() {
     content: '',
     attachments: [],
   });
+  useEffect(() => {
+    if (typeOptions.length === 0) return;
+    setNewDoc((current) => (
+      typeOptions.some((option) => option.value === current.type)
+        ? current
+        : { ...current, type: typeOptions[0].value }
+    ));
+  }, [typeOptions]);
   const [isPublishing, setIsPublishing] = useState(false);
   const isSimpleFolderCreate = newDoc.format === 'folder';
 
