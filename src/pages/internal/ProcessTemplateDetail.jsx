@@ -584,6 +584,7 @@ export default function ProcessTemplateDetail() {
   // 访问记录弹层：点击浏览数小眼睛时打开，展示谁在什么时候看过这篇文档
   const [viewLogOpen, setViewLogOpen] = useState(false);
   const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   // 编辑历史：每次保存会写一条 { editorId, editorName, editedAt, changes[] }
   // 在目录下方的小矩形里展示，支持折叠 / 展开更多
@@ -1023,7 +1024,6 @@ export default function ProcessTemplateDetail() {
   }, [doc, user, liked, likes]);
 
   /* ========== 编辑模式 ========== */
-  const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editContent, setEditContent] = useState('');
