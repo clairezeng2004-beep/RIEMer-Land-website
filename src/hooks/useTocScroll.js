@@ -168,6 +168,7 @@ export default function useTocScroll({
       requestAnimationFrame(updateActive);
     };
 
+    const scrollTarget = findScrollParent(root) || window;
     updateActive();
     const timers = [120, 360, 900].map((ms) => window.setTimeout(requestUpdate, ms));
     const resizeObserver = typeof ResizeObserver !== 'undefined'
@@ -179,9 +180,11 @@ export default function useTocScroll({
       img.addEventListener('load', requestUpdate, { once: true });
       img.addEventListener('error', requestUpdate, { once: true });
     });
-    // scroll 不冒泡；用捕获阶段监听 window，才能同时覆盖 window、主内容区、
-    // 编辑器内部滚动层等不同页面结构。滚动容器会在 updateActive 中实时重算。
-    window.addEventListener('scroll', requestUpdate, { passive: true, capture: true });
+    // 直接监听实际滚动目标，避免部分浏览器不向 window 捕获阶段分发元素滚动事件。
+    scrollTarget.addEventListener('scroll', requestUpdate, { passive: true });
+    if (scrollTarget !== window) {
+      window.addEventListener('scroll', requestUpdate, { passive: true });
+    }
     window.addEventListener('resize', requestUpdate);
     return () => {
       timers.forEach((id) => window.clearTimeout(id));
@@ -190,7 +193,10 @@ export default function useTocScroll({
         img.removeEventListener('load', requestUpdate);
         img.removeEventListener('error', requestUpdate);
       });
-      window.removeEventListener('scroll', requestUpdate, { capture: true });
+      scrollTarget.removeEventListener('scroll', requestUpdate);
+      if (scrollTarget !== window) {
+        window.removeEventListener('scroll', requestUpdate);
+      }
       window.removeEventListener('resize', requestUpdate);
     };
   }, [toc, contentRef, findHeadingInRoot, findScrollParent, pickActiveHeading]);

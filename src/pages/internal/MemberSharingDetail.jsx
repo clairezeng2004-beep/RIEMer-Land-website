@@ -223,7 +223,7 @@ export default function MemberSharingDetail() {
       if (uid && user?.id === uid && (user.name || user.nickname)) {
         return user.name || user.nickname;
       }
-      return fallback || 'Unknown';
+      return fallback || '';
     },
     [userNameMap, user],
   );
@@ -231,10 +231,12 @@ export default function MemberSharingDetail() {
     (p) => {
       const ids = Array.isArray(p?.contributorIds) ? p.contributorIds : [];
       if (ids.length > 0) {
-        return ids.map((uid) => resolveContributorName(uid, null)).filter(Boolean).join('、')
-          || (p?.author || 'Unknown');
+        const resolvedNames = ids
+          .map((uid) => resolveContributorName(uid, ''))
+          .filter(Boolean);
+        if (resolvedNames.length > 0) return resolvedNames.join('、');
       }
-      return resolveContributorName(p?.authorId, p?.author);
+      return resolveContributorName(p?.authorId, p?.author) || p?.author || 'Unknown';
     },
     [resolveContributorName],
   );
