@@ -12,6 +12,54 @@ const NOTIFICATIONS_KEY = 'riemer_notifications';
 const LAST_EMAIL_KEY = 'riemer_last_email_reminder';
 // 记录「系统自动已读」的通知 ID（区别于用户手动点击已读），列表里会显示为"自动已读"
 const AUTO_READ_IDS_KEY = 'riemer_auto_read_ids';
+const USER_STATE_KEY_PREFIX = 'riemer_notification_user_state_v1';
+const MAX_STORED_STATE_IDS = 2000;
+
+function getUserStateKey(userId) {
+  return userId ? `${USER_STATE_KEY_PREFIX}:${String(userId)}` : null;
+}
+
+function loadUserNotificationState(userId) {
+  const key = getUserStateKey(userId);
+  if (!key) return { readIds: new Set(), dismissedIds: new Set() };
+  try {
+    const parsed = JSON.parse(localStorage.getItem(key) || '{}');
+    return {
+      readIds: new Set(Array.isArray(parsed.readIds) ? parsed.readIds.map(String) : []),
+      dismissedIds: new Set(
+        Array.isArray(parsed.dismissedIds) ? parsed.dismissedIds.map(String) : []
+      ),
+    };
+  } catch {
+    return { readIds: new Set(), dismissedIds: new Set() };
+  }
+}
+
+function saveUserNotificationState(userId, state) {
+  const key = getUserStateKey(userId);
+  if (!key) return;
+  try {
+    localStorage.setItem(key, JSON.stringify({
+      readIds: [...state.readIds].slice(-MAX_STORED_STATE_IDS),
+      dismissedIds: [...state.dismissedIds].slice(-MAX_STORED_STATE_IDS),
+    }));
+  } catch { /* ignore */ }
+}
+
+function updateUserNotificationState(userId, updater) {
+  if (!userId) return;
+  const current = loadUserNotificationState(userId);
+  updater(current);
+  saveUserNotificationState(userId, current);
+}
+
+function updateStoredNotifications(updater) {
+  try {
+    const stored = localStorage.getItem(NOTIFICATIONS_KEY);
+    const current = stored ? normalizeNotificationsList(JSON.parse(stored)) : [];
+    localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updater(current)));
+  } catch { /* ignore */ }
+}
 
 function loadAutoReadIds() {
   try {
@@ -237,13 +285,21 @@ export function NotificationProvider({ children }) {
                 }
               } catch { /* ignore */ }
             } else if (readData) {
-              readSet = new Set(readData.map((r) => r.notification_id));
-              readAtMap = new Map(readData.map((r) => [r.notification_id, r.read_at]));
+              readSet = new Set(readData.map((r) => String(r.notification_id)));
+              readAtMap = new Map(
+                readData.map((r) => [String(r.notification_id), r.read_at])
+              );
               console.log('[Notification] 云端已读记录:', readData.length, '条');
             }
           } else {
             console.warn('[Notification] 当前未登录 Supabase，无法获取云端已读状态');
           }
+
+          // 本地用户状态是云端状态的可靠补充：
+          // - 云端写入失败/延迟时，刷新后仍保持用户刚刚做出的已读选择；
+          // - dismissedIds 为用户个人隐藏记录，避免无 DELETE 权限时通知重新出现。
+          const localUserState = loadUserNotificationState(userIdRef.current);
+          localUserState.readIds.forEach((notificationId) => readSet.add(notificationId));
 
           // 根据用户角色过滤通知（管理员看所有，普通成员只看非 admin-only）
           // 获取当前用户的角色
@@ -264,6 +320,7 @@ export function NotificationProvider({ children }) {
           console.log('[Notification] Supabase 返回', sourceData.length, '条通知, 用户角色:', userRole);
 
           const filtered = sourceData.filter((n) => {
+            if (localUserState.dismissedIds.has(String(n.id))) return false;
             if (!n.target_role) return true; // target_role 为 null 表示所有人可见
             return n.target_role === userRole || userRole === 'admin';
           });
@@ -277,8 +334,9 @@ export function NotificationProvider({ children }) {
             // 先按本地记录判断（老数据兜底）
             let isAuto = autoReadSet.has(String(n.id));
             // 再按云端 read_at 与 created_at 间隔判断（跨设备也可靠）
-            if (!isAuto && readSet.has(n.id)) {
-              const readAt = readAtMap.get(n.id);
+            const notificationId = String(n.id);
+            if (!isAuto && readSet.has(notificationId)) {
+              const readAt = readAtMap.get(notificationId);
               if (readAt && n.created_at) {
                 const diff = Math.abs(new Date(readAt).getTime() - new Date(n.created_at).getTime());
                 if (diff <= AUTO_READ_THRESHOLD_MS) {
@@ -292,7 +350,7 @@ export function NotificationProvider({ children }) {
               message: n.message,
               type: n.type,
               date: n.date,
-              read: readSet.has(n.id),
+              read: readSet.has(notificationId),
               autoRead: isAuto,
             }, index);
           }).filter(Boolean);
@@ -366,10 +424,16 @@ export function NotificationProvider({ children }) {
       console.log('[Notification] 本地模式加载:', notifs.length, '条通知（来自本地缓存）');
     }
     // 本地模式：过滤 target_role（非管理员看不到 admin-only 通知）
-    const filtered = normalizeNotificationsList(notifs).filter((n) => {
-      if (!n.target_role) return true;
-      return n.target_role === 'admin' && isAdminRef.current;
-    });
+    const localUserState = loadUserNotificationState(userIdRef.current);
+    const filtered = normalizeNotificationsList(notifs)
+      .filter((n) => !localUserState.dismissedIds.has(String(n.id)))
+      .filter((n) => {
+        if (!n.target_role) return true;
+        return n.target_role === 'admin' && isAdminRef.current;
+      })
+      .map((n) => (
+        localUserState.readIds.has(String(n.id)) ? { ...n, read: true } : n
+      ));
     setNotifications((prev) => {
       if (notificationsEqual(prev, filtered)) return prev;
       return filtered;
@@ -449,10 +513,19 @@ export function NotificationProvider({ children }) {
 
   // ---- 标记单条已读 ----
   const markAsRead = useCallback(async (id) => {
+    const notificationId = String(id);
     // 立即更新本地状态
     setNotifications((prev) =>
-      (Array.isArray(prev) ? prev : []).map((n) => (n.id === id ? { ...n, read: true } : n))
+      (Array.isArray(prev) ? prev : []).map((n) => (
+        String(n.id) === notificationId ? { ...n, read: true } : n
+      ))
     );
+    updateUserNotificationState(userIdRef.current, (state) => {
+      state.readIds.add(notificationId);
+    });
+    updateStoredNotifications((current) => current.map((n) => (
+      String(n.id) === notificationId ? { ...n, read: true } : n
+    )));
 
     if (useSupabase) {
       try {
@@ -467,7 +540,7 @@ export function NotificationProvider({ children }) {
         const { error } = await supabase
           .from('notification_reads')
           .upsert(
-            { notification_id: id, user_id: user.id, read_at: new Date().toISOString() },
+            { notification_id: notificationId, user_id: user.id, read_at: new Date().toISOString() },
             { onConflict: 'notification_id,user_id' }
           );
         if (error) {
@@ -493,7 +566,15 @@ export function NotificationProvider({ children }) {
 
   // ---- 全部标记已读 ----
   const markAllAsRead = useCallback(async () => {
+    const notificationIds = safeNotifications.map((n) => String(n.id));
     setNotifications((prev) => (Array.isArray(prev) ? prev : []).map((n) => ({ ...n, read: true })));
+    updateUserNotificationState(userIdRef.current, (state) => {
+      notificationIds.forEach((notificationId) => state.readIds.add(notificationId));
+    });
+    const visibleIds = new Set(notificationIds);
+    updateStoredNotifications((current) => current.map((n) => (
+      visibleIds.has(String(n.id)) ? { ...n, read: true } : n
+    )));
 
     if (useSupabase) {
       try {
@@ -612,23 +693,31 @@ export function NotificationProvider({ children }) {
 
   // ---- 删除通知 ----
   const deleteNotification = useCallback(async (id) => {
-    setNotifications((prev) => (Array.isArray(prev) ? prev : []).filter((n) => n.id !== id));
+    const notificationId = String(id);
+    setNotifications((prev) => (
+      (Array.isArray(prev) ? prev : []).filter((n) => String(n.id) !== notificationId)
+    ));
+    updateUserNotificationState(userIdRef.current, (state) => {
+      state.dismissedIds.add(notificationId);
+      state.readIds.add(notificationId);
+    });
+    updateStoredNotifications((current) => (
+      current.filter((n) => String(n.id) !== notificationId)
+    ));
 
     if (useSupabase) {
       try {
-        await supabase.from('notifications').delete().eq('id', id);
+        const { error } = await supabase
+          .from('notifications')
+          .delete()
+          .eq('id', notificationId);
+        if (error) {
+          // 普通成员没有删除公共通知的 RLS 权限是预期情况。
+          // 用户级 dismissedIds 已经持久化，后续云端刷新不会让它复活。
+          console.warn('[Notification] 云端删除通知失败，已保留个人隐藏状态:', error.message);
+        }
       } catch (err) {
-        console.warn('[Notification] 删除通知失败:', err.message);
-      }
-    } else {
-      // 本地模式：同步更新 localStorage
-      try {
-        const stored = localStorage.getItem(NOTIFICATIONS_KEY);
-        const all = stored ? JSON.parse(stored) : [];
-        const updated = all.filter((n) => n.id !== id);
-        localStorage.setItem(NOTIFICATIONS_KEY, JSON.stringify(updated));
-      } catch (err) {
-        console.warn('[Notification] 本地通知删除持久化失败:', err.message);
+        console.warn('[Notification] 云端删除通知异常，已保留个人隐藏状态:', err.message);
       }
     }
   }, [useSupabase]);
