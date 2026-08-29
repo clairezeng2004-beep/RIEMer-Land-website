@@ -1,11 +1,11 @@
 .login-page {
-  min-height: 100vh;
+  min-height: calc(100dvh - 72px);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
-  padding: var(--space-xl);
-  padding-top: 6vh;
+  padding: clamp(16px, 3vh, 28px) var(--space-xl);
   position: relative;
+  overflow: hidden;
 }
 
 .login-page__bg {
@@ -27,11 +27,10 @@
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
   border: 1px solid var(--color-border-light);
-  padding: var(--space-3xl);
+  padding: 28px 32px;
   width: 100%;
   max-width: 440px;
-  height: min(660px, calc(100vh - 12vh));
-  min-height: 560px;
+  height: min(560px, calc(100dvh - 104px));
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -39,30 +38,31 @@
 
 .login-card__header {
   text-align: center;
-  margin-bottom: var(--space-xl);
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
 .login-card__logo {
-  width: 80px;
+  width: 56px;
   height: auto;
-  margin-bottom: var(--space-md);
+  margin-bottom: 8px;
 }
 
 .login-card__header h2 {
-  font-size: var(--text-xl);
-  margin-bottom: var(--space-xs);
+  font-size: var(--text-lg);
+  margin-bottom: 4px;
 }
 
 .login-card__header p {
   color: var(--color-text-muted);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  line-height: 1.4;
 }
 
 .login-card__tabs {
   display: flex;
   gap: var(--space-xs);
-  margin-bottom: var(--space-xl);
+  margin-bottom: 16px;
   background: var(--color-bg);
   border-radius: var(--radius-md);
   padding: 4px;
@@ -75,7 +75,8 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 0.6rem;
+  min-height: 44px;
+  padding: 0.5rem;
   border: none;
   background: transparent;
   color: var(--color-text-muted);
@@ -96,10 +97,10 @@
   display: flex;
   align-items: center;
   gap: var(--space-sm);
-  padding: 0.75rem 1rem;
+  padding: 0.65rem 0.85rem;
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
-  margin-bottom: var(--space-lg);
+  margin-bottom: 12px;
   flex-shrink: 0;
 }
 
@@ -118,18 +119,16 @@
 .login-card__form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-lg);
+  gap: 12px;
   flex: 1;
   min-height: 0;
-  overflow-y: auto;
-  overscroll-behavior: contain;
-  scrollbar-width: thin;
+  overflow: visible;
 }
 
 .login-card__field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xs);
+  gap: 5px;
 }
 
 .login-card__label {
@@ -148,7 +147,8 @@
 }
 
 .login-card__input {
-  padding: 0.75rem 1rem;
+  height: 42px;
+  padding: 0.55rem 0.9rem;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   font-size: var(--text-sm);
@@ -308,7 +308,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-top: calc(-1 * var(--space-sm));
+  min-height: 22px;
+  margin-top: -4px;
 }
 
 .login-card__forgot-link {
@@ -336,7 +337,7 @@
   font-size: var(--text-sm);
   cursor: pointer;
   padding: 0;
-  margin-bottom: var(--space-lg);
+  margin-bottom: 14px;
   transition: color var(--transition-fast);
 }
 
@@ -365,14 +366,15 @@
 
 .login-card__submit {
   width: 100%;
+  min-height: 46px;
   justify-content: center;
   margin-top: auto;
 }
 
 .login-card__hint {
   text-align: center;
-  margin-top: var(--space-lg);
-  padding-top: var(--space-lg);
+  margin-top: 12px;
+  padding-top: 12px;
   border-top: 1px solid var(--color-border-light);
   flex-shrink: 0;
 }
@@ -385,15 +387,13 @@
 /* ==================== 手机端紧凑布局 ==================== */
 @media (max-width: 768px) {
   .login-page {
-    padding: var(--space-md);
-    align-items: flex-start;
-    padding-top: var(--space-xl);
+    padding: 12px;
+    align-items: center;
   }
 
   .login-card {
-    padding: var(--space-xl) var(--space-lg);
-    height: auto;
-    min-height: clamp(480px, calc(100dvh - var(--space-xl) * 2), 640px);
+    padding: 20px 18px;
+    height: min(540px, calc(100dvh - 96px));
   }
 
   .login-card__header {
@@ -401,8 +401,8 @@
   }
 
   .login-card__logo {
-    width: 60px;
-    margin-bottom: var(--space-sm);
+    width: 48px;
+    margin-bottom: 6px;
   }
 
   .login-card__header h2 {
@@ -419,15 +419,16 @@
   }
 
   .login-card__form {
-    gap: var(--space-md);
+    gap: 10px;
   }
 
   .login-card__input {
-    padding: 0.6rem 0.85rem;
+    height: 40px;
+    padding: 0.5rem 0.8rem;
   }
 
   .login-card__submit {
-    margin-top: 4px;
+    min-height: 44px;
   }
 
   .login-card__hint {
