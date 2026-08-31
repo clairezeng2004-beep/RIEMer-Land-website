@@ -128,6 +128,7 @@ export default function ContentManagement() {
   const [fetchError, setFetchError] = useState('');
   const [editingArticle, setEditingArticle] = useState(null); // 正在编辑的文章（新建或修改）
   const [editingArticleId, setEditingArticleId] = useState(null); // 正在编辑的已有文章 ID
+  const [savingArticleId, setSavingArticleId] = useState(null);
 
   const articleTagOptions = useMemo(() => {
     const tagLabels = userArticles.flatMap((article) => article.tags || []);
@@ -1128,13 +1129,29 @@ export default function ContentManagement() {
                             </div>
                             <button
                               className="btn btn-primary content-mgmt__confirm-btn"
-                              onClick={() => {
-                                updateArticle(article.id, editingArticle);
-                                setEditingArticleId(null);
-                                setEditingArticle(null);
+                              disabled={savingArticleId === article.id}
+                              onClick={async () => {
+                                if (savingArticleId) return;
+                                setSavingArticleId(article.id);
+                                try {
+                                  const result = await updateArticle(article.id, editingArticle);
+                                  if (!result.success) {
+                                    alert(`文章保存失败：${result.error || '数据库没有确认更新成功，请稍后重试。'}`);
+                                    return;
+                                  }
+                                  setEditingArticleId(null);
+                                  setEditingArticle(null);
+                                } catch (err) {
+                                  alert(`文章保存失败：${err?.message || '未知错误'}`);
+                                } finally {
+                                  setSavingArticleId(null);
+                                }
                               }}
                             >
-                              <CheckCircle size={18} /> 确认保存修改
+                              {savingArticleId === article.id
+                                ? <Loader2 size={18} className="spin" />
+                                : <CheckCircle size={18} />}
+                              {savingArticleId === article.id ? '保存中…' : '确认保存修改'}
                             </button>
                           </>
                         ) : (

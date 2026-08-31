@@ -449,6 +449,8 @@ export default function InternalArticles() {
   const [archiveEditCategory, setArchiveEditCategory] = useState('');
   const [archiveNewCategory, setArchiveNewCategory] = useState('');
   const [archiveEditTags, setArchiveEditTags] = useState([]);
+  const [archiveEditSaving, setArchiveEditSaving] = useState(false);
+  const [archiveEditError, setArchiveEditError] = useState('');
 
   // ---- 批量阅读量录入弹窗 ----
   const [showReadNumModal, setShowReadNumModal] = useState(false);
@@ -594,6 +596,29 @@ export default function InternalArticles() {
     setEditCatColor(cat.color || PRESET_COLORS[0]);
   };
 
+  const persistArticleUpdates = async (changes, actionLabel) => {
+    if (changes.length === 0) return true;
+
+    let results;
+    try {
+      results = await Promise.all(
+        changes.map(({ id, updates }) => updateArticle(id, updates)),
+      );
+    } catch (err) {
+      alert(`${actionLabel}未完成：${err?.message || '未知错误'}`);
+      return false;
+    }
+    const failures = results.filter((result) => !result?.success);
+    if (failures.length === 0) return true;
+
+    const firstError = failures.find((result) => result?.error)?.error;
+    alert(
+      `${actionLabel}未完成：${failures.length}/${changes.length} 篇文章保存失败。\n` +
+      `${firstError || '数据库没有确认更新成功，请稍后重试。'}`,
+    );
+    return false;
+  };
+
   const saveEditCategory = async () => {
     const nextLabel = editCatLabel.trim();
     if (!nextLabel) return;
@@ -620,32 +645,33 @@ export default function InternalArticles() {
       return;
     }
 
-    // 1) 更新/补齐 categoryList
+    // 先准备系列配置，文章全部保存成功后再落盘，避免配置与文章部分不一致。
+    let nextCategoryList = null;
     if (managed) {
-      // 托管系列：原地改名 + 可选的 color
-      const updated = categoryList.map((c) =>
+      nextCategoryList = categoryList.map((c) =>
         c.key === editingCatKey ? { ...c, label: nextLabel, color: editCatColor } : c,
       );
-      setCategoryList(updated);
-      persistCategories(updated, lastCatSyncRef);
     } else if (isDynamic) {
-      // 动态派生系列被改名：把这个 label 正式"领养"进 categoryList，
-      // 这样下次就能直接作为托管系列参与批量管理
       const key = 'acat_' + Date.now();
-      const updated = [...categoryList, { key, label: nextLabel, color: editCatColor }];
-      setCategoryList(updated);
-      persistCategories(updated, lastCatSyncRef);
+      nextCategoryList = [...categoryList, { key, label: nextLabel, color: editCatColor }];
     }
 
-    // 2) 同步改写所有旧 label 的文章 article.category（托管 & 派生都要做，
-    //    这样筛选项、文章明细上的系列标签才会真正改名）
     if (nextLabel !== prevLabel) {
       const affected = allArticles.filter((a) => a.category === prevLabel);
-      await Promise.all(
-        affected.map((a) => updateArticle(a.id, { category: nextLabel })),
+      const success = await persistArticleUpdates(
+        affected.map((article) => ({
+          id: article.id,
+          updates: { category: nextLabel },
+        })),
+        '系列改名',
       );
-      // 如果当前选中的正是被改名的系列，把选中项同步切到新名
+      if (!success) return;
       setSelectedCategories((prev) => prev.map((item) => (item === prevLabel ? nextLabel : item)));
+    }
+
+    if (nextCategoryList) {
+      setCategoryList(nextCategoryList);
+      persistCategories(nextCategoryList, lastCatSyncRef);
     }
 
     setEditingCatKey(null);
@@ -661,16 +687,20 @@ export default function InternalArticles() {
       : `确定要删除系列「${label}」吗？`;
     if (!window.confirm(msg)) return;
 
-    // 1) 从 categoryList 中移除（如果是托管项）
+    const success = await persistArticleUpdates(
+      affected.map((article) => ({
+        id: article.id,
+        updates: { category: '' },
+      })),
+      '删除系列',
+    );
+    if (!success) return;
+
     if (managed) {
       const updated = categoryList.filter((c) => c.key !== managed.key);
       setCategoryList(updated);
       persistCategories(updated, lastCatSyncRef);
     }
-    // 2) 把所有引用该系列的文章 category 清空，使派生系列真正消失
-    await Promise.all(
-      affected.map((a) => updateArticle(a.id, { category: '' })),
-    );
     setSelectedCategories((prev) => prev.filter((item) => item !== label));
   };
 
@@ -697,13 +727,18 @@ export default function InternalArticles() {
 
     if (nextLabel !== prevLabel) {
       const affected = allArticles.filter((a) => (a.tags || []).includes(prevLabel));
-      await Promise.all(
-        affected.map((a) => updateArticle(a.id, {
-          tags: [...new Set((a.tags || []).map((tag) => (
-            tag === prevLabel ? nextLabel : tag
-          )))],
+      const success = await persistArticleUpdates(
+        affected.map((article) => ({
+          id: article.id,
+          updates: {
+            tags: [...new Set((article.tags || []).map((tag) => (
+              tag === prevLabel ? nextLabel : tag
+            )))],
+          },
         })),
+        '标签改名',
       );
+      if (!success) return;
       setSelectedTags((prev) => prev.map((item) => (item === prevLabel ? nextLabel : item)));
     }
 
@@ -719,11 +754,14 @@ export default function InternalArticles() {
       : `确定要删除内容标签「${label}」吗？`;
     if (!window.confirm(msg)) return;
 
-    await Promise.all(
-      affected.map((a) => updateArticle(a.id, {
-        tags: (a.tags || []).filter((tag) => tag !== label),
+    const success = await persistArticleUpdates(
+      affected.map((article) => ({
+        id: article.id,
+        updates: { tags: (article.tags || []).filter((tag) => tag !== label) },
       })),
+      '删除标签',
     );
+    if (!success) return;
     setSelectedTags((prev) => prev.filter((item) => item !== label));
   };
 
@@ -1232,9 +1270,14 @@ export default function InternalArticles() {
           changes.push({ id: a.id, readNum: next });
         }
       });
-      await Promise.all(
-        changes.map((c) => updateArticle(c.id, { readNum: c.readNum })),
+      const success = await persistArticleUpdates(
+        changes.map((change) => ({
+          id: change.id,
+          updates: { readNum: change.readNum },
+        })),
+        '阅读量保存',
       );
+      if (!success) return;
       setReadNumSaved(true);
       // 延迟关闭，给用户短暂反馈
       setTimeout(() => {
@@ -1251,6 +1294,8 @@ export default function InternalArticles() {
     setArchiveEditCategory(article.category || '');
     setArchiveNewCategory('');
     setArchiveEditTags(article.tags || []);
+    setArchiveEditSaving(false);
+    setArchiveEditError('');
     setTaskLinkMode('none');
     setSelectedTaskId('');
     setNewLinkedTaskTitle(article.title || '');
@@ -1258,11 +1303,13 @@ export default function InternalArticles() {
     setTaskLinkError('');
   };
 
-  const closeArchiveEditor = () => {
+  const resetArchiveEditor = () => {
     setEditingArchive(null);
     setArchiveEditCategory('');
     setArchiveNewCategory('');
     setArchiveEditTags([]);
+    setArchiveEditSaving(false);
+    setArchiveEditError('');
     setTaskLinkMode('none');
     setSelectedTaskId('');
     setNewLinkedTaskTitle('');
@@ -1270,8 +1317,14 @@ export default function InternalArticles() {
     setTaskLinkError('');
   };
 
+  const closeArchiveEditor = () => {
+    if (archiveEditSaving) return;
+    resetArchiveEditor();
+  };
+
   const handleSaveArchiveEdit = async () => {
-    if (!editingArchive) return;
+    if (!editingArchive || archiveEditSaving) return;
+    setArchiveEditError('');
 
     const newCategoryLabel = archiveNewCategory.trim();
     if (archiveEditCategory === '__new__' && !newCategoryLabel) {
@@ -1283,6 +1336,7 @@ export default function InternalArticles() {
       ? newCategoryLabel
       : (archiveEditCategory || '');
 
+    let pendingCategoryList = null;
     if (archiveEditCategory === '__new__' && newCategoryLabel) {
       const existing = categories.find(
         (cat) => cat !== '全部' && cat.trim().toLowerCase() === newCategoryLabel.toLowerCase(),
@@ -1290,7 +1344,7 @@ export default function InternalArticles() {
       if (existing) {
         finalCategory = existing;
       } else {
-        const updated = [
+        pendingCategoryList = [
           ...categoryList,
           {
             key: 'acat_' + Date.now(),
@@ -1298,72 +1352,86 @@ export default function InternalArticles() {
             color: PRESET_COLORS[Math.floor(Math.random() * PRESET_COLORS.length)],
           },
         ];
-        setCategoryList(updated);
-        persistCategories(updated, lastCatSyncRef);
       }
     }
 
-    let linkedWorkItemId = editingArchive.workItemId || null;
-    if (!linkedWorkItemId && taskLinkMode === 'existing') {
-      const task = linkableTasks.find((item) => String(item.id) === String(selectedTaskId));
-      if (!task) {
-        setTaskLinkError('请选择要绑定的事项');
-        return;
-      }
-      const res = await bindExistingTaskToWorkItem(task, 'article');
-      if (!res.success) {
-        setTaskLinkError(`事项绑定失败：${res.error || '未知错误'}`);
-        return;
-      }
-      linkedWorkItemId = res.workItemId;
-    }
-    if (!linkedWorkItemId && taskLinkMode === 'new') {
-      const taskTitle = (
-        syncNewTaskTitle
-          ? editingArchive.title
-          : newLinkedTaskTitle
-      ).trim();
-      if (!taskTitle) {
-        setTaskLinkError('请输入新事项标题');
-        return;
-      }
-      const res = await createLinkedTask({
-        title: taskTitle,
-        kind: 'article',
-        category: filterOptions?.taskCategories?.includes('公众号文章')
-          ? '公众号文章'
-          : (filterOptions?.taskCategories?.[0] || ''),
-        assigneeId: user?.id || null,
-        completedAt: editingArchive.date,
-        creatorId: user?.id || null,
-        creatorName: user?.nickname || user?.name || user?.email || '',
-      });
-      if (!res.success) {
-        setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
-        return;
-      }
-      linkedWorkItemId = res.workItemId;
-    }
-
-    const updates = {
-      title: editingArchive.title.trim(),
-      date: editingArchive.date,
-      category: finalCategory,
-      tags: archiveEditTags,
-      excerpt: editingArchive.excerpt.trim(),
-      url: editingArchive.url || '',
-      author: editingArchive.author || 'RIEMer Land',
-      coverImage: editingArchive.coverImage || null,
-      workItemId: linkedWorkItemId,
-    };
-
-    if (!updates.title) {
+    const title = editingArchive.title.trim();
+    if (!title) {
       alert('请输入文章标题');
       return;
     }
 
-    await updateArticle(editingArchive.id, updates);
-    closeArchiveEditor();
+    setArchiveEditSaving(true);
+    try {
+      let linkedWorkItemId = editingArchive.workItemId || null;
+      if (!linkedWorkItemId && taskLinkMode === 'existing') {
+        const task = linkableTasks.find((item) => String(item.id) === String(selectedTaskId));
+        if (!task) {
+          setTaskLinkError('请选择要绑定的事项');
+          return;
+        }
+        const res = await bindExistingTaskToWorkItem(task, 'article');
+        if (!res.success) {
+          setTaskLinkError(`事项绑定失败：${res.error || '未知错误'}`);
+          return;
+        }
+        linkedWorkItemId = res.workItemId;
+      }
+      if (!linkedWorkItemId && taskLinkMode === 'new') {
+        const taskTitle = (
+          syncNewTaskTitle
+            ? editingArchive.title
+            : newLinkedTaskTitle
+        ).trim();
+        if (!taskTitle) {
+          setTaskLinkError('请输入新事项标题');
+          return;
+        }
+        const res = await createLinkedTask({
+          title: taskTitle,
+          kind: 'article',
+          category: filterOptions?.taskCategories?.includes('公众号文章')
+            ? '公众号文章'
+            : (filterOptions?.taskCategories?.[0] || ''),
+          assigneeId: user?.id || null,
+          completedAt: editingArchive.date,
+          creatorId: user?.id || null,
+          creatorName: user?.nickname || user?.name || user?.email || '',
+        });
+        if (!res.success) {
+          setTaskLinkError(`事项创建失败：${res.error || '未知错误'}`);
+          return;
+        }
+        linkedWorkItemId = res.workItemId;
+      }
+
+      const result = await updateArticle(editingArchive.id, {
+        title,
+        date: editingArchive.date,
+        category: finalCategory,
+        tags: archiveEditTags,
+        excerpt: editingArchive.excerpt.trim(),
+        url: editingArchive.url || '',
+        author: editingArchive.author || 'RIEMer Land',
+        coverImage: editingArchive.coverImage || null,
+        workItemId: linkedWorkItemId,
+      });
+
+      if (!result.success) {
+        setArchiveEditError(`保存失败：${result.error || '数据库没有确认更新成功，请稍后重试。'}`);
+        return;
+      }
+
+      if (pendingCategoryList) {
+        setCategoryList(pendingCategoryList);
+        persistCategories(pendingCategoryList, lastCatSyncRef);
+      }
+      resetArchiveEditor();
+    } catch (err) {
+      setArchiveEditError(`保存失败：${err?.message || '未知错误'}`);
+    } finally {
+      setArchiveEditSaving(false);
+    }
   };
 
   const handleDeleteArchive = async (article) => {
@@ -2454,19 +2522,25 @@ export default function InternalArticles() {
                     onChange: (coverImage) => setEditingArchive((prev) => ({ ...prev, coverImage })),
                   })}
                 </div>
+                {archiveEditError && (
+                  <div className="ia-modal__error">
+                    <AlertCircle size={14} /> {archiveEditError}
+                  </div>
+                )}
               </div>
             </div>
 
             <div className="ia-modal__footer">
-              <button className="btn btn-ghost" onClick={closeArchiveEditor}>
+              <button className="btn btn-ghost" onClick={closeArchiveEditor} disabled={archiveEditSaving}>
                 取消
               </button>
               <button
                 className="btn btn-primary"
                 onClick={handleSaveArchiveEdit}
-                disabled={!editingArchive.title.trim()}
+                disabled={!editingArchive.title.trim() || archiveEditSaving}
               >
-                <Check size={16} /> 保存修改
+                {archiveEditSaving ? <Loader2 size={16} className="spin" /> : <Check size={16} />}
+                {archiveEditSaving ? '保存中…' : '保存修改'}
               </button>
             </div>
           </div>

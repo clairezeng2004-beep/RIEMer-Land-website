@@ -7,7 +7,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const LOCAL_ARTICLES_KEY = 'riemer_user_articles';
-const ARTICLE_COVERS_BUCKET = 'article-covers';
 const ARTICLE_LIST_COLUMNS = [
   'id',
   'title',
@@ -26,69 +25,8 @@ const ARTICLE_LIST_COLUMNS = [
   'work_item_id',
 ].join(', ');
 
-function isDataUrl(value) {
-  return /^data:/i.test(String(value || ''));
-}
-
-function getFileExtFromMime(mime = '') {
-  if (mime.includes('jpeg') || mime.includes('jpg')) return 'jpg';
-  if (mime.includes('webp')) return 'webp';
-  if (mime.includes('gif')) return 'gif';
-  if (mime.includes('svg')) return 'svg';
-  return 'png';
-}
-
-function dataUrlToBlob(dataUrl) {
-  const [meta, body] = String(dataUrl || '').split(',');
-  if (!meta || !body) return null;
-  const mime = meta.match(/^data:([^;]+);base64$/)?.[1] || 'image/png';
-  const binary = atob(body);
-  const bytes = new Uint8Array(binary.length);
-  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
-  return new Blob([bytes], { type: mime });
-}
-
-async function uploadCoverImage({ articleId, coverImage, userId }) {
-  if (!isDataUrl(coverImage) || !isSupabaseConfigured || !supabase) return coverImage || null;
-  const blob = dataUrlToBlob(coverImage);
-  if (!blob) return coverImage;
-
-  const ext = getFileExtFromMime(blob.type);
-  const path = [
-    userId || 'unknown-user',
-    articleId || `article-${Date.now()}`,
-    `cover-${Date.now()}.${ext}`,
-  ].join('/');
-
-  const { error } = await supabase.storage
-    .from(ARTICLE_COVERS_BUCKET)
-    .upload(path, blob, {
-      contentType: blob.type || 'image/png',
-      upsert: true,
-    });
-
-  if (error) {
-    console.warn('[ArticleDB] 封面图上传失败，保留原始图片字段:', error.message);
-    return coverImage;
-  }
-
-  const { data } = supabase.storage.from(ARTICLE_COVERS_BUCKET).getPublicUrl(path);
-  return data?.publicUrl || coverImage;
-}
-
-async function prepareArticleForDb(article, userId) {
-  if (!article || !isDataUrl(article.coverImage || article.cover_image)) return article;
-  const coverImage = await uploadCoverImage({
-    articleId: article.id,
-    coverImage: article.coverImage || article.cover_image,
-    userId,
-  });
-  return {
-    ...article,
-    coverImage,
-    cover_image: coverImage,
-  };
-}
+// cover_image 保持为兼容字段：可存 Base64 Data URL、HTTP(S) URL 或 null。
+// 这里不做 Storage 上传和历史数据迁移，避免保存单篇文章时隐式改写旧封面。
 
 /**
  * 从 Supabase 获取所有文章（按日期倒序）
@@ -155,8 +93,7 @@ export async function addArticleToDb(article, userId) {
   }
 
   try {
-    const cloudArticle = await prepareArticleForDb(article, userId);
-    const row = frontendToDb(cloudArticle, userId);
+    const row = frontendToDb(article, userId);
     const { data, error } = await supabase
       .from('articles')
       .insert(row)
@@ -165,8 +102,8 @@ export async function addArticleToDb(article, userId) {
 
     if (error) {
       console.warn('[ArticleDB] 添加文章失败，保存本地:', error.message);
-      addLocalArticle(cloudArticle);
-      return { ...cloudArticle, _localOnly: true, _saveError: error.message };
+      addLocalArticle(article);
+      return { ...article, _localOnly: true, _saveError: error.message };
     }
 
     return dbToFrontend(data);
@@ -179,45 +116,64 @@ export async function addArticleToDb(article, userId) {
 
 /**
  * 更新文章
+ * @returns {Promise<{success:boolean, article:object|null, error:string|null, localOnly?:boolean}>}
  */
 export async function updateArticleInDb(id, updates) {
+  if (!id) {
+    return { success: false, article: null, error: '缺少文章 ID，无法保存。' };
+  }
+
   if (!isSupabaseConfigured || !supabase) {
     updateLocalArticle(id, updates);
-    return;
+    return {
+      success: true,
+      article: { id, ...updates },
+      error: null,
+      localOnly: true,
+    };
   }
 
   try {
-    const cloudUpdates = await prepareArticleForDb({ id, ...updates });
     const dbUpdates = {};
-    if (cloudUpdates.title !== undefined) dbUpdates.title = cloudUpdates.title;
-    if (cloudUpdates.rawTitle !== undefined) dbUpdates.raw_title = cloudUpdates.rawTitle;
-    if (cloudUpdates.category !== undefined) dbUpdates.category = cloudUpdates.category;
-    if (cloudUpdates.tags !== undefined) dbUpdates.tags = cloudUpdates.tags;
-    if (cloudUpdates.excerpt !== undefined) dbUpdates.excerpt = cloudUpdates.excerpt;
-    if (cloudUpdates.outline !== undefined) dbUpdates.outline = cloudUpdates.outline;
-    if (cloudUpdates.content !== undefined) dbUpdates.content = cloudUpdates.content;
-    if (cloudUpdates.url !== undefined) dbUpdates.url = cloudUpdates.url;
-    if (cloudUpdates.date !== undefined) dbUpdates.date = cloudUpdates.date;
-    if (cloudUpdates.author !== undefined) dbUpdates.author = cloudUpdates.author;
-    if (cloudUpdates.coverImage !== undefined) dbUpdates.cover_image = cloudUpdates.coverImage;
-    if (cloudUpdates.readNum !== undefined) dbUpdates.read_num = Number(cloudUpdates.readNum) || 0;
+    if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.rawTitle !== undefined) dbUpdates.raw_title = updates.rawTitle;
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.tags !== undefined) dbUpdates.tags = updates.tags;
+    if (updates.excerpt !== undefined) dbUpdates.excerpt = updates.excerpt;
+    if (updates.outline !== undefined) dbUpdates.outline = updates.outline;
+    if (updates.content !== undefined) dbUpdates.content = updates.content;
+    if (updates.url !== undefined) dbUpdates.url = updates.url;
+    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    if (updates.author !== undefined) dbUpdates.author = updates.author;
+    if (updates.coverImage !== undefined) dbUpdates.cover_image = updates.coverImage;
+    if (updates.readNum !== undefined) dbUpdates.read_num = Number(updates.readNum) || 0;
     // 工作项关联（见 supabase-work-item-link.sql / src/utils/workItem.js）：
     // 允许把 null 写回数据库以解除关联；undefined 则表示调用方没打算改这个字段。
-    if (cloudUpdates.workItemId !== undefined) dbUpdates.work_item_id = cloudUpdates.workItemId || null;
+    if (updates.workItemId !== undefined) dbUpdates.work_item_id = updates.workItemId || null;
     dbUpdates.updated_at = new Date().toISOString();
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('articles')
       .update(dbUpdates)
-      .eq('id', id);
+      .eq('id', id)
+      .select('*')
+      .single();
 
     if (error) {
       console.warn('[ArticleDB] 更新文章失败:', error.message);
-      updateLocalArticle(id, cloudUpdates);
+      return { success: false, article: null, error: error.message };
     }
+
+    if (!data) {
+      const error = '数据库没有返回已更新的文章，可能是记录不存在或当前账号没有更新权限。';
+      console.warn('[ArticleDB] 更新文章失败:', error);
+      return { success: false, article: null, error };
+    }
+
+    return { success: true, article: dbToFrontend(data), error: null };
   } catch (err) {
     console.warn('[ArticleDB] 更新文章异常:', err.message);
-    updateLocalArticle(id, updates);
+    return { success: false, article: null, error: err.message || '更新文章时发生异常。' };
   }
 }
 

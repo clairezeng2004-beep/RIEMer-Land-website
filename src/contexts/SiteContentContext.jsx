@@ -1177,10 +1177,17 @@ export function SiteContentProvider({ children }) {
   };
 
   const updateArticle = async (id, updates) => {
+    const result = await updateArticleInDb(id, updates);
+    if (!result.success) return result;
+
     setUserArticles((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...updates } : a))
+      prev.map((article) => (
+        article.id === id
+          ? { ...article, ...updates, ...result.article }
+          : article
+      ))
     );
-    await updateArticleInDb(id, updates);
+    return result;
   };
 
   const deleteArticle = async (id) => {
