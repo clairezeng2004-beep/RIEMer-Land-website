@@ -1016,14 +1016,31 @@ export default function ContentManagement() {
                       <div className="content-mgmt__article-form-actions">
                         <button
                           className="btn btn-primary content-mgmt__confirm-btn"
-                          disabled={!editingArticle.title.trim()}
-                          onClick={() => {
-                            addArticle(editingArticle, user?.id);
-                            setEditingArticle(null);
-                            setArticleUrl('');
+                          disabled={!editingArticle.title.trim() || savingArticleId === 'new'}
+                          onClick={async () => {
+                            if (savingArticleId) return;
+                            setSavingArticleId('new');
+                            try {
+                              const saved = await addArticle(editingArticle, user?.id);
+                              if (saved?._localOnly || saved?._saveFailed) {
+                                alert(
+                                  `文章保存失败：${saved._saveError || '云端没有确认保存成功。'}`,
+                                );
+                                return;
+                              }
+                              setEditingArticle(null);
+                              setArticleUrl('');
+                            } catch (err) {
+                              alert(`文章保存失败：${err?.message || '未知错误'}`);
+                            } finally {
+                              setSavingArticleId(null);
+                            }
                           }}
                         >
-                          <CheckCircle size={18} /> 确认添加文章
+                          {savingArticleId === 'new'
+                            ? <Loader2 size={18} className="spin" />
+                            : <CheckCircle size={18} />}
+                          {savingArticleId === 'new' ? '保存中…' : '确认添加文章'}
                         </button>
                         <button
                           className="btn btn-ghost"
@@ -1156,7 +1173,11 @@ export default function ContentManagement() {
                                 if (savingArticleId) return;
                                 setSavingArticleId(article.id);
                                 try {
-                                  const result = await updateArticle(article.id, editingArticle);
+                                  const result = await updateArticle(
+                                    article.id,
+                                    editingArticle,
+                                    user?.id,
+                                  );
                                   if (!result.success) {
                                     alert(`文章保存失败：${result.error || '数据库没有确认更新成功，请稍后重试。'}`);
                                     return;

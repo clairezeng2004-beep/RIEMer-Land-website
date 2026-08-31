@@ -1173,7 +1173,7 @@ export function SiteContentProvider({ children }) {
     setUserArticles((prev) => [article, ...prev]);
     // 异步写入数据库
     const saved = await addArticleToDb(article, userId);
-    if (saved?._localOnly) {
+    if (saved?._localOnly || saved?._saveFailed) {
       setUserArticles((prev) => prev.filter((a) => a.id !== article.id));
       return saved;
     }
@@ -1186,8 +1186,12 @@ export function SiteContentProvider({ children }) {
     return saved;
   };
 
-  const updateArticle = async (id, updates) => {
-    const result = await updateArticleInDb(id, updates);
+  const updateArticle = async (id, updates, userId) => {
+    const previousArticle = userArticles.find((article) => article.id === id);
+    const result = await updateArticleInDb(id, updates, {
+      userId,
+      previousCoverImage: previousArticle?.coverImage,
+    });
     if (!result.success) return result;
 
     setUserArticles((prev) =>

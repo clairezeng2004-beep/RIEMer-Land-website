@@ -116,6 +116,33 @@ export const supabase = supabaseUrl && supabaseAnonKey
     })
   : null;
 
+// 公开内容只读客户端：不读取或刷新浏览器里的登录会话。
+// 文章列表等公开查询无需等待 auth 锁，因此不同浏览器即使登录状态异常，
+// 也能从同一份云端数据加载。所有写操作仍使用上方的 authenticated client。
+export const publicSupabase = supabaseUrl && supabaseAnonKey
+  ? createClient(supabaseUrl, supabaseAnonKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+        detectSessionInUrl: false,
+        storageKey: 'riemer-public-anon',
+      },
+      global: {
+        fetch: (url, options = {}) => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(
+            () => controller.abort(),
+            getSupabaseFetchTimeout(url, options),
+          );
+          return fetch(url, {
+            ...options,
+            signal: controller.signal,
+          }).finally(() => clearTimeout(timeoutId));
+        },
+      },
+    })
+  : null;
+
 // ---- Supabase 连接健康状态 ----
 // supabaseReachable: true=可达, false=不可达, null=未检测
 let supabaseReachable = null;

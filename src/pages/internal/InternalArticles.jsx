@@ -75,8 +75,8 @@ function saveCoverGallery(data) {
   localStorage.setItem(ARTICLE_COVER_GALLERY_KEY, JSON.stringify(data));
 }
 
-// ---- 封面图片上传 ----
-// 封面直接存 base64 Data URL，随文章的 coverImage/cover_image 字段一起保存。
+// ---- 封面图片选择 ----
+// 浏览器先生成预览 Data URL；保存文章时由 articleCoverService 上传到 Storage。
 
 function fileToDataUrl(file) {
   return new Promise((resolve, reject) => {
@@ -1184,10 +1184,10 @@ export default function InternalArticles() {
 
     const articleTitle = newArticle.title;
     const savedArticle = await addArticle(newArticle, user?.id);
-    if (savedArticle?._localOnly) {
+    if (savedArticle?._localOnly || savedArticle?._saveFailed) {
       alert(
         `文章没有写入云端 articles 表：${savedArticle._saveError || '未知错误'}\n` +
-        '这条归档暂时只在本机缓存里，刷新或跨设备可能看不到。请检查 Supabase 表结构 / RLS 权限后重试。'
+        '编辑内容已保留，请检查网络、Storage 配置或 RLS 权限后重试。'
       );
       return;
     }
@@ -1445,7 +1445,7 @@ export default function InternalArticles() {
         author: editingArchive.author || 'RIEMer Land',
         coverImage: editingArchive.coverImage || null,
         workItemId: linkedWorkItemId,
-      });
+      }, user?.id);
 
       if (!result.success) {
         setArchiveEditError(`保存失败：${result.error || '数据库没有确认更新成功，请稍后重试。'}`);

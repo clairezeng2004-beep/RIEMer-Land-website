@@ -4,7 +4,13 @@
 // 提供文章的 CRUD 操作，存储到 Supabase articles 表
 // 当 Supabase 不可用时，回退到 localStorage
 
-import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { publicSupabase, supabase, isSupabaseConfigured } from '../lib/supabase';
+import {
+  getManagedArticleCoverPath,
+  isImageDataUrl,
+  removeArticleCover,
+  uploadArticleCover,
+} from './articleCoverService';
 
 const LOCAL_ARTICLES_KEY = 'riemer_user_articles';
 const ARTICLE_LIST_COLUMNS = [
@@ -26,19 +32,19 @@ const ARTICLE_LIST_COLUMNS = [
   'work_item_id',
 ].join(', ');
 
-// cover_image 保持为兼容字段：可存 Base64 Data URL、HTTP(S) URL 或 null。
-// 这里不做 Storage 上传和历史数据迁移，避免保存单篇文章时隐式改写旧封面。
+// cover_image 保持为兼容字段：历史 Base64、Storage URL、外部 URL 和 null 均可读取。
+// 只有用户新选择的 Base64 封面会上传 Storage；编辑其他字段不会改写旧封面。
 
 /**
  * 从 Supabase 获取所有文章（按日期倒序）
  */
 export async function fetchArticles() {
-  if (!isSupabaseConfigured || !supabase) {
+  if (!isSupabaseConfigured || !publicSupabase) {
     return getLocalArticles();
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await publicSupabase
       .from('articles')
       .select(ARTICLE_LIST_COLUMNS)
       .order('date', { ascending: false });
@@ -61,12 +67,12 @@ export async function fetchArticles() {
  */
 export async function fetchArticleById(id) {
   if (!id) return null;
-  if (!isSupabaseConfigured || !supabase) {
+  if (!isSupabaseConfigured || !publicSupabase) {
     return getLocalArticles().find((article) => String(article.id) === String(id)) || null;
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = await publicSupabase
       .from('articles')
       .select('*')
       .eq('id', id)
@@ -93,8 +99,16 @@ export async function addArticleToDb(article, userId) {
     return { ...article, _localOnly: true, _saveError: 'Supabase 未配置，文章仅保存到本机缓存。' };
   }
 
+  let uploadedCoverPath = null;
   try {
-    const row = frontendToDb(article, userId);
+    let coverImage = article.coverImage || article.cover_image || null;
+    if (isImageDataUrl(coverImage)) {
+      const uploaded = await uploadArticleCover(coverImage, userId);
+      coverImage = uploaded.publicUrl;
+      uploadedCoverPath = uploaded.path;
+    }
+
+    const row = frontendToDb({ ...article, coverImage }, userId);
     const { data, error } = await supabase
       .from('articles')
       .insert(row)
@@ -102,16 +116,16 @@ export async function addArticleToDb(article, userId) {
       .single();
 
     if (error) {
-      console.warn('[ArticleDB] 添加文章失败，保存本地:', error.message);
-      addLocalArticle(article);
-      return { ...article, _localOnly: true, _saveError: error.message };
+      if (uploadedCoverPath) await removeArticleCover(uploadedCoverPath);
+      console.warn('[ArticleDB] 添加文章失败:', error.message);
+      return { ...article, _saveFailed: true, _saveError: error.message };
     }
 
     return dbToFrontend(data);
   } catch (err) {
-    console.warn('[ArticleDB] 添加文章异常，保存本地:', err.message);
-    addLocalArticle(article);
-    return { ...article, _localOnly: true, _saveError: err.message };
+    if (uploadedCoverPath) await removeArticleCover(uploadedCoverPath);
+    console.warn('[ArticleDB] 添加文章异常:', err.message);
+    return { ...article, _saveFailed: true, _saveError: err.message };
   }
 }
 
@@ -119,7 +133,7 @@ export async function addArticleToDb(article, userId) {
  * 更新文章
  * @returns {Promise<{success:boolean, article:object|null, error:string|null, localOnly?:boolean}>}
  */
-export async function updateArticleInDb(id, updates) {
+export async function updateArticleInDb(id, updates, options = {}) {
   if (!id) {
     return { success: false, article: null, error: '缺少文章 ID，无法保存。' };
   }
@@ -134,6 +148,7 @@ export async function updateArticleInDb(id, updates) {
     };
   }
 
+  let uploadedCoverPath = null;
   try {
     const dbUpdates = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;
@@ -146,7 +161,17 @@ export async function updateArticleInDb(id, updates) {
     if (updates.url !== undefined) dbUpdates.url = updates.url;
     if (updates.date !== undefined) dbUpdates.date = updates.date;
     if (updates.author !== undefined) dbUpdates.author = updates.author;
-    if (updates.coverImage !== undefined) dbUpdates.cover_image = updates.coverImage;
+    const coverChanged = updates.coverImage !== undefined
+      && updates.coverImage !== options.previousCoverImage;
+    if (coverChanged) {
+      if (isImageDataUrl(updates.coverImage)) {
+        const uploaded = await uploadArticleCover(updates.coverImage, options.userId);
+        dbUpdates.cover_image = uploaded.publicUrl;
+        uploadedCoverPath = uploaded.path;
+      } else {
+        dbUpdates.cover_image = updates.coverImage || null;
+      }
+    }
     if (updates.readNum !== undefined) dbUpdates.read_num = Number(updates.readNum) || 0;
     // 工作项关联（见 supabase-work-item-link.sql / src/utils/workItem.js）：
     // 允许把 null 写回数据库以解除关联；undefined 则表示调用方没打算改这个字段。
@@ -161,18 +186,31 @@ export async function updateArticleInDb(id, updates) {
       .single();
 
     if (error) {
+      if (uploadedCoverPath) await removeArticleCover(uploadedCoverPath);
       console.warn('[ArticleDB] 更新文章失败:', error.message);
       return { success: false, article: null, error: error.message };
     }
 
     if (!data) {
+      if (uploadedCoverPath) await removeArticleCover(uploadedCoverPath);
       const error = '数据库没有返回已更新的文章，可能是记录不存在或当前账号没有更新权限。';
       console.warn('[ArticleDB] 更新文章失败:', error);
       return { success: false, article: null, error };
     }
 
+    const previousPath = coverChanged
+      ? getManagedArticleCoverPath(options.previousCoverImage)
+      : null;
+    if (previousPath && previousPath !== uploadedCoverPath) {
+      const cleanup = await removeArticleCover(previousPath);
+      if (!cleanup.success) {
+        console.warn('[ArticleDB] 旧封面清理失败:', cleanup.error);
+      }
+    }
+
     return { success: true, article: dbToFrontend(data), error: null };
   } catch (err) {
+    if (uploadedCoverPath) await removeArticleCover(uploadedCoverPath);
     console.warn('[ArticleDB] 更新文章异常:', err.message);
     return { success: false, article: null, error: err.message || '更新文章时发生异常。' };
   }
