@@ -22,6 +22,7 @@ const ARTICLE_LIST_COLUMNS = [
   'archived_by',
   'archived_by_id',
   'created_at',
+  'updated_at',
   'work_item_id',
 ].join(', ');
 
@@ -181,24 +182,200 @@ export async function updateArticleInDb(id, updates) {
  * 删除文章
  */
 export async function deleteArticleFromDb(id) {
+  if (!id) {
+    return { success: false, deletedId: null, error: '缺少文章 ID，无法删除。' };
+  }
+
   if (!isSupabaseConfigured || !supabase) {
     deleteLocalArticle(id);
-    return;
+    return { success: true, deletedId: id, error: null, localOnly: true };
   }
 
   try {
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('articles')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
+      .select('id')
+      .single();
 
     if (error) {
       console.warn('[ArticleDB] 删除文章失败:', error.message);
-      deleteLocalArticle(id);
+      return { success: false, deletedId: null, error: error.message };
     }
+
+    if (!data?.id) {
+      const error = '数据库没有返回被删除的文章，可能是记录不存在或当前账号没有删除权限。';
+      console.warn('[ArticleDB] 删除文章失败:', error);
+      return { success: false, deletedId: null, error };
+    }
+
+    return { success: true, deletedId: data.id, error: null };
   } catch (err) {
     console.warn('[ArticleDB] 删除文章异常:', err.message);
-    deleteLocalArticle(id);
+    return { success: false, deletedId: null, error: err.message || '删除文章时发生异常。' };
+  }
+}
+
+const BATCH_ARTICLE_FIELDS = new Set(['category', 'tags', 'readNum']);
+
+function buildBatchPayload(changes, { requireVersion = true } = {}) {
+  if (!Array.isArray(changes)) {
+    return { payload: null, error: '批量更新参数格式不正确。' };
+  }
+
+  const payload = [];
+  const ids = new Set();
+  for (const change of changes) {
+    const id = change?.id;
+    const updates = change?.updates || {};
+    if (!id) return { payload: null, error: '批量更新中存在缺少 ID 的文章。' };
+    if (ids.has(String(id))) return { payload: null, error: `批量更新中存在重复文章 ID：${id}` };
+    ids.add(String(id));
+
+    if (requireVersion && !change.expectedUpdatedAt) {
+      return { payload: null, error: '文章数据缺少版本信息，请刷新页面后重试。' };
+    }
+
+    const fields = Object.keys(updates);
+    const unsupportedField = fields.find((field) => !BATCH_ARTICLE_FIELDS.has(field));
+    if (unsupportedField) {
+      return { payload: null, error: `批量更新包含不支持的字段：${unsupportedField}` };
+    }
+    if (fields.length === 0) {
+      return { payload: null, error: `文章 ${id} 的更新内容为空。` };
+    }
+    if (updates.category !== undefined && typeof updates.category !== 'string') {
+      return { payload: null, error: `文章 ${id} 的系列格式不正确。` };
+    }
+    if (
+      updates.tags !== undefined
+      && (!Array.isArray(updates.tags) || updates.tags.some((tag) => typeof tag !== 'string'))
+    ) {
+      return { payload: null, error: `文章 ${id} 的标签格式不正确。` };
+    }
+    if (
+      updates.readNum !== undefined
+      && (!Number.isInteger(Number(updates.readNum)) || Number(updates.readNum) < 0)
+    ) {
+      return { payload: null, error: `文章 ${id} 的阅读量必须是非负整数。` };
+    }
+
+    const row = {
+      id,
+    };
+    if (requireVersion) row.expected_updated_at = change.expectedUpdatedAt;
+    if (updates.category !== undefined) row.category = updates.category;
+    if (updates.tags !== undefined) row.tags = updates.tags;
+    if (updates.readNum !== undefined) row.read_num = Number(updates.readNum);
+    payload.push(row);
+  }
+
+  return { payload, error: null };
+}
+
+function updateLocalArticlesBatch(changes) {
+  const articles = getLocalArticles();
+  const byId = new Map(articles.map((article) => [String(article.id), article]));
+  const missing = changes.find((change) => !byId.has(String(change.id)));
+  if (missing) {
+    return { success: false, articles: [], error: `本地缓存中找不到文章：${missing.id}` };
+  }
+
+  const now = new Date().toISOString();
+  const updatesById = new Map(changes.map((change) => [String(change.id), change.updates || {}]));
+  const nextArticles = articles.map((article) => {
+    const updates = updatesById.get(String(article.id));
+    return updates ? { ...article, ...updates, updatedAt: now } : article;
+  });
+  saveLocalArticles(nextArticles);
+
+  return {
+    success: true,
+    articles: nextArticles.filter((article) => updatesById.has(String(article.id))),
+    error: null,
+    localOnly: true,
+  };
+}
+
+/**
+ * 原子批量更新文章。生产环境通过单次 RPC 在同一数据库事务内完成；
+ * 任一文章版本冲突、无权限或不存在时，整批回滚。
+ */
+export async function batchUpdateArticlesInDb(changes) {
+  if (!Array.isArray(changes) || changes.length === 0) {
+    return { success: true, articles: [], error: null };
+  }
+
+  const cloudEnabled = isSupabaseConfigured && Boolean(supabase);
+  const { payload, error: payloadError } = buildBatchPayload(changes, {
+    requireVersion: cloudEnabled,
+  });
+  if (payloadError) return { success: false, articles: [], error: payloadError };
+  if (!cloudEnabled) return updateLocalArticlesBatch(changes);
+
+  try {
+    const { data, error } = await supabase.rpc('apply_article_batch_updates', {
+      p_changes: payload,
+    });
+    if (error) return { success: false, articles: [], error: error.message };
+
+    const rows = Array.isArray(data?.articles) ? data.articles : [];
+    if (rows.length !== changes.length) {
+      return { success: false, articles: [], error: '数据库返回的文章数量与提交数量不一致。' };
+    }
+    return { success: true, articles: rows.map(dbToFrontend), error: null };
+  } catch (err) {
+    return { success: false, articles: [], error: err.message || '批量更新文章时发生异常。' };
+  }
+}
+
+/**
+ * 原子更新文章系列及 site_settings.article_categories。
+ * SQL 函数只在事务成功后返回，避免文章和系列配置分步成功。
+ */
+export async function batchUpdateArticleCategoriesInDb(
+  changes,
+  categories,
+  expectedSettingUpdatedAt,
+) {
+  if (!Array.isArray(changes) || !Array.isArray(categories)) {
+    return { success: false, articles: [], error: '系列批量更新参数格式不正确。' };
+  }
+
+  const cloudEnabled = isSupabaseConfigured && Boolean(supabase);
+  const { payload, error: payloadError } = buildBatchPayload(changes, {
+    requireVersion: cloudEnabled,
+  });
+  if (payloadError) return { success: false, articles: [], error: payloadError };
+
+  if (!cloudEnabled) {
+    const localResult = changes.length > 0
+      ? updateLocalArticlesBatch(changes)
+      : { success: true, articles: [], error: null, localOnly: true };
+    return { ...localResult, settingUpdatedAt: null };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('apply_article_category_batch', {
+      p_changes: payload,
+      p_categories: categories,
+      p_expected_setting_updated_at: expectedSettingUpdatedAt || null,
+    });
+    if (error) return { success: false, articles: [], error: error.message };
+
+    const rows = Array.isArray(data?.articles) ? data.articles : [];
+    if (rows.length !== changes.length) {
+      return { success: false, articles: [], error: '数据库返回的文章数量与提交数量不一致。' };
+    }
+    return {
+      success: true,
+      articles: rows.map(dbToFrontend),
+      settingUpdatedAt: data?.setting_updated_at || null,
+      error: null,
+    };
+  } catch (err) {
+    return { success: false, articles: [], error: err.message || '批量更新文章系列时发生异常。' };
   }
 }
 
@@ -311,6 +488,7 @@ function dbToFrontend(row) {
     archivedBy: row.archived_by || '未知',
     archivedById: row.archived_by_id || null,
     archivedAt: row.created_at || new Date().toISOString(),
+    updatedAt: row.updated_at || row.created_at || null,
     // 工作项关联（WorkItem）：用于和 tasks / events 之间串"同一件工作"
     // 的闭环。老数据无此列 → 读出来是 undefined → 统一归一成 null。
     workItemId: row.work_item_id || null,

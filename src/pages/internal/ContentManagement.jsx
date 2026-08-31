@@ -129,6 +129,7 @@ export default function ContentManagement() {
   const [editingArticle, setEditingArticle] = useState(null); // 正在编辑的文章（新建或修改）
   const [editingArticleId, setEditingArticleId] = useState(null); // 正在编辑的已有文章 ID
   const [savingArticleId, setSavingArticleId] = useState(null);
+  const [deletingArticleId, setDeletingArticleId] = useState(null);
 
   const articleTagOptions = useMemo(() => {
     const tagLabels = userArticles.flatMap((article) => article.tags || []);
@@ -307,6 +308,32 @@ export default function ContentManagement() {
       setFiltersForm({ ...filterOptions });
       // 需要从 context 获取重置后的值
       window.location.reload();
+    }
+  };
+
+  const handleDeleteArticle = async (article) => {
+    if (!article || deletingArticleId) return;
+    if (!window.confirm(`确定删除「${article.title}」？`)) return;
+
+    setDeletingArticleId(article.id);
+    try {
+      const deleteResult = await deleteArticle(article, user);
+      if (!deleteResult?.success) {
+        const backupMessage = deleteResult?.recycleSaved
+          ? '\n文章仍保留，回收站中已有安全副本。'
+          : '\n文章仍保留，未执行数据库删除。';
+        alert(`文章删除失败：${deleteResult?.error || '数据库没有确认删除成功。'}${backupMessage}`);
+        return;
+      }
+
+      if (editingArticleId === article.id) {
+        setEditingArticleId(null);
+        setEditingArticle(null);
+      }
+    } catch (err) {
+      alert(`文章删除失败：${err?.message || '未知错误'}`);
+    } finally {
+      setDeletingArticleId(null);
     }
   };
 
@@ -1051,18 +1078,13 @@ export default function ContentManagement() {
                             </button>
                             <button
                               className="content-mgmt__remove-btn"
-                              onClick={() => {
-                                if (window.confirm(`确定删除「${article.title}」？`)) {
-                                  deleteArticle(article.id);
-                                  if (editingArticleId === article.id) {
-                                    setEditingArticleId(null);
-                                    setEditingArticle(null);
-                                  }
-                                }
-                              }}
-                              title="删除"
+                              onClick={() => handleDeleteArticle(article)}
+                              disabled={deletingArticleId === article.id}
+                              title={deletingArticleId === article.id ? '正在删除' : '删除'}
                             >
-                              <Trash2 size={14} />
+                              {deletingArticleId === article.id
+                                ? <Loader2 size={14} className="spin" />
+                                : <Trash2 size={14} />}
                             </button>
                           </div>
                         </div>

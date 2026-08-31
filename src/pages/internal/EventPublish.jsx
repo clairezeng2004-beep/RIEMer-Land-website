@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
-import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -156,7 +156,7 @@ const EMPTY_EVENT = {
 };
 
 export default function EventPublish() {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAdmin, user } = useAuth();
   // flushSettingToCloud / SITE_KEYS：当我们做"分类改名 / 删除分类"这种需要级联
   // 修改 events[].category 的操作时，events 默认走 context 的 400ms 去抖写云。
   // 如果用户删完立即关 tab，events 的去抖尚未触发就被取消 → B 设备看到分类列表
@@ -325,8 +325,6 @@ export default function EventPublish() {
   // 跨模块联动提示：发布一个带 workItemId 的活动之后，引导用户去 Tasks 页
   // 把对应事项标为"已完成"形成闭环。与 InternalArticles 的 taskPrompt 等价。
   const [taskPrompt, setTaskPrompt] = useState(null);
-
-  if (!isAuthenticated) return <Navigate to="/login" replace />;
 
   // 分类（"全部" + 预设分类 + events 中出现但不在预设里的历史分类）
   // 老活动里的"分享会 / 经验分享"不再作为筛选项展示；其它历史分类保留在列表末尾。

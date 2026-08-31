@@ -1,7 +1,17 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { clubInfo, taskCategories as defaultTaskCategories, taskStatuses as defaultTaskStatuses, teamMembers as defaultTeamMembers, eventsData as defaultEventsData, timelineData as defaultTimelineData } from '../data/siteData';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
-import { fetchArticles as fetchArticlesFromDb, addArticleToDb, updateArticleInDb, deleteArticleFromDb, migrateLocalArticlesToDb, subscribeArticles } from '../services/articleDbService';
+import {
+  fetchArticles as fetchArticlesFromDb,
+  addArticleToDb,
+  updateArticleInDb,
+  deleteArticleFromDb,
+  batchUpdateArticlesInDb,
+  batchUpdateArticleCategoriesInDb,
+  migrateLocalArticlesToDb,
+  subscribeArticles,
+} from '../services/articleDbService';
+import { moveToRecycleBin } from '../services/recycleBinService';
 import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig, fetchSettings, saveSetting, subscribeSettings, SITE_KEYS } from '../services/siteSettingsService';
 
 const SiteContentContext = createContext(null);
@@ -1190,9 +1200,55 @@ export function SiteContentProvider({ children }) {
     return result;
   };
 
-  const deleteArticle = async (id) => {
-    setUserArticles((prev) => prev.filter((a) => a.id !== id));
-    await deleteArticleFromDb(id);
+  const deleteArticle = async (article, user) => {
+    if (!article?.id) {
+      return { success: false, stage: 'validation', error: '缺少要删除的文章信息' };
+    }
+
+    const recycleResult = await moveToRecycleBin({ itemType: 'article', item: article, user });
+    if (!recycleResult?.success) {
+      return {
+        success: false,
+        stage: 'recycle',
+        error: recycleResult?.error || '回收站云端备份失败',
+      };
+    }
+
+    const result = await deleteArticleFromDb(article.id);
+    if (!result.success) {
+      return { ...result, stage: 'delete', recycleSaved: true };
+    }
+
+    setUserArticles((prev) => prev.filter((item) => item.id !== result.deletedId));
+    return { ...result, stage: 'complete', recycleSaved: true };
+  };
+
+  const applyReturnedArticles = (updatedArticles) => {
+    if (!Array.isArray(updatedArticles) || updatedArticles.length === 0) return;
+    const byId = new Map(updatedArticles.map((article) => [String(article.id), article]));
+    setUserArticles((prev) => prev.map((article) => (
+      byId.has(String(article.id))
+        ? { ...article, ...byId.get(String(article.id)) }
+        : article
+    )));
+  };
+
+  const batchUpdateArticles = async (changes) => {
+    const result = await batchUpdateArticlesInDb(changes);
+    if (!result.success) return result;
+    applyReturnedArticles(result.articles);
+    return result;
+  };
+
+  const batchUpdateArticleCategories = async (changes, categories, expectedSettingUpdatedAt) => {
+    const result = await batchUpdateArticleCategoriesInDb(
+      changes,
+      categories,
+      expectedSettingUpdatedAt,
+    );
+    if (!result.success) return result;
+    applyReturnedArticles(result.articles);
+    return result;
   };
 
   // 刷新文章列表（从数据库重新加载）
@@ -1378,7 +1434,9 @@ export function SiteContentProvider({ children }) {
     <SiteContentContext.Provider value={{
       content, updateContent, resetContent,
       filterOptions, updateFilterOptions, resetFilterOptions,
-      userArticles, addArticle, updateArticle, deleteArticle, refreshArticles, articlesLoaded,
+      userArticles, addArticle, updateArticle, deleteArticle,
+      batchUpdateArticles, batchUpdateArticleCategories,
+      refreshArticles, articlesLoaded,
       internalConfig, updateInternalConfig, resetInternalConfig,
       replaceInternalConfig, flushInternalConfig,
       internalConfigPersistPaused, setInternalConfigPersistPaused,

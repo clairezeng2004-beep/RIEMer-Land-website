@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -538,10 +538,6 @@ export default function Tasks() {
   );
   // 默认折叠以免顶部太重；有未闭环项时右上角显示角标引导展开
   const [showOpenList, setShowOpenList] = useState(false);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
 
   const canUseSupabase = isSupabaseConfigured && supabaseOk === true;
 

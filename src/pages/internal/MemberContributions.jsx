@@ -1,5 +1,4 @@
 import { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -185,10 +184,6 @@ export default function MemberContributions() {
     }
   }, [canUseSupabase]);
 
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
 
   const currentPeriod = selectedPeriod === 'all'
     ? null

@@ -1,5 +1,5 @@
 import { useMemo, useState, useCallback, useRef, useEffect } from 'react';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -26,7 +26,6 @@ import {
 import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
 import { fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../../services/siteSettingsService';
-import { moveToRecycleBin } from '../../services/recycleBinService';
 import { isSupabaseConfigured } from '../../lib/supabase';
 import {
   bindExistingTaskToWorkItem,
@@ -283,9 +282,11 @@ function findMatchingArticleId(titleText, articles) {
 }
 
 export default function InternalArticles() {
-  const { isAuthenticated, isAdmin, user } = useAuth();
+  const { isAdmin, user } = useAuth();
   const {
-    userArticles, addArticle, updateArticle, deleteArticle, internalConfig, updateInternalConfig,
+    userArticles, addArticle, updateArticle, deleteArticle,
+    batchUpdateArticles, batchUpdateArticleCategories,
+    internalConfig, updateInternalConfig,
     filterOptions,
   } = useSiteContent();
   const { addNotification } = useNotifications();
@@ -451,6 +452,7 @@ export default function InternalArticles() {
   const [archiveEditTags, setArchiveEditTags] = useState([]);
   const [archiveEditSaving, setArchiveEditSaving] = useState(false);
   const [archiveEditError, setArchiveEditError] = useState('');
+  const [deletingArticleId, setDeletingArticleId] = useState(null);
 
   // ---- 批量阅读量录入弹窗 ----
   const [showReadNumModal, setShowReadNumModal] = useState(false);
@@ -464,10 +466,6 @@ export default function InternalArticles() {
   const [pasteText, setPasteText] = useState('');
   // 解析结果：{ matched: [{id,title,readNum}], unmatched: [{titleText,readNum}] }
   const [pasteResult, setPasteResult] = useState(null);
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
-  }
 
   const allArticles = useMemo(
     () => [...userArticles, ...articlesData].sort((a, b) => b.date.localeCompare(a.date)),
@@ -596,27 +594,64 @@ export default function InternalArticles() {
     setEditCatColor(cat.color || PRESET_COLORS[0]);
   };
 
+  const addArticleVersions = (changes) => {
+    const articlesById = new Map(userArticles.map((article) => [String(article.id), article]));
+    for (const change of changes) {
+      if (!articlesById.has(String(change.id))) {
+        return {
+          changes: null,
+          error: '批量操作包含内置文章或当前账号不可管理的文章，已取消本次操作。',
+        };
+      }
+    }
+    return {
+      changes: changes.map((change) => ({
+        ...change,
+        expectedUpdatedAt: articlesById.get(String(change.id))?.updatedAt,
+      })),
+      error: null,
+    };
+  };
+
+  const showBatchError = (actionLabel, error) => {
+    alert(`${actionLabel}未完成：${error || '数据库没有确认整批更新成功，请刷新后重试。'}`);
+  };
+
   const persistArticleUpdates = async (changes, actionLabel) => {
     if (changes.length === 0) return true;
-
-    let results;
-    try {
-      results = await Promise.all(
-        changes.map(({ id, updates }) => updateArticle(id, updates)),
-      );
-    } catch (err) {
-      alert(`${actionLabel}未完成：${err?.message || '未知错误'}`);
+    const versioned = addArticleVersions(changes);
+    if (versioned.error) {
+      showBatchError(actionLabel, versioned.error);
       return false;
     }
-    const failures = results.filter((result) => !result?.success);
-    if (failures.length === 0) return true;
 
-    const firstError = failures.find((result) => result?.error)?.error;
-    alert(
-      `${actionLabel}未完成：${failures.length}/${changes.length} 篇文章保存失败。\n` +
-      `${firstError || '数据库没有确认更新成功，请稍后重试。'}`,
-    );
+    const result = await batchUpdateArticles(versioned.changes);
+    if (result?.success) return true;
+    showBatchError(actionLabel, result?.error);
     return false;
+  };
+
+  const persistCategoryUpdates = async (changes, nextCategoryList, actionLabel) => {
+    const versioned = addArticleVersions(changes);
+    if (versioned.error) {
+      showBatchError(actionLabel, versioned.error);
+      return false;
+    }
+
+    const result = await batchUpdateArticleCategories(
+      versioned.changes,
+      nextCategoryList,
+      lastCatSyncRef.current,
+    );
+    if (!result?.success) {
+      showBatchError(actionLabel, result?.error);
+      return false;
+    }
+
+    setCategoryList(nextCategoryList);
+    saveArticleCategories(nextCategoryList);
+    if (result.settingUpdatedAt) lastCatSyncRef.current = result.settingUpdatedAt;
+    return true;
   };
 
   const saveEditCategory = async () => {
@@ -656,22 +691,20 @@ export default function InternalArticles() {
       nextCategoryList = [...categoryList, { key, label: nextLabel, color: editCatColor }];
     }
 
-    if (nextLabel !== prevLabel) {
-      const affected = allArticles.filter((a) => a.category === prevLabel);
-      const success = await persistArticleUpdates(
-        affected.map((article) => ({
-          id: article.id,
-          updates: { category: nextLabel },
-        })),
-        '系列改名',
-      );
-      if (!success) return;
-      setSelectedCategories((prev) => prev.map((item) => (item === prevLabel ? nextLabel : item)));
-    }
+    const affected = nextLabel !== prevLabel
+      ? allArticles.filter((article) => article.category === prevLabel)
+      : [];
+    const changes = affected.map((article) => ({
+      id: article.id,
+      updates: { category: nextLabel },
+    }));
+    const success = nextCategoryList
+      ? await persistCategoryUpdates(changes, nextCategoryList, '系列修改')
+      : await persistArticleUpdates(changes, '系列改名');
+    if (!success) return;
 
-    if (nextCategoryList) {
-      setCategoryList(nextCategoryList);
-      persistCategories(nextCategoryList, lastCatSyncRef);
+    if (nextLabel !== prevLabel) {
+      setSelectedCategories((prev) => prev.map((item) => (item === prevLabel ? nextLabel : item)));
     }
 
     setEditingCatKey(null);
@@ -687,20 +720,17 @@ export default function InternalArticles() {
       : `确定要删除系列「${label}」吗？`;
     if (!window.confirm(msg)) return;
 
-    const success = await persistArticleUpdates(
-      affected.map((article) => ({
-        id: article.id,
-        updates: { category: '' },
-      })),
-      '删除系列',
-    );
+    const changes = affected.map((article) => ({
+      id: article.id,
+      updates: { category: '' },
+    }));
+    const nextCategoryList = managed
+      ? categoryList.filter((category) => category.key !== managed.key)
+      : null;
+    const success = nextCategoryList
+      ? await persistCategoryUpdates(changes, nextCategoryList, '删除系列')
+      : await persistArticleUpdates(changes, '删除系列');
     if (!success) return;
-
-    if (managed) {
-      const updated = categoryList.filter((c) => c.key !== managed.key);
-      setCategoryList(updated);
-      persistCategories(updated, lastCatSyncRef);
-    }
     setSelectedCategories((prev) => prev.filter((item) => item !== label));
   };
 
@@ -1435,13 +1465,23 @@ export default function InternalArticles() {
   };
 
   const handleDeleteArchive = async (article) => {
-    if (!article) return;
+    if (!article || deletingArticleId) return;
     const title = article.title || '未命名文章';
     if (!window.confirm(`确定删除「${title}」这条文章归档吗？`)) return;
-    // 删除前先把整条快照挪进回收站，支持后续恢复
-    moveToRecycleBin({ itemType: 'article', item: article, user })
-      .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
-    await deleteArticle(article.id);
+    setDeletingArticleId(article.id);
+    try {
+      const deleteResult = await deleteArticle(article, user);
+      if (!deleteResult?.success) {
+        const backupMessage = deleteResult?.recycleSaved
+          ? '\n文章仍保留，回收站中已有安全副本。'
+          : '\n文章仍保留，未执行数据库删除。';
+        alert(`文章删除失败：${deleteResult?.error || '数据库没有确认删除成功。'}${backupMessage}`);
+      }
+    } catch (err) {
+      alert(`文章删除失败：${err?.message || '未知错误'}`);
+    } finally {
+      setDeletingArticleId(null);
+    }
   };
 
   // 总阅读量（用于弹窗顶部汇总展示）
@@ -1932,9 +1972,12 @@ export default function InternalArticles() {
                       e.stopPropagation();
                       handleDeleteArchive(article);
                     }}
-                    title="删除归档"
+                    disabled={deletingArticleId === article.id}
+                    title={deletingArticleId === article.id ? '正在删除' : '删除归档'}
                   >
-                    <Trash2 size={14} />
+                    {deletingArticleId === article.id
+                      ? <Loader2 size={14} className="spin" />
+                      : <Trash2 size={14} />}
                   </button>
                 )}
                 {/* 点击卡片先弹出「中间卡片」预览，由预览卡片再决定打开原文 / 站内详情，
