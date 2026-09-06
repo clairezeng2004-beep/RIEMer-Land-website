@@ -496,6 +496,53 @@ export async function migrateLocalArticlesToDb(userId) {
   return migrated;
 }
 
+/**
+ * 把单篇文章的历史 Base64 封面迁移到 Storage。
+ *
+ * 背景：历史封面以 Base64 内联存在 articles.cover_image，57 张≈7.5MB 全部挤在
+ * 同一个列表响应里，导致公开页"文字秒出、封面要等一大包下载完"，且超过 5MB 的
+ * localStorage 缓存上限根本写不进，每次打开都要重下。迁移成 Storage 公开 URL 后，
+ * 列表响应缩到 ~50KB，封面各自从 CDN 懒加载并被浏览器缓存。
+ *
+ * 只处理 Base64 封面；已是 URL / 空封面直接跳过（skipped:true），不会误伤。
+ * DB 更新失败会回收刚上传的 Storage 文件，保证不产生孤儿文件。
+ */
+export async function migrateArticleCoverToStorage(article, userId) {
+  if (!isSupabaseConfigured || !supabase) {
+    return { success: false, error: 'Supabase 未配置，无法迁移封面。' };
+  }
+  const cover = article?.coverImage || article?.cover_image || null;
+  if (!isImageDataUrl(cover)) {
+    // 非 Base64（已迁移的 URL、外部链接、空封面）无需处理
+    return { success: true, skipped: true, article };
+  }
+
+  let uploadedPath = null;
+  try {
+    const uploaded = await uploadArticleCover(cover, userId);
+    uploadedPath = uploaded.path;
+    const { data, error } = await supabase
+      .from('articles')
+      .update({ cover_image: uploaded.publicUrl, updated_at: new Date().toISOString() })
+      .eq('id', article.id)
+      .select('*')
+      .single();
+
+    if (error || !data) {
+      if (uploadedPath) await removeArticleCover(uploadedPath);
+      return {
+        success: false,
+        error: error?.message || '数据库没有返回更新后的文章，可能是记录不存在或没有更新权限。',
+      };
+    }
+
+    return { success: true, article: dbToFrontend(data) };
+  } catch (err) {
+    if (uploadedPath) await removeArticleCover(uploadedPath);
+    return { success: false, error: err.message || '迁移封面时发生异常。' };
+  }
+}
+
 // ========== 数据格式转换 ==========
 
 /** 数据库行 → 前端对象 */

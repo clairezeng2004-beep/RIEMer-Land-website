@@ -27,6 +27,7 @@ import '../../components/CrossLinkToast.css';
 import './InternalArticles.css';
 import { fetchSetting, saveSetting, subscribeSetting, SITE_KEYS } from '../../services/siteSettingsService';
 import { isSupabaseConfigured } from '../../lib/supabase';
+import { isImageDataUrl } from '../../services/articleCoverService';
 import {
   bindExistingTaskToWorkItem,
   createLinkedTask,
@@ -286,6 +287,7 @@ export default function InternalArticles() {
   const {
     userArticles, addArticle, updateArticle, deleteArticle,
     batchUpdateArticles, batchUpdateArticleCategories,
+    migrateArticleCovers,
     internalConfig, updateInternalConfig,
     filterOptions,
   } = useSiteContent();
@@ -1492,6 +1494,37 @@ export default function InternalArticles() {
     );
   }, [readNumDraft]);
 
+  // ---- 一键迁移历史 Base64 封面到 Storage ----
+  // 待迁移数量：cover_image 仍是 Base64 的文章。为 0 时按钮隐藏。
+  const pendingCoverCount = useMemo(
+    () => userArticles.filter((a) => isImageDataUrl(a.coverImage)).length,
+    [userArticles],
+  );
+  const [coverMigrateOpen, setCoverMigrateOpen] = useState(false);
+  const [coverMigrating, setCoverMigrating] = useState(false);
+  const [coverMigrateProgress, setCoverMigrateProgress] = useState(null); // {done,total,migrated,failed}
+  const [coverMigrateResult, setCoverMigrateResult] = useState(null); // {total,migrated,failed,errors}
+
+  const runCoverMigration = useCallback(async () => {
+    if (coverMigrating) return;
+    setCoverMigrating(true);
+    setCoverMigrateResult(null);
+    setCoverMigrateProgress({ done: 0, total: pendingCoverCount, migrated: 0, failed: 0 });
+    try {
+      const result = await migrateArticleCovers(user?.id, (p) => setCoverMigrateProgress(p));
+      setCoverMigrateResult(result);
+    } catch (err) {
+      setCoverMigrateResult({
+        total: pendingCoverCount,
+        migrated: 0,
+        failed: pendingCoverCount,
+        errors: [{ id: null, title: '', error: err.message || '迁移过程发生异常。' }],
+      });
+    } finally {
+      setCoverMigrating(false);
+    }
+  }, [coverMigrating, migrateArticleCovers, pendingCoverCount, user?.id]);
+
   return (
     <div className="ia-list-page">
       <div className="container">
@@ -1503,6 +1536,15 @@ export default function InternalArticles() {
             <EditableText as="p" value={ia.pageDesc || '浏览公众号历史推送内容，回顾与归档'} configKey="internalArticles.pageDesc" onChange={v => updateIA('pageDesc', v)} />
           </div>
           <div className="ia-list__header-actions">
+            {isAdmin && pendingCoverCount > 0 && (
+              <button
+                className="btn btn-ghost"
+                onClick={() => { setCoverMigrateResult(null); setCoverMigrateProgress(null); setCoverMigrateOpen(true); }}
+                title="把历史 Base64 封面迁移到云存储，加快公开页封面加载"
+              >
+                <ImagePlus size={16} /> 迁移封面（{pendingCoverCount}）
+              </button>
+            )}
             {isAdmin && (
               <button
                 className="btn btn-ghost"
@@ -2987,6 +3029,110 @@ export default function InternalArticles() {
               >
                 暂不需要
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 一键迁移封面到云存储弹窗 ========== */}
+      {coverMigrateOpen && (
+        <div
+          className="ia-modal-overlay"
+          onClick={() => { if (!coverMigrating) setCoverMigrateOpen(false); }}
+        >
+          <div className="ia-modal" onClick={(e) => e.stopPropagation()}>
+            <div className="ia-modal__header">
+              <h2>
+                <ImagePlus size={20} /> 迁移封面到云存储
+              </h2>
+              <button
+                className="ia-modal__close"
+                onClick={() => setCoverMigrateOpen(false)}
+                disabled={coverMigrating}
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ia-modal__body">
+              {!coverMigrateResult && (
+                <p className="ia-modal__hint">
+                  当前有 <strong>{pendingCoverCount}</strong> 篇文章的封面仍以 Base64 内联存储，
+                  它们让公开页每次都要下载约数 MB 的大包，封面显示明显变慢。
+                  迁移会把这些封面上传到云存储（article-covers），数据库只保存图片链接，
+                  之后公开页封面会秒开并被浏览器缓存。已迁移的链接封面和空封面会自动跳过，不受影响。
+                </p>
+              )}
+
+              {coverMigrating && coverMigrateProgress && (
+                <div className="ia-cover-migrate__progress">
+                  <Loader2 size={18} className="ia-spin" />
+                  <span>
+                    正在迁移 {coverMigrateProgress.done} / {coverMigrateProgress.total}
+                    （成功 {coverMigrateProgress.migrated}
+                    {coverMigrateProgress.failed > 0 ? `，失败 ${coverMigrateProgress.failed}` : ''}）
+                  </span>
+                </div>
+              )}
+
+              {coverMigrateResult && (
+                <div className="ia-cover-migrate__result">
+                  <p>
+                    <Check size={16} /> 迁移完成：共 {coverMigrateResult.total} 篇，
+                    成功 {coverMigrateResult.migrated} 篇
+                    {coverMigrateResult.failed > 0 ? `，失败 ${coverMigrateResult.failed} 篇` : ''}。
+                  </p>
+                  {coverMigrateResult.failed > 0 && (
+                    <ul className="ia-cover-migrate__errors">
+                      {coverMigrateResult.errors.slice(0, 8).map((e, i) => (
+                        <li key={e.id || i}>
+                          <AlertCircle size={13} /> {e.title || e.id || '未知文章'}：{e.error}
+                        </li>
+                      ))}
+                      {coverMigrateResult.errors.length > 8 && (
+                        <li>…等共 {coverMigrateResult.errors.length} 篇失败，可再次点击迁移重试。</li>
+                      )}
+                    </ul>
+                  )}
+                  {coverMigrateResult.failed > 0 && (
+                    <p className="ia-modal__hint">
+                      失败通常是登录态过期或网络波动，重新登录后再次点击「迁移封面」即可只重试剩余部分。
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="ia-modal__footer">
+              {!coverMigrateResult ? (
+                <>
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => setCoverMigrateOpen(false)}
+                    disabled={coverMigrating}
+                  >
+                    取消
+                  </button>
+                  <button
+                    className="btn btn-primary"
+                    onClick={runCoverMigration}
+                    disabled={coverMigrating || pendingCoverCount === 0}
+                  >
+                    {coverMigrating ? (
+                      <><Loader2 size={16} className="ia-spin" /> 迁移中…</>
+                    ) : (
+                      <><ImagePlus size={16} /> 开始迁移（{pendingCoverCount} 篇）</>
+                    )}
+                  </button>
+                </>
+              ) : (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => setCoverMigrateOpen(false)}
+                >
+                  完成
+                </button>
+              )}
             </div>
           </div>
         </div>

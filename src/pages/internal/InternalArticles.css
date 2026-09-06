@@ -1331,6 +1331,50 @@
   to { transform: rotate(360deg); }
 }
 
+/* 一键迁移封面到云存储 */
+.ia-spin {
+  animation: spin 1s linear infinite;
+}
+
+.ia-cover-migrate__progress {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  color: var(--color-text);
+  padding: var(--space-md) 0;
+}
+
+.ia-cover-migrate__progress .ia-spin {
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.ia-cover-migrate__result p {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  color: var(--color-text);
+  margin: 0 0 var(--space-sm);
+}
+
+.ia-cover-migrate__errors {
+  list-style: none;
+  margin: var(--space-sm) 0 0;
+  padding: 0;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.ia-cover-migrate__errors li {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  font-size: 0.85rem;
+  color: var(--color-danger, #ef4444);
+  padding: 4px 0;
+  line-height: 1.4;
+}
+
 /* Step: 确认 */
 .ia-modal__step-confirm {
   display: flex;

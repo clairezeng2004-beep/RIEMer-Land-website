@@ -9,8 +9,10 @@ import {
   batchUpdateArticlesInDb,
   batchUpdateArticleCategoriesInDb,
   migrateLocalArticlesToDb,
+  migrateArticleCoverToStorage,
   subscribeArticles,
 } from '../services/articleDbService';
+import { isImageDataUrl } from '../services/articleCoverService';
 import { moveToRecycleBin } from '../services/recycleBinService';
 import { fetchInternalConfig, saveInternalConfig, subscribeInternalConfig, fetchSettings, saveSetting, subscribeSettings, SITE_KEYS } from '../services/siteSettingsService';
 
@@ -1257,6 +1259,36 @@ export function SiteContentProvider({ children }) {
     return result;
   };
 
+  // 一键把所有历史 Base64 封面迁移到 Storage（管理员在内部页触发）。
+  // 逐篇串行迁移：每成功一篇立刻更新本地 state（封面即时变成 URL），
+  // 通过 onProgress 回调把进度回传给 UI。返回汇总结果。
+  const migrateArticleCovers = useCallback(async (userId, onProgress) => {
+    const targets = userArticles.filter((a) => isImageDataUrl(a.coverImage));
+    const total = targets.length;
+    let done = 0;
+    let migrated = 0;
+    let failed = 0;
+    const errors = [];
+
+    for (const article of targets) {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await migrateArticleCoverToStorage(article, userId);
+      done += 1;
+      if (res.success && !res.skipped) {
+        migrated += 1;
+        setUserArticles((prev) => prev.map((a) => (
+          a.id === article.id ? { ...a, ...res.article } : a
+        )));
+      } else if (!res.success) {
+        failed += 1;
+        errors.push({ id: article.id, title: article.title, error: res.error });
+      }
+      if (onProgress) onProgress({ done, total, migrated, failed });
+    }
+
+    return { total, migrated, failed, errors };
+  }, [userArticles]);
+
   // 刷新文章列表（从数据库重新加载）
   const refreshArticles = useCallback(async () => {
     const articles = await fetchArticlesFromDb();
@@ -1442,6 +1474,7 @@ export function SiteContentProvider({ children }) {
       filterOptions, updateFilterOptions, resetFilterOptions,
       userArticles, addArticle, updateArticle, deleteArticle,
       batchUpdateArticles, batchUpdateArticleCategories,
+      migrateArticleCovers,
       refreshArticles, articlesLoaded,
       internalConfig, updateInternalConfig, resetInternalConfig,
       replaceInternalConfig, flushInternalConfig,
