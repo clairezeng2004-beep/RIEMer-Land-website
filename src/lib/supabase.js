@@ -116,32 +116,41 @@ export const supabase = supabaseUrl && supabaseAnonKey
     })
   : null;
 
-// 公开内容只读客户端：不读取或刷新浏览器里的登录会话。
-// 文章列表等公开查询无需等待 auth 锁，因此不同浏览器即使登录状态异常，
-// 也能从同一份云端数据加载。所有写操作仍使用上方的 authenticated client。
-export const publicSupabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false,
-        detectSessionInUrl: false,
-        storageKey: 'riemer-public-anon',
-      },
-      global: {
-        fetch: (url, options = {}) => {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(
-            () => controller.abort(),
-            getSupabaseFetchTimeout(url, options),
-          );
-          return fetch(url, {
-            ...options,
-            signal: controller.signal,
-          }).finally(() => clearTimeout(timeoutId));
+/**
+ * 读取公开 PostgREST 数据，不创建第二个 Supabase Auth 客户端。
+ * 公开文章查询因此不读取、刷新或锁定浏览器登录会话。
+ */
+export async function fetchPublicRows(table, params = new URLSearchParams()) {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Supabase 未配置。');
+  }
+
+  const query = params.toString();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
+  try {
+    const response = await fetch(
+      `${supabaseUrl}/rest/v1/${encodeURIComponent(table)}${query ? `?${query}` : ''}`,
+      {
+        headers: {
+          apikey: supabaseAnonKey,
+          Authorization: `Bearer ${supabaseAnonKey}`,
         },
+        signal: controller.signal,
       },
-    })
-  : null;
+    );
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `公开数据读取失败（HTTP ${response.status}）`);
+    }
+
+    return await response.json();
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 // ---- Supabase 连接健康状态 ----
 // supabaseReachable: true=可达, false=不可达, null=未检测

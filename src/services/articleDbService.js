@@ -4,7 +4,7 @@
 // 提供文章的 CRUD 操作，存储到 Supabase articles 表
 // 当 Supabase 不可用时，回退到 localStorage
 
-import { publicSupabase, supabase, isSupabaseConfigured } from '../lib/supabase';
+import { fetchPublicRows, supabase, isSupabaseConfigured } from '../lib/supabase';
 import {
   getManagedArticleCoverPath,
   isImageDataUrl,
@@ -39,20 +39,16 @@ const ARTICLE_LIST_COLUMNS = [
  * 从 Supabase 获取所有文章（按日期倒序）
  */
 export async function fetchArticles() {
-  if (!isSupabaseConfigured || !publicSupabase) {
+  if (!isSupabaseConfigured) {
     return getLocalArticles();
   }
 
   try {
-    const { data, error } = await publicSupabase
-      .from('articles')
-      .select(ARTICLE_LIST_COLUMNS)
-      .order('date', { ascending: false });
-
-    if (error) {
-      console.warn('[ArticleDB] 获取文章失败，回退本地:', error.message);
-      return getLocalArticles();
-    }
+    const params = new URLSearchParams({
+      select: ARTICLE_LIST_COLUMNS,
+      order: 'date.desc',
+    });
+    const data = await fetchPublicRows('articles', params);
 
     // 将数据库格式转为前端格式
     return (data || []).map(dbToFrontend);
@@ -67,21 +63,17 @@ export async function fetchArticles() {
  */
 export async function fetchArticleById(id) {
   if (!id) return null;
-  if (!isSupabaseConfigured || !publicSupabase) {
+  if (!isSupabaseConfigured) {
     return getLocalArticles().find((article) => String(article.id) === String(id)) || null;
   }
 
   try {
-    const { data, error } = await publicSupabase
-      .from('articles')
-      .select('*')
-      .eq('id', id)
-      .maybeSingle();
-
-    if (error) {
-      console.warn('[ArticleDB] 获取文章详情失败，回退本地:', error.message);
-      return getLocalArticles().find((article) => String(article.id) === String(id)) || null;
-    }
+    const params = new URLSearchParams({
+      select: '*',
+      id: `eq.${id}`,
+      limit: '1',
+    });
+    const [data] = await fetchPublicRows('articles', params);
 
     return data ? dbToFrontend(data) : null;
   } catch (err) {
