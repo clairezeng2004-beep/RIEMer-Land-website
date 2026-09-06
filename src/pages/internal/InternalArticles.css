@@ -2184,3 +2184,89 @@
   font-variant-numeric: tabular-nums;
   opacity: 0.8;
 }
+
+/* ===== 批量导入归档弹窗 ===== */
+.ia-modal--batch {
+  max-width: 640px;
+}
+.ia-batch__desc {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  color: var(--color-text-muted);
+}
+.ia-batch__textarea {
+  width: 100%;
+  padding: var(--space-sm) var(--space-md);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-mono, ui-monospace, monospace);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  resize: vertical;
+  box-sizing: border-box;
+}
+.ia-batch__textarea:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+.ia-batch__ai {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  margin-top: var(--space-md);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+  color: var(--color-text-muted);
+  cursor: pointer;
+}
+.ia-batch__ai input {
+  margin-top: 2px;
+  flex-shrink: 0;
+}
+.ia-batch__results {
+  list-style: none;
+  margin: var(--space-md) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.ia-batch__row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-sm);
+  border-radius: var(--radius-sm, 6px);
+  background: var(--color-bg-muted, rgba(94, 173, 140, 0.06));
+  font-size: var(--text-sm);
+}
+.ia-batch__status {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+  color: var(--color-text-muted);
+}
+.ia-batch__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ia-batch__label {
+  color: var(--color-text);
+}
+.ia-batch__url {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  word-break: break-all;
+}
+.ia-batch__row--ok .ia-batch__status,
+.ia-batch__row--ok .ia-batch__label { color: var(--color-primary); }
+.ia-batch__row--fail .ia-batch__status,
+.ia-batch__row--fail .ia-batch__label { color: var(--color-danger, #EF4444); }
+.ia-batch__row--running .ia-batch__status { color: var(--color-primary); }

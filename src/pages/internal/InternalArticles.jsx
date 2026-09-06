@@ -12,10 +12,13 @@ import { articlesData } from '../../data/siteData';
 import { getCommentCount } from '../../services/commentService';
 import {
   fetchAndParseArticle,
+  generateSummary,
   generateSummaryAI,
   inferCategory,
   inferTags,
   cleanTitle,
+  extractWechatUrls,
+  wechatArticleKey,
 } from '../../services/articleService';
 import {
   FileText, Search, MessageSquare, Calendar, ArrowRight,
@@ -468,6 +471,13 @@ export default function InternalArticles() {
   const [pasteText, setPasteText] = useState('');
   // 解析结果：{ matched: [{id,title,readNum}], unmatched: [{titleText,readNum}] }
   const [pasteResult, setPasteResult] = useState(null);
+
+  // ---- 批量新建归档（粘贴多条公众号链接）----
+  const [showBatchModal, setShowBatchModal] = useState(false);
+  const [batchText, setBatchText] = useState('');
+  const [batchAutoAI, setBatchAutoAI] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchRows, setBatchRows] = useState([]); // [{ url, key, status, title, error }]
 
   const allArticles = useMemo(
     () => [...userArticles, ...articlesData].sort((a, b) => b.date.localeCompare(a.date)),
@@ -1219,6 +1229,112 @@ export default function InternalArticles() {
     }
   };
 
+  // ---- 批量新建归档 ----
+  const openBatchModal = () => {
+    setBatchText('');
+    setBatchRows([]);
+    setBatchRunning(false);
+    setShowBatchModal(true);
+  };
+  const closeBatchModal = () => {
+    if (batchRunning) return; // 跑批途中不允许关闭，避免中断写库
+    setShowBatchModal(false);
+  };
+
+  // 已入库文章的"身份键"集合，用于批量判重
+  const existingArticleKeys = useMemo(() => {
+    const set = new Set();
+    for (const a of userArticles) {
+      if (a?.url) set.add(wechatArticleKey(a.url));
+    }
+    return set;
+  }, [userArticles]);
+
+  const runBatchImport = async () => {
+    const urls = extractWechatUrls(batchText);
+    if (urls.length === 0) {
+      setBatchRows([{ url: '', key: '', status: 'fail', title: '', error: '没识别到微信公众号链接' }]);
+      return;
+    }
+
+    const seenThisRun = new Set();
+    const initial = urls.map((url) => {
+      const key = wechatArticleKey(url);
+      let status = 'pending';
+      if (seenThisRun.has(key)) status = 'dup';
+      else if (existingArticleKeys.has(key)) status = 'exists';
+      seenThisRun.add(key);
+      return { url, key, status, title: '', error: '' };
+    });
+    setBatchRows(initial);
+    setBatchRunning(true);
+
+    const patch = (i, next) =>
+      setBatchRows((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...next } : r)));
+
+    for (let i = 0; i < initial.length; i++) {
+      const row = initial[i];
+      if (row.status === 'exists' || row.status === 'dup') continue;
+      patch(i, { status: 'running' });
+      try {
+        const parsed = await fetchAndParseArticle(row.url);
+        const cleanedTitle = cleanTitle(parsed.rawTitle || parsed.title, [
+          ...seriesTitlePrefixes,
+          parsed.category,
+        ]) || parsed.title;
+
+        // 摘要：默认本地兜底；勾了 AI 就尝试 AI，失败退回本地
+        let excerpt = parsed.excerpt || generateSummary(parsed.content, 100);
+        if (batchAutoAI) {
+          try {
+            excerpt = await generateSummaryAI(cleanedTitle, parsed.content);
+          } catch {
+            /* AI 失败保留本地摘要 */
+          }
+        }
+
+        const newArticle = {
+          id: `user-${Date.now()}-${i}`,
+          title: cleanedTitle,
+          rawTitle: parsed.rawTitle || '',
+          author: parsed.author || 'RIEMer Land',
+          avatar: null,
+          coverImage: null,
+          date: parsed.date,
+          category: parsed.category || '',
+          tags: [],
+          excerpt,
+          outline: [],
+          url: parsed.url || row.url,
+          content: parsed.content,
+          archivedBy: user?.name || user?.nickname || '未知',
+          archivedById: user?.id || null,
+          archivedAt: new Date().toISOString(),
+          workItemId: null,
+        };
+
+        const saved = await addArticle(newArticle, user?.id);
+        if (saved?._localOnly || saved?._saveFailed) {
+          patch(i, { status: 'fail', title: cleanedTitle, error: saved._saveError || '云端未确认保存' });
+          continue;
+        }
+        patch(i, { status: 'ok', title: cleanedTitle });
+        try {
+          emitNotificationEvent('article.archive', {
+            operator: newArticle.archivedBy,
+            operatorUserId: user?.id,
+            title: cleanedTitle,
+            category: newArticle.category || '',
+          });
+        } catch { /* 通知失败不影响归档 */ }
+      } catch (err) {
+        patch(i, { status: 'fail', error: err?.message || '抓取失败' });
+      }
+    }
+
+    setBatchRunning(false);
+  };
+
   // ---- 批量录入阅读量 ----
   const openReadNumModal = () => {
     // 以"按日期倒序"为默认展示顺序，方便最新文章优先填写
@@ -1552,6 +1668,15 @@ export default function InternalArticles() {
                 title="批量录入/更新公众号阅读量"
               >
                 <Eye size={16} /> 更新阅读量
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                className="btn btn-ghost"
+                onClick={openBatchModal}
+                title="一次粘贴多条公众号链接，批量新建归档"
+              >
+                <ClipboardPaste size={16} /> 批量导入
               </button>
             )}
             <button className="btn btn-primary" onClick={openModal}>
@@ -2716,6 +2841,88 @@ export default function InternalArticles() {
                   <p>上传后，新增或编辑公众号归档时就可以直接选择。</p>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========== 批量导入归档弹窗（粘贴多条链接） ========== */}
+      {showBatchModal && (
+        <div className="ia-modal-overlay" onClick={closeBatchModal}>
+          <div className="ia-modal ia-modal--batch" onClick={(e) => e.stopPropagation()}>
+            <div className="ia-modal__header">
+              <h2>批量导入归档</h2>
+              <button className="ia-modal__close" onClick={closeBatchModal} disabled={batchRunning}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="ia-modal__body">
+              <p className="ia-batch__desc">
+                把多条微信文章链接粘进来（一行一条，或整段文字都行，会自动识别）。
+                已归档过的会自动跳过；系列、日期、封面等抓取后可到「新建归档」逐条微调。
+              </p>
+
+              <textarea
+                className="ia-batch__textarea"
+                rows={6}
+                value={batchText}
+                onChange={(e) => setBatchText(e.target.value)}
+                placeholder={'https://mp.weixin.qq.com/s/xxxx\nhttps://mp.weixin.qq.com/s/yyyy\n…'}
+                disabled={batchRunning}
+              />
+
+              <label className="ia-batch__ai">
+                <input
+                  type="checkbox"
+                  checked={batchAutoAI}
+                  onChange={(e) => setBatchAutoAI(e.target.checked)}
+                  disabled={batchRunning}
+                />
+                <span>为每篇自动生成 AI 摘要（更准，但明显更慢）；不勾选则用本地摘要，可事后逐篇再点 AI 重写</span>
+              </label>
+
+              {batchRows.length > 0 && (
+                <ul className="ia-batch__results">
+                  {batchRows.map((r, idx) => (
+                    <li key={idx} className={`ia-batch__row ia-batch__row--${r.status}`}>
+                      <span className="ia-batch__status">
+                        {r.status === 'ok' && <Check size={14} />}
+                        {r.status === 'running' && <Loader2 size={14} className="ia-modal__spinner" />}
+                        {(r.status === 'exists' || r.status === 'dup') && <AlertCircle size={14} />}
+                        {r.status === 'fail' && <X size={14} />}
+                        {r.status === 'pending' && <ChevronDown size={14} />}
+                      </span>
+                      <span className="ia-batch__text">
+                        <span className="ia-batch__label">
+                          {r.status === 'ok' && (r.title || '已归档')}
+                          {r.status === 'running' && '抓取中…'}
+                          {r.status === 'exists' && '已归档过，跳过'}
+                          {r.status === 'dup' && '本次重复，跳过'}
+                          {r.status === 'pending' && '等待中'}
+                          {r.status === 'fail' && (r.error || '失败')}
+                        </span>
+                        {r.url && <span className="ia-batch__url">{r.url}</span>}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="ia-modal__footer">
+              <button className="btn btn-ghost" onClick={closeBatchModal} disabled={batchRunning}>
+                {batchRows.some((r) => r.status === 'ok') ? '完成' : '取消'}
+              </button>
+              <button
+                className="btn btn-primary"
+                onClick={runBatchImport}
+                disabled={batchRunning || !batchText.trim()}
+              >
+                {batchRunning
+                  ? <><Loader2 size={16} className="ia-modal__spinner" /> 处理中…</>
+                  : <><ClipboardPaste size={16} /> 批量提取并归档</>}
+              </button>
             </div>
           </div>
         </div>
