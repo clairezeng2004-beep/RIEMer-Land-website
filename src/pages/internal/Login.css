@@ -30,9 +30,10 @@
   padding: 28px 32px;
   width: 100%;
   max-width: 440px;
-  height: min(560px, calc(100dvh - 104px));
+  height: min(620px, calc(100dvh - 72px));
   display: flex;
   flex-direction: column;
+  gap: 0;
   overflow: hidden;
 }
 
@@ -120,7 +121,7 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
-  flex: 1;
+  flex: 0 0 auto;
   min-height: 0;
   overflow: visible;
 }
@@ -368,13 +369,13 @@
   width: 100%;
   min-height: 46px;
   justify-content: center;
-  margin-top: auto;
+  margin-top: 4px;
 }
 
 .login-card__hint {
   text-align: center;
-  margin-top: 12px;
-  padding-top: 12px;
+  margin-top: auto;
+  padding-top: 14px;
   border-top: 1px solid var(--color-border-light);
   flex-shrink: 0;
 }
@@ -393,7 +394,7 @@
 
   .login-card {
     padding: 20px 18px;
-    height: min(540px, calc(100dvh - 96px));
+    height: min(620px, calc(100dvh - 64px));
   }
 
   .login-card__header {
@@ -432,7 +433,6 @@
   }
 
   .login-card__hint {
-    margin-top: var(--space-md);
-    padding-top: var(--space-md);
+    padding-top: 12px;
   }
 }
