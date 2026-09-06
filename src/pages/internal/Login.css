@@ -367,7 +367,9 @@
 
 .login-card__submit {
   width: 100%;
-  min-height: 46px;
+  min-height: 42px;
+  padding-top: 0.55rem;
+  padding-bottom: 0.55rem;
   justify-content: center;
   margin-top: 4px;
 }
@@ -429,7 +431,9 @@
   }
 
   .login-card__submit {
-    min-height: 44px;
+    min-height: 40px;
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
   }
 
   .login-card__hint {
