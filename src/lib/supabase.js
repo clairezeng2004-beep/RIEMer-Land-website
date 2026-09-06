@@ -146,7 +146,8 @@ export async function fetchPublicRows(table, params = new URLSearchParams()) {
       throw new Error(message || `公开数据读取失败（HTTP ${response.status}）`);
     }
 
-    return await response.json();
+    const rows = await response.json();
+    return rows;
   } finally {
     clearTimeout(timeoutId);
   }

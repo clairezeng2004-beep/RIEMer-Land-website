@@ -8,7 +8,7 @@ import {
   Clock,
 } from 'lucide-react';
 import { trackEvent } from '../../lib/analytics';
-import { articlesData, teamMembers } from '../../data/siteData';
+import { articlesData } from '../../data/siteData';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { pinyinMatch } from '../../utils/pinyinSearch';
 import ArticleChat from '../../components/ArticleChat';
@@ -74,7 +74,10 @@ export default function Articles() {
         selectedTags.some((tag) => (article.tags || []).includes(tag));
       return matchesSearch && matchesCategory && matchesTag;
     });
-  }, [searchTerm, selectedCategories, selectedTags]);
+    // ⚠️ allArticles 必须在依赖里：userArticles 从云端拉回（12 旧缓存 → 66 带封面）
+    // 后 allArticles 会重算，若这里漏了它，filtered 会一直返回首屏快照的旧记忆值，
+    // 页面永远刷不出云端最新文章与封面 —— 这正是"跨浏览器封面显示不一致"的根因。
+  }, [allArticles, searchTerm, selectedCategories, selectedTags]);
 
   return (
     <div className="articles-page">
