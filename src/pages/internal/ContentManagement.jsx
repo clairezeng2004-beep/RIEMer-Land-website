@@ -4,7 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useNotifications } from '../../contexts/NotificationContext';
-import { fetchAndParseArticle, cleanTitle, generateSummary, inferCategory, inferTags } from '../../services/articleService';
+import { fetchAndParseArticle, cleanTitle, generateSummary, generateSummaryAI, inferCategory, inferTags, extractWechatUrls, wechatArticleKey } from '../../services/articleService';
 import {
   Settings,
   Save,
@@ -41,6 +41,7 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
 } from 'lucide-react';
 import CustomSelect from '../../components/CustomSelect';
 import './ContentManagement.css';
@@ -130,6 +131,80 @@ export default function ContentManagement() {
   const [editingArticleId, setEditingArticleId] = useState(null); // 正在编辑的已有文章 ID
   const [savingArticleId, setSavingArticleId] = useState(null);
   const [deletingArticleId, setDeletingArticleId] = useState(null);
+
+  // 批量添加状态
+  const [batchInput, setBatchInput] = useState('');
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [batchAutoAI, setBatchAutoAI] = useState(false);
+  const [batchRunning, setBatchRunning] = useState(false);
+  const [batchResults, setBatchResults] = useState([]); // [{ url, key, status, title, error }]
+
+  // 已入库文章的"身份键"集合，用于批量导入判重
+  const existingArticleKeys = useMemo(() => {
+    const set = new Set();
+    for (const a of userArticles) {
+      if (a?.url) set.add(wechatArticleKey(a.url));
+    }
+    return set;
+  }, [userArticles]);
+
+  // 批量提取并建档：拆链接 → 去重 → 逐条抓取+入库 → 实时进度
+  const runBatchImport = useCallback(async () => {
+    const urls = extractWechatUrls(batchInput);
+    if (urls.length === 0) {
+      setBatchResults([{ url: '', key: '', status: 'fail', title: '', error: '没识别到微信公众号链接' }]);
+      return;
+    }
+
+    // 初始化进度表：本次已存在 / 站内已有 先行标出
+    const seenThisRun = new Set();
+    const initial = urls.map((url) => {
+      const key = wechatArticleKey(url);
+      let status = 'pending';
+      if (seenThisRun.has(key)) status = 'dup';
+      else if (existingArticleKeys.has(key)) status = 'exists';
+      seenThisRun.add(key);
+      return { url, key, status, title: '', error: '' };
+    });
+    setBatchResults(initial);
+    setBatchRunning(true);
+
+    const patch = (i, next) =>
+      setBatchResults((prev) => prev.map((r, idx) => (idx === i ? { ...r, ...next } : r)));
+
+    for (let i = 0; i < initial.length; i++) {
+      const row = initial[i];
+      if (row.status === 'exists' || row.status === 'dup') continue; // 跳过重复
+      patch(i, { status: 'running' });
+      try {
+        const parsed = await fetchAndParseArticle(row.url);
+        // 摘要：默认本地兜底；开了 AI 就尝试 AI，失败再退回本地
+        let excerpt = generateSummary(parsed.content, 100);
+        if (batchAutoAI) {
+          try {
+            excerpt = await generateSummaryAI(parsed.title, parsed.content);
+          } catch {
+            /* AI 失败保留本地摘要 */
+          }
+        }
+        const article = {
+          id: `user-${Date.now()}-${i}`,
+          ...parsed,
+          excerpt,
+        };
+        const saved = await addArticle(article, user?.id);
+        if (saved?._localOnly || saved?._saveFailed) {
+          patch(i, { status: 'fail', title: parsed.title, error: saved._saveError || '云端未确认保存' });
+        } else {
+          patch(i, { status: 'ok', title: parsed.title });
+        }
+      } catch (err) {
+        patch(i, { status: 'fail', error: err?.message || '抓取失败' });
+      }
+    }
+
+    setBatchRunning(false);
+  }, [batchInput, batchAutoAI, existingArticleKeys, addArticle, user]);
 
   const articleTagOptions = useMemo(() => {
     const tagLabels = userArticles.flatMap((article) => article.tags || []);
@@ -889,6 +964,87 @@ export default function ContentManagement() {
                       <span>{fetchError}</span>
                     </div>
                   )}
+
+                  {/* 批量添加（粘贴多条链接） */}
+                  <div className="content-mgmt__batch">
+                    <button
+                      type="button"
+                      className="content-mgmt__batch-toggle"
+                      onClick={() => setBatchOpen((v) => !v)}
+                    >
+                      {batchOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      批量添加（一次粘贴多条链接）
+                    </button>
+
+                    {batchOpen && (
+                      <div className="content-mgmt__batch-body">
+                        <p className="content-mgmt__section-desc" style={{ marginTop: 0 }}>
+                          把多条微信文章链接粘进来（一行一条，或整段文字都行，会自动识别）。已存在的会自动跳过。
+                        </p>
+                        <textarea
+                          value={batchInput}
+                          onChange={(e) => setBatchInput(e.target.value)}
+                          className="content-mgmt__input content-mgmt__textarea"
+                          rows={5}
+                          placeholder={'https://mp.weixin.qq.com/s/xxxx\nhttps://mp.weixin.qq.com/s/yyyy\n…'}
+                          disabled={batchRunning}
+                        />
+                        <label className="content-mgmt__batch-ai">
+                          <input
+                            type="checkbox"
+                            checked={batchAutoAI}
+                            onChange={(e) => setBatchAutoAI(e.target.checked)}
+                            disabled={batchRunning}
+                          />
+                          <span>为每篇自动生成 AI 摘要（更准，但明显更慢）；不勾选则用本地摘要，可事后逐篇再点 AI</span>
+                        </label>
+                        <div className="content-mgmt__batch-actions">
+                          <button
+                            className="btn btn-primary"
+                            disabled={!batchInput.trim() || batchRunning}
+                            onClick={runBatchImport}
+                          >
+                            {batchRunning
+                              ? <><Loader2 size={16} className="content-mgmt__spinner" /> 处理中…</>
+                              : <><Plus size={16} /> 批量提取并建档</>}
+                          </button>
+                          {!batchRunning && batchResults.length > 0 && (
+                            <button
+                              className="btn btn-ghost"
+                              onClick={() => { setBatchResults([]); setBatchInput(''); }}
+                            >
+                              清空结果
+                            </button>
+                          )}
+                        </div>
+
+                        {batchResults.length > 0 && (
+                          <ul className="content-mgmt__batch-results">
+                            {batchResults.map((r, idx) => (
+                              <li key={idx} className={`content-mgmt__batch-row content-mgmt__batch-row--${r.status}`}>
+                                <span className="content-mgmt__batch-status">
+                                  {r.status === 'ok' && <CheckCircle size={14} />}
+                                  {r.status === 'running' && <Loader2 size={14} className="content-mgmt__spinner" />}
+                                  {(r.status === 'exists' || r.status === 'dup') && <AlertCircle size={14} />}
+                                  {r.status === 'fail' && <X size={14} />}
+                                  {r.status === 'pending' && <Clock size={14} />}
+                                </span>
+                                <span className="content-mgmt__batch-text">
+                                  {r.status === 'ok' && (r.title || '已建档')}
+                                  {r.status === 'running' && '抓取中…'}
+                                  {r.status === 'exists' && '已存在，跳过'}
+                                  {r.status === 'dup' && '本次重复，跳过'}
+                                  {r.status === 'pending' && '等待中'}
+                                  {r.status === 'fail' && (r.error || '失败')}
+                                  <span className="content-mgmt__batch-url">{r.url}</span>
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    )}
+                  </div>
 
                   {/* 手动添加按钮 */}
                   {!editingArticle && (

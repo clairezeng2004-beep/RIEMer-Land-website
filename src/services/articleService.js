@@ -428,6 +428,61 @@ export function generateOutline(content) {
   return outline.slice(0, 8);
 }
 
+/**
+ * 计算微信文章的"身份键"，用于判重
+ * - 新版短链 https://mp.weixin.qq.com/s/<token> → 以 path 为键（忽略追踪参数）
+ * - 老版长链 https://mp.weixin.qq.com/s?__biz=..&mid=..&idx=..&sn=.. → 以 mid+idx+sn 为键
+ * 解析失败时回退为去掉首尾空白的原串。
+ * @param {string} rawUrl
+ * @returns {string} 归一化后的键（大小写不敏感）
+ */
+export function wechatArticleKey(rawUrl) {
+  const raw = String(rawUrl || '').trim();
+  if (!raw) return '';
+  try {
+    const u = new URL(raw);
+    // 新版短链：/s/<token>
+    const shortMatch = u.pathname.match(/^\/s\/([^/?#]+)/);
+    if (shortMatch) {
+      return `${u.host}/s/${shortMatch[1]}`.toLowerCase();
+    }
+    // 老版长链：靠 mid+idx+sn 唯一标识
+    const mid = u.searchParams.get('mid');
+    const idx = u.searchParams.get('idx');
+    const sn = u.searchParams.get('sn');
+    if (mid && sn) {
+      return `${u.host}/s?mid=${mid}&idx=${idx || '1'}&sn=${sn}`.toLowerCase();
+    }
+    // 兜底：host + path + 排序后的查询串
+    return `${u.host}${u.pathname}${u.search}`.toLowerCase();
+  } catch {
+    return raw.toLowerCase();
+  }
+}
+
+/**
+ * 从一段任意文本中提取所有微信公众号文章链接（按出现顺序、去重）
+ * 支持一行一条、逗号/空格分隔，或从"复制链接"粘贴进来的整段文本中挑出。
+ * @param {string} text
+ * @returns {string[]}
+ */
+export function extractWechatUrls(text) {
+  const src = String(text || '');
+  const re = /https?:\/\/mp\.weixin\.qq\.com\/[^\s"'<>）)】\]]+/gi;
+  const found = src.match(re) || [];
+  const seen = new Set();
+  const urls = [];
+  for (const rawUrl of found) {
+    // 去掉粘贴时常见的尾部标点
+    const url = rawUrl.replace(/[.,;；，。]+$/, '');
+    const key = wechatArticleKey(url);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    urls.push(url);
+  }
+  return urls;
+}
+
 // ========== 主入口：抓取并解析文章 ==========
 
 /**
