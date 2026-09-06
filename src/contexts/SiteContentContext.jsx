@@ -564,7 +564,9 @@ export function SiteContentProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false;
-    loadArticlesFromCloud({ migrate: true }).then(({ articles, migrated }) => {
+    // 旧本地文章迁移包含数据库写入，只允许在内部管理页执行。
+    // 公开页直接读取云端，避免认证状态或旧缓存阻塞文章与封面加载。
+    loadArticlesFromCloud({ migrate: isInternalRoute }).then(({ articles, migrated }) => {
       if (cancelled) return;
       setUserArticles(articles);
       setArticlesLoaded(true);
@@ -578,7 +580,7 @@ export function SiteContentProvider({ children }) {
       if (!cancelled) setArticlesLoaded(true);
     });
     return () => { cancelled = true; };
-  }, [loadArticlesFromCloud]);
+  }, [isInternalRoute, loadArticlesFromCloud]);
 
   // ---- 订阅 articles 表实时变更：任一设备归档/编辑/删除文章后，所有设备立即同步 ----
   useEffect(() => {
