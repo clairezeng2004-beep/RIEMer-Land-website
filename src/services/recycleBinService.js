@@ -15,6 +15,7 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { addSharing } from './memberSharingService';
 import { addArticleToDb } from './articleDbService';
+import { getManagedArticleCoverPath, removeArticleCover } from './articleCoverService';
 import { createDoc } from '../lib/documentsService';
 import { SITE_KEYS, fetchSetting, saveSetting } from './siteSettingsService';
 
@@ -228,6 +229,24 @@ export async function restoreItem(entry) {
 export async function purgeItem(entry) {
   if (!entry) return { success: false, error: '条目不存在' };
   await removeEntryRow(entry.id);
+  // 文章彻底删除时顺带回收 Storage 封面，避免孤儿文件长期堆积。
+  // 时机说明：只在 purge（彻底删除）而非 moveToRecycleBin（删入回收站）时清理——
+  // 回收站期间文章仍可「恢复」，而 restore 直接复用 payload 里的封面 URL
+  // （见 restorePayload → addArticleToDb），提前删文件会让恢复后的封面 404。
+  // 仅处理受管的 Storage 封面（getManagedArticleCoverPath 命中才删）；
+  // 历史 Base64 / 外链封面返回 null，天然跳过。失败只告警，不影响彻底删除结果。
+  if (entry.itemType === 'article') {
+    try {
+      const cover = entry.payload?.coverImage || entry.payload?.cover_image || null;
+      const path = getManagedArticleCoverPath(cover);
+      if (path) {
+        const res = await removeArticleCover(path);
+        if (!res.success) console.warn('[RecycleBin] 文章封面回收失败:', res.error);
+      }
+    } catch (err) {
+      console.warn('[RecycleBin] 文章封面回收异常:', err?.message || err);
+    }
+  }
   return { success: true, error: null };
 }
 
