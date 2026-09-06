@@ -26,6 +26,15 @@
     <link rel="dns-prefetch" href="https://unpkg.com" />
 
     <!--
+      预连接 Supabase 源（%VITE_SUPABASE_URL% 由 Vite 在构建时替换为实际项目地址）
+      - 无 crossorigin 的一条：预热文章封面 <img> 走的普通连接池
+      - 带 crossorigin 的一条：预热 REST 列表接口（fetchPublicRows）走的 CORS 连接池
+      首次访问时省下现场 DNS+TLS 握手，封面/数据能更快开始下载。
+    -->
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" />
+    <link rel="preconnect" href="%VITE_SUPABASE_URL%" crossorigin />
+
+    <!--
       字体加载策略（优化版 2026-04）：
       - 英文衬线：Lora（正文）/ EB Garamond（品牌）/ DM Serif Display（大标题）
         → 走 Google Fonts 中科大镜像 fonts.loli.net（国内直连，不被墙）
