@@ -11,7 +11,7 @@ import {
   Bell, BellRing, FolderOpen, Share2, BookOpen, CheckSquare,
   Camera, BarChart3, MessageSquarePlus, MessageCircle, UserCircle, Contact,
   Users, Settings, CalendarRange, Activity,
-  Trash2,
+  Trash2, HardDrive,
 } from 'lucide-react';
 import './InternalLayout.css';
 
@@ -63,6 +63,7 @@ function MobileInternalNav() {
     { to: '/internal/guestbook', icon: MessageCircle, label: sc.labelGuestbook },
     // 成员（对齐 InternalSidebar.memberItems：内部分享 → 通讯录 → 建设建议 → 互动相册 → 个人主页）
     { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
+    { to: '/internal/internal-files', icon: HardDrive, label: sc.labelInternalFiles },
     { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
     { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },

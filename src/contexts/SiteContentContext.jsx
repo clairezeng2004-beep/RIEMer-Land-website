@@ -158,6 +158,7 @@ const getDefaultInternalConfig = () => ({
     labelTasks: '事项追踪',
     labelProcessTemplates: '流程模板文件',
     labelMemberSharing: '成员内部分享',
+    labelInternalFiles: '内部资料',
     labelArticles: '公众号长文分享归档',
     labelContributions: '成员贡献',
     labelSuggestions: '建设建议',

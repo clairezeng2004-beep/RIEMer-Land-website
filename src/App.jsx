@@ -62,6 +62,7 @@ const InternalArticles = lazyWithReload(() => import('./pages/internal/InternalA
 const InternalArticleDetail = lazyWithReload(() => import('./pages/internal/InternalArticleDetail'));
 const MemberContributions = lazyWithReload(() => import('./pages/internal/MemberContributions'));
 const MemberProfiles = lazyWithReload(() => import('./pages/internal/MemberProfiles'));
+const InternalFiles = lazyWithReload(() => import('./pages/internal/InternalFiles'));
 const Profile = lazyWithReload(() => import('./pages/internal/Profile'));
 const Suggestions = lazyWithReload(() => import('./pages/internal/Suggestions'));
 const Guestbook = lazyWithReload(() => import('./pages/internal/Guestbook'));
@@ -201,6 +202,7 @@ function AppShell() {
         <Route path="guestbook" element={<Guestbook />} />
         <Route path="profile" element={<Profile />} />
         <Route path="member-profiles" element={<MemberProfiles />} />
+        <Route path="internal-files" element={<InternalFiles />} />
         <Route path="event-publish" element={<EventPublish />} />
         <Route path="sync-diagnostic" element={<SyncDiagnostic />} />
         <Route path="recycle-bin" element={<RecycleBin />} />

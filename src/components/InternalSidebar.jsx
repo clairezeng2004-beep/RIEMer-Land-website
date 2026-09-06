@@ -24,6 +24,7 @@ import {
   CalendarRange,
   Activity,
   Trash2,
+  HardDrive,
 } from 'lucide-react';
 import './InternalSidebar.css';
 
@@ -91,6 +92,7 @@ export default function InternalSidebar() {
   // 顺序：成员内部分享 → 成员通讯录 → 建设建议 → 互动相册 → 个人主页
   const memberItems = [
     { to: '/internal/member-sharing', icon: Share2, configKey: 'labelMemberSharing', label: sc.labelMemberSharing },
+    { to: '/internal/internal-files', icon: HardDrive, configKey: 'labelInternalFiles', label: sc.labelInternalFiles },
     { to: '/internal/member-profiles', icon: Contact, configKey: 'labelMemberProfiles', label: sc.labelMemberProfiles },
     { to: '/internal/suggestions', icon: MessageSquarePlus, configKey: 'labelSuggestions', label: sc.labelSuggestions },
     { to: '/internal/gallery', icon: Camera, configKey: 'labelGallery', label: sc.labelGallery },
