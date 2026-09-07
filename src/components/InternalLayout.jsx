@@ -53,12 +53,17 @@ function InternalPageFallback() {
    memberItems / adminItems）。修改侧边栏顺序时这里也要一并同步。
    ============================================================ */
 
-// 转盘几何常量（单位 px / 角度）。圆心在 stage 顶部下方 CY 处、半径 R，
-// 顶部一段弧露在 stage（高度 STAGE_H）里；R 调大弧更平缓/更铺开，
-// 调小则弧更收紧、字块更聚拢。
-const DIAL_R = 200;
-const DIAL_CY = 212; // 圆心距 stage 顶的距离；焦点板块 y ≈ CY - R = 12
-const DIAL_STAGE_H = 150;
+// 转盘几何常量（单位 px / 角度）。转盘在屏幕左侧、呈「右半圆」（向右打开）：
+// 圆心在 stage 左缘之外（CX 为负），半径 R；字块沿右侧一段竖直弧排开，
+// 焦点板块落在 3 点方向（最靠右、纵向居中），上下的板块向左缘收拢。
+// R 调大弧更平缓/更铺开，调小则更收紧。FOCUS_X = 焦点板块中心距 stage 左缘；
+// CY = 圆心纵向位置（= stage 高一半），让焦点纵向居中。
+const DIAL_R = 190;
+const DIAL_FOCUS_X = 104;
+const DIAL_CY = 200;
+const DIAL_STAGE_H = 400;
+const DIAL_STAGE_W = 240;
+const DIAL_CX = DIAL_FOCUS_X - DIAL_R; // 圆心横坐标（负值：在 stage 左缘之外）
 
 // 角度归一到 (-180, 180]，用来判断某板块离「12 点焦点位」多远
 function normDeg(d) {
@@ -165,9 +170,9 @@ function MobileDialNav() {
     stageRef.current?.setPointerCapture?.(e.pointerId);
     suppressClickRef.current = false;
     dragRef.current = {
-      startX: e.clientX,
+      startY: e.clientY,
       startAngle: angleRef.current,
-      lastX: e.clientX,
+      lastY: e.clientY,
       lastT: performance.now(),
       vel: 0,
       moved: 0,
@@ -177,15 +182,16 @@ function MobileDialNav() {
   const onPointerMove = useCallback((e) => {
     const d = dragRef.current;
     if (!d) return;
-    const dx = e.clientX - d.startX;
-    d.moved = Math.max(d.moved, Math.abs(dx));
+    // 左侧竖直转盘：改用纵向拖动。手指下拉 => 板块随之向下转。
+    const dy = e.clientY - d.startY;
+    d.moved = Math.max(d.moved, Math.abs(dy));
     const now = performance.now();
-    const dxInst = e.clientX - d.lastX;
+    const dyInst = e.clientY - d.lastY;
     const dt = now - d.lastT || 16;
-    d.vel = (dxInst * degPerPx) / dt; // 瞬时角速度（度/ms），供惯性使用
-    d.lastX = e.clientX;
+    d.vel = (dyInst * degPerPx) / dt; // 瞬时角速度（度/ms），供惯性使用
+    d.lastY = e.clientY;
     d.lastT = now;
-    setAngleBoth(d.startAngle + dx * degPerPx);
+    setAngleBoth(d.startAngle + dy * degPerPx);
   }, [degPerPx, setAngleBoth]);
 
   const onPointerUp = useCallback(() => {
@@ -240,22 +246,24 @@ function MobileDialNav() {
 
   return (
     <div className="mdial">
-      {/* 入口小圆：显示当前板块图标 + 名称 */}
-      <button
-        type="button"
-        className="mdial-trigger"
-        onClick={openDial}
-        aria-label="打开板块转盘"
-        aria-expanded={open}
-      >
-        <span className="mdial-trigger__ring">
-          <ActiveIcon size={22} />
-          {unreadCount > 0 && activeItem?.to !== '/internal/notifications' && (
-            <span className="mdial-trigger__dot" />
-          )}
-        </span>
-        <span className="mdial-trigger__label">{activeItem?.label || '板块'}</span>
-      </button>
+      {/* 入口小圆：显示当前板块图标 + 名称；打开转盘时隐藏，避免与焦点板块重叠 */}
+      {!open && (
+        <button
+          type="button"
+          className="mdial-trigger"
+          onClick={openDial}
+          aria-label="打开板块转盘"
+          aria-expanded={open}
+        >
+          <span className="mdial-trigger__ring">
+            <ActiveIcon size={22} />
+            {unreadCount > 0 && activeItem?.to !== '/internal/notifications' && (
+              <span className="mdial-trigger__dot" />
+            )}
+          </span>
+          <span className="mdial-trigger__label">{activeItem?.label || '板块'}</span>
+        </button>
+      )}
 
       {open && (
         <div className="mdial-overlay" onPointerDown={closeDial}>
@@ -269,22 +277,19 @@ function MobileDialNav() {
             <div
               className="mdial-stage"
               ref={stageRef}
-              style={{ height: DIAL_STAGE_H }}
+              style={{ height: DIAL_STAGE_H, width: DIAL_STAGE_W }}
               onPointerDown={onPointerDown}
               onPointerMove={onPointerMove}
               onPointerUp={onPointerUp}
               onPointerCancel={onPointerUp}
             >
-              {/* 焦点指针（12 点方向），标记「转到这里即选中」 */}
-              <span className="mdial-stage__pointer" />
-
               {navItems.map((item, i) => {
                 const theta = normDeg(i * STEP + angle); // 该板块当前相对焦点位的角度
                 const rad = (theta * Math.PI) / 180;
-                const cos = Math.cos(rad);
-                if (cos <= 0.04) return null; // 转到圆背面，不渲染
-                const x = DIAL_R * Math.sin(rad);
-                const y = DIAL_CY - DIAL_R * cos; // 距 stage 顶的 y
+                const cos = Math.cos(rad); // 「靠右」程度：1=焦点(3点方向)，0=正上/正下
+                if (cos <= 0.04) return null; // 转到圆背面（左半圆），不渲染
+                const x = DIAL_CX + DIAL_R * cos; // 越靠焦点越靠右；上下的板块向左缘收拢
+                const y = DIAL_CY + DIAL_R * Math.sin(rad); // 焦点上方 y 变小、下方变大
                 const opacity = Math.max(0, Math.min(1, (cos - 0.26) / 0.74));
                 const scale = 0.72 + 0.28 * cos;
                 const isFocus = Math.abs(theta) < STEP / 2; // 落在焦点位

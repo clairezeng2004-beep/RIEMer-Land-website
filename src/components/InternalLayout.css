@@ -328,12 +328,12 @@
     display: block;
   }
 
-  /* ---- 入口小圆：底部居中，抬高避开右下角编辑 FAB ---- */
+  /* ---- 入口小圆：左侧边缘、纵向居中（转盘从这里向右展开） ---- */
   .mdial-trigger {
     position: fixed;
-    left: 50%;
-    bottom: calc(env(safe-area-inset-bottom, 0px) + 18px);
-    transform: translateX(-50%);
+    left: 12px;
+    top: 50%;
+    transform: translateY(-50%);
     z-index: 900;
     display: flex;
     flex-direction: column;
@@ -395,16 +395,16 @@
     text-overflow: ellipsis;
   }
 
-  /* ---- 浮层 + 底部面板（透明毛玻璃悬浮，不做白色实底 sheet） ---- */
+  /* ---- 浮层 + 左侧面板（透明毛玻璃悬浮，不做白色实底 sheet） ---- */
   .mdial-overlay {
     position: fixed;
     inset: 0;
     z-index: 1200;
-    /* 页面顶部保持可见（“漂浮在上面”），仅底部一段极轻渐隐让转盘从背景里托起来 */
+    /* 页面大部分保持可见（“漂浮在上面”），仅左侧一段极轻渐隐把转盘托起来 */
     background: linear-gradient(
-      to bottom,
-      transparent 45%,
-      rgba(20, 24, 20, 0.14) 100%
+      to right,
+      rgba(20, 24, 20, 0.14) 0%,
+      transparent 45%
     );
     animation: mdial-fade 0.16s ease;
   }
@@ -414,23 +414,26 @@
     to { opacity: 1; }
   }
 
+  /* 左侧竖直面板：整高、纵向居中，转盘从左缘滑入 */
   .mdial-panel {
     position: absolute;
     left: 0;
-    right: 0;
+    top: 0;
     bottom: 0;
-    padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 16px);
+    display: flex;
+    align-items: center;
+    padding: 0 8px;
     background: none; /* 透明：字块直接悬浮在页面上，无白色底板 */
-    animation: mdial-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
+    animation: mdial-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
     touch-action: none;
   }
 
   @keyframes mdial-rise {
-    from { transform: translateY(100%); }
-    to { transform: translateY(0); }
+    from { transform: translateX(-16px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
   }
 
-  /* ---- 转盘舞台：只露出圆的顶部一段弧，超出裁掉（板块从两侧转入/转出） ---- */
+  /* ---- 转盘舞台：只露出右侧一段竖直弧，超出裁掉（板块从上下转入/转出） ---- */
   .mdial-stage {
     position: relative;
     overflow: hidden;
@@ -439,24 +442,10 @@
     user-select: none;
   }
 
-  .mdial-stage__pointer {
-    position: absolute;
-    top: 0;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 40px;
-    height: 3px;
-    border-radius: var(--radius-full);
-    background: var(--color-primary);
-    opacity: 0.55;
-    z-index: 200;
-    pointer-events: none;
-  }
-
   .mdial-chip {
     position: absolute;
     top: 0;
-    left: 50%;
+    left: 0;
     display: inline-flex;
     align-items: center;
     gap: 5px;
