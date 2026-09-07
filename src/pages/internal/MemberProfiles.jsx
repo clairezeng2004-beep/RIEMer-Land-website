@@ -175,6 +175,9 @@ export default function MemberProfiles() {
   });
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
+  // 手机端「成员通讯录」不再用横向滚动表格，而是一列卡片：左名字、右年级+一句话简介。
+  // 点击卡片，把 user_id 记到这里，弹出详情面板（可查看/编辑）。
+  const [mobileDetailId, setMobileDetailId] = useState(null);
   const [saving, setSaving] = useState(false);
   // 行内保存反馈（不用 alert，alert 可能被浏览器/扩展拦截导致"没反应"假象）
   // 形如 { type: 'error'|'warning'|'success', text: '...' }
@@ -955,6 +958,60 @@ export default function MemberProfiles() {
 
   const isOwnRow = (profile) => profile.user_id === user?.id;
 
+  // 当前手机端详情面板对应的成员（跟随 profiles 实时刷新，保存后立即可见）
+  const mobileDetailProfile = mobileDetailId
+    ? profiles.find((p) => p.user_id === mobileDetailId) || null
+    : null;
+
+  // 关闭详情面板：若正处于编辑态，先取消编辑再关闭，避免遗留半途的 editData。
+  const closeMobileDetail = () => {
+    if (editingId) cancelEdit();
+    setMobileDetailId(null);
+  };
+
+  // 手机端详情面板里，单个可编辑字段的输入控件（复用表格里的年月 / 文本域逻辑）
+  const renderMobileEditField = (col) => {
+    if (col.inputType === 'yearMonth') {
+      return (
+        <div className="member-profiles-table__year-month">
+          <CustomSelect
+            size="sm"
+            className="member-profiles-table__select"
+            placeholder="年"
+            value={editData._joined_year ? String(editData._joined_year) : ''}
+            onChange={(v) => setEditData({ ...editData, _joined_year: v ? Number(v) : '' })}
+            options={[
+              { value: '', label: '年' },
+              ...YEAR_OPTIONS.map((y) => ({ value: String(y), label: String(y) })),
+            ]}
+          />
+          <span className="member-profiles-table__year-month-sep">年</span>
+          <CustomSelect
+            size="sm"
+            className="member-profiles-table__select"
+            placeholder="月"
+            value={editData._joined_month ? String(editData._joined_month) : ''}
+            onChange={(v) => setEditData({ ...editData, _joined_month: v ? Number(v) : '' })}
+            options={[
+              { value: '', label: '月' },
+              ...MONTH_OPTIONS.map((m) => ({ value: String(m), label: String(m) })),
+            ]}
+          />
+          <span className="member-profiles-table__year-month-sep">月</span>
+        </div>
+      );
+    }
+    return (
+      <textarea
+        className="member-profiles-mobile-detail__textarea"
+        rows={2}
+        value={editData[col.key] || ''}
+        onChange={(e) => setEditData({ ...editData, [col.key]: e.target.value })}
+        placeholder={col.placeholder}
+      />
+    );
+  };
+
   return (
     <div className="member-profiles-page">
       <div className="container">
@@ -1226,7 +1283,149 @@ export default function MemberProfiles() {
             </tbody>
           </table>
         </div>
+
+        {/* 手机端卡片列表：一列卡片，左名字、右年级 + 一句话简介，点击进详情。
+            桌面端通过 CSS 隐藏（.member-profiles-mobile-list），与表格互斥展示。 */}
+        <ul className="member-profiles-mobile-list">
+          {profiles.map((profile, idx) => {
+            const isSelf = isOwnRow(profile);
+            return (
+              <li key={profile.user_id} className="member-profiles-mobile-list__item">
+                <button
+                  type="button"
+                  className={`member-profiles-mobile-card ${isSelf ? 'member-profiles-mobile-card--self' : ''}`}
+                  onClick={() => setMobileDetailId(profile.user_id)}
+                >
+                  <span className="member-profiles-mobile-card__left">
+                    <span className="member-profiles-mobile-card__index">{idx + 1}</span>
+                    <span className="member-profiles-mobile-card__name">
+                      {profile.name || '未知用户'}
+                      {isSelf && <span className="member-profiles-mobile-card__self-badge">我</span>}
+                    </span>
+                  </span>
+                  <span className="member-profiles-mobile-card__right">
+                    {profile.enrollment_year && (
+                      <span className="member-profiles-mobile-card__year">
+                        {String(profile.enrollment_year).trim()}
+                        {/^\d{4}$/.test(String(profile.enrollment_year).trim()) ? '级' : ''}
+                      </span>
+                    )}
+                    {profile.bio ? (
+                      <span className="member-profiles-mobile-card__bio">{profile.bio}</span>
+                    ) : (
+                      <span className="member-profiles-mobile-card__bio member-profiles-mobile-card__bio--empty">
+                        暂无简介
+                      </span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {profiles.length === 0 && (
+            <li className="member-profiles-mobile-empty">
+              <Users size={40} />
+              <p>暂无成员通讯录</p>
+            </li>
+          )}
+        </ul>
       </div>
+
+      {/* 手机端成员详情面板（底部抽屉）：点击卡片后弹出，查看全部字段；
+          本人或管理员可点「编辑」切换为可编辑表单，复用 startEdit/saveEdit/cancelEdit。 */}
+      {mobileDetailProfile && (() => {
+        const profile = mobileDetailProfile;
+        const isSelf = isOwnRow(profile);
+        const isEditing = editingId === profile.user_id;
+        const canEdit = isSelf || isAdmin;
+        return (
+          <div className="member-profiles-mobile-detail-overlay" onClick={closeMobileDetail}>
+            <div
+              className="member-profiles-mobile-detail"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="member-profiles-mobile-detail__header">
+                <h3 className="member-profiles-mobile-detail__title">
+                  {profile.name || '未知用户'}
+                  {isSelf && <span className="member-profiles-mobile-card__self-badge">我</span>}
+                </h3>
+                <button
+                  type="button"
+                  className="member-profiles-mobile-detail__close"
+                  onClick={closeMobileDetail}
+                  aria-label="关闭"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="member-profiles-mobile-detail__body">
+                {COLUMNS.filter((col) => col.key !== 'name').map((col) => {
+                  const rawVal =
+                    col.key === 'joined_at_display'
+                      ? profile.joined_at_display
+                      : profile[col.key];
+                  return (
+                    <div key={col.key} className="member-profiles-mobile-detail__field">
+                      <label className="member-profiles-mobile-detail__label">{col.label}</label>
+                      {isEditing && col.editable ? (
+                        renderMobileEditField(col)
+                      ) : (
+                        <div
+                          className={`member-profiles-mobile-detail__value ${
+                            rawVal ? '' : 'member-profiles-mobile-detail__value--empty'
+                          }`}
+                        >
+                          {rawVal || '—'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {canEdit && (
+                <div className="member-profiles-mobile-detail__footer">
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        className="member-profiles-mobile-detail__btn member-profiles-mobile-detail__btn--ghost"
+                        onClick={cancelEdit}
+                        disabled={saving}
+                      >
+                        取消
+                      </button>
+                      <button
+                        type="button"
+                        className="member-profiles-mobile-detail__btn member-profiles-mobile-detail__btn--primary"
+                        onClick={saveEdit}
+                        disabled={saving}
+                      >
+                        {saving ? (
+                          <><Loader2 size={15} className="member-profiles-cloud-banner__spin" /> 保存中…</>
+                        ) : (
+                          <><Check size={15} /> 保存</>
+                        )}
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      className="member-profiles-mobile-detail__btn member-profiles-mobile-detail__btn--primary member-profiles-mobile-detail__btn--wide"
+                      onClick={() => startEdit(profile)}
+                    >
+                      <Pencil size={15} /> {isSelf ? '编辑我的信息' : '编辑该成员信息'}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 保存反馈 Toast：位于页面根节点末尾，position: fixed 脱离表格
           sticky 列 / overflow 容器的堆叠环境，确保提示永远浮在最上层、
