@@ -26,6 +26,8 @@ import {
   Edit3,
   Paperclip,
   Code2,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react';
 import { documentsData } from '../../data/siteData';
 import CustomSelect from '../../components/CustomSelect';
@@ -40,9 +42,12 @@ import {
 import TextAnnotation from '../../components/TextAnnotation';
 import WordPreview from '../../components/WordPreview';
 import {
-  fetchAllFromCloud,
+  fetchListFromCloud,
+  fetchDocContentFromCloud,
   fetchViewsFromCloud,
   fetchViewLog,
+  incrementView,
+  recordViewLog,
   DOC_VIEWS_KEY,
   loadLocalViews,
   ensureLocalViewCount,
@@ -137,6 +142,40 @@ function saveDeletedDefaultIds(ids) {
 // 判断是否为用户发布的文档（而非默认模拟数据）
 function isUserDoc(doc) {
   return String(doc?.id || '').startsWith('doc-');
+}
+
+// ============ 浏览计数去重 ============
+// 与 ProcessTemplateDetail 共用同一把 localStorage 键，保证「列表就地预览」和
+// 「详情页打开」两个入口对同一篇文档同一天只累计一次浏览，不会互相重复计数。
+const PROCESS_TEMPLATE_VIEWED_KEY = 'riemer_process_template_viewed_v2';
+
+function getLocalDateKey(date = new Date()) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+function hasCountedViewToday(docId, user) {
+  try {
+    const viewerId = user?.id || user?.email || 'anonymous';
+    const key = `${viewerId}:${docId}:${getLocalDateKey()}`;
+    const stored = JSON.parse(localStorage.getItem(PROCESS_TEMPLATE_VIEWED_KEY) || '{}');
+    if (stored[key]) return true;
+
+    const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+    Object.keys(stored).forEach((storedKey) => {
+      if (Number(stored[storedKey]) < cutoff) delete stored[storedKey];
+    });
+    stored[key] = Date.now();
+    localStorage.setItem(PROCESS_TEMPLATE_VIEWED_KEY, JSON.stringify(stored));
+    return false;
+  } catch {
+    const fallbackKey = `${PROCESS_TEMPLATE_VIEWED_KEY}:${docId}:${getLocalDateKey()}`;
+    if (sessionStorage.getItem(fallbackKey)) return true;
+    sessionStorage.setItem(fallbackKey, '1');
+    return false;
+  }
 }
 
 function mergeDocuments({ userDocs, deletedIds, filterTypes }) {
@@ -507,7 +546,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
 
     if (shouldUseCloudDocs) {
       setCloudLoading(true);
-      const cloud = await fetchAllFromCloud();
+      // 轻量列表查询：不含正文 content，正文改由打开文档时按需拉取。
+      const cloud = await fetchListFromCloud();
       if (refreshSeqRef.current !== seq) return;
       if (cloud) {
         applyCloudDocs(cloud.docs, cloud.deletedIds);
@@ -636,6 +676,8 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   }, [showUpload, user?.id]);
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewDoc, setPreviewDoc] = useState(null);
+  // 预览层正文按需加载中（仅当本地无缓存正文、需要现拉时才为 true）
+  const [previewLoading, setPreviewLoading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
 
   // 访问记录弹层：点击小眼睛时激活，保存当前查看的文档
@@ -924,7 +966,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     document.body.removeChild(a);
   };
 
-  const handleDownload = (doc, e) => {
+  const handleDownload = async (doc, e) => {
     if (e) e.stopPropagation();
     if (!doc) return;
 
@@ -955,7 +997,18 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     }
 
     // 3) 只有正文 content（富文本/Markdown）—— 把正文导出为文件
-    const content = typeof doc.content === 'string' ? doc.content.trim() : '';
+    // 列表查询不含正文，纯文本文档从卡片下载时正文可能尚未加载，这里按需补拉一次。
+    let content = typeof doc.content === 'string' ? doc.content.trim() : '';
+    if (!content && !doc._contentLoaded && shouldUseCloudDocs) {
+      const patch = await fetchDocContentFromCloud(String(doc.id));
+      if (patch) {
+        content = typeof patch.content === 'string' ? patch.content.trim() : '';
+        // 回写 state，避免同一篇重复补拉
+        setDocuments((prev) =>
+          prev.map((d) => (String(d.id) === String(doc.id) ? { ...d, ...patch } : d))
+        );
+      }
+    }
     if (content) {
       const isMd = doc.format === 'markdown';
       const mime = isMd ? 'text/markdown;charset=utf-8' : 'text/html;charset=utf-8';
@@ -977,15 +1030,51 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
   };
 
   const openPreview = (doc) => {
-    // 增加浏览次数
-    setDocuments((prev) =>
-      prev.map((d) => (d.id === doc.id ? { ...d, viewCount: (d.viewCount || 0) + 1 } : d))
-    );
+    // 就地弹层预览：先用列表已有的轻量数据把弹层打开（文件类可立即预览），
+    // 正文（content）按需拉取——列表查询不含正文，避免拖慢列表。
     setPreviewDoc(doc);
+
+    // 浏览计数：同一用户 / 同一篇 / 同一天只计一次（与详情页共用去重键）。
+    try {
+      if (!hasCountedViewToday(String(doc.id), user)) {
+        // 本地乐观 +1，展示即时更新；docViews 是卡片浏览数的云端来源镜像。
+        setDocViews((prev) => ({
+          ...prev,
+          [doc.id]: (Number(prev[doc.id]) || 0) + 1,
+        }));
+        if (shouldUseCloudDocs) {
+          incrementView(String(doc.id)).catch((err) => {
+            console.warn('[Documents] 浏览计数同步失败:', err);
+          });
+          recordViewLog(String(doc.id), user).catch(() => { /* 访问日志失败不阻塞 */ });
+        }
+      }
+    } catch { /* ignore */ }
+
+    // 正文按需加载（stale-while-revalidate）：
+    // - _contentLoaded 为 true 说明正文已是最新（来自详情/上次拉取），无需再拉；
+    // - 否则去云端拉一次；本地已有缓存正文时先秒显、后台静默校正，无缓存则显示加载态。
+    if (!doc._contentLoaded && shouldUseCloudDocs) {
+      const hasCachedContent = Boolean(doc.content && String(doc.content).trim());
+      if (!hasCachedContent) setPreviewLoading(true);
+      fetchDocContentFromCloud(String(doc.id))
+        .then((patch) => {
+          if (!patch) return;
+          setPreviewDoc((prev) =>
+            prev && String(prev.id) === String(doc.id) ? { ...prev, ...patch } : prev
+          );
+          setDocuments((prev) =>
+            prev.map((d) => (String(d.id) === String(doc.id) ? { ...d, ...patch } : d))
+          );
+        })
+        .catch((err) => console.warn('[Documents] 正文按需加载失败:', err))
+        .finally(() => setPreviewLoading(false));
+    }
   };
 
   const closePreview = () => {
     setPreviewDoc(null);
+    setPreviewLoading(false);
   };
 
   const canPreview = (doc) => {
@@ -1352,14 +1441,10 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
         <div className="documents-grid">
           {filtered.map((doc) => {
             const handleCardClick = () => {
-              // 统一所有文档（流程模板 + 普通文档）都用新窗口全屏查看页，
-              // 不再使用悬浮 Modal。ProcessTemplateDetail 页内部已通过 canEdit
-              // 控制编辑权限（管理员或本人上传的用户文档可编辑，其余只读）。
-              window.open(
-                `/internal/process-templates/view/${doc.id}`,
-                '_blank',
-                'noopener,noreferrer'
-              );
+              // 点卡片：就地弹层预览，直接用列表已加载的数据渲染，不跳页、不新开标签页，
+              // 避免整站在新标签里冷启动 + 详情页重新并发拉取云端造成的明显卡顿。
+              // 需要编辑 / 划线评论时，弹层头部有「打开完整页」入口进详情页。
+              openPreview(doc);
             };
             return (
             <div
@@ -1501,6 +1586,15 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                 </span>
               </div>
               <div className="doc-preview__header-actions">
+                <a
+                  className="doc-preview__download"
+                  href={`/internal/process-templates/view/${previewDoc.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="打开完整页面（目录、划线评论、编辑）"
+                >
+                  <ExternalLink size={16} /> 打开完整页
+                </a>
                 {(previewDoc.fileUrl ||
                   (Array.isArray(previewDoc.attachments) && previewDoc.attachments.length > 0) ||
                   (typeof previewDoc.content === 'string' && previewDoc.content.trim().length > 0)) && (
@@ -1625,6 +1719,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
                     title={previewDoc.title}
                   />
                 ) : null
+              ) : previewLoading ? (
+                <div className="doc-preview__loading" aria-busy="true">
+                  <Loader2 size={22} className="doc-preview__loading-spinner" />
+                  <p>正在加载文档内容…</p>
+                </div>
               ) : (
                 <div className="doc-preview__no-preview">
                   <FileIcon fileType={previewDoc.fileType} size={64} />

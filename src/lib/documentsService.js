@@ -28,6 +28,18 @@ const VIEW_COUNT_TIMEOUT_MS = 8000;
 const VIEW_LOG_TIMEOUT_MS = 8000;
 const DEFAULT_VIEW_TARGET_TYPE = 'process-template';
 
+// 列表查询的轻量投影：除 `content` 外的全部列。
+// 列表卡片不渲染正文，正文（Word/Markdown 大段 HTML）改为打开文档时按需拉取，
+// 避免每次列表加载 / 实时刷新 / 窗口聚焦都把所有文档的正文全量传一遍。
+// ⚠️ 改表结构（新增/删除列）时，这里要同步维护。
+const DOC_LIST_COLUMNS = [
+  'id', 'title', 'type', 'description', 'format',
+  'attachments', 'file_type', 'file_url', 'size_text',
+  'uploaded_by', 'uploaded_by_id', 'contributor_ids',
+  'date', 'view_count', 'likes', 'last_edited_at', 'last_edited_by',
+  'created_at', 'updated_at',
+].join(',');
+
 /**
  * 判断当前是否可以使用 Supabase（已配置 + 健康检测通过）
  */
@@ -69,6 +81,9 @@ function rowToDoc(row) {
     description: row.description || '',
     format: row.format || 'word',
     content: row.content || '',
+    // 标记正文是否已随本次查询取回：轻量列表投影不含 content 列，
+    // 打开文档时据此决定是否再按需拉取正文（stale-while-revalidate）。
+    _contentLoaded: Object.prototype.hasOwnProperty.call(row, 'content'),
     attachments: Array.isArray(row.attachments) ? row.attachments : [],
     fileType: row.file_type || null,
     fileUrl: row.file_url || null,
@@ -399,6 +414,111 @@ export async function fetchDocFromCloud(id) {
     return { doc, deletedIds };
   } catch (err) {
     console.warn('[documentsService] fetchDocFromCloud 异常:', err.message);
+    return null;
+  }
+}
+
+/**
+ * 轻量列表拉取：只取 DOC_LIST_COLUMNS（不含正文 content）。
+ * 供 Documents 列表页在挂载 / 实时刷新 / 聚焦时使用，替代 fetchAllFromCloud，
+ * 大幅降低"文档多时"的传输量（正文改由打开时按需拉取）。
+ *
+ * 返回结构与 fetchAllFromCloud 保持一致：{ docs, deletedIds } | null。
+ * 为兼顾详情页的离线首屏，这里会把本地缓存里已有的 content 合并回来（仅作即时展示，
+ * 每篇 _contentLoaded 仍为 false → 打开时会再校正一次，保证不显示过期正文）。
+ */
+export async function fetchListFromCloud() {
+  if (!canUseSupabase() || !supabase) return null;
+  try {
+    const [docsRes, deletedRes] = await withTimeout(
+      Promise.all([
+        supabase
+          .from('documents')
+          .select(DOC_LIST_COLUMNS)
+          .order('created_at', { ascending: false }),
+        supabase.from('documents_deleted_defaults').select('default_id'),
+      ]),
+      DOCUMENTS_CLOUD_TIMEOUT_MS,
+      '拉取流程模板列表',
+    );
+
+    if (docsRes.error) {
+      console.warn('[documentsService] 云端拉取 documents 列表失败:', docsRes.error.message);
+      return null;
+    }
+
+    const docs = (docsRes.data || []).map(rowToDoc); // _contentLoaded = false（投影不含 content）
+    const deletedIds = deletedRes.error
+      ? []
+      : (deletedRes.data || []).map((r) => String(r.default_id));
+
+    try {
+      // 合并本地缓存里的正文，供详情页离线首屏 & 预览层秒显；不改 _contentLoaded。
+      const cachedById = new Map(loadLocalDocs().map((d) => [String(d.id), d]));
+      const merged = docs.map((d) => {
+        const cached = cachedById.get(String(d.id));
+        if (cached && typeof cached.content === 'string' && cached.content) {
+          return { ...d, content: cached.content };
+        }
+        return d;
+      });
+      saveLocalDocs(merged);
+      saveLocalDeletedIds(deletedIds);
+      return { docs: merged, deletedIds };
+    } catch {
+      return { docs, deletedIds };
+    }
+  } catch (err) {
+    console.warn('[documentsService] fetchListFromCloud 异常:', err.message);
+    return null;
+  }
+}
+
+/**
+ * 按需拉取单篇文档的"重字段"（正文 + 附件 + 主文件），用于打开预览 / 下载纯文本文档。
+ * 只 select 需要的列，比 fetchDocFromCloud（select *，且附带删除列表）更轻。
+ * 返回一个可直接 merge 进 doc 对象的补丁 { content, attachments, fileUrl, fileType, size, _contentLoaded:true } | null。
+ * 同时回写本地缓存，便于下次离线首屏 / 秒显。
+ */
+export async function fetchDocContentFromCloud(id) {
+  if (!canUseSupabase() || !supabase || !id) return null;
+  try {
+    const { data, error } = await withTimeout(
+      supabase
+        .from('documents')
+        .select('id,content,attachments,file_url,file_type,size_text')
+        .eq('id', String(id))
+        .maybeSingle(),
+      DOCUMENTS_CLOUD_TIMEOUT_MS,
+      '拉取文档正文',
+    );
+    if (error) {
+      console.warn('[documentsService] 云端拉取文档正文失败:', error.message);
+      return null;
+    }
+    if (!data) return null; // 内置示例等云端无记录 → 交由调用方回退
+
+    const patch = {
+      content: data.content || '',
+      attachments: Array.isArray(data.attachments) ? data.attachments : [],
+      fileUrl: data.file_url || null,
+      fileType: data.file_type || null,
+      size: data.size_text || '—',
+      _contentLoaded: true,
+    };
+
+    try {
+      const local = loadLocalDocs();
+      const idx = local.findIndex((d) => String(d.id) === String(id));
+      if (idx >= 0) {
+        local[idx] = { ...local[idx], ...patch };
+        saveLocalDocs(local);
+      }
+    } catch { /* ignore */ }
+
+    return patch;
+  } catch (err) {
+    console.warn('[documentsService] fetchDocContentFromCloud 异常:', err.message);
     return null;
   }
 }
