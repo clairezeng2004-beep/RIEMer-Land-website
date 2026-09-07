@@ -128,6 +128,9 @@ export default function MemberContributions() {
   // 编辑中的"其他"贡献
   const [editingMember, setEditingMember] = useState(null);
   const [editText, setEditText] = useState('');
+  // 手机端「成员贡献」不再用横向滚动表格，而是一列卡片：左侧总计，点击进详情看各项拆分。
+  // 记录当前打开详情面板的成员 id。
+  const [mobileDetailId, setMobileDetailId] = useState(null);
 
   // 每次本地状态变化都写回 localStorage 作为兜底
   useEffect(() => {
@@ -329,6 +332,27 @@ export default function MemberContributions() {
       return <span className={`mc-rank mc-rank--top${index + 1}`}>{index + 1}</span>;
     }
     return <span className="mc-rank">{index + 1}</span>;
+  };
+
+  // 详情面板里各贡献维度的定义（标签与表头一致，图标复用）
+  const metricDefs = [
+    { key: 'shareEvents', label: '线上分享会', Icon: Mic },
+    { key: 'articleCount', label: '公众号文章', Icon: FileText },
+    { key: 'helpCount', label: '协作帮助', Icon: Handshake },
+    { key: 'uploadCount', label: '内部分享', Icon: Upload },
+  ];
+
+  // 当前手机端详情面板对应的成员及其排名（跟随 sortedStats 实时刷新）
+  const mobileDetailIndex = mobileDetailId
+    ? sortedStats.findIndex((m) => m.id === mobileDetailId)
+    : -1;
+  const mobileDetailMember = mobileDetailIndex >= 0 ? sortedStats[mobileDetailIndex] : null;
+
+  // 关闭详情面板：顺手取消未提交的「其他」输入，避免遗留半途状态。
+  const closeMobileDetail = () => {
+    setEditingMember(null);
+    setEditText('');
+    setMobileDetailId(null);
   };
 
   return (
@@ -583,6 +607,32 @@ export default function MemberContributions() {
           </table>
         </div>
 
+        {/* 手机端卡片列表：一列卡片，左侧总计 + 排名/姓名，点击进详情看各项拆分。
+            桌面端通过 CSS 隐藏（.mc-mobile-list），与表格互斥展示。 */}
+        <ul className="mc-mobile-list">
+          {sortedStats.map((member, index) => (
+            <li key={member.id} className="mc-mobile-list__item">
+              <button
+                type="button"
+                className={`mc-mobile-card ${index < 3 ? `mc-mobile-card--top${index + 1}` : ''}`}
+                onClick={() => setMobileDetailId(member.id)}
+              >
+                <span className="mc-mobile-card__total">
+                  <span className="mc-mobile-card__total-value">{member.total}</span>
+                  <span className="mc-mobile-card__total-label">总计</span>
+                </span>
+                <span className="mc-mobile-card__main">
+                  <span className="mc-mobile-card__name">{member.name}</span>
+                  <span className="mc-mobile-card__sub">
+                    分享会{member.shareEvents} · 文章{member.articleCount} · 协作{member.helpCount} · 内部{member.uploadCount}
+                  </span>
+                </span>
+                <span className="mc-mobile-card__rank">{getRankDisplay(index)}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+
         {/* 说明 */}
         <div className="mc-note">
           <p>
@@ -627,6 +677,136 @@ export default function MemberContributions() {
           </ul>
         </div>
       </div>
+
+      {/* 手机端成员贡献详情面板（底部抽屉）：点击卡片后弹出，展示各维度拆分，
+          「其他」贡献仍可增删（复用 handleAddCustom / handleRemoveCustom）。 */}
+      {mobileDetailMember && (() => {
+        const member = mobileDetailMember;
+        const index = mobileDetailIndex;
+        return (
+          <div className="mc-mobile-detail-overlay" onClick={closeMobileDetail}>
+            <div
+              className="mc-mobile-detail"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="mc-mobile-detail__header">
+                <div className="mc-mobile-detail__heading">
+                  {getRankDisplay(index)}
+                  <h3 className="mc-mobile-detail__name">{member.name}</h3>
+                </div>
+                <button
+                  type="button"
+                  className="mc-mobile-detail__close"
+                  onClick={closeMobileDetail}
+                  aria-label="关闭"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="mc-mobile-detail__body">
+                {/* 总计横幅 */}
+                <div className="mc-mobile-detail__total">
+                  <span className="mc-mobile-detail__total-value">{member.total}</span>
+                  <span className="mc-mobile-detail__total-label">
+                    <Trophy size={14} /> 贡献总计
+                  </span>
+                </div>
+
+                {/* 各维度拆分 */}
+                <div className="mc-mobile-detail__metrics">
+                  {metricDefs.map(({ key, label, Icon }) => (
+                    <div key={key} className="mc-mobile-detail__metric">
+                      <span className="mc-mobile-detail__metric-label">
+                        <Icon size={14} /> {label}
+                      </span>
+                      <span
+                        className={`mc-mobile-detail__metric-value ${
+                          member[key] > 0 ? 'mc-mobile-detail__metric-value--active' : ''
+                        }`}
+                      >
+                        {member[key]}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                {/* 其他（自定义）贡献 */}
+                <div className="mc-mobile-detail__custom">
+                  <div className="mc-mobile-detail__custom-title">其他贡献</div>
+                  {member.customItems.map((item, idx) => {
+                    const recorder =
+                      (item.addedById &&
+                        members.find((m) => m.id === item.addedById)?.name) ||
+                      item.addedByName ||
+                      '';
+                    return (
+                      <div key={idx} className="mc-custom__item">
+                        <div className="mc-custom__body">
+                          <span className="mc-custom__text">{item.text}</span>
+                          {recorder && (
+                            <span className="mc-custom__recorder" title={`由 ${recorder} 录入`}>
+                              记录人：{recorder}
+                            </span>
+                          )}
+                        </div>
+                        <button
+                          className="mc-custom__remove"
+                          onClick={() => handleRemoveCustom(member.id, idx)}
+                          title="删除"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                  {member.customItems.length === 0 && editingMember !== member.id && (
+                    <div className="mc-mobile-detail__custom-empty">暂无其他贡献</div>
+                  )}
+                  {editingMember === member.id ? (
+                    <div className="mc-custom__edit">
+                      <input
+                        type="text"
+                        className="mc-custom__input"
+                        placeholder="输入其他贡献…"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') handleAddCustom(member.id);
+                          if (e.key === 'Escape') { setEditingMember(null); setEditText(''); }
+                        }}
+                        autoFocus
+                      />
+                      <button
+                        className="mc-custom__confirm"
+                        onClick={() => handleAddCustom(member.id)}
+                        disabled={!editText.trim()}
+                      >
+                        确认
+                      </button>
+                      <button
+                        className="mc-custom__cancel"
+                        onClick={() => { setEditingMember(null); setEditText(''); }}
+                      >
+                        取消
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      className="mc-custom__add"
+                      onClick={() => { setEditingMember(member.id); setEditText(''); }}
+                    >
+                      <Plus size={12} /> 添加
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }

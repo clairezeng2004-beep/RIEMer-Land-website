@@ -705,6 +705,275 @@
   font-weight: 700;
 }
 
+/* ============================================================
+ * 手机端卡片列表 + 详情抽屉
+ * 桌面端默认隐藏；在 @media (max-width: 768px) 里显示，并隐藏表格。
+ * ============================================================ */
+.mc-mobile-list {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* 「不要太宽」：即便在大屏手机 / 平板竖屏也保持一列窄卡片，居中排布。 */
+  max-width: 520px;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.mc-mobile-list__item {
+  margin: 0;
+}
+
+.mc-mobile-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  width: 100%;
+  padding: 0.75rem 0.9rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-card);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mc-mobile-card:active {
+  transform: scale(0.99);
+  border-color: var(--color-primary);
+}
+
+/* 前三名：卡片左侧「总计」块用金/银/铜描边呼应表格里的排名圆章 */
+.mc-mobile-card--top1 .mc-mobile-card__total { border-color: rgba(138, 106, 10, 0.5); }
+.mc-mobile-card--top2 .mc-mobile-card__total { border-color: rgba(74, 82, 96, 0.5); }
+.mc-mobile-card--top3 .mc-mobile-card__total { border-color: rgba(138, 90, 42, 0.5); }
+
+/* 左侧「总计」块：卡片的主角，一个方形数字块 */
+.mc-mobile-card__total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 56px;
+  height: 56px;
+  border: 1.5px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  background: rgba(91, 140, 62, 0.06);
+}
+
+.mc-mobile-card__total-value {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--color-primary);
+}
+
+.mc-mobile-card__total-label {
+  font-size: 10px;
+  color: var(--color-text-muted);
+  margin-top: 1px;
+}
+
+.mc-mobile-card__main {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mc-mobile-card__name {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-mobile-card__sub {
+  font-size: 11px;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-mobile-card__rank {
+  flex-shrink: 0;
+}
+
+/* 详情抽屉：从底部滑出 */
+.mc-mobile-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: mc-detail-fade 0.18s ease;
+}
+
+@keyframes mc-detail-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.mc-mobile-detail {
+  width: 100%;
+  max-width: 560px;
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-lg);
+  animation: mc-detail-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes mc-detail-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.mc-mobile-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.mc-mobile-detail__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.mc-mobile-detail__name {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mc-mobile-detail__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mc-mobile-detail__close:active {
+  background: var(--color-bg);
+}
+
+.mc-mobile-detail__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-lg);
+  padding: var(--space-lg);
+  overflow-y: auto;
+}
+
+.mc-mobile-detail__total {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: var(--space-md);
+  border-radius: var(--radius-md);
+  background: rgba(91, 140, 62, 0.06);
+  border: 1px solid var(--color-border-light);
+}
+
+.mc-mobile-detail__total-value {
+  font-size: var(--text-3xl, 2rem);
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1;
+}
+
+.mc-mobile-detail__total-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+}
+
+.mc-mobile-detail__metrics {
+  display: flex;
+  flex-direction: column;
+}
+
+.mc-mobile-detail__metric {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  padding: 0.7rem 0.25rem;
+  border-bottom: 1px solid var(--color-border-light);
+}
+
+.mc-mobile-detail__metric:last-child {
+  border-bottom: none;
+}
+
+.mc-mobile-detail__metric-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: var(--text-sm);
+  color: var(--color-text-light);
+}
+
+.mc-mobile-detail__metric-value {
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text-muted);
+  min-width: 24px;
+  text-align: right;
+}
+
+.mc-mobile-detail__metric-value--active {
+  color: var(--color-primary);
+}
+
+.mc-mobile-detail__custom {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.mc-mobile-detail__custom-title {
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mc-mobile-detail__custom-empty {
+  font-size: var(--text-sm);
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .mc-page {
@@ -714,6 +983,14 @@
   .mc-page__header {
     flex-direction: column;
     gap: var(--space-md);
+  }
+
+  /* 手机端：隐藏横向滚动表格，改用卡片列表 */
+  .mc-table-wrapper { display: none; }
+  .mc-mobile-list {
+    display: flex;
+    margin-left: auto;
+    margin-right: auto;
   }
 
   .mc-period-selector {
