@@ -259,7 +259,7 @@
   display: none;
 }
 
-/* 响应式：手机端侧边栏隐藏时去掉左边距，显示水平导航 */
+/* 响应式：手机端侧边栏隐藏，改用底部「转盘」导航 */
 @media (max-width: 768px) {
   .internal-layout {
     flex-direction: column;
@@ -269,9 +269,31 @@
     margin-left: 0;
   }
 
+  /* 去掉旧横向导航条后，各 Tab 页原先为「导航条 + 让位」预留的大顶距
+     （多为 --space-3xl / 108px）就成了标题与顶部 RiemerLand 标志之间的
+     多余留白。这里统一收紧到一个舒适的小顶距，让内容整体上移。
+     选择器带 .internal-layout__content 前缀 => 特异性高于各页自身的
+     `.xxx-page { padding-top }`，无需改十几个页面文件即可集中覆盖。 */
+  .internal-layout__content .documents-page,
+  .internal-layout__content .notifications-page,
+  .internal-layout__content .tasks-page,
+  .internal-layout__content .users-page,
+  .internal-layout__content .gallery-page,
+  .internal-layout__content .guestbook-page,
+  .internal-layout__content .internal-files-page,
+  .internal-layout__content .mc-page,
+  .internal-layout__content .member-profiles-page,
+  .internal-layout__content .ms-page,
+  .internal-layout__content .notif-mgmt,
+  .internal-layout__content .profile-page,
+  .internal-layout__content .suggestions-page,
+  .internal-layout__content .ia-list-page {
+    padding-top: var(--space-lg);
+  }
+
   .internal-page-fallback {
     min-height: calc(100vh - 64px);
-    padding: 92px var(--space-md) var(--space-3xl);
+    padding: var(--space-xl) var(--space-md) var(--space-3xl);
   }
 
   .internal-page-fallback__header {
@@ -397,7 +419,7 @@
     left: 0;
     right: 0;
     bottom: 0;
-    padding: 8px 12px calc(env(safe-area-inset-bottom, 0px) + 16px);
+    padding: 12px 12px calc(env(safe-area-inset-bottom, 0px) + 16px);
     background: none; /* 透明：字块直接悬浮在页面上，无白色底板 */
     animation: mdial-rise 0.22s cubic-bezier(0.22, 1, 0.36, 1);
     touch-action: none;
@@ -406,42 +428,6 @@
   @keyframes mdial-rise {
     from { transform: translateY(100%); }
     to { transform: translateY(0); }
-  }
-
-  .mdial-panel__bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    height: 32px;
-  }
-
-  .mdial-panel__hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 3px 10px;
-    border-radius: var(--radius-full);
-    /* 透明面板上，提示文字用一小片毛玻璃托底，保证任意页面背景下都可读 */
-    background: rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(10px) saturate(160%);
-    -webkit-backdrop-filter: blur(10px) saturate(160%);
-    font-size: 0.72rem;
-    color: var(--color-primary-dark);
-  }
-
-  .mdial-panel__close {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 32px;
-    height: 32px;
-    border: 1px solid rgba(255, 255, 255, 0.5);
-    border-radius: var(--radius-full);
-    background: rgba(255, 255, 255, 0.35);
-    backdrop-filter: blur(10px) saturate(160%);
-    -webkit-backdrop-filter: blur(10px) saturate(160%);
-    color: var(--color-primary-dark);
-    cursor: pointer;
   }
 
   /* ---- 转盘舞台：只露出圆的顶部一段弧，超出裁掉（板块从两侧转入/转出） ---- */

@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
 import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { RotateCw, X } from 'lucide-react';
+import { RotateCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useSiteContent } from '../contexts/SiteContentContext';
@@ -54,10 +54,11 @@ function InternalPageFallback() {
    ============================================================ */
 
 // 转盘几何常量（单位 px / 角度）。圆心在 stage 顶部下方 CY 处、半径 R，
-// 顶部一段弧露在 stage（高度 STAGE_H）里；R/CY 调大弧更平缓、露出更多。
-const DIAL_R = 240;
-const DIAL_CY = 252; // 圆心距 stage 顶的距离；焦点板块 y ≈ CY - R = 12
-const DIAL_STAGE_H = 176;
+// 顶部一段弧露在 stage（高度 STAGE_H）里；R 调大弧更平缓/更铺开，
+// 调小则弧更收紧、字块更聚拢。
+const DIAL_R = 200;
+const DIAL_CY = 212; // 圆心距 stage 顶的距离；焦点板块 y ≈ CY - R = 12
+const DIAL_STAGE_H = 150;
 
 // 角度归一到 (-180, 180]，用来判断某板块离「12 点焦点位」多远
 function normDeg(d) {
@@ -264,20 +265,7 @@ function MobileDialNav() {
             role="dialog"
             aria-label="板块转盘"
           >
-            <div className="mdial-panel__bar">
-              <span className="mdial-panel__hint">
-                <RotateCw size={13} /> 拖动转盘切换板块
-              </span>
-              <button
-                type="button"
-                className="mdial-panel__close"
-                onClick={closeDial}
-                aria-label="关闭"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
+            {/* 关闭方式：点转盘外的空白处 / 点任意板块 / 按 Esc，无需专门按钮 */}
             <div
               className="mdial-stage"
               ref={stageRef}
