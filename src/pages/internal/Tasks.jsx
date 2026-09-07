@@ -449,6 +449,9 @@ export default function Tasks() {
   }, [isAuthenticated, supabaseOk]);
 
   const [showForm, setShowForm] = useState(false);
+  // 手机端「事项追踪」不再用横向滚动的表格，而是一列长条块（卡片）。
+  // 点击某个条块，把它的 id 记到这里，弹出可直接编辑的详情面板。
+  const [mobileDetailId, setMobileDetailId] = useState(null);
   const [filterStatus, setFilterStatus] = useState([]);
   const [filterCategory, setFilterCategory] = useState([]);
   // 表头「负责人」列筛选：'全部' 表示不筛选；否则为某个 user.id，仅展示该人为负责人的事项。
@@ -988,6 +991,16 @@ export default function Tasks() {
     }
   };
 
+  // 当前手机端详情面板对应的事项（跟随 tasks 变化实时刷新，编辑立刻可见）
+  const mobileDetailTask = mobileDetailId
+    ? tasks.find((t) => t.id === mobileDetailId) || null
+    : null;
+  const mobileDetailAssigneeIds = mobileDetailTask
+    ? (Array.isArray(mobileDetailTask.assignee)
+        ? mobileDetailTask.assignee
+        : mobileDetailTask.assignee ? [mobileDetailTask.assignee] : [])
+    : [];
+
   return (
     <div className="tasks-page">
       <div className="container">
@@ -1509,6 +1522,49 @@ export default function Tasks() {
           </table>
         </div>
 
+        {/* 手机端卡片列表：一列长条块，标题在左、状态/分类标签在右，点击进详情编辑。
+            桌面端通过 CSS 隐藏（.tasks-mobile-list），与上面的表格互斥展示。 */}
+        <ul className="tasks-mobile-list">
+          {filtered.map((task) => {
+            const latestStatusChange = Array.isArray(task.statusHistory) && task.statusHistory.length > 0
+              ? task.statusHistory[task.statusHistory.length - 1]
+              : null;
+            const statusDate = formatCompactTaskDate(latestStatusChange?.date || task.createdAt || '');
+            return (
+              <li key={task.id} className="tasks-mobile-list__item">
+                <button
+                  type="button"
+                  className={`tasks-mobile-card ${isClosedTask(task) ? 'tasks-mobile-card--done' : ''}`}
+                  onClick={() => setMobileDetailId(task.id)}
+                >
+                  <span className="tasks-mobile-card__main">
+                    <span className="tasks-mobile-card__title">
+                      {task.title || '（未命名事项）'}
+                    </span>
+                    {statusDate && (
+                      <span className="tasks-mobile-card__date">{statusDate}</span>
+                    )}
+                  </span>
+                  <span className="tasks-mobile-card__tags">
+                    <span
+                      className="tasks-mobile-card__status"
+                      style={{
+                        color: statusColors[task.status] || 'var(--color-text-muted)',
+                        borderColor: statusColors[task.status] || 'var(--color-border)',
+                      }}
+                    >
+                      {task.status}
+                    </span>
+                    {task.category && (
+                      <span className="tasks-mobile-card__category">{task.category}</span>
+                    )}
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+
         {filtered.length === 0 && (
           <div className="tasks-empty">
             <CheckSquare size={48} />
@@ -1575,6 +1631,143 @@ export default function Tasks() {
                 onClick={() => setArchivePrompt(null)}
               >
                 暂不需要
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 手机端事项详情编辑面板（底部抽屉）：点击卡片后弹出，字段可直接编辑。
+          复用与桌面表格完全相同的处理函数（updateTaskStatus / updateTaskField / deleteTask）。 */}
+      {mobileDetailTask && (
+        <div
+          className="tasks-mobile-detail-overlay"
+          onClick={() => setMobileDetailId(null)}
+        >
+          <div
+            className="tasks-mobile-detail"
+            role="dialog"
+            aria-modal="true"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="tasks-mobile-detail__header">
+              <h3>事项详情</h3>
+              <button
+                type="button"
+                className="tasks-mobile-detail__close"
+                onClick={() => setMobileDetailId(null)}
+                aria-label="关闭"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="tasks-mobile-detail__body">
+              <div className="tasks-mobile-detail__field">
+                <label>标题</label>
+                <input
+                  type="text"
+                  className="tasks-form__input"
+                  value={mobileDetailTask.title || ''}
+                  onChange={(e) => updateTaskField(mobileDetailTask.id, 'title', e.target.value)}
+                  placeholder="事项标题"
+                />
+              </div>
+
+              <div className="tasks-mobile-detail__row">
+                <div className="tasks-mobile-detail__field">
+                  <label>状态</label>
+                  <CustomSelect
+                    value={mobileDetailTask.status}
+                    onChange={(val) => updateTaskStatus(mobileDetailTask.id, val)}
+                    options={taskStatuses.map((s) => ({ value: s, label: s }))}
+                    size="sm"
+                    style={{ color: statusColors[mobileDetailTask.status] }}
+                  />
+                </div>
+                <div className="tasks-mobile-detail__field">
+                  <label>分类</label>
+                  <CustomSelect
+                    value={mobileDetailTask.category || ''}
+                    onChange={(val) => updateTaskField(mobileDetailTask.id, 'category', val)}
+                    options={taskCategories.map((c) => ({ value: c, label: c }))}
+                    placeholder="选择分类"
+                    size="sm"
+                  />
+                </div>
+              </div>
+
+              <div className="tasks-mobile-detail__field">
+                <label>负责人</label>
+                <CustomSelect
+                  value={mobileDetailAssigneeIds}
+                  onChange={(vals) => updateTaskField(mobileDetailTask.id, 'assignee', vals)}
+                  options={assigneeOptions}
+                  placeholder="可不选择负责人"
+                  multiple
+                  size="sm"
+                  searchable
+                  searchPlaceholder="搜索负责人…"
+                />
+              </div>
+
+              <div className="tasks-mobile-detail__field">
+                <label>协助人</label>
+                <CustomSelect
+                  value={(mobileDetailTask.helpers || [])}
+                  onChange={(vals) => updateTaskField(mobileDetailTask.id, 'helpers', vals)}
+                  options={assigneeOptions}
+                  placeholder="选择协助人"
+                  multiple
+                  size="sm"
+                  searchable
+                  searchPlaceholder="搜索协助人…"
+                />
+              </div>
+
+              <div className="tasks-mobile-detail__field">
+                <label>亮点总结</label>
+                <input
+                  type="text"
+                  className="tasks-form__input"
+                  placeholder="如：规模大、参与人数多、主题热门、嘉宾准备细心…"
+                  value={mobileDetailTask.highlights || ''}
+                  onChange={(e) => updateTaskField(mobileDetailTask.id, 'highlights', e.target.value)}
+                />
+              </div>
+
+              <div className="tasks-mobile-detail__field">
+                <label>经验复盘</label>
+                <input
+                  type="text"
+                  className="tasks-form__input"
+                  placeholder="如：设备调试、时间策划、宣传力度、嘉宾跟进节奏…"
+                  value={mobileDetailTask.reflections || ''}
+                  onChange={(e) => updateTaskField(mobileDetailTask.id, 'reflections', e.target.value)}
+                />
+              </div>
+            </div>
+
+            <div className="tasks-mobile-detail__footer">
+              {canDeleteTask(mobileDetailTask) && (
+                <button
+                  type="button"
+                  className="tasks-mobile-detail__delete"
+                  onClick={() => {
+                    const target = mobileDetailTask;
+                    setMobileDetailId(null);
+                    deleteTask(target);
+                  }}
+                >
+                  <X size={16} /> 删除事项
+                </button>
+              )}
+              <button
+                type="button"
+                className="btn btn-primary tasks-mobile-detail__done"
+                onClick={() => setMobileDetailId(null)}
+              >
+                完成
               </button>
             </div>
           </div>
