@@ -1,9 +1,10 @@
-import { Suspense, useEffect, useState, useRef } from 'react';
-import { Navigate, NavLink, Outlet, useLocation } from 'react-router-dom';
+import { Suspense, useEffect, useState, useRef, useCallback } from 'react';
+import { Navigate, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { RotateCw, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useNotifications } from '../contexts/NotificationContext';
 import { useSiteContent } from '../contexts/SiteContentContext';
-import { WysiwygProvider } from '../contexts/WysiwygContext';
+import { WysiwygProvider, useWysiwyg } from '../contexts/WysiwygContext';
 import InternalSidebar from './InternalSidebar';
 import WysiwygToolbar from './WysiwygToolbar';
 import ErrorBoundary from './ErrorBoundary';
@@ -38,20 +39,43 @@ function InternalPageFallback() {
   );
 }
 
-/* 手机端水平导航条 */
-function MobileInternalNav() {
+/* ============================================================
+   手机端「转盘导航」（MobileDialNav）
+   ------------------------------------------------------------
+   代替原先的横向滚动胶囊条：底部居中一颗小圆，点开后板块以弧形
+   转盘（圆心在屏幕下方之外，只露出顶部一段弧）排开。手指左右拖动
+   转动整个圆，带惯性甩动与吸附；顶部中央「焦点位」的板块被放大高亮，
+   点任意板块即跳转并收起。因为是闭环，最后一个到第一个只需反向转一点，
+   没有横条「划到头」的死角 —— 两个方向都是最短路径。
+   ------------------------------------------------------------
+   板块顺序仍必须与电脑端 InternalSidebar 保持一致（日常管理 / 成员 /
+   管理 三段，段内严格 follow InternalSidebar.jsx 的 dailyItems /
+   memberItems / adminItems）。修改侧边栏顺序时这里也要一并同步。
+   ============================================================ */
+
+// 转盘几何常量（单位 px / 角度）。圆心在 stage 顶部下方 CY 处、半径 R，
+// 顶部一段弧露在 stage（高度 STAGE_H）里；R/CY 调大弧更平缓、露出更多。
+const DIAL_R = 240;
+const DIAL_CY = 252; // 圆心距 stage 顶的距离；焦点板块 y ≈ CY - R = 12
+const DIAL_STAGE_H = 176;
+
+// 角度归一到 (-180, 180]，用来判断某板块离「12 点焦点位」多远
+function normDeg(d) {
+  d %= 360;
+  if (d > 180) d -= 360;
+  if (d <= -180) d += 360;
+  return d;
+}
+
+function MobileDialNav() {
   const { unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
   const { isAdmin } = useAuth();
+  const { editing } = useWysiwyg();
   const sc = internalConfig.sidebar || {};
-  const scrollRef = useRef(null);
+  const navigate = useNavigate();
   const location = useLocation();
 
-  // 手机端导航条的顺序必须与电脑端 InternalSidebar 保持一致，
-  // 否则用户在两种设备间切换时会找不到同一个入口。分组依据同样是
-  // 「日常管理 / 成员 / 管理」三段，段内顺序严格 follow InternalSidebar.jsx
-  // 里的 dailyItems / memberItems / adminItems。修改侧边栏顺序时，
-  // 这里也必须一并同步。
   const navItems = [
     // 日常管理（对齐 InternalSidebar.dailyItems）
     { to: '/internal/tasks', icon: CheckSquare, label: sc.labelTasks },
@@ -61,7 +85,7 @@ function MobileInternalNav() {
     { to: '/internal/event-publish', icon: CalendarRange, label: sc.labelEventPublish },
     { to: '/internal/contributions', icon: BarChart3, label: sc.labelContributions },
     { to: '/internal/guestbook', icon: MessageCircle, label: sc.labelGuestbook },
-    // 成员（对齐 InternalSidebar.memberItems：内部分享 → 通讯录 → 建设建议 → 互动相册 → 个人主页）
+    // 成员（对齐 InternalSidebar.memberItems：内部分享 → 内部资料 → 通讯录 → 建设建议 → 互动相册 → 个人主页）
     { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
     { to: '/internal/internal-files', icon: HardDrive, label: sc.labelInternalFiles },
     { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
@@ -79,53 +103,232 @@ function MobileInternalNav() {
     ] : []),
   ];
 
-  // 路由变化时把当前激活项滚到可见区域。
-  // 注意：刷新后第一次进入也会执行这个 effect。
-  // 若直接用 behavior:'smooth'，浏览器会从 scrollLeft=0 平滑滚到目标位置 ——
-  // 用户感知就是"导航栏左右抖一下"。
-  // 同时 sc.labelXxx 来自异步加载的 internalConfig，刷新瞬间 label 可能
-  // 还是空字符串/默认值，等云端拉回来后每个 chip 宽度会跳变，
-  // 此时若已经平滑滚动过一次，会再被推一次 → 二次抖动。
-  // 修复：
-  //   1) 首次挂载（initialPositionDoneRef 还是 false）用 'auto' 瞬时居中，不动画；
-  //   2) 用 requestAnimationFrame 等首次 layout 完成（label 文字已稳定）再定位，
-  //      避免在 label 还在跳变时定位、之后又被异步 label 推一次；
-  //   3) 后续路由切换才允许 smooth。
-  const initialPositionDoneRef = useRef(false);
+  const N = navItems.length;
+  const STEP = 360 / N; // 相邻板块的角间距，能整除 360 => 闭环无缝、可无限循环
+
+  // 当前路由对应的板块下标（找不到时落在 0，避免转盘空转）
+  const activeIndex = Math.max(
+    0,
+    navItems.findIndex(
+      (it) => location.pathname === it.to || location.pathname.startsWith(it.to + '/')
+    )
+  );
+
+  const [open, setOpen] = useState(false);
+  const [angle, setAngle] = useState(0); // 转盘整体旋转角（度）
+  const angleRef = useRef(0);
+  const stageRef = useRef(null);
+  const dragRef = useRef(null); // 拖拽过程态：{startX,startAngle,lastX,lastT,vel,moved}
+  const rafRef = useRef(0);
+  const suppressClickRef = useRef(false); // 拖动后抑制误触发的 click 跳转
+
+  const degPerPx = (180 / Math.PI) / DIAL_R; // 沿弧 1:1 手感：拖 dx px ↔ 转 dx*degPerPx 度
+
+  const setAngleBoth = useCallback((a) => {
+    angleRef.current = a;
+    setAngle(a);
+  }, []);
+
+  // 打开转盘：先把当前板块转到焦点位（θ=0），让用户一眼看到「我在哪」
+  const openDial = useCallback(() => {
+    if (editing) return; // 编辑态下不劫持底部，交给编辑工具条
+    const a = -(activeIndex * STEP);
+    setAngleBoth(a);
+    suppressClickRef.current = false;
+    setOpen(true);
+  }, [activeIndex, STEP, setAngleBoth, editing]);
+
+  const closeDial = useCallback(() => {
+    cancelAnimationFrame(rafRef.current);
+    setOpen(false);
+  }, []);
+
+  // 松手后吸附：把最接近焦点位的板块精确对齐到 12 点
+  const snap = useCallback(() => {
+    const target = Math.round(angleRef.current / STEP) * STEP;
+    const start = angleRef.current;
+    const t0 = performance.now();
+    const dur = 220;
+    const anim = () => {
+      const p = Math.min(1, (performance.now() - t0) / dur);
+      const e = 1 - Math.pow(1 - p, 3); // easeOutCubic
+      setAngleBoth(start + (target - start) * e);
+      if (p < 1) rafRef.current = requestAnimationFrame(anim);
+    };
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(anim);
+  }, [STEP, setAngleBoth]);
+
+  const onPointerDown = useCallback((e) => {
+    cancelAnimationFrame(rafRef.current);
+    stageRef.current?.setPointerCapture?.(e.pointerId);
+    suppressClickRef.current = false;
+    dragRef.current = {
+      startX: e.clientX,
+      startAngle: angleRef.current,
+      lastX: e.clientX,
+      lastT: performance.now(),
+      vel: 0,
+      moved: 0,
+    };
+  }, []);
+
+  const onPointerMove = useCallback((e) => {
+    const d = dragRef.current;
+    if (!d) return;
+    const dx = e.clientX - d.startX;
+    d.moved = Math.max(d.moved, Math.abs(dx));
+    const now = performance.now();
+    const dxInst = e.clientX - d.lastX;
+    const dt = now - d.lastT || 16;
+    d.vel = (dxInst * degPerPx) / dt; // 瞬时角速度（度/ms），供惯性使用
+    d.lastX = e.clientX;
+    d.lastT = now;
+    setAngleBoth(d.startAngle + dx * degPerPx);
+  }, [degPerPx, setAngleBoth]);
+
+  const onPointerUp = useCallback(() => {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d) return;
+    suppressClickRef.current = d.moved > 8; // 拖动过 => 这次抬手后的 click 不算点选
+    let vel = d.vel;
+    const decay = 0.95;
+    let last = performance.now();
+    const step = () => {
+      const now = performance.now();
+      const dt = now - last;
+      last = now;
+      vel *= Math.pow(decay, dt / 16);
+      if (Math.abs(vel) < 0.003) {
+        snap();
+        return;
+      }
+      setAngleBoth(angleRef.current + vel * dt);
+      rafRef.current = requestAnimationFrame(step);
+    };
+    if (Math.abs(vel) > 0.01) {
+      rafRef.current = requestAnimationFrame(step);
+    } else {
+      snap();
+    }
+  }, [snap, setAngleBoth]);
+
+  const onChipClick = useCallback((item) => {
+    if (suppressClickRef.current) return; // 刚才是拖动，不跳转
+    navigate(item.to);
+    closeDial();
+  }, [navigate, closeDial]);
+
+  // 打开时锁背景滚动 + 支持 Esc 关闭
   useEffect(() => {
-    if (!scrollRef.current) return;
-    const raf = requestAnimationFrame(() => {
-      if (!scrollRef.current) return;
-      const active = scrollRef.current.querySelector('.internal-mobile-nav__item--active');
-      if (!active) return;
-      active.scrollIntoView({
-        behavior: initialPositionDoneRef.current ? 'smooth' : 'auto',
-        inline: 'center',
-        block: 'nearest',
-      });
-      initialPositionDoneRef.current = true;
-    });
-    return () => cancelAnimationFrame(raf);
-  }, [location.pathname]);
+    if (!open) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKey = (e) => { if (e.key === 'Escape') closeDial(); };
+    window.addEventListener('keydown', onKey);
+    return () => {
+      document.body.style.overflow = prev;
+      window.removeEventListener('keydown', onKey);
+      cancelAnimationFrame(rafRef.current);
+    };
+  }, [open, closeDial]);
+
+  const activeItem = navItems[activeIndex];
+  const ActiveIcon = activeItem?.icon || RotateCw;
 
   return (
-    <nav className="internal-mobile-nav" ref={scrollRef}>
-      {navItems.map((item) => (
-        <NavLink
-          key={item.to}
-          to={item.to}
-          className={({ isActive }) =>
-            `internal-mobile-nav__item ${isActive ? 'internal-mobile-nav__item--active' : ''}`
-          }
-        >
-          <item.icon size={16} />
-          <span>{item.label}</span>
-          {item.badge && (
-            <span className="internal-mobile-nav__badge">{item.badge}</span>
+    <div className="mdial">
+      {/* 入口小圆：显示当前板块图标 + 名称 */}
+      <button
+        type="button"
+        className="mdial-trigger"
+        onClick={openDial}
+        aria-label="打开板块转盘"
+        aria-expanded={open}
+      >
+        <span className="mdial-trigger__ring">
+          <ActiveIcon size={22} />
+          {unreadCount > 0 && activeItem?.to !== '/internal/notifications' && (
+            <span className="mdial-trigger__dot" />
           )}
-        </NavLink>
-      ))}
-    </nav>
+        </span>
+        <span className="mdial-trigger__label">{activeItem?.label || '板块'}</span>
+      </button>
+
+      {open && (
+        <div className="mdial-overlay" onPointerDown={closeDial}>
+          <div
+            className="mdial-panel"
+            onPointerDown={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="板块转盘"
+          >
+            <div className="mdial-panel__bar">
+              <span className="mdial-panel__hint">
+                <RotateCw size={13} /> 拖动转盘切换板块
+              </span>
+              <button
+                type="button"
+                className="mdial-panel__close"
+                onClick={closeDial}
+                aria-label="关闭"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div
+              className="mdial-stage"
+              ref={stageRef}
+              style={{ height: DIAL_STAGE_H }}
+              onPointerDown={onPointerDown}
+              onPointerMove={onPointerMove}
+              onPointerUp={onPointerUp}
+              onPointerCancel={onPointerUp}
+            >
+              {/* 焦点指针（12 点方向），标记「转到这里即选中」 */}
+              <span className="mdial-stage__pointer" />
+
+              {navItems.map((item, i) => {
+                const theta = normDeg(i * STEP + angle); // 该板块当前相对焦点位的角度
+                const rad = (theta * Math.PI) / 180;
+                const cos = Math.cos(rad);
+                if (cos <= 0.04) return null; // 转到圆背面，不渲染
+                const x = DIAL_R * Math.sin(rad);
+                const y = DIAL_CY - DIAL_R * cos; // 距 stage 顶的 y
+                const opacity = Math.max(0, Math.min(1, (cos - 0.26) / 0.74));
+                const scale = 0.72 + 0.28 * cos;
+                const isFocus = Math.abs(theta) < STEP / 2; // 落在焦点位
+                const isCurrent = i === activeIndex; // 当前所在板块
+                const Icon = item.icon;
+                return (
+                  <button
+                    type="button"
+                    key={item.to}
+                    className={
+                      'mdial-chip' +
+                      (isFocus ? ' mdial-chip--focus' : '') +
+                      (isCurrent ? ' mdial-chip--current' : '')
+                    }
+                    style={{
+                      transform: `translate(${x}px, ${y}px) translate(-50%, -50%) scale(${scale})`,
+                      opacity,
+                      zIndex: Math.round(cos * 100),
+                    }}
+                    onClick={() => onChipClick(item)}
+                  >
+                    <Icon size={16} className="mdial-chip__icon" />
+                    <span className="mdial-chip__label">{item.label}</span>
+                    {item.badge && <span className="mdial-chip__badge">{item.badge}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -184,7 +387,7 @@ export default function InternalLayout() {
     <WysiwygProvider>
       <div className="internal-layout">
         <InternalSidebar />
-        <MobileInternalNav />
+        <MobileDialNav />
         <div className="internal-layout__content">
           <ErrorBoundary key={location.pathname}>
             <Suspense fallback={<InternalPageFallback />}>
