@@ -581,6 +581,276 @@
   opacity: 0.7;
 }
 
+/* ============================================================
+ * 手机端卡片列表 + 详情抽屉
+ * 桌面端默认隐藏；在 @media (max-width: 768px) 里显示，并隐藏表格。
+ * ============================================================ */
+.sug-mobile-list {
+  display: none;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  /* 「不要太宽」：即便在大屏手机 / 平板竖屏也保持一列窄卡片。 */
+  max-width: 560px;
+  flex-direction: column;
+  gap: var(--space-sm);
+}
+
+.sug-mobile-list__item {
+  margin: 0;
+}
+
+.sug-mobile-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  background: var(--color-bg-card);
+  text-align: left;
+  cursor: pointer;
+  transition: border-color var(--transition-fast), transform var(--transition-fast);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sug-mobile-card:active {
+  transform: scale(0.99);
+  border-color: var(--color-primary);
+}
+
+/* 具体建议：卡片主角，最多三行截断 */
+.sug-mobile-card__content {
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--color-text);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.sug-mobile-card__meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sug-mobile-card__proposer {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.sug-mobile-card__status {
+  padding: 1px 9px;
+  border-radius: var(--radius-full);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sug-mobile-card__status--done { background: rgba(39, 174, 96, 0.1); color: var(--color-success); }
+.sug-mobile-card__status--wip { background: rgba(243, 156, 18, 0.1); color: #d4920a; }
+.sug-mobile-card__status--skip { background: rgba(127, 140, 141, 0.1); color: var(--color-text-muted); }
+
+.sug-mobile-card__plus {
+  margin-left: auto;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* 详情抽屉：从底部滑出 */
+.sug-mobile-detail-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(0, 0, 0, 0.4);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  animation: sug-detail-fade 0.18s ease;
+}
+
+@keyframes sug-detail-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sug-mobile-detail {
+  width: 100%;
+  max-width: 560px;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-bg-card);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  box-shadow: var(--shadow-lg);
+  animation: sug-detail-up 0.22s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@keyframes sug-detail-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.sug-mobile-detail__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-sm);
+  padding: var(--space-md) var(--space-lg);
+  border-bottom: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.sug-mobile-detail__heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.sug-mobile-detail__heading svg {
+  color: var(--color-primary);
+}
+
+.sug-mobile-detail__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sug-mobile-detail__close:active {
+  background: var(--color-bg);
+}
+
+.sug-mobile-detail__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-md);
+  padding: var(--space-lg);
+  overflow-y: auto;
+}
+
+.sug-mobile-detail__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-md);
+}
+
+.sug-mobile-detail__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.sug-mobile-detail__label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: var(--color-text-muted);
+}
+
+.sug-mobile-detail__content {
+  font-size: var(--text-sm);
+  line-height: 1.55;
+  color: var(--color-text);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.sug-mobile-detail__value {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
+.sug-mobile-detail__plus-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sug-mobile-detail__supporters {
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.sug-mobile-detail__reason {
+  display: flex;
+  align-items: flex-start;
+  gap: 5px;
+  padding: 6px 10px;
+  border-radius: var(--radius-sm);
+  background: rgba(243, 156, 18, 0.06);
+  border: 1px solid rgba(243, 156, 18, 0.12);
+  font-size: var(--text-sm);
+  color: #b07d0a;
+  line-height: 1.45;
+}
+
+.sug-mobile-detail__reason svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+.sug-mobile-detail__footer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-md);
+  padding: var(--space-md) var(--space-lg);
+  border-top: 1px solid var(--color-border-light);
+  flex-shrink: 0;
+}
+
+.sug-mobile-detail__btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.sug-mobile-detail__btn--wide {
+  flex: 2;
+}
+
+.sug-mobile-detail__delete {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0.5rem 0.9rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-danger, #c0392b);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.sug-mobile-detail__delete:active {
+  background: rgba(192, 57, 43, 0.08);
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .suggestions-page {
@@ -596,12 +866,9 @@
     flex-direction: column;
   }
 
-  .sug-table-wrap {
-    margin: 0 calc(-1 * var(--space-md));
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-  }
+  /* 手机端：隐藏横向滚动表格，改用卡片列表 */
+  .sug-table-wrap { display: none; }
+  .sug-mobile-list { display: flex; }
 }
 
 @media (max-width: 480px) {

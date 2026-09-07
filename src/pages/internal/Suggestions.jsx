@@ -40,6 +40,9 @@ export default function Suggestions() {
 
   const [editingSuggestion, setEditingSuggestion] = useState(null);
   const [editingSuggestionId, setEditingSuggestionId] = useState(null);
+  // 手机端「建设建议」不再用横向滚动表格，而是一列卡片：显示具体建议 + 提出人，
+  // 点击某张卡片把它的 id 记到这里，弹出可查看/编辑的详情面板。
+  const [mobileDetailId, setMobileDetailId] = useState(null);
   const [isListening, setIsListening] = useState(false);
   const recognitionRef = useRef(null);
 
@@ -189,6 +192,83 @@ export default function Suggestions() {
     });
     setEditingSuggestionId(null);
   };
+
+  // ——— 手机端详情面板复用的编辑逻辑（与表格里的两处内联保存等价）———
+  // 进入编辑：拷贝一份到 editingSuggestion，并记录正在编辑的 id。
+  const startEditSuggestion = (sug) => {
+    setEditingSuggestionId(sug.id);
+    setEditingSuggestion({ ...sug });
+  };
+  const cancelEditSuggestion = () => {
+    setEditingSuggestionId(null);
+    setEditingSuggestion(null);
+  };
+  // 保存编辑：沿用表格里两处内联保存的口径（更新 statusUpdatedAt、状态变更时发通知）。
+  const saveEditedSuggestion = () => {
+    const es = editingSuggestion;
+    if (!es) return;
+    const oldSug = suggestions.find((s) => s.id === es.id);
+    updateSuggestion(es.id, {
+      ...es,
+      category: es.category,
+      statusUpdatedAt: new Date().toISOString().split('T')[0],
+      statusUpdatedByAvatar: null,
+    });
+    if (oldSug && oldSug.status !== es.status) {
+      emitNotificationEvent('suggestion.status_change', {
+        summary: es.content.slice(0, 30) + (es.content.length > 30 ? '…' : ''),
+        from: oldSug.status,
+        to: es.status,
+      });
+    }
+    setEditingSuggestionId(null);
+    setEditingSuggestion(null);
+  };
+
+  // 状态胶囊的配色类（与表格 sug-table__status--* 口径一致）
+  const statusClass = (status) =>
+    status === '已完成' || status === '已修复'
+      ? 'done'
+      : status === '处理中' || status === '修复中'
+        ? 'wip'
+        : 'skip';
+
+  // 关闭详情面板：若正在编辑这一条，先取消编辑，避免遗留半途状态。
+  const closeMobileDetail = () => {
+    if (editingSuggestionId && editingSuggestionId === mobileDetailId) cancelEditSuggestion();
+    setMobileDetailId(null);
+  };
+
+  // 渲染一个分区的手机端卡片列表（website / organization 复用）
+  const renderMobileList = (sugs) => (
+    <ul className="sug-mobile-list">
+      {sugs.map((sug) => {
+        const supporters = sug.supporters || [];
+        return (
+          <li key={sug.id} className="sug-mobile-list__item">
+            <button
+              type="button"
+              className="sug-mobile-card"
+              onClick={() => setMobileDetailId(sug.id)}
+            >
+              <span className="sug-mobile-card__content">{sug.content}</span>
+              <span className="sug-mobile-card__meta">
+                <span className="sug-mobile-card__proposer">
+                  <User size={12} /> {sug.proposer || '—'}
+                </span>
+                <span className={`sug-mobile-card__status sug-mobile-card__status--${statusClass(sug.status)}`}>
+                  {sug.status}
+                </span>
+                {supporters.length > 0 && (
+                  <span className="sug-mobile-card__plus">+1 · {supporters.length}</span>
+                )}
+              </span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
 
   // 渲染"新建建议"表单（内嵌到对应的 section 中）
   const renderAddForm = (category) => {
@@ -572,6 +652,8 @@ export default function Suggestions() {
               <span>暂无网站建设相关建议</span>
             </div>
           )}
+          {/* 手机端卡片列表（桌面端由 CSS 隐藏，与表格互斥展示） */}
+          {websiteSugs.length > 0 && renderMobileList(websiteSugs)}
         </div>
 
         {/* ============ 组织建设相关 ============ */}
@@ -794,9 +876,236 @@ export default function Suggestions() {
               <span>暂无组织建设相关建议</span>
             </div>
           )}
+          {/* 手机端卡片列表（桌面端由 CSS 隐藏，与表格互斥展示） */}
+          {orgSugs.length > 0 && renderMobileList(orgSugs)}
         </div>
       </div>
       </div>
+
+      {/* 手机端建议详情面板（底部抽屉）：点击卡片后弹出，查看全部字段；
+          可 +1、编辑、删除。编辑复用 startEditSuggestion / saveEditedSuggestion。 */}
+      {(() => {
+        const sug = mobileDetailId ? suggestions.find((s) => s.id === mobileDetailId) : null;
+        if (!sug) return null;
+        const isEditing = editingSuggestionId === sug.id && editingSuggestion;
+        const supporters = sug.supporters || [];
+        const supportedByMe = supporters.some((s) => s.name === currentUserName);
+        const reasonLabel = sug.status === '暂时不做' ? '原因说明' : '搁置原因';
+        return (
+          <div className="sug-mobile-detail-overlay" onClick={closeMobileDetail}>
+            <div
+              className="sug-mobile-detail"
+              role="dialog"
+              aria-modal="true"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="sug-mobile-detail__header">
+                <h3 className="sug-mobile-detail__heading">
+                  {sug.category === 'organization' ? <Users size={16} /> : <Monitor size={16} />}
+                  {sug.category === 'organization' ? '组织建议' : '网站建议'}
+                </h3>
+                <button
+                  type="button"
+                  className="sug-mobile-detail__close"
+                  onClick={closeMobileDetail}
+                  aria-label="关闭"
+                >
+                  <X size={20} />
+                </button>
+              </div>
+
+              {isEditing ? (
+                <div className="sug-mobile-detail__body">
+                  <div className="suggestions-page__field">
+                    <div className="suggestions-page__label-row">
+                      <label>具体建议</label>
+                      <button
+                        type="button"
+                        className={`suggestions-page__voice-btn-inline${isListening ? ' suggestions-page__voice-btn-inline--active' : ''}`}
+                        onClick={() => toggleVoiceInput('content')}
+                        title={isListening ? '停止语音输入' : '点击开始语音输入'}
+                      >
+                        {isListening ? <MicOff size={14} /> : <Mic size={14} />}
+                        <span>{isListening ? '停止录音' : '语音输入'}</span>
+                      </button>
+                    </div>
+                    <textarea
+                      value={editingSuggestion.content}
+                      onChange={(e) => setEditingSuggestion({ ...editingSuggestion, content: e.target.value })}
+                      className="suggestions-page__input suggestions-page__textarea"
+                      rows={3}
+                    />
+                  </div>
+                  <div className="suggestions-page__field">
+                    <label>提出人</label>
+                    <input
+                      type="text"
+                      value={editingSuggestion.proposer}
+                      onChange={(e) => setEditingSuggestion({ ...editingSuggestion, proposer: e.target.value })}
+                      className="suggestions-page__input"
+                    />
+                  </div>
+                  <div className="suggestions-page__field">
+                    <label>当前状态</label>
+                    <CustomSelect
+                      value={editingSuggestion.status}
+                      onChange={(val) => setEditingSuggestion({ ...editingSuggestion, status: val })}
+                      options={getStatusOptions(editingSuggestion.category)}
+                      placeholder="请选择状态"
+                      allowClear
+                    />
+                  </div>
+                  <div className="suggestions-page__field">
+                    <label>负责人</label>
+                    <CustomSelect
+                      value={editingSuggestion.resolver}
+                      onChange={(val) => setEditingSuggestion({ ...editingSuggestion, resolver: val })}
+                      options={authorizedUsers}
+                      placeholder="选择负责人"
+                      allowClear
+                    />
+                  </div>
+                  <div className="suggestions-page__field">
+                    <label>状态更新人</label>
+                    <input
+                      type="text"
+                      value={editingSuggestion.statusUpdatedBy}
+                      onChange={(e) => setEditingSuggestion({ ...editingSuggestion, statusUpdatedBy: e.target.value })}
+                      className="suggestions-page__input"
+                      placeholder="谁更新了这个状态"
+                    />
+                  </div>
+                  {(editingSuggestion.status === '暂时搁置' || editingSuggestion.status === '暂时不做') && (
+                    <div className="suggestions-page__field">
+                      <label><AlertCircle size={14} /> {editingSuggestion.status === '暂时不做' ? '原因说明' : '搁置原因'}</label>
+                      <textarea
+                        value={editingSuggestion.skipReason}
+                        onChange={(e) => setEditingSuggestion({ ...editingSuggestion, skipReason: e.target.value })}
+                        className="suggestions-page__input suggestions-page__textarea"
+                        rows={2}
+                      />
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="sug-mobile-detail__body">
+                  <div className="sug-mobile-detail__field">
+                    <label className="sug-mobile-detail__label">具体建议</label>
+                    <div className="sug-mobile-detail__content">{sug.content}</div>
+                  </div>
+                  <div className="sug-mobile-detail__field">
+                    <label className="sug-mobile-detail__label">提出人</label>
+                    <div className="sug-mobile-detail__value">
+                      <User size={13} /> {sug.proposer || '—'}
+                    </div>
+                  </div>
+                  <div className="sug-mobile-detail__field">
+                    <label className="sug-mobile-detail__label">支持（+1）</label>
+                    <div className="sug-mobile-detail__plus-row">
+                      <button
+                        type="button"
+                        className={`sug-table__plus-one${supportedByMe ? ' sug-table__plus-one--active' : ''}`}
+                        onClick={() => handlePlusOne(sug.id)}
+                        title={supportedByMe ? '取消 +1' : '+1 支持这个建议'}
+                      >
+                        <span>+1</span>
+                        {supporters.length > 0 && (
+                          <span className="sug-table__plus-one-count">{supporters.length}</span>
+                        )}
+                      </button>
+                      {supporters.length > 0 && (
+                        <span className="sug-mobile-detail__supporters">
+                          {supporters.map((s) => s.name).join('、')}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <div className="sug-mobile-detail__grid">
+                    <div className="sug-mobile-detail__field">
+                      <label className="sug-mobile-detail__label">当前状态</label>
+                      <div>
+                        <span className={`sug-table__status sug-table__status--${statusClass(sug.status)}`}>
+                          {sug.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="sug-mobile-detail__field">
+                      <label className="sug-mobile-detail__label">负责人</label>
+                      <div className="sug-mobile-detail__value">
+                        {sug.resolver || <span className="sug-table__empty">未指派</span>}
+                      </div>
+                    </div>
+                    <div className="sug-mobile-detail__field">
+                      <label className="sug-mobile-detail__label">提出时间</label>
+                      <div className="sug-mobile-detail__value">{sug.createdAt || '—'}</div>
+                    </div>
+                    <div className="sug-mobile-detail__field">
+                      <label className="sug-mobile-detail__label">状态更新</label>
+                      <div className="sug-mobile-detail__value">
+                        {sug.statusUpdatedAt || '—'}
+                        {sug.statusUpdatedBy && ` · by ${sug.statusUpdatedBy}`}
+                      </div>
+                    </div>
+                  </div>
+                  {sug.skipReason && (sug.status === '暂时搁置' || sug.status === '暂时不做') && (
+                    <div className="sug-mobile-detail__field">
+                      <label className="sug-mobile-detail__label">{reasonLabel}</label>
+                      <div className="sug-mobile-detail__reason">
+                        <AlertCircle size={13} /> {sug.skipReason}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="sug-mobile-detail__footer">
+                {isEditing ? (
+                  <>
+                    <button
+                      type="button"
+                      className="btn btn-ghost sug-mobile-detail__btn"
+                      onClick={cancelEditSuggestion}
+                    >
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary sug-mobile-detail__btn"
+                      disabled={!editingSuggestion.content.trim() || !editingSuggestion.proposer.trim()}
+                      onClick={saveEditedSuggestion}
+                    >
+                      <Save size={15} /> 保存
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      type="button"
+                      className="sug-mobile-detail__delete"
+                      onClick={() => {
+                        if (window.confirm('确定删除这条建议吗？')) {
+                          const id = sug.id;
+                          setMobileDetailId(null);
+                          deleteSuggestion(id);
+                        }
+                      }}
+                    >
+                      <Trash2 size={15} /> 删除
+                    </button>
+                    <button
+                      type="button"
+                      className="btn btn-primary sug-mobile-detail__btn sug-mobile-detail__btn--wide"
+                      onClick={() => startEditSuggestion(sug)}
+                    >
+                      <Pencil size={15} /> 编辑
+                    </button>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 }
