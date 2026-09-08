@@ -208,11 +208,20 @@ export default function Timeline() {
     };
   }, [loadMembers]);
 
+  // 手机端时间轴是纵向布局（见 Timeline.css 的 max-width: 768px 块），
+  // 轨道不再横向滚动。所有横向滚动/拖拽逻辑都先用这个判断兜底，
+  // 避免在竖版下拦截手势或做无意义的 scrollLeft 写入。
+  const isHorizontallyScrollable = () => {
+    const el = trackRef.current;
+    return !!el && el.scrollWidth > el.clientWidth + 1;
+  };
+
   const checkScroll = useCallback(() => {
     const el = trackRef.current;
     if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 10);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+    const scrollable = el.scrollWidth > el.clientWidth + 1;
+    setCanScrollLeft(scrollable && el.scrollLeft > 10);
+    setCanScrollRight(scrollable && el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
   }, []);
 
   useEffect(() => {
@@ -241,6 +250,7 @@ export default function Timeline() {
 
   const handleMouseDown = (e) => {
     if (isTouchDevice) return;
+    if (!isHorizontallyScrollable()) return;
     const el = trackRef.current;
     if (!el) return;
     setIsDragging(true);
@@ -272,6 +282,8 @@ export default function Timeline() {
   const handleWheel = (e) => {
     const el = trackRef.current;
     if (!el) return;
+    // 竖版（手机端）下轨道没有横向可滚动空间，直接放行给页面滚动
+    if (!isHorizontallyScrollable()) return;
 
     const absX = Math.abs(e.deltaX);
     const absY = Math.abs(e.deltaY);

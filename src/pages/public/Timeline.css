@@ -497,6 +497,7 @@
   color: var(--color-text-light);
 }
 
+
 /* ============ Responsive ============ */
 @media (max-width: 768px) {
   .timeline-hero { padding: 48px 0 32px; }
@@ -511,44 +512,142 @@
     padding-top: var(--space-md);
   }
 
-  .timeline__arrow { display: none; }
-
-  .timeline__track {
-    /* 手机端：内容更容易换行，单侧高度反而可能需要比桌面更多
-       （卡片变窄后描述行数会增加）。把变量上调到 300px 保平安。 */
-    --tl-slot-h: 300px;
-    --tl-card-w: 260px;
-    --tl-card-h: 205px;
-    padding: var(--tl-slot-h) 1.5rem;
-    /* 手机端把渐隐区加宽，避免下一张卡片在屏幕右缘露出一条硬边，
-       看起来像一个竖向悬浮按钮。 */
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 48px,
-      #000 calc(100% - 48px),
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 48px,
-      #000 calc(100% - 48px),
-      transparent 100%
-    );
+  /* 手机端把时间轴区域的左右留白收窄一些：
+     竖版时间轴要把一行分成"左卡片 / 竖线 / 右卡片"三段，
+     每张卡片只有半幅可用，多出来的这点宽度对可读性帮助很大。
+     用 .timeline .timeline__container 提高优先级，确保能盖住
+     全局 .container 的 padding 简写。 */
+  .timeline .timeline__container {
+    padding-left: 1rem;
+    padding-right: 1rem;
   }
 
+  /* 横向滚动相关控件在竖版下没有意义 */
+  .timeline__arrow { display: none; }
+  .timeline__hint { display: none; }
+
+  /* ---------- 手机端：横向时间轴 → 纵向时间轴 ----------
+     中间一条竖线，卡片按 旧 → 新 从上到下排列，
+     左右交替（偶数项在左、奇数项在右），
+     圆点钉在竖线上、与对应卡片垂直居中对齐。 */
+  .timeline__track {
+    /* --tl-dot：圆点直径
+       --tl-gutter：竖线到卡片外边框的水平距离（需 > 圆点半径）
+       --tl-connector：卡片与竖线之间那截短横线的长度 */
+    --tl-dot: 32px;
+    --tl-gutter: 20px;
+    --tl-connector: 12px;
+
+    display: block;
+    /* 不再横向滚动 → 恢复默认 overflow，卡片可以自由撑高 */
+    overflow: visible;
+    padding: 0;
+    cursor: default;
+    touch-action: auto;
+    /* 横向渐隐蒙版会把左右两侧的卡片边缘吃掉，竖版下必须去掉 */
+    -webkit-mask-image: none;
+    mask-image: none;
+  }
+
+  .timeline__track-inner {
+    display: block;
+    width: 100%;
+    min-width: 0;
+  }
+
+  /* 竖线 */
+  .timeline__line {
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    right: auto;
+    width: 2px;
+    height: auto;
+    min-width: 0;
+    transform: translateX(-50%);
+  }
+
+  /* 每个节点占一整行；用 margin 而非 padding 拉开间距，
+     这样 top: 50% 的圆点正好落在卡片的垂直中心。 */
   .timeline__item {
-    width: 100vw;
-    min-width: 100vw;
+    display: block;
+    width: 100%;
+    min-width: 0;
+    margin-bottom: var(--space-xl);
+  }
+
+  .timeline__item:last-child {
+    margin-bottom: 0;
+  }
+
+  /* 卡片容器回到文档流，占半幅宽度 */
+  .timeline__card-wrapper {
+    position: static;
+    left: auto;
+    right: auto;
+    top: auto;
+    bottom: auto;
+    transform: none;
+    width: calc(50% - var(--tl-gutter));
+    flex-direction: row;
+    align-items: center;
+    overflow: visible;
+  }
+
+  /* 偶数项（桌面端的"上方卡片"）→ 靠左，连接线在卡片右侧 */
+  .timeline__card-wrapper--top {
+    margin-right: auto;
+    flex-direction: row-reverse;
+  }
+
+  /* 奇数项（桌面端的"下方卡片"）→ 靠右，连接线在卡片左侧 */
+  .timeline__card-wrapper--bottom {
+    margin-left: auto;
+    flex-direction: row;
+  }
+
+  /* 连接线由竖向短线改为横向短线 */
+  .timeline__connector {
+    width: var(--tl-connector);
+    height: 2px;
   }
 
   .timeline__card {
-    padding: var(--space-md);
+    flex: 1 1 auto;
+    width: auto;
+    min-width: 0;
+    /* 高度交给内容决定，避免窄卡片里文字被裁掉 */
+    height: auto;
+    padding: var(--space-md) var(--space-sm);
+    text-align: left;
   }
 
-  .timeline__card-wrapper {
-    overflow: visible;
+  /* 圆点：绝对定位到竖线上 */
+  .timeline__dot {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    width: var(--tl-dot);
+    height: var(--tl-dot);
+  }
+
+  .timeline__item:hover .timeline__dot {
+    transform: translate(-50%, -50%) scale(1.15);
+  }
+
+  /* 半幅宽度下字号需要相应收一档，并且不再两端对齐
+     （窄栏两端对齐会出现大片字间空隙） */
+  .timeline__title {
+    font-size: var(--text-sm);
+    line-height: 1.45;
+  }
+
+  .timeline__desc {
+    font-size: var(--text-xs);
+    line-height: 1.6;
+    text-align: left;
+    text-align-last: left;
   }
 
   .members__grid {
@@ -570,44 +669,24 @@
     padding-top: var(--space-sm);
   }
 
+  /* 超小屏：圆点、间距再收紧一点，把宽度留给文字 */
   .timeline__track {
-    /* 超小屏（<=480px）：容器更窄，卡片描述可能再多一行。
-       保守设 310px，与手机端基本持平即可。 */
-    --tl-slot-h: 310px;
-    --tl-card-w: 248px;
-    --tl-card-h: 210px;
-    padding: var(--tl-slot-h) 1rem;
-    -webkit-mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 48px,
-      #000 calc(100% - 48px),
-      transparent 100%
-    );
-    mask-image: linear-gradient(
-      to right,
-      transparent 0,
-      #000 48px,
-      #000 calc(100% - 48px),
-      transparent 100%
-    );
+    --tl-dot: 28px;
+    --tl-gutter: 18px;
+    --tl-connector: 10px;
   }
 
   .timeline__item {
-    width: 100vw;
-    min-width: 100vw;
+    margin-bottom: var(--space-lg);
   }
 
   .timeline__card {
-    padding: var(--space-sm) var(--space-md);
+    padding: var(--space-sm) var(--space-sm);
   }
 
-  .timeline__card-wrapper {
-    overflow: visible;
+  .timeline__year {
+    padding: 1px 8px;
   }
-
-  .timeline__title { font-size: var(--text-base); }
-  .timeline__desc { font-size: var(--text-sm); }
 
   .members__grid {
     grid-template-columns: 1fr;
