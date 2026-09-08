@@ -892,10 +892,11 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     if (!user) return;
     const target = documents.find((d) => String(d.id) === String(docId));
     if (!target) return;
+    // 只存 userId + userName：卡片/详情页从不渲染点赞者头像，
+    // 存 base64 头像会让 documents 行和列表查询急剧膨胀（见 documentsService.sanitizeLikes）。
     const likeData = {
       userId: user.id,
       userName: user.name || user.nickname || user.email,
-      userAvatar: user.avatar || null,
     };
     const currentLikes = Array.isArray(target.likes) ? target.likes : [];
     const alreadyLiked = currentLikes.some((l) => l.userId === user.id);

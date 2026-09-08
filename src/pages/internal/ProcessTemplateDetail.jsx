@@ -986,10 +986,10 @@ export default function ProcessTemplateDetail() {
 
   const handleLike = useCallback(() => {
     if (!doc || !user) return;
+    // 只存 userId + userName：点赞者头像从不渲染，存 base64 会撑大文档行拖慢列表。
     const likeInfo = {
       userId: user.id,
       userName: user.name || user.nickname || user.email,
-      userAvatar: user.avatar || null,
     };
     let nextLikes;
     if (liked) {

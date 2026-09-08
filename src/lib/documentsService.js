@@ -72,6 +72,19 @@ function parseViewTargetKey(key, targetType = DEFAULT_VIEW_TARGET_TYPE) {
 /* ============ Row ↔ Doc 对象互转 ============ */
 // 数据库列名（snake_case）与前端字段（camelCase）互转
 
+/**
+ * 点赞瘦身：卡片/详情页只用 userId 计数 + userName 显示名字，从不渲染点赞者头像。
+ * 但历史 handleLike 把整段 base64 头像（user.avatar）塞进了 likes 数组，导致
+ * documents 行体积膨胀——而列表查询会一次性拉取所有文档的 likes 列，直接拖慢首屏。
+ * 读、写两侧都过一遍这个函数：既阻断新的头像写入，也让旧数据在下一次保存时被清理。
+ */
+function sanitizeLikes(likes) {
+  if (!Array.isArray(likes)) return [];
+  return likes
+    .filter((l) => l && l.userId != null)
+    .map((l) => ({ userId: l.userId, userName: l.userName ?? '' }));
+}
+
 function rowToDoc(row) {
   if (!row) return null;
   return {
@@ -98,7 +111,7 @@ function rowToDoc(row) {
         : [],
     date: row.date || '',
     viewCount: row.view_count || 0,
-    likes: Array.isArray(row.likes) ? row.likes : [],
+    likes: sanitizeLikes(row.likes),
     lastEditedAt: row.last_edited_at || null,
     lastEditedBy: row.last_edited_by || null,
     _updatedAt: row.updated_at || row.created_at || null,
@@ -130,7 +143,7 @@ function docToRow(doc) {
       : doc.uploadedById ? [doc.uploadedById] : [],
     date: doc.date || new Date().toISOString().split('T')[0],
     view_count: doc.viewCount || 0,
-    likes: Array.isArray(doc.likes) ? doc.likes : [],
+    likes: sanitizeLikes(doc.likes),
     last_edited_at: doc.lastEditedAt || null,
     last_edited_by: doc.lastEditedBy || null,
   };
@@ -646,7 +659,7 @@ export async function updateDoc(id, patch) {
     if ('attachments' in patch) update.attachments = patch.attachments;
     if ('fileType' in patch) update.file_type = patch.fileType;
     if ('fileUrl' in patch) update.file_url = patch.fileUrl;
-    if ('likes' in patch) update.likes = patch.likes;
+    if ('likes' in patch) update.likes = sanitizeLikes(patch.likes);
     if ('contributorIds' in patch) update.contributor_ids = patch.contributorIds;
     if ('uploadedBy' in patch) update.uploaded_by = patch.uploadedBy;
     if ('uploadedById' in patch) update.uploaded_by_id = patch.uploadedById;
