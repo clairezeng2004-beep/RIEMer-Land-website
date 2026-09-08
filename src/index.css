@@ -64,15 +64,20 @@
   /* 晕染强度：想整体更淡/更浓，只改这一个数即可（0 = 回到纯色底） */
   --wash-strength: 1;
 
-  /* 水彩纸的斑驳感：一张 1200×1200 的 SVG 分形噪声瓦片，用 feColorMatrix
-     把噪声的 R 通道映射成"绿色 + 极低 alpha"（峰值约 10%），再平铺满屏。
+  /* 水彩纸的斑驳感：一张 SVG 分形噪声图，用 feColorMatrix 把噪声的 R 通道
+     映射成"绿色 + 极低 alpha"（峰值约 10%），铺满整屏。
      纯渐变的底色再柔和也是"数学上的光滑"，一眼就看得出是 CSS；叠一层这种
      大颗粒、低对比的云状斑驳之后，才有水彩在纸上洇开的手感——也就是参考图里
      那种深浅不匀的层次。
-     stitchTiles='stitch' 让相邻瓦片的噪声在接缝处连续，不会出现网格状拼接痕。
-     整张图只栅格化一次然后平铺，开销可以忽略。 */
+     关键：只写 viewBox 且 preserveAspectRatio='none'，不写 width / height。
+     这样这张图既没有固有尺寸也没有固有宽高比，background-size: auto 会让它
+     正好拉满整个背景区域——**只有一张、不平铺**，也就不可能出现瓦片接缝。
+     （若保留 width/height，它就会按 1200px 平铺，在更宽的屏幕上要靠
+     stitchTiles 缝合，多一层不确定性。云状纹理被拉伸看不出来，反而能随
+     视口一起放大，大屏上构图比例保持不变。）
+     整张图只栅格化一次，开销可以忽略。 */
   --page-mottle:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1200'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004' numOctaves='5' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.33 0 0 0 0 0.56 0 0 0 0 0.28 0.15 0 0 0 -0.055'/%3E%3C/filter%3E%3Crect width='1200' height='1200' filter='url(%23m)'/%3E%3C/svg%3E");
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1200 1200' preserveAspectRatio='none'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004' numOctaves='5' seed='11'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.33 0 0 0 0 0.56 0 0 0 0 0.28 0.15 0 0 0 -0.055'/%3E%3C/filter%3E%3Crect width='1200' height='1200' filter='url(%23m)'/%3E%3C/svg%3E");
 
   /* 主背景层，自下而上分两部分：
      1) 一道 155° 的斜向底色，暖（槐花黄绿）→ 中性（艾背绿）→ 冷（嘉陵水绿 / 青蓝），
@@ -260,10 +265,24 @@ body::after {
 }
 
 body::before {
-  /* 斑驳层压在渐变之上（background-image 列表里越靠前越靠上） */
+  /* 斑驳层压在渐变之上（background-image 列表里越靠前越靠上）。
+     这里刻意不写 background-size / background-repeat：
+     本元素一共有 8 个背景层（1 层斑驳 + --page-wash 里的 7 团渐变），
+     而这两个属性接受的是**逐层列表**，写不满时 CSS 会把短列表循环补齐。
+     曾经写成 `repeat, no-repeat` / `1200px 1200px, cover` 两个值，循环之后
+     第 2、4、6 团渐变拿到了 `1200px 1200px + repeat`——于是它们每 1200px
+     平铺一次，在宽于 1200px 的屏幕上切出一条竖直的硬边（手机端窗口比一块
+     瓦片还窄，所以只有电脑端能看到）。
+     教训：background-size / background-repeat 是**逐层列表**，要么写满每一层，
+     要么只写一个值让它统一套用；写"两个值"是最容易出错的中间状态。
+     现在两个属性各只写**一个**值：单值会原样套用到每一层，不存在"循环补齐"
+     这回事，因此与背景层的数量彻底解耦——以后往 --page-wash 里增删渐变，
+     这里都不用跟着改。
+     no-repeat 从根上杜绝平铺（也就杜绝接缝）；cover 对没有固有宽高比的图
+     （渐变、以及下面这张只有 viewBox 的斑驳图）就是"正好铺满定位区域"。 */
   background-image: var(--page-mottle), var(--page-wash);
-  background-repeat: repeat, no-repeat;
-  background-size: 1200px 1200px, cover;
+  background-repeat: no-repeat;
+  background-size: cover;
 }
 
 /* 漂移层放得更靠后一层，并向四周外扩，

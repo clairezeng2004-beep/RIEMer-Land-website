@@ -4,10 +4,14 @@
   left: 0;
   right: 0;
   z-index: 1000;
-  /* 半透明 + 毛玻璃：顶栏不再是一条与页面割裂的实色横条，
-     背后的水彩晕染会淡淡透上来，滚动时颜色随之流动。
-     backdrop-filter 不支持时（老浏览器）退化成这层半透明白，仍然可读。 */
-  background: rgba(250, 252, 247, 0.62);
+  /* 未滚动时完全透明：顶栏底下就是页面的水彩背景，只要给它任何一点自己的
+     底色，都会在 72px 处切出一条横向色带边——正是"配色分割线"的观感。
+     滚到内容上方后才淡入毛玻璃白底（.navbar--scrolled），那时它需要挡住
+     下面滚过的文字，边界配合 border + shadow 读起来是"悬浮条"而不是"接缝"。
+     backdrop-filter 两个状态都保留：一是切换时不会突兀，二是它会让本元素
+     成为固定定位后代的包含块，保持在两个状态下行为一致（手机端下拉菜单
+     .navbar__links 是 fixed 定位的后代）。 */
+  background: transparent;
   backdrop-filter: saturate(150%) blur(14px);
   -webkit-backdrop-filter: saturate(150%) blur(14px);
   transition: background 0.25s ease,
