@@ -356,12 +356,39 @@
     gap: var(--space-md);
   }
 
-  /* 手机端隐藏卡片封面图，只保留文字 */
-  .article-card__cover { display: none; }
+  /* 手机端卡片改为横向：左文字、右小封面 */
+  .article-card {
+    flex-direction: row;
+    align-items: flex-start;
+    gap: var(--space-md);
+    padding: var(--space-md);
+  }
+
+  /* order 让 DOM 里在前面的封面视觉上排到右侧，无需改动结构 */
+  .article-card__cover {
+    order: 2;
+    width: 96px;
+    aspect-ratio: 1 / 1;
+    border-radius: var(--radius-md);
+    align-self: flex-start;
+  }
+
+  /* 横向卡片里不做 hover 缩放，避免小图裁切过多 */
+  .article-card:hover .article-card__cover-img {
+    transform: none;
+  }
+
+  .article-card__cover-placeholder svg {
+    width: 22px;
+    height: 22px;
+  }
 
   .article-card__body {
-    padding: var(--space-lg);
+    order: 1;
+    padding: 0;
     gap: var(--space-sm);
+    /* flex 子项默认 min-width:auto，长标题会把文字列撑开挤走封面 */
+    min-width: 0;
   }
 
   .article-card__avatar {
@@ -413,8 +440,17 @@
     gap: var(--space-sm);
   }
 
+  .article-card {
+    gap: var(--space-sm);
+    padding: var(--space-sm);
+  }
+
+  .article-card__cover {
+    width: 78px;
+  }
+
   .article-card__body {
-    padding: var(--space-md);
+    padding: 0;
     gap: var(--space-xs);
   }
 
