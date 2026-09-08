@@ -356,21 +356,39 @@
     gap: var(--space-md);
   }
 
-  /* 手机端卡片改为横向：左文字、右小封面 */
+  /* 手机端卡片：横线以上左文右图，横线以下（日期 + 阅读全文）横跨整张卡片 */
   .article-card {
-    flex-direction: row;
-    align-items: flex-start;
-    gap: var(--space-md);
+    display: grid;
+    /* minmax(0,1fr)：网格子项默认 min-width:auto，长标题会把文字列撑开挤走封面 */
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: var(--space-md);
+    row-gap: var(--space-sm);
     padding: var(--space-md);
   }
 
-  /* order 让 DOM 里在前面的封面视觉上排到右侧，无需改动结构 */
+  /* body 不再承担布局，标题/摘要/标签/底栏直接参与卡片网格，
+     底栏才能跨出文字列、和改动前一样占满整张卡片宽度 */
+  .article-card__body {
+    display: contents;
+  }
+
+  .article-card__title { grid-column: 1; grid-row: 1; }
+  .article-card__excerpt { grid-column: 1; grid-row: 2; }
+  .article-card__tags { grid-column: 1; grid-row: 3; }
+
+  /* 封面缩略图只占右列的横线以上部分 */
   .article-card__cover {
-    order: 2;
+    grid-column: 2;
+    grid-row: 1 / 4;
     width: 96px;
     aspect-ratio: 1 / 1;
     border-radius: var(--radius-md);
-    align-self: flex-start;
+    align-self: start;
+  }
+
+  .article-card__bottom {
+    grid-column: 1 / -1;
+    grid-row: 4;
   }
 
   /* 横向卡片里不做 hover 缩放，避免小图裁切过多 */
@@ -381,14 +399,6 @@
   .article-card__cover-placeholder svg {
     width: 22px;
     height: 22px;
-  }
-
-  .article-card__body {
-    order: 1;
-    padding: 0;
-    gap: var(--space-sm);
-    /* flex 子项默认 min-width:auto，长标题会把文字列撑开挤走封面 */
-    min-width: 0;
   }
 
   .article-card__avatar {
@@ -441,17 +451,13 @@
   }
 
   .article-card {
-    gap: var(--space-sm);
+    column-gap: var(--space-sm);
+    row-gap: var(--space-xs);
     padding: var(--space-sm);
   }
 
   .article-card__cover {
     width: 78px;
-  }
-
-  .article-card__body {
-    padding: 0;
-    gap: var(--space-xs);
   }
 
   .article-card__title {
