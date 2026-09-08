@@ -356,7 +356,7 @@
     gap: var(--space-md);
   }
 
-  /* 手机端卡片：横线以上左文右图，横线以下（日期 + 阅读全文）横跨整张卡片 */
+  /* 手机端卡片：横线以上左文右图，横线以下（日期 + 标签）横跨整张卡片 */
   .article-card {
     display: grid;
     /* minmax(0,1fr)：网格子项默认 min-width:auto，长标题会把文字列撑开挤走封面 */
@@ -374,12 +374,11 @@
 
   .article-card__title { grid-column: 1; grid-row: 1; }
   .article-card__excerpt { grid-column: 1; grid-row: 2; }
-  .article-card__tags { grid-column: 1; grid-row: 3; }
 
   /* 封面缩略图只占右列的横线以上部分 */
   .article-card__cover {
     grid-column: 2;
-    grid-row: 1 / 4;
+    grid-row: 1 / 3;
     width: 96px;
     aspect-ratio: 1 / 1;
     border-radius: var(--radius-md);
@@ -388,7 +387,38 @@
 
   .article-card__bottom {
     grid-column: 1 / -1;
-    grid-row: 4;
+    grid-row: 3;
+  }
+
+  /* 手机端点整张卡片就能进详情，「阅读全文」是冗余的 */
+  .article-card__link {
+    display: none;
+  }
+
+  /* 标签挪到底栏右侧，和日期同一行；与 __bottom 同格叠放，
+     这样分隔线仍由 __bottom 画满整张卡片 */
+  .article-card__tags {
+    grid-column: 1 / -1;
+    grid-row: 3;
+    align-self: start;
+    justify-self: end;
+    /* 与 __bottom 的 padding-top 对齐，让标签和日期落在同一水平线 */
+    padding-top: var(--space-sm);
+    /* 留出日期的位置，避免宽标签压到日期上 */
+    max-width: 60%;
+    /* 换行 + 定高（20px = 标签行高 16 + 上下内边距 2×2）：
+       塞不下的标签被挤到第二行后整颗裁掉，不会出现半截标签 */
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    align-content: flex-start;
+    height: calc(20px + var(--space-sm));
+    overflow: hidden;
+  }
+
+  .article-card__tags .article-card__tag {
+    /* 单个标签不许被压扁换行，否则会撑成两行被裁成半截 */
+    flex-shrink: 0;
+    white-space: nowrap;
   }
 
   /* 横向卡片里不做 hover 缩放，避免小图裁切过多 */
@@ -429,6 +459,8 @@
   .article-card__tag {
     font-size: var(--text-xs);
     padding: 2px 6px;
+    /* 锁死行高，标签高度恒为 20px，配合 __tags 的定高裁切 */
+    line-height: 16px;
   }
 
   .article-card__meta {
