@@ -4,7 +4,12 @@
   left: 0;
   right: 0;
   z-index: 1000;
-  background: var(--color-bg);
+  /* 半透明 + 毛玻璃：顶栏不再是一条与页面割裂的实色横条，
+     背后的水彩晕染会淡淡透上来，滚动时颜色随之流动。
+     backdrop-filter 不支持时（老浏览器）退化成这层半透明白，仍然可读。 */
+  background: rgba(250, 252, 247, 0.62);
+  backdrop-filter: saturate(150%) blur(14px);
+  -webkit-backdrop-filter: saturate(150%) blur(14px);
   transition: background 0.25s ease,
               box-shadow 0.25s ease,
               border-color 0.25s ease;
@@ -12,7 +17,7 @@
 }
 
 .navbar--scrolled {
-  background: white;
+  background: rgba(255, 255, 255, 0.82);
   border-bottom-color: var(--color-border-light);
   box-shadow: var(--shadow-sm);
 }

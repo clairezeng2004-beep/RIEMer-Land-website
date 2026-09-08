@@ -37,6 +37,88 @@
   --color-border: #D4E2D5;
   --color-border-light: #E8F0E9;
 
+  /* ============================================
+     Watercolor Wash — 全站背景色彩层
+     ============================================
+     设计来源：站点 Logo（青绿→黄绿渐变的山峦）与两组中国传统绿色卡：
+       海沫绿 / 橄榄石绿 / 水绿 / 芦苇绿 / 槐花黄绿
+       艾背绿 / 嘉陵水绿 / 玉髓绿 / 鲜绿 / 宝石绿
+     这些颜色只以极低透明度的大半径径向渐变出现，叠加成"水彩晕染"的底子：
+     远看有冷暖过渡与层次，近看仍是接近白的浅色，白色卡片、正文对比度不受影响。
+     纯色变量（--color-bg 等）保持不变，因为输入框 / 表头 / 弹窗等大量组件
+     依赖它们作为**实色**填充，一旦改成渐变会到处露馅。 */
+
+  /* 传统色原色（供渐变与点缀取用，不直接刷大面积） */
+  --hue-seafoam: 220, 233, 183;   /* 海沫绿 */
+  --hue-peridot: 154, 208, 124;   /* 橄榄石绿 */
+  --hue-water: 87, 193, 90;       /* 水绿 */
+  --hue-reed: 157, 200, 94;       /* 芦苇绿 */
+  --hue-sophora: 214, 219, 92;    /* 槐花黄绿 */
+  --hue-mugwort: 219, 234, 215;   /* 艾背绿 */
+  --hue-jialing: 164, 217, 169;   /* 嘉陵水绿 */
+  --hue-chalcedony: 0, 185, 78;   /* 玉髓绿 */
+  --hue-teal: 79, 195, 199;       /* 取自 Logo 中峰的青蓝——整套配色里唯一的"冷极"，
+                                     没有它，全部色块都是绿，叠在一起只会糊成一片
+                                     没有层次的浅绿。 */
+
+  /* 晕染强度：想整体更淡/更浓，只改这一个数即可（0 = 回到纯色底） */
+  --wash-strength: 1;
+
+  /* 水彩纸的斑驳感：一张 1200×1200 的 SVG 分形噪声瓦片，用 feColorMatrix
+     把噪声的 R 通道映射成"绿色 + 极低 alpha"（峰值约 10%），再平铺满屏。
+     纯渐变的底色再柔和也是"数学上的光滑"，一眼就看得出是 CSS；叠一层这种
+     大颗粒、低对比的云状斑驳之后，才有水彩在纸上洇开的手感——也就是参考图里
+     那种深浅不匀的层次。
+     stitchTiles='stitch' 让相邻瓦片的噪声在接缝处连续，不会出现网格状拼接痕。
+     整张图只栅格化一次然后平铺，开销可以忽略。 */
+  --page-mottle:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='1200' height='1200'%3E%3Cfilter id='m' x='0' y='0' width='100%25' height='100%25'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.004' numOctaves='5' seed='11' stitchTiles='stitch'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 0.33 0 0 0 0 0.56 0 0 0 0 0.28 0.15 0 0 0 -0.055'/%3E%3C/filter%3E%3Crect width='1200' height='1200' filter='url(%23m)'/%3E%3C/svg%3E");
+
+  /* 主背景层，自下而上分两部分：
+     1) 一道 155° 的斜向底色，暖（槐花黄绿）→ 中性（艾背绿）→ 冷（嘉陵水绿 / 青蓝），
+        保证视口正中间也有颜色，不会像原来那样中间发白、只有四角有色；
+     2) 六团大半径的径向晕染压在上面，冷暖对角呼应，模拟水彩在纸上互相渗开的边界。 */
+  --page-wash:
+    radial-gradient(58vw 46vw at 2% -12%,
+      rgba(var(--hue-sophora), calc(0.40 * var(--wash-strength))) 0%,
+      rgba(var(--hue-sophora), calc(0.14 * var(--wash-strength))) 42%,
+      rgba(var(--hue-sophora), 0) 70%),
+    radial-gradient(52vw 42vw at 99% -6%,
+      rgba(var(--hue-teal), calc(0.26 * var(--wash-strength))) 0%,
+      rgba(var(--hue-teal), calc(0.09 * var(--wash-strength))) 45%,
+      rgba(var(--hue-teal), 0) 72%),
+    radial-gradient(44vw 38vw at 80% 38%,
+      rgba(var(--hue-water), calc(0.20 * var(--wash-strength))) 0%,
+      rgba(var(--hue-water), calc(0.06 * var(--wash-strength))) 48%,
+      rgba(var(--hue-water), 0) 76%),
+    radial-gradient(46vw 40vw at 14% 48%,
+      rgba(var(--hue-peridot), calc(0.20 * var(--wash-strength))) 0%,
+      rgba(var(--hue-peridot), calc(0.06 * var(--wash-strength))) 50%,
+      rgba(var(--hue-peridot), 0) 78%),
+    radial-gradient(52vw 44vw at -8% 98%,
+      rgba(var(--hue-jialing), calc(0.32 * var(--wash-strength))) 0%,
+      rgba(var(--hue-jialing), calc(0.11 * var(--wash-strength))) 46%,
+      rgba(var(--hue-jialing), 0) 74%),
+    radial-gradient(56vw 46vw at 98% 110%,
+      rgba(var(--hue-seafoam), calc(0.52 * var(--wash-strength))) 0%,
+      rgba(var(--hue-seafoam), calc(0.18 * var(--wash-strength))) 44%,
+      rgba(var(--hue-seafoam), 0) 72%),
+    linear-gradient(155deg,
+      rgba(var(--hue-sophora), calc(0.18 * var(--wash-strength))) 0%,
+      rgba(var(--hue-mugwort), calc(0.14 * var(--wash-strength))) 34%,
+      rgba(var(--hue-jialing), calc(0.14 * var(--wash-strength))) 64%,
+      rgba(var(--hue-teal), calc(0.16 * var(--wash-strength))) 100%);
+
+  /* 漂移层：两团更浓一点的色块，用 transform 极慢地平移缩放，
+     让底色"呼吸"，而不是一张钉死的图 */
+  --page-wash-drift:
+    radial-gradient(40vw 34vw at 26% 22%,
+      rgba(var(--hue-peridot), calc(0.22 * var(--wash-strength))) 0%,
+      rgba(var(--hue-peridot), 0) 68%),
+    radial-gradient(38vw 32vw at 76% 78%,
+      rgba(var(--hue-teal), calc(0.20 * var(--wash-strength))) 0%,
+      rgba(var(--hue-teal), 0) 68%);
+
   /* Accents */
   --color-accent: #D4A44C;
   --color-danger: #C0392B;
@@ -136,7 +218,9 @@ html {
 body {
   font-family: var(--font-body);
   color: var(--color-text);
-  background-color: var(--color-bg);
+  /* 背景色交给 html + body::before 水彩层承担。
+     body 这里必须保持透明，否则它的实色底会盖住 z-index: -1 的水彩伪元素。 */
+  background-color: transparent;
   line-height: 1.8;
   /* 关闭浏览器对缺失字形的"伪粗体 / 伪斜体"合成。
      LXGW WenKai 只打包了 regular 字重，如果允许合成，浏览器会把页面里所有
@@ -153,6 +237,54 @@ body {
   text-rendering: optimizeLegibility;
   /* 兜底：确保最小可滚动高度（避免某些 flex 布局里 body 被压成 0 导致滚动条消失） */
   min-height: 100vh;
+}
+
+/* ============================================
+   背景水彩层
+   ============================================
+   两个固定定位的伪元素铺满视口、置于所有内容之下（z-index: -1 / -2），
+   而不是把渐变直接写进 body 的 background：
+     1. 固定层不随页面滚动重绘，比 background-attachment: fixed 更省电，
+        移动端也不会出现 iOS Safari 上 fixed 背景的抖动/拉伸问题；
+     2. 渐变尺寸用 vw 表达，永远相对视口而不是文档总高——长页面（文档列表、
+        文章详情）才不会把晕染拉成一条条竖纹。
+   前提：body 的 background-color 必须留空，否则它会盖住 z-index: -1 的层；
+   页面底色改由 html 承担（同时兼顾移动端橡皮筋回弹时露出的颜色）。 */
+body::before,
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+body::before {
+  /* 斑驳层压在渐变之上（background-image 列表里越靠前越靠上） */
+  background-image: var(--page-mottle), var(--page-wash);
+  background-repeat: repeat, no-repeat;
+  background-size: 1200px 1200px, cover;
+}
+
+/* 漂移层放得更靠后一层，并向四周外扩，
+   这样 transform 位移时边缘不会露出没有颜色的空白。 */
+body::after {
+  z-index: -2;
+  inset: -25%;
+  background-image: var(--page-wash-drift);
+  background-repeat: no-repeat;
+  animation: pageWashDrift 44s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes pageWashDrift {
+  from { transform: translate3d(-2%, -1.5%, 0) scale(1); }
+  to   { transform: translate3d(3%, 2%, 0) scale(1.12); }
+}
+
+/* 触屏设备省电：去掉动画，保留静态色块（层次不丢） */
+@media (hover: none), (prefers-reduced-motion: reduce) {
+  body::after { animation: none; }
 }
 
 /* ============================================
@@ -485,12 +617,13 @@ input[type='number']::placeholder {
 /* Route loading skeleton */
 .route-skeleton {
   min-height: calc(100vh - 72px);
-  background: var(--color-bg);
+  /* 透明，骨架屏期间也能看到水彩背景，切换路由时不会闪一块实色 */
+  background: transparent;
 }
 
 .route-skeleton--public .route-skeleton__hero {
   padding: clamp(5rem, 11vw, 8rem) 0 clamp(3rem, 7vw, 5rem);
-  background: var(--color-bg-alt);
+  background: rgba(var(--hue-mugwort), 0.35);
 }
 
 .route-skeleton--public .route-skeleton__section {

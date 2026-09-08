@@ -59,7 +59,13 @@
 }
 
 .footer__content {
-  background: white;
+  /* 半透明白：页脚不再是硬邦邦的一块纯白，
+     底部那团海沫绿 / 玉髓绿的晕染会隐约透出来，和页面收尾衔接得上。
+     注意：这里刻意不加 backdrop-filter —— 二维码全屏遮罩
+     .footer__qrcode-overlay（position: fixed; inset: 0）是 .footer__content
+     的后代，而 backdrop-filter 会让本元素成为固定定位后代的包含块，
+     遮罩就会被压缩到页脚那一小块区域里，不再铺满全屏。 */
+  background: rgba(255, 255, 255, 0.74);
   color: var(--color-text);
   padding: var(--space-2xl) 0 var(--space-xl);
   border-top: 1px solid var(--color-border-light);

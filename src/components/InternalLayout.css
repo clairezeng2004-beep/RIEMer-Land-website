@@ -5,7 +5,9 @@
 .internal-layout {
   display: flex;
   min-height: calc(100vh - 72px);
-  background: var(--color-bg);
+  /* 透明：让 body 的水彩背景层透上来（原本这里刷实色 --color-bg，
+     会把内部空间整块盖成一片死板的浅绿）。 */
+  background: transparent;
   /* 禁用内部空间的"左右横滑到底切换 tab / 浏览器前进后退"手势：
      - overscroll-behavior-x: none：即使子容器横向滚到尽头，也不把剩余的横向滑动交给浏览器
      - touch-action: pan-y：触摸设备上仅允许纵向 pan，禁止水平 pan 触发浏览器级手势（iOS Safari 两指/边缘滑动切页等） */
@@ -23,7 +25,7 @@
      而真实纵向滚动发生在 window 上 → 结果就是 sticky 失效、目录跟着内容一起走。
      clip 只做视觉裁剪、不创建滚动容器，overflow-y 保持 visible，sticky 挂到 window 上后正常生效。 */
   overflow-x: clip;
-  background: var(--color-bg);
+  background: transparent;
   margin-left: 220px;
   overscroll-behavior-x: none;
   touch-action: auto;
@@ -33,7 +35,7 @@
   min-height: calc(100vh - 72px);
   padding: 60px clamp(1.5rem, 3vw, 2.5rem) var(--space-4xl);
   box-sizing: border-box;
-  background: var(--color-bg);
+  background: transparent;
 }
 
 .internal-page-fallback__header {
