@@ -24,12 +24,17 @@ CREATE TABLE IF NOT EXISTS public.internal_files (
   url TEXT,                    -- 公开访问 URL
   mime_type TEXT DEFAULT '',
   size_bytes BIGINT DEFAULT 0,
+  -- 备注：默认空，仅上传者本人可编辑（编辑权限在前端 + RLS 双重约束）
+  note TEXT DEFAULT '',
   -- 归属信息
   created_by_id UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_by TEXT DEFAULT '',
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- 为「已存在的旧表」补齐 note 列（幂等）
+ALTER TABLE public.internal_files ADD COLUMN IF NOT EXISTS note TEXT DEFAULT '';
 
 -- 常用索引：按父目录列子项 / 按创建者过滤
 CREATE INDEX IF NOT EXISTS idx_internal_files_parent ON public.internal_files(parent_id);

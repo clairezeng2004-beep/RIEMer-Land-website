@@ -9,6 +9,7 @@ import {
   uploadFiles,
   uploadFolderTree,
   renameNode,
+  updateNote,
   deleteNode,
 } from '../../services/internalFilesService';
 import {
@@ -28,6 +29,11 @@ import {
   RefreshCw,
   AlertCircle,
   Inbox,
+  StickyNote,
+  Info,
+  User,
+  Clock,
+  X,
 } from 'lucide-react';
 import './InternalFiles.css';
 
@@ -91,6 +97,36 @@ function toDownloadUrl(url, name) {
   return `${url}${sep}download=${encodeURIComponent(name || '')}`;
 }
 
+/* 备注单元格：上传者本人可点击编辑，其余人只读 */
+function NoteCell({ node, editable, busy, onEdit }) {
+  const hasNote = !!(node.note && node.note.trim());
+  if (editable) {
+    return (
+      <button
+        className={`if-col-note if-note-btn ${hasNote ? '' : 'is-empty'}`}
+        onClick={() => onEdit(node)}
+        disabled={busy}
+        title={hasNote ? `${node.note}（点击编辑）` : '点击添加备注'}
+      >
+        <StickyNote size={13} className="if-note-icon" />
+        <span className="if-note-text">{hasNote ? node.note : '添加备注'}</span>
+      </button>
+    );
+  }
+  return (
+    <span className={`if-col-note if-note-readonly ${hasNote ? '' : 'is-empty'}`} title={node.note || ''}>
+      {hasNote ? (
+        <>
+          <StickyNote size={13} className="if-note-icon" />
+          <span className="if-note-text">{node.note}</span>
+        </>
+      ) : (
+        <span className="if-note-dash">—</span>
+      )}
+    </span>
+  );
+}
+
 export default function InternalFiles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
 
@@ -102,15 +138,39 @@ export default function InternalFiles() {
   const [busy, setBusy] = useState(false); // 上传/新建等写操作进行中
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
+  const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
 
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const inflightRef = useRef(false);
+  // 长按检测：按住 ~500ms 视为长按，弹出上传详情，并抑制随后的点击（进文件夹/打开文件）
+  const pressTimerRef = useRef(null);
+  const longPressedRef = useRef(false);
 
+  // 重命名 / 删除：上传者本人或管理员
   const canModify = useCallback(
     (node) => isAdmin || (node.createdById && node.createdById === user?.id),
     [isAdmin, user?.id]
   );
+  // 备注编辑：仅上传者本人
+  const isUploader = useCallback(
+    (node) => !!(node.createdById && node.createdById === user?.id),
+    [user?.id]
+  );
+
+  const startPress = useCallback((node) => {
+    longPressedRef.current = false;
+    clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = setTimeout(() => {
+      longPressedRef.current = true;
+      setDetailNode(node);
+    }, 500);
+  }, []);
+
+  const cancelPress = useCallback(() => {
+    clearTimeout(pressTimerRef.current);
+    pressTimerRef.current = null;
+  }, []);
 
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
@@ -142,8 +202,28 @@ export default function InternalFiles() {
   }, [isAuthenticated, folderId, load]);
 
   const openFolder = (id) => {
+    // 长按刚触发过详情，抑制这次点击，避免误进文件夹
+    if (longPressedRef.current) {
+      longPressedRef.current = false;
+      return;
+    }
     if (busy) return;
     setFolderId(id);
+  };
+
+  /* ---- 编辑备注（仅上传者本人）---- */
+  const handleEditNote = async (node) => {
+    const next = window.prompt('备注（简短说明，留空可清除）：', node.note || '');
+    if (next === null || next.trim() === (node.note || '')) return;
+    setBusy(true);
+    try {
+      await updateNote(node, next);
+      await load(folderId);
+    } catch (err) {
+      alert('保存备注失败：' + (err?.message || err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---- 新建文件夹 ---- */
@@ -377,27 +457,38 @@ export default function InternalFiles() {
               <div className="if-table__head">
                 <span className="if-col-name">名称</span>
                 <span className="if-col-size">大小</span>
-                <span className="if-col-owner">上传者</span>
-                <span className="if-col-date">时间</span>
+                <span className="if-col-note">备注</span>
                 <span className="if-col-actions" />
               </div>
               {items.map((node) => {
+                const detailTitle = `由 ${node.createdBy || '未知'} 上传${node.createdAt ? ` · ${formatDate(node.createdAt)}` : ''}`;
+
                 if (node.isFolder) {
                   return (
-                    <div key={node.id} className="if-row">
+                    <div
+                      key={node.id}
+                      className="if-row"
+                      onPointerDown={() => startPress(node)}
+                      onPointerUp={cancelPress}
+                      onPointerLeave={cancelPress}
+                      onPointerCancel={cancelPress}
+                      onContextMenu={(e) => e.preventDefault()}
+                    >
                       <button
                         className="if-col-name if-name-btn"
                         onClick={() => openFolder(node.id)}
                         disabled={busy}
-                        title={node.name}
+                        title={`${node.name}（${detailTitle}）`}
                       >
                         <span className="if-icon is-folder"><Folder size={20} /></span>
                         <span className="if-name-text">{node.name}</span>
                       </button>
                       <span className="if-col-size">文件夹</span>
-                      <span className="if-col-owner">{node.createdBy || '—'}</span>
-                      <span className="if-col-date">{formatDate(node.createdAt)}</span>
+                      <NoteCell node={node} editable={isUploader(node)} busy={busy} onEdit={handleEditNote} />
                       <span className="if-col-actions">
+                        <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
+                          <Info size={15} />
+                        </button>
                         {canModify(node) && (
                           <>
                             <button className="if-icon-btn" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
@@ -415,22 +506,38 @@ export default function InternalFiles() {
 
                 const { Icon, label, cls } = getFileMeta(node);
                 return (
-                  <div key={node.id} className="if-row">
+                  <div
+                    key={node.id}
+                    className="if-row"
+                    onPointerDown={() => startPress(node)}
+                    onPointerUp={cancelPress}
+                    onPointerLeave={cancelPress}
+                    onPointerCancel={cancelPress}
+                    onContextMenu={(e) => e.preventDefault()}
+                  >
                     <a
                       className="if-col-name if-name-btn"
                       href={node.url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`${node.name} · 点击预览`}
+                      title={`${node.name} · 点击预览（${detailTitle}）`}
+                      onClick={(e) => {
+                        if (longPressedRef.current) {
+                          e.preventDefault();
+                          longPressedRef.current = false;
+                        }
+                      }}
                     >
                       <span className={`if-icon ${cls}`}><Icon size={20} /></span>
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
                     </a>
                     <span className="if-col-size">{formatSize(node.sizeBytes)}</span>
-                    <span className="if-col-owner">{node.createdBy || '—'}</span>
-                    <span className="if-col-date">{formatDate(node.createdAt)}</span>
+                    <NoteCell node={node} editable={isUploader(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
+                      <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
+                        <Info size={15} />
+                      </button>
                       <a
                         className="if-icon-btn"
                         href={toDownloadUrl(node.url, node.name)}
@@ -466,9 +573,32 @@ export default function InternalFiles() {
 
         <div className="internal-files-page__hint">
           <AlertCircle size={14} />
-          <span>所有成员均可查看与上传；文件夹 / 文件的重命名和删除仅限上传者本人或管理员。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
+          <span>所有成员均可查看与上传；备注仅上传者本人可编辑；重命名与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
         </div>
       </div>
+
+      {/* 上传详情弹窗（长按 / Info 触发） */}
+      {detailNode && (
+        <div className="if-detail-overlay" onClick={() => setDetailNode(null)}>
+          <div className="if-detail" onClick={(e) => e.stopPropagation()}>
+            <div className="if-detail__head">
+              <span className="if-detail__title">{detailNode.isFolder ? '文件夹详情' : '文件详情'}</span>
+              <button className="if-icon-btn" onClick={() => setDetailNode(null)} title="关闭">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="if-detail__name">{detailNode.name}</div>
+            <ul className="if-detail__list">
+              <li><User size={14} /><span>上传者</span><b>{detailNode.createdBy || '未知'}</b></li>
+              <li><Clock size={14} /><span>上传时间</span><b>{formatDate(detailNode.createdAt) || '未知'}</b></li>
+              {!detailNode.isFolder && (
+                <li><Info size={14} /><span>大小</span><b>{formatSize(detailNode.sizeBytes)}</b></li>
+              )}
+              <li><StickyNote size={14} /><span>备注</span><b>{detailNode.note?.trim() || '（空）'}</b></li>
+            </ul>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

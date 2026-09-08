@@ -39,6 +39,7 @@ function rowToNode(row) {
     url: row.url || null,
     mimeType: row.mime_type || '',
     sizeBytes: Number(row.size_bytes || 0),
+    note: row.note || '',
     createdById: row.created_by_id || null,
     createdBy: row.created_by || '',
     createdAt: row.created_at || null,
@@ -316,6 +317,26 @@ export async function renameNode(node, newName) {
     throw new Error('重命名未生效：你可能没有权限修改此项（仅上传者或管理员可操作）。');
   }
   return data[0].name;
+}
+
+/* ============================================
+ * 更新备注（仅上传者本人；RLS 与前端双重约束）
+ * 传空字符串即清空备注
+ * ============================================ */
+export async function updateNote(node, note) {
+  requireRemote();
+  // 备注保持简短，最多 200 字，去掉首尾空白
+  const clean = (note || '').trim().slice(0, 200);
+  const { data, error } = await supabase
+    .from('internal_files')
+    .update({ note: clean, updated_at: new Date().toISOString() })
+    .eq('id', node.id)
+    .select('id, note');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('备注未生效：只有上传者本人可以编辑自己上传项的备注。');
+  }
+  return data[0].note || '';
 }
 
 /* 递归收集某文件夹下所有子孙的 Storage 路径（BFS） */
