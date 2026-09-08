@@ -328,22 +328,33 @@
     display: block;
   }
 
-  /* ---- 入口小圆：左侧边缘、纵向居中（转盘从这里向右展开） ---- */
+  /* ---- 入口小圆：停靠在某条屏幕边上，可按住拖走（位置由 JS 给 left/top） ---- */
   .mdial-trigger {
     position: fixed;
-    left: 12px;
-    top: 50%;
-    transform: translateY(-50%);
     z-index: 900;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 4px;
+    /* left/top 是圆心坐标，这里把自己挪回去半个身位 */
+    transform: translate(-50%, -50%);
+    display: block;
     padding: 0;
     background: none;
     border: none;
-    cursor: pointer;
+    cursor: grab;
+    touch-action: none; /* 拖动小圆时不要让页面跟着滚 */
     -webkit-tap-highlight-color: transparent;
+    /* 松手后吸附到最近边的滑行动画 */
+    transition: left 0.26s cubic-bezier(0.22, 1, 0.36, 1),
+                top 0.26s cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  /* 拖动中：跟手，不要过渡；轻微放大表示「抓住了」 */
+  .mdial-trigger--dragging {
+    transition: none;
+    cursor: grabbing;
+  }
+
+  .mdial-trigger--dragging .mdial-trigger__ring {
+    transform: scale(1.08);
+    box-shadow: 0 10px 26px rgba(91, 140, 62, 0.4);
   }
 
   .mdial-trigger__ring {
@@ -361,11 +372,16 @@
     border: 1px solid rgba(255, 255, 255, 0.45);
     color: #fff;
     box-shadow: 0 6px 20px rgba(91, 140, 62, 0.32);
-    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    pointer-events: none; /* 指针事件统一交给外层 button，拖动更稳 */
   }
 
   .mdial-trigger:active .mdial-trigger__ring {
     transform: scale(0.94);
+  }
+
+  .mdial-trigger--dragging:active .mdial-trigger__ring {
+    transform: scale(1.08);
   }
 
   .mdial-trigger__dot {
@@ -379,7 +395,13 @@
     border: 2px solid var(--color-primary);
   }
 
+  /* 名称条：绝对定位挂在小圆下方，这样 button 的尺寸 = 小圆，
+     圆心定位不受名称长短影响 */
   .mdial-trigger__label {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
     max-width: 84px;
     padding: 2px 9px;
     border-radius: var(--radius-full);
@@ -393,16 +415,35 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    pointer-events: none;
   }
 
-  /* ---- 浮层 + 左侧面板（透明毛玻璃悬浮，不做白色实底 sheet） ---- */
+  /* 贴着某条边时，名称条往屏幕内侧躲，别被切掉 */
+  .mdial-trigger--left .mdial-trigger__label {
+    left: 0;
+    transform: none;
+  }
+
+  .mdial-trigger--right .mdial-trigger__label {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+
+  .mdial-trigger--bottom .mdial-trigger__label {
+    top: auto;
+    bottom: calc(100% + 4px);
+  }
+
+  /* ---- 浮层（透明毛玻璃悬浮，不做白色实底 sheet） ---- */
   .mdial-overlay {
     position: fixed;
     inset: 0;
     z-index: 1200;
-    /* 页面大部分保持可见（“漂浮在上面”），仅左侧一段极轻渐隐把转盘托起来 */
+    /* 页面大部分保持可见（“漂浮在上面”），仅转盘那一侧一段极轻渐隐把它托起来。
+       --mdial-fade 由 JS 按停靠边给成 to right / to left / to bottom / to top */
     background: linear-gradient(
-      to right,
+      var(--mdial-fade, to right),
       rgba(20, 24, 20, 0.14) 0%,
       transparent 45%
     );
@@ -414,32 +455,40 @@
     to { opacity: 1; }
   }
 
-  /* 左侧竖直面板：整高、纵向居中，转盘从左缘滑入 */
-  .mdial-panel {
+  /* ---- 转盘舞台：铺满视口，字块按视口坐标绝对定位；
+         转到圆背面的板块由 JS 直接不渲染，所以不需要额外裁剪。 ---- */
+  .mdial-stage {
     position: absolute;
-    left: 0;
-    top: 0;
-    bottom: 0;
-    display: flex;
-    align-items: center;
-    padding: 0 8px;
-    background: none; /* 透明：字块直接悬浮在页面上，无白色底板 */
-    animation: mdial-rise 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+    inset: 0;
     touch-action: none;
+    -webkit-tap-highlight-color: transparent;
+    user-select: none;
   }
 
-  @keyframes mdial-rise {
+  /* 入场：从停靠的那条边滑进来 */
+  .mdial-stage--left { animation: mdial-rise-left 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+  .mdial-stage--right { animation: mdial-rise-right 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+  .mdial-stage--top { animation: mdial-rise-top 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+  .mdial-stage--bottom { animation: mdial-rise-bottom 0.24s cubic-bezier(0.22, 1, 0.36, 1); }
+
+  @keyframes mdial-rise-left {
     from { transform: translateX(-16px); opacity: 0; }
     to { transform: translateX(0); opacity: 1; }
   }
 
-  /* ---- 转盘舞台：只露出右侧一段竖直弧，超出裁掉（板块从上下转入/转出） ---- */
-  .mdial-stage {
-    position: relative;
-    overflow: hidden;
-    touch-action: none;
-    -webkit-tap-highlight-color: transparent;
-    user-select: none;
+  @keyframes mdial-rise-right {
+    from { transform: translateX(16px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+  }
+
+  @keyframes mdial-rise-top {
+    from { transform: translateY(-16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+
+  @keyframes mdial-rise-bottom {
+    from { transform: translateY(16px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
   }
 
   .mdial-chip {
@@ -463,6 +512,17 @@
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.1);
     cursor: pointer;
     will-change: transform, opacity;
+  }
+
+  /* 停在上/下边时弧是横着铺开的，手机宽度撑不下长名字 => 收窄并省略号 */
+  .mdial-stage--top .mdial-chip__label,
+  .mdial-stage--bottom .mdial-chip__label {
+    display: inline-block;
+    max-width: 88px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    vertical-align: middle;
   }
 
   .mdial-chip__icon {
