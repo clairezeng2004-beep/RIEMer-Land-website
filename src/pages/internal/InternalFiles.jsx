@@ -147,15 +147,10 @@ export default function InternalFiles() {
   const pressTimerRef = useRef(null);
   const longPressedRef = useRef(false);
 
-  // 重命名 / 删除：上传者本人或管理员
+  // 重命名 / 删除 / 编辑备注：上传者本人或管理员
   const canModify = useCallback(
     (node) => isAdmin || (node.createdById && node.createdById === user?.id),
     [isAdmin, user?.id]
-  );
-  // 备注编辑：仅上传者本人
-  const isUploader = useCallback(
-    (node) => !!(node.createdById && node.createdById === user?.id),
-    [user?.id]
   );
 
   const startPress = useCallback((node) => {
@@ -484,7 +479,7 @@ export default function InternalFiles() {
                         <span className="if-name-text">{node.name}</span>
                       </button>
                       <span className="if-col-size">文件夹</span>
-                      <NoteCell node={node} editable={isUploader(node)} busy={busy} onEdit={handleEditNote} />
+                      <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                       <span className="if-col-actions">
                         <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
                           <Info size={15} />
@@ -533,7 +528,7 @@ export default function InternalFiles() {
                       <span className="if-badge">{label}</span>
                     </a>
                     <span className="if-col-size">{formatSize(node.sizeBytes)}</span>
-                    <NoteCell node={node} editable={isUploader(node)} busy={busy} onEdit={handleEditNote} />
+                    <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
                       <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
                         <Info size={15} />
@@ -573,7 +568,7 @@ export default function InternalFiles() {
 
         <div className="internal-files-page__hint">
           <AlertCircle size={14} />
-          <span>所有成员均可查看与上传；备注仅上传者本人可编辑；重命名与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
+          <span>所有成员均可查看与上传；备注、重命名与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
         </div>
       </div>
 

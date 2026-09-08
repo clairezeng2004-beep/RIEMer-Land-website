@@ -320,7 +320,7 @@ export async function renameNode(node, newName) {
 }
 
 /* ============================================
- * 更新备注（仅上传者本人；RLS 与前端双重约束）
+ * 更新备注（上传者本人或管理员；RLS 与前端双重约束）
  * 传空字符串即清空备注
  * ============================================ */
 export async function updateNote(node, note) {
@@ -334,7 +334,7 @@ export async function updateNote(node, note) {
     .select('id, note');
   if (error) throw error;
   if (!data || data.length === 0) {
-    throw new Error('备注未生效：只有上传者本人可以编辑自己上传项的备注。');
+    throw new Error('备注未生效：只有上传者本人或管理员可以编辑备注。');
   }
   return data[0].note || '';
 }
