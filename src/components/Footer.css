@@ -3,11 +3,11 @@
   margin-top: var(--space-4xl);
 }
 
-/* 内部页面（/internal/**）：桌面端侧边栏宽 220px（position: fixed），
-   Footer 须让出对应左侧空间，避免被侧栏遮挡。
-   手机端侧栏隐藏 → 通过 media query 恢复全宽。 */
+/* 内部页面（/internal/**）：桌面端侧边栏是一块浮动毛玻璃面板（position: fixed），
+   Footer 须让出它占据的整条通道（面板宽 + 两侧空隙，见 --internal-lane），
+   避免被侧栏遮挡。手机端侧栏隐藏 → 通过 media query 恢复全宽。 */
 .footer--internal {
-  margin-left: 220px;
+  margin-left: var(--internal-lane);
 }
 
 /* 内部页面在中等宽度（≤1024px）下，扣除 220px 侧栏后可用空间已不足以
@@ -65,7 +65,7 @@
      .footer__qrcode-overlay（position: fixed; inset: 0）是 .footer__content
      的后代，而 backdrop-filter 会让本元素成为固定定位后代的包含块，
      遮罩就会被压缩到页脚那一小块区域里，不再铺满全屏。 */
-  background: rgba(255, 255, 255, 0.74);
+  background: var(--glass);
   color: var(--color-text);
   padding: var(--space-2xl) 0 var(--space-xl);
   border-top: 1px solid var(--color-border-light);

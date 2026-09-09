@@ -70,16 +70,21 @@
 .wysiwyg-toolbar {
   position: fixed;
   bottom: 0;
-  left: 220px;
+  left: var(--internal-lane);
   right: 0;
   z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 12px 28px;
-  background: var(--color-bg-card);
-  border-top: 2px solid var(--color-primary);
-  box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.08);
+  /* 与顶栏同一档玻璃：这条工具条下面会持续滚过正文，必须压得住，
+     但仍让水彩透一点上来，否则又是一条横贯屏幕的白色硬边。
+     原来的 2px 主色实线收成 1px 半透明，"编辑态"的绿改由阴影去暗示。 */
+  background: var(--glass-strong);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border-top: 1px solid rgba(91, 140, 62, 0.45);
+  box-shadow: 0 -6px 28px -10px rgba(44, 62, 45, 0.22);
   animation: wysiwygToolbarIn 0.3s ease;
 }
 

@@ -38,6 +38,38 @@
   --color-border-light: #E8F0E9;
 
   /* ============================================
+     内部空间（/internal/**）侧边栏的几何量
+     ============================================
+     侧栏不再是"贴边的整块白墙"，而是一张浮在水彩背景上的毛玻璃面板：
+     四周留出 --internal-sidebar-gap 的空隙让背景绕过去，因此正文/页脚/
+     编辑工具条要让出的宽度是「面板宽 + 左右两侧空隙」= --internal-lane。
+     任何需要"避开侧栏"的固定定位元素都应引用 --internal-lane，
+     不要再各自硬编码 220px。 */
+  --internal-sidebar-w: 220px;
+  --internal-sidebar-gap: 14px;
+  --internal-lane: calc(var(--internal-sidebar-w) + var(--internal-sidebar-gap) * 2);
+
+  /* ============================================
+     Glass Surfaces — 浮在水彩背景上的"面"
+     ============================================
+     这套站点的底是一层会呼吸的水彩晕染（见下方 --page-wash）。任何铺满一大片
+     的**实色**面（顶栏、侧栏、页脚、底部工具条）压上去，都会在自己的边界处切出
+     一条颜色分割线——纯白尤其明显，因为它是这套浅色调里对比最强的一档。
+     结论：大面积的"chrome"一律用半透明白 + backdrop-filter，让水彩透上来给它
+     染色，面与底就永远同色系；真正需要挡住内容的小面（输入框、下拉、弹窗、卡片）
+     继续用 --color-bg-card 实色，不要套这里的 token。
+     三档强度按"这块面下面会滚过多少内容"来选：
+       weak   侧栏——底下只有背景，不需要遮挡，可以最透
+       base   页脚——底下是文末内容，偶尔滚过
+       strong 顶栏 / 底部工具条——内容持续从下面滚过，必须压得住 */
+  --glass-weak: rgba(255, 255, 255, 0.55);
+  --glass: rgba(255, 255, 255, 0.74);
+  --glass-strong: rgba(255, 255, 255, 0.84);
+  /* 玻璃的"厚度"来自这道亮边，而不是描边的深浅 */
+  --glass-edge: rgba(255, 255, 255, 0.72);
+  --glass-blur: saturate(150%) blur(16px);
+
+  /* ============================================
      Watercolor Wash — 全站背景色彩层
      ============================================
      设计来源：站点 Logo（青绿→黄绿渐变的山峦）与两组中国传统绿色卡：
@@ -595,22 +627,40 @@ input[type='number']::placeholder {
   color: var(--color-primary-dark);
 }
 
-/* Scrollbar */
+/* Scrollbar
+   轨道原本刷 --color-bg（#F7FAF5 实色），于是每一页的右缘都有一条 8px 的
+   浅色竖条压在水彩背景上——又一条不必要的分割线。改成透明后背景直接透上来，
+   滑块用主色的低透明度版本，收窄成一颗内嵌的胶囊（transparent border +
+   background-clip: padding-box 做出左右内缩的留白）。 */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-bg);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-border);
+  background: rgba(91, 140, 62, 0.24);
+  border: 3px solid transparent;
+  background-clip: padding-box;
   border-radius: var(--radius-full);
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-text-muted);
+  background: rgba(91, 140, 62, 0.42);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Firefox */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91, 140, 62, 0.28) transparent;
 }
 
 /* Animations */
@@ -737,13 +787,16 @@ input[type='number']::placeholder {
 
 .route-skeleton__sidebar {
   position: fixed;
-  top: 72px;
-  left: 0;
-  bottom: 0;
-  width: 220px;
+  top: calc(72px + var(--internal-sidebar-gap));
+  left: var(--internal-sidebar-gap);
+  bottom: var(--internal-sidebar-gap);
+  width: var(--internal-sidebar-w);
   padding: 18px 14px;
-  border-right: 1px solid var(--color-border-light);
-  background: var(--color-bg-card);
+  border-radius: 20px;
+  border: 1px solid var(--glass-edge);
+  background: var(--glass-weak);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
 }
 
 .route-skeleton__brand {
@@ -759,7 +812,7 @@ input[type='number']::placeholder {
 .route-skeleton__internal-content {
   width: 100%;
   min-height: calc(100vh - 72px);
-  margin-left: 220px;
+  margin-left: var(--internal-lane);
   padding: 60px clamp(1.5rem, 3vw, 2.5rem) var(--space-4xl);
 }
 

@@ -12,8 +12,8 @@
      成为固定定位后代的包含块，保持在两个状态下行为一致（手机端下拉菜单
      .navbar__links 是 fixed 定位的后代）。 */
   background: transparent;
-  backdrop-filter: saturate(150%) blur(14px);
-  -webkit-backdrop-filter: saturate(150%) blur(14px);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   transition: background 0.25s ease,
               box-shadow 0.25s ease,
               border-color 0.25s ease;
@@ -21,7 +21,7 @@
 }
 
 .navbar--scrolled {
-  background: rgba(255, 255, 255, 0.82);
+  background: var(--glass-strong);
   border-bottom-color: var(--color-border-light);
   box-shadow: var(--shadow-sm);
 }

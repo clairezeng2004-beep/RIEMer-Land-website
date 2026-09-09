@@ -2,21 +2,54 @@
    Internal Sidebar
    ============================================ */
 
+/* 侧栏＝浮在水彩背景上的一张毛玻璃面板，而不是贴边的整块白墙。
+   之前的问题：background 是纯白 #FFF（--color-bg-card），从 navbar 下沿一直
+   铺到视口底、左右都顶死，再加一条 border-right —— 纯白是这套浅色调里对比
+   最强的一档，压在带颜色的水彩底上，就在 220px 处切出一条竖直分割线，和
+   顶栏当初"72px 处切出横向色带"（见 Navbar.css 注释）是同一个毛病。
+   解法也和顶栏一致：
+     1) 四周留 --internal-sidebar-gap 的空隙，让背景从面板外侧绕过去，
+        面板变成"页面里的一块卡片"而不是"另一块拼上来的页面"；
+     2) 底色改成半透明白 + backdrop-filter，水彩会透上来给它染色，
+        于是面板和背景永远同色系，不存在需要"对比"的两块颜色；
+     3) 去掉 border-right 这条硬边，改用圆角 + 极淡的外发光收边。 */
 .internal-sidebar {
-  width: 220px;
+  width: var(--internal-sidebar-w);
   flex-shrink: 0;
-  background: var(--color-bg-card);
-  border-right: 1px solid var(--color-border-light);
-  padding: var(--space-lg) 0;
+  padding: var(--space-md) 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-md);
-  height: calc(100vh - 72px);
   position: fixed;
-  top: 72px;
-  left: 0;
+  top: calc(72px + var(--internal-sidebar-gap));
+  left: var(--internal-sidebar-gap);
+  height: calc(100vh - 72px - var(--internal-sidebar-gap) * 2);
   overflow-y: auto;
+  overscroll-behavior: contain;
   z-index: 10;
+
+  border-radius: 20px;
+  /* 侧栏底下只有背景、没有滚动的内容要遮，所以用最透的一档（见 index.css
+     的 Glass Surfaces 说明）。想更"实"一点改 --glass-weak 或这里单独覆盖。 */
+  background: var(--glass-weak);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  /* 亮边 + 极淡的落影：玻璃的厚度感来自这两笔，不来自描边的深浅 */
+  border: 1px solid var(--glass-edge);
+  box-shadow:
+    0 18px 40px -28px rgba(44, 62, 45, 0.35),
+    0 2px 8px -6px rgba(44, 62, 45, 0.18);
+  scrollbar-width: thin;
+  scrollbar-color: rgba(91, 140, 62, 0.28) transparent;
+}
+
+/* 不支持 backdrop-filter 的浏览器（老 Firefox 等）：没有背景模糊就没有"被
+   染色"这回事，半透明白会显得脏。退回到更实的白，但仍比原来的纯白低一档，
+   并保留圆角与留白——竖直分割线的问题在这条路径上也一样被解掉。 */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .internal-sidebar {
+    background: rgba(255, 255, 255, 0.88);
+  }
 }
 
 .internal-sidebar__section {
@@ -46,24 +79,45 @@
   font-weight: 500;
   color: var(--color-text-light);
   text-decoration: none;
-  transition: all var(--transition-fast);
+  transition: background var(--transition-fast), color var(--transition-fast),
+              transform var(--transition-fast);
   position: relative;
 }
 
 .internal-sidebar__item:hover {
   color: var(--color-text);
-  background: rgba(91, 140, 62, 0.06);
+  /* 玻璃面板本身已经是半透明，hover 用"更白一点"比"更绿一点"干净：
+     它读起来是光打在玻璃上，而不是又叠了一层色块。
+     再配 2px 的右移——静止时整列安静，指过去才有反应；活力来自交互反馈，
+     而不是把静态配色调重。 */
+  background: var(--glass);
+  transform: translateX(2px);
 }
 
+/* 选中态：底色 + 左侧一小段主色竖条。
+   面板变透明后，单靠一块淡绿底已经不够跳；竖条是"当前位置"最省颜色的写法，
+   同时把整列条目对齐到一条视觉基线上。 */
 .internal-sidebar__item--active {
-  color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.1);
+  color: var(--color-primary-dark);
+  background: rgba(91, 140, 62, 0.14);
   font-weight: 600;
 }
 
+.internal-sidebar__item--active::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 3px;
+  height: 18px;
+  border-radius: 0 3px 3px 0;
+  background: var(--color-primary);
+}
+
 .internal-sidebar__item--active:hover {
-  color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.12);
+  color: var(--color-primary-dark);
+  background: rgba(91, 140, 62, 0.18);
 }
 
 .internal-sidebar__icon {
