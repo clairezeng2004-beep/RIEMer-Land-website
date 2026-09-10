@@ -4,20 +4,7 @@
   left: 0;
   right: 0;
   z-index: 1000;
-<<<<<<< Updated upstream
-  /* 未滚动时完全透明：顶栏底下就是页面的水彩背景，只要给它任何一点自己的
-     底色，都会在 72px 处切出一条横向色带边——正是"配色分割线"的观感。
-     滚到内容上方后才淡入毛玻璃白底（.navbar--scrolled），那时它需要挡住
-     下面滚过的文字，边界配合 border + shadow 读起来是"悬浮条"而不是"接缝"。
-     backdrop-filter 两个状态都保留：一是切换时不会突兀，二是它会让本元素
-     成为固定定位后代的包含块，保持在两个状态下行为一致（手机端下拉菜单
-     .navbar__links 是 fixed 定位的后代）。 */
-  background: transparent;
-  backdrop-filter: var(--glass-blur);
-  -webkit-backdrop-filter: var(--glass-blur);
-=======
   background: #ffffff;
->>>>>>> Stashed changes
   transition: background 0.25s ease,
               box-shadow 0.25s ease,
               border-color 0.25s ease;
@@ -25,11 +12,7 @@
 }
 
 .navbar--scrolled {
-<<<<<<< Updated upstream
-  background: var(--glass-strong);
-=======
   background: #ffffff;
->>>>>>> Stashed changes
   border-bottom-color: var(--color-border-light);
   box-shadow: var(--shadow-sm);
 }
