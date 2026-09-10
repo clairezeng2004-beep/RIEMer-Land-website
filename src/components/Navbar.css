@@ -4,6 +4,7 @@
   left: 0;
   right: 0;
   z-index: 1000;
+<<<<<<< Updated upstream
   /* 未滚动时完全透明：顶栏底下就是页面的水彩背景，只要给它任何一点自己的
      底色，都会在 72px 处切出一条横向色带边——正是"配色分割线"的观感。
      滚到内容上方后才淡入毛玻璃白底（.navbar--scrolled），那时它需要挡住
@@ -14,6 +15,9 @@
   background: transparent;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+=======
+  background: #ffffff;
+>>>>>>> Stashed changes
   transition: background 0.25s ease,
               box-shadow 0.25s ease,
               border-color 0.25s ease;
@@ -21,7 +25,11 @@
 }
 
 .navbar--scrolled {
+<<<<<<< Updated upstream
   background: var(--glass-strong);
+=======
+  background: #ffffff;
+>>>>>>> Stashed changes
   border-bottom-color: var(--color-border-light);
   box-shadow: var(--shadow-sm);
 }
@@ -102,20 +110,20 @@
 
 .navbar__nav-item:hover {
   color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.04);
+  background: #F3F8F0;
 }
 
 .navbar__nav-item--active {
   color: var(--color-primary);
   font-weight: 500;
-  background: rgba(91, 140, 62, 0.10);
+  background: #EDF5E9;
   /* 选中态仅通过「变色 + 浅绿底」提示，不再用 text-shadow 模拟加粗，
      保持和未选中项完全相同的字重与字形宽度。 */
 }
 
 .navbar__nav-item--active:hover {
   color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.14);
+  background: #E8F1E3;
 }
 
 /* ---- 右侧：成员入口 ---- */
@@ -211,7 +219,7 @@
 }
 
 .navbar__user-link:hover {
-  background: rgba(91, 140, 62, 0.06);
+  background: #F2F7EF;
 }
 
 .navbar__user-link:hover .navbar__user-name {
@@ -237,12 +245,12 @@
 
 .navbar__link:hover {
   color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.06);
+  background: #F2F7EF;
 }
 
 .navbar__link--active {
   color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.1);
+  background: #EDF5E9;
 }
 
 /* ---- 下拉菜单 ---- */
@@ -284,7 +292,7 @@
 
 .navbar__dropdown-item:hover {
   color: var(--color-primary);
-  background: rgba(91, 140, 62, 0.06);
+  background: #F2F7EF;
 }
 
 /* 通知入口菜单项 */
