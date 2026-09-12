@@ -12,12 +12,8 @@ import {
   updateNote,
   deleteNode,
   sortNodes,
-  logFileDownload,
-  fetchDownloadHistoryPage,
   CHILDREN_PAGE_SIZE,
-  DOWNLOAD_HISTORY_PAGE_SIZE,
 } from '../../services/internalFilesService';
-import InternalFilePreviewModal from '../../components/InternalFilePreviewModal';
 import {
   HardDrive,
   Folder,
@@ -41,8 +37,6 @@ import {
   User,
   Clock,
   X,
-  History,
-  Printer,
 } from 'lucide-react';
 import './InternalFiles.css';
 
@@ -151,16 +145,6 @@ export default function InternalFiles() {
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
-  const [previewNode, setPreviewNode] = useState(null); // 站内文件预览弹窗
-
-  // 下载历史（仅管理员可见）
-  const [showHistory, setShowHistory] = useState(false);
-  const [history, setHistory] = useState([]);
-  const [historyTotal, setHistoryTotal] = useState(null);
-  const [historyHasMore, setHistoryHasMore] = useState(false);
-  const [historyLoading, setHistoryLoading] = useState(false);
-  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
-  const [historyError, setHistoryError] = useState('');
 
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -252,61 +236,6 @@ export default function InternalFiles() {
     if (busy) return;
     setFolderId(id);
   };
-
-  // 点开文件名 → 站内预览（长按刚触发详情则抑制本次点击）
-  const openPreview = (node) => {
-    if (longPressedRef.current) {
-      longPressedRef.current = false;
-      return;
-    }
-    setPreviewNode(node);
-  };
-
-  // 记录一次「下载 / 打印」到下载历史（失败静默，不打断用户操作）
-  const recordDownload = useCallback(
-    (node, action) => logFileDownload(node, action, user),
-    [user]
-  );
-
-  /* ---- 下载历史（仅管理员）---- */
-  const openHistory = useCallback(async () => {
-    setShowHistory(true);
-    setHistoryLoading(true);
-    setHistoryError('');
-    try {
-      const page = await fetchDownloadHistoryPage({
-        offset: 0,
-        limit: DOWNLOAD_HISTORY_PAGE_SIZE,
-      });
-      setHistory(page.items);
-      setHistoryTotal(page.total);
-      setHistoryHasMore(page.hasMore);
-    } catch (err) {
-      console.error('[InternalFiles] 加载下载历史失败：', err);
-      setHistoryError(err?.message || '加载下载历史失败，请稍后重试。');
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
-
-  const loadMoreHistory = useCallback(async () => {
-    if (historyLoadingMore || !historyHasMore) return;
-    setHistoryLoadingMore(true);
-    try {
-      const page = await fetchDownloadHistoryPage({
-        offset: history.length,
-        limit: DOWNLOAD_HISTORY_PAGE_SIZE,
-      });
-      setHistory((prev) => [...prev, ...page.items]);
-      setHistoryTotal(page.total);
-      setHistoryHasMore(page.hasMore);
-    } catch (err) {
-      console.error('[InternalFiles] 加载更多下载历史失败：', err);
-      setHistoryError(err?.message || '加载更多失败，请稍后重试。');
-    } finally {
-      setHistoryLoadingMore(false);
-    }
-  }, [history.length, historyHasMore, historyLoadingMore]);
 
   /* ---- 编辑备注（仅上传者本人）---- */
   const handleEditNote = async (node) => {
@@ -612,16 +541,23 @@ export default function InternalFiles() {
                     onPointerCancel={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
                   >
-                    <button
-                      type="button"
+                    <a
                       className="if-col-name if-name-btn"
+                      href={node.url || '#'}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       title={`${node.name} · 点击预览（${detailTitle}）`}
-                      onClick={() => openPreview(node)}
+                      onClick={(e) => {
+                        if (longPressedRef.current) {
+                          e.preventDefault();
+                          longPressedRef.current = false;
+                        }
+                      }}
                     >
                       <span className={`if-icon ${cls}`}><Icon size={20} /></span>
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
-                    </button>
+                    </a>
                     <span className="if-col-size">{formatSize(node.sizeBytes)}</span>
                     <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
@@ -633,7 +569,6 @@ export default function InternalFiles() {
                         href={toDownloadUrl(node.url, node.name)}
                         title="下载"
                         download={node.name}
-                        onClick={() => recordDownload(node, 'download')}
                       >
                         <Download size={15} />
                       </a>
@@ -715,97 +650,6 @@ export default function InternalFiles() {
               )}
               <li><StickyNote size={14} /><span>备注</span><b>{detailNode.note?.trim() || '（空）'}</b></li>
             </ul>
-          </div>
-        </div>
-      )}
-
-      {/* 下载历史入口（仅管理员，固定在右下角） */}
-      {isAdmin && (
-        <button className="if-history-fab" onClick={openHistory} title="查看下载历史">
-          <History size={16} />
-          <span className="if-history-fab__text">下载历史</span>
-        </button>
-      )}
-
-      {/* 站内文件预览弹窗（点「下载 / 打印」才记录历史） */}
-      {previewNode && (
-        <InternalFilePreviewModal
-          node={previewNode}
-          onClose={() => setPreviewNode(null)}
-          onLog={(action) => recordDownload(previewNode, action)}
-        />
-      )}
-
-      {/* 下载历史弹窗（仅管理员） */}
-      {showHistory && (
-        <div className="if-history-overlay" onClick={() => setShowHistory(false)}>
-          <div className="if-history" onClick={(e) => e.stopPropagation()}>
-            <div className="if-history__head">
-              <span className="if-history__title">
-                <History size={16} /> 下载历史
-                {historyTotal != null && <em className="if-history__count">共 {historyTotal} 条</em>}
-              </span>
-              <button className="if-icon-btn" onClick={() => setShowHistory(false)} title="关闭">
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="if-history__body">
-              {historyLoading ? (
-                <div className="if-history__state">
-                  <RefreshCw size={18} className="if-spin" /> <span>加载中…</span>
-                </div>
-              ) : historyError ? (
-                <div className="if-history__state if-history__state--error">
-                  <AlertCircle size={18} /> <span>{historyError}</span>
-                </div>
-              ) : history.length === 0 ? (
-                <div className="if-history__state">
-                  <Inbox size={28} /> <span>还没有任何下载 / 打印记录</span>
-                </div>
-              ) : (
-                <ul className="if-history__list">
-                  {history.map((h) => (
-                    <li key={h.id} className="if-history__item">
-                      <span className={`if-history__action is-${h.action}`}>
-                        {h.action === 'print' ? <Printer size={13} /> : <Download size={13} />}
-                        {h.action === 'print' ? '打印' : '下载'}
-                      </span>
-                      <span className="if-history__file" title={h.fileName}>
-                        {h.fileName || '（文件已删除）'}
-                      </span>
-                      <span className="if-history__who">
-                        <User size={12} /> {h.userName || '未知成员'}
-                      </span>
-                      <span className="if-history__time">
-                        <Clock size={12} /> {formatDate(h.createdAt) || '—'}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {!historyLoading && !historyError && historyHasMore && (
-                <div className="if-history__more">
-                  <button
-                    className="if-btn if-btn--ghost"
-                    onClick={loadMoreHistory}
-                    disabled={historyLoadingMore}
-                  >
-                    {historyLoadingMore ? (
-                      <><RefreshCw size={15} className="if-spin" /> <span>加载中…</span></>
-                    ) : (
-                      <>
-                        <ChevronDown size={15} />
-                        <span>
-                          加载更多{historyTotal != null ? `（还有 ${historyTotal - history.length} 条）` : ''}
-                        </span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              )}
-            </div>
           </div>
         </div>
       )}
