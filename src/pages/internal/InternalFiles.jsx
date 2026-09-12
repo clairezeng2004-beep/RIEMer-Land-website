@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   isInternalFilesAvailable,
-  fetchChildren,
+  fetchChildrenPage,
   fetchBreadcrumb,
   createFolder,
   uploadFiles,
@@ -11,7 +11,13 @@ import {
   renameNode,
   updateNote,
   deleteNode,
+  sortNodes,
+  logFileDownload,
+  fetchDownloadHistoryPage,
+  CHILDREN_PAGE_SIZE,
+  DOWNLOAD_HISTORY_PAGE_SIZE,
 } from '../../services/internalFilesService';
+import InternalFilePreviewModal from '../../components/InternalFilePreviewModal';
 import {
   HardDrive,
   Folder,
@@ -26,6 +32,7 @@ import {
   Pencil,
   Trash2,
   ChevronRight,
+  ChevronDown,
   RefreshCw,
   AlertCircle,
   Inbox,
@@ -34,6 +41,8 @@ import {
   User,
   Clock,
   X,
+  History,
+  Printer,
 } from 'lucide-react';
 import './InternalFiles.css';
 
@@ -133,12 +142,25 @@ export default function InternalFiles() {
   const [folderId, setFolderId] = useState(null); // null = 根目录
   const [breadcrumb, setBreadcrumb] = useState([]); // [{id,name}, ...]
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(null); // 当前目录项总数（服务端 count）
+  const [hasMore, setHasMore] = useState(false); // 是否还有下一页
+  const [loading, setLoading] = useState(true); // 首屏 / 切换目录加载
+  const [loadingMore, setLoadingMore] = useState(false); // 「加载更多」进行中
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false); // 上传/新建等写操作进行中
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
+  const [previewNode, setPreviewNode] = useState(null); // 站内文件预览弹窗
+
+  // 下载历史（仅管理员可见）
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState([]);
+  const [historyTotal, setHistoryTotal] = useState(null);
+  const [historyHasMore, setHistoryHasMore] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [historyLoadingMore, setHistoryLoadingMore] = useState(false);
+  const [historyError, setHistoryError] = useState('');
 
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -167,17 +189,20 @@ export default function InternalFiles() {
     pressTimerRef.current = null;
   }, []);
 
+  // 首屏加载 / 刷新：只取第一页目录项与面包屑（懒加载，不预取文件内容）
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
     inflightRef.current = true;
     setLoading(true);
     setError('');
     try {
-      const [children, crumb] = await Promise.all([
-        fetchChildren(targetId),
+      const [page, crumb] = await Promise.all([
+        fetchChildrenPage(targetId, { offset: 0, limit: CHILDREN_PAGE_SIZE }),
         targetId ? fetchBreadcrumb(targetId) : Promise.resolve([]),
       ]);
-      setItems(children);
+      setItems(sortNodes(page.items));
+      setTotal(page.total);
+      setHasMore(page.hasMore);
       setBreadcrumb(crumb);
     } catch (err) {
       console.error('[InternalFiles] 加载失败：', err);
@@ -187,6 +212,28 @@ export default function InternalFiles() {
       inflightRef.current = false;
     }
   }, []);
+
+  // 加载下一页并追加到当前列表（偏移量按已加载数量，与服务端排序对齐）
+  const loadMore = useCallback(async () => {
+    if (inflightRef.current || loadingMore || !hasMore) return;
+    inflightRef.current = true;
+    setLoadingMore(true);
+    try {
+      const page = await fetchChildrenPage(folderId, {
+        offset: items.length,
+        limit: CHILDREN_PAGE_SIZE,
+      });
+      setItems((prev) => sortNodes([...prev, ...page.items]));
+      setTotal(page.total);
+      setHasMore(page.hasMore);
+    } catch (err) {
+      console.error('[InternalFiles] 加载更多失败：', err);
+      setError(err?.message || '加载更多失败，请稍后重试。');
+    } finally {
+      setLoadingMore(false);
+      inflightRef.current = false;
+    }
+  }, [folderId, items.length, hasMore, loadingMore]);
 
   useEffect(() => {
     if (isAuthenticated && isInternalFilesAvailable()) {
@@ -205,6 +252,61 @@ export default function InternalFiles() {
     if (busy) return;
     setFolderId(id);
   };
+
+  // 点开文件名 → 站内预览（长按刚触发详情则抑制本次点击）
+  const openPreview = (node) => {
+    if (longPressedRef.current) {
+      longPressedRef.current = false;
+      return;
+    }
+    setPreviewNode(node);
+  };
+
+  // 记录一次「下载 / 打印」到下载历史（失败静默，不打断用户操作）
+  const recordDownload = useCallback(
+    (node, action) => logFileDownload(node, action, user),
+    [user]
+  );
+
+  /* ---- 下载历史（仅管理员）---- */
+  const openHistory = useCallback(async () => {
+    setShowHistory(true);
+    setHistoryLoading(true);
+    setHistoryError('');
+    try {
+      const page = await fetchDownloadHistoryPage({
+        offset: 0,
+        limit: DOWNLOAD_HISTORY_PAGE_SIZE,
+      });
+      setHistory(page.items);
+      setHistoryTotal(page.total);
+      setHistoryHasMore(page.hasMore);
+    } catch (err) {
+      console.error('[InternalFiles] 加载下载历史失败：', err);
+      setHistoryError(err?.message || '加载下载历史失败，请稍后重试。');
+    } finally {
+      setHistoryLoading(false);
+    }
+  }, []);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (historyLoadingMore || !historyHasMore) return;
+    setHistoryLoadingMore(true);
+    try {
+      const page = await fetchDownloadHistoryPage({
+        offset: history.length,
+        limit: DOWNLOAD_HISTORY_PAGE_SIZE,
+      });
+      setHistory((prev) => [...prev, ...page.items]);
+      setHistoryTotal(page.total);
+      setHistoryHasMore(page.hasMore);
+    } catch (err) {
+      console.error('[InternalFiles] 加载更多下载历史失败：', err);
+      setHistoryError(err?.message || '加载更多失败，请稍后重试。');
+    } finally {
+      setHistoryLoadingMore(false);
+    }
+  }, [history.length, historyHasMore, historyLoadingMore]);
 
   /* ---- 编辑备注（仅上传者本人）---- */
   const handleEditNote = async (node) => {
@@ -510,23 +612,16 @@ export default function InternalFiles() {
                     onPointerCancel={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
                   >
-                    <a
+                    <button
+                      type="button"
                       className="if-col-name if-name-btn"
-                      href={node.url || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
                       title={`${node.name} · 点击预览（${detailTitle}）`}
-                      onClick={(e) => {
-                        if (longPressedRef.current) {
-                          e.preventDefault();
-                          longPressedRef.current = false;
-                        }
-                      }}
+                      onClick={() => openPreview(node)}
                     >
                       <span className={`if-icon ${cls}`}><Icon size={20} /></span>
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
-                    </a>
+                    </button>
                     <span className="if-col-size">{formatSize(node.sizeBytes)}</span>
                     <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
@@ -538,6 +633,7 @@ export default function InternalFiles() {
                         href={toDownloadUrl(node.url, node.name)}
                         title="下载"
                         download={node.name}
+                        onClick={() => recordDownload(node, 'download')}
                       >
                         <Download size={15} />
                       </a>
@@ -557,12 +653,40 @@ export default function InternalFiles() {
               })}
             </div>
           )}
+
+          {/* 分页懒加载：还有更多目录项时才显示 */}
+          {!loading && hasMore && (
+            <div className="internal-files-page__more">
+              <button
+                className="if-btn if-btn--ghost"
+                onClick={loadMore}
+                disabled={loadingMore || busy}
+              >
+                {loadingMore ? (
+                  <>
+                    <RefreshCw size={16} className="if-spin" />
+                    <span>加载中…</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={16} />
+                    <span>
+                      加载更多{total != null ? `（还有 ${total - items.length} 项）` : ''}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {!loading && items.length > 0 && (
           <div className="internal-files-page__stats">
             <span><Folder size={13} /> {folderCount} 个文件夹</span>
             <span><File size={13} /> {fileCount} 个文件</span>
+            {total != null && (hasMore || total > items.length) && (
+              <span>已加载 {items.length} / 共 {total} 项</span>
+            )}
           </div>
         )}
 
@@ -591,6 +715,97 @@ export default function InternalFiles() {
               )}
               <li><StickyNote size={14} /><span>备注</span><b>{detailNode.note?.trim() || '（空）'}</b></li>
             </ul>
+          </div>
+        </div>
+      )}
+
+      {/* 下载历史入口（仅管理员，固定在右下角） */}
+      {isAdmin && (
+        <button className="if-history-fab" onClick={openHistory} title="查看下载历史">
+          <History size={16} />
+          <span className="if-history-fab__text">下载历史</span>
+        </button>
+      )}
+
+      {/* 站内文件预览弹窗（点「下载 / 打印」才记录历史） */}
+      {previewNode && (
+        <InternalFilePreviewModal
+          node={previewNode}
+          onClose={() => setPreviewNode(null)}
+          onLog={(action) => recordDownload(previewNode, action)}
+        />
+      )}
+
+      {/* 下载历史弹窗（仅管理员） */}
+      {showHistory && (
+        <div className="if-history-overlay" onClick={() => setShowHistory(false)}>
+          <div className="if-history" onClick={(e) => e.stopPropagation()}>
+            <div className="if-history__head">
+              <span className="if-history__title">
+                <History size={16} /> 下载历史
+                {historyTotal != null && <em className="if-history__count">共 {historyTotal} 条</em>}
+              </span>
+              <button className="if-icon-btn" onClick={() => setShowHistory(false)} title="关闭">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="if-history__body">
+              {historyLoading ? (
+                <div className="if-history__state">
+                  <RefreshCw size={18} className="if-spin" /> <span>加载中…</span>
+                </div>
+              ) : historyError ? (
+                <div className="if-history__state if-history__state--error">
+                  <AlertCircle size={18} /> <span>{historyError}</span>
+                </div>
+              ) : history.length === 0 ? (
+                <div className="if-history__state">
+                  <Inbox size={28} /> <span>还没有任何下载 / 打印记录</span>
+                </div>
+              ) : (
+                <ul className="if-history__list">
+                  {history.map((h) => (
+                    <li key={h.id} className="if-history__item">
+                      <span className={`if-history__action is-${h.action}`}>
+                        {h.action === 'print' ? <Printer size={13} /> : <Download size={13} />}
+                        {h.action === 'print' ? '打印' : '下载'}
+                      </span>
+                      <span className="if-history__file" title={h.fileName}>
+                        {h.fileName || '（文件已删除）'}
+                      </span>
+                      <span className="if-history__who">
+                        <User size={12} /> {h.userName || '未知成员'}
+                      </span>
+                      <span className="if-history__time">
+                        <Clock size={12} /> {formatDate(h.createdAt) || '—'}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+
+              {!historyLoading && !historyError && historyHasMore && (
+                <div className="if-history__more">
+                  <button
+                    className="if-btn if-btn--ghost"
+                    onClick={loadMoreHistory}
+                    disabled={historyLoadingMore}
+                  >
+                    {historyLoadingMore ? (
+                      <><RefreshCw size={15} className="if-spin" /> <span>加载中…</span></>
+                    ) : (
+                      <>
+                        <ChevronDown size={15} />
+                        <span>
+                          加载更多{historyTotal != null ? `（还有 ${historyTotal - history.length} 条）` : ''}
+                        </span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
