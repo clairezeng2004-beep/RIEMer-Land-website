@@ -19,6 +19,8 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 const BUCKET = 'internal-files';
 const STORAGE_UPLOAD_ATTEMPTS = 4;
 const UPLOAD_CONCURRENCY = 3;
+// 分页懒加载：一次只取一页目录项，点开文件才由浏览器按 URL 拉取内容
+export const CHILDREN_PAGE_SIZE = 50;
 
 export const isInternalFilesAvailable = () => !!(isSupabaseConfigured && supabase);
 
@@ -48,7 +50,7 @@ function rowToNode(row) {
 }
 
 /* 目录内排序：文件夹在前，同类按名称（中文/数字友好） */
-function sortNodes(nodes) {
+export function sortNodes(nodes) {
   const collator = new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' });
   return [...nodes].sort((a, b) => {
     if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
@@ -87,7 +89,7 @@ async function removeStoragePaths(paths) {
 }
 
 /* ============================================
- * 列出某个目录下的直接子项
+ * 列出某个目录下的直接子项（一次性取全部，主要供内部脚本/兼容使用）
  * parentId 为 null / undefined 表示根目录
  * ============================================ */
 export async function fetchChildren(parentId = null) {
@@ -97,6 +99,37 @@ export async function fetchChildren(parentId = null) {
   const { data, error } = await query;
   if (error) throw error;
   return sortNodes((data || []).map(rowToNode));
+}
+
+/* ============================================
+ * 分页列出某个目录下的直接子项（懒加载）
+ * 只取「目录项」的元数据（名称/大小/URL 等），不下载文件内容——
+ * 文件内容仅在用户点开时由浏览器按公开 URL 拉取。
+ *
+ * 说明：为让「加载更多」的偏移量在多次请求间保持一致，这里用
+ * 数据库排序（文件夹在前、再按 name）来切分页；已加载项在前端
+ * 仍用中文/数字友好的 sortNodes 展示，两者互不影响分页游标。
+ *
+ * 返回 { items, total, hasMore }
+ * ============================================ */
+export async function fetchChildrenPage(
+  parentId = null,
+  { offset = 0, limit = CHILDREN_PAGE_SIZE } = {}
+) {
+  requireRemote();
+  let query = supabase
+    .from('internal_files')
+    .select('*', { count: 'exact' })
+    .order('is_folder', { ascending: false })
+    .order('name', { ascending: true });
+  query = parentId ? query.eq('parent_id', parentId) : query.is('parent_id', null);
+  const { data, error, count } = await query.range(offset, offset + limit - 1);
+  if (error) throw error;
+  const items = (data || []).map(rowToNode);
+  const total = typeof count === 'number' ? count : null;
+  const hasMore =
+    total != null ? offset + items.length < total : items.length === limit;
+  return { items, total, hasMore };
 }
 
 /* 单个节点（用于面包屑 / 校验） */

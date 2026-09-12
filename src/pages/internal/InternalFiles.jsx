@@ -3,7 +3,7 @@ import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   isInternalFilesAvailable,
-  fetchChildren,
+  fetchChildrenPage,
   fetchBreadcrumb,
   createFolder,
   uploadFiles,
@@ -11,6 +11,8 @@ import {
   renameNode,
   updateNote,
   deleteNode,
+  sortNodes,
+  CHILDREN_PAGE_SIZE,
 } from '../../services/internalFilesService';
 import {
   HardDrive,
@@ -26,6 +28,7 @@ import {
   Pencil,
   Trash2,
   ChevronRight,
+  ChevronDown,
   RefreshCw,
   AlertCircle,
   Inbox,
@@ -133,7 +136,10 @@ export default function InternalFiles() {
   const [folderId, setFolderId] = useState(null); // null = 根目录
   const [breadcrumb, setBreadcrumb] = useState([]); // [{id,name}, ...]
   const [items, setItems] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [total, setTotal] = useState(null); // 当前目录项总数（服务端 count）
+  const [hasMore, setHasMore] = useState(false); // 是否还有下一页
+  const [loading, setLoading] = useState(true); // 首屏 / 切换目录加载
+  const [loadingMore, setLoadingMore] = useState(false); // 「加载更多」进行中
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false); // 上传/新建等写操作进行中
   const [progress, setProgress] = useState(null); // {done,total,current}
@@ -167,17 +173,20 @@ export default function InternalFiles() {
     pressTimerRef.current = null;
   }, []);
 
+  // 首屏加载 / 刷新：只取第一页目录项与面包屑（懒加载，不预取文件内容）
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
     inflightRef.current = true;
     setLoading(true);
     setError('');
     try {
-      const [children, crumb] = await Promise.all([
-        fetchChildren(targetId),
+      const [page, crumb] = await Promise.all([
+        fetchChildrenPage(targetId, { offset: 0, limit: CHILDREN_PAGE_SIZE }),
         targetId ? fetchBreadcrumb(targetId) : Promise.resolve([]),
       ]);
-      setItems(children);
+      setItems(sortNodes(page.items));
+      setTotal(page.total);
+      setHasMore(page.hasMore);
       setBreadcrumb(crumb);
     } catch (err) {
       console.error('[InternalFiles] 加载失败：', err);
@@ -187,6 +196,28 @@ export default function InternalFiles() {
       inflightRef.current = false;
     }
   }, []);
+
+  // 加载下一页并追加到当前列表（偏移量按已加载数量，与服务端排序对齐）
+  const loadMore = useCallback(async () => {
+    if (inflightRef.current || loadingMore || !hasMore) return;
+    inflightRef.current = true;
+    setLoadingMore(true);
+    try {
+      const page = await fetchChildrenPage(folderId, {
+        offset: items.length,
+        limit: CHILDREN_PAGE_SIZE,
+      });
+      setItems((prev) => sortNodes([...prev, ...page.items]));
+      setTotal(page.total);
+      setHasMore(page.hasMore);
+    } catch (err) {
+      console.error('[InternalFiles] 加载更多失败：', err);
+      setError(err?.message || '加载更多失败，请稍后重试。');
+    } finally {
+      setLoadingMore(false);
+      inflightRef.current = false;
+    }
+  }, [folderId, items.length, hasMore, loadingMore]);
 
   useEffect(() => {
     if (isAuthenticated && isInternalFilesAvailable()) {
@@ -557,12 +588,40 @@ export default function InternalFiles() {
               })}
             </div>
           )}
+
+          {/* 分页懒加载：还有更多目录项时才显示 */}
+          {!loading && hasMore && (
+            <div className="internal-files-page__more">
+              <button
+                className="if-btn if-btn--ghost"
+                onClick={loadMore}
+                disabled={loadingMore || busy}
+              >
+                {loadingMore ? (
+                  <>
+                    <RefreshCw size={16} className="if-spin" />
+                    <span>加载中…</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={16} />
+                    <span>
+                      加载更多{total != null ? `（还有 ${total - items.length} 项）` : ''}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
         </div>
 
         {!loading && items.length > 0 && (
           <div className="internal-files-page__stats">
             <span><Folder size={13} /> {folderCount} 个文件夹</span>
             <span><File size={13} /> {fileCount} 个文件</span>
+            {total != null && (hasMore || total > items.length) && (
+              <span>已加载 {items.length} / 共 {total} 项</span>
+            )}
           </div>
         )}
 

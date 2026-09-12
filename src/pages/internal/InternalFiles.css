@@ -394,6 +394,13 @@
 }
 
 /* 统计 */
+/* 分页「加载更多」 */
+.internal-files-page__more {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-md) 0 0;
+}
+
 .internal-files-page__stats {
   display: flex;
   align-items: center;
