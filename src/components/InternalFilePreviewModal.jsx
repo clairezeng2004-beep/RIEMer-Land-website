@@ -9,6 +9,14 @@ function toDownloadUrl(url, name) {
   return `${url}${sep}download=${encodeURIComponent(name || '')}`;
 }
 
+/* PDF 预览地址：加 #toolbar=0&navpanes=0 隐藏浏览器 PDF 查看器自带的
+   下载/打印/侧栏工具条，避免用户绕过我们（能记录的）按钮直接下载。 */
+function toPdfViewerUrl(url) {
+  if (!url) return url;
+  const [base] = url.split('#'); // 去掉可能已有的 hash 再拼
+  return `${base}#toolbar=0&navpanes=0`;
+}
+
 /* 判断预览类别：image / pdf / other */
 function getPreviewKind(node) {
   const name = (node?.name || '').toLowerCase();
@@ -91,7 +99,7 @@ export default function InternalFilePreviewModal({ node, onClose, onLog }) {
             <iframe
               ref={frameRef}
               className="ifp-frame"
-              src={node.url}
+              src={toPdfViewerUrl(node.url)}
               title={node.name}
             />
           )}
