@@ -21,6 +21,8 @@ const STORAGE_UPLOAD_ATTEMPTS = 4;
 const UPLOAD_CONCURRENCY = 3;
 // 分页懒加载：一次只取一页目录项，点开文件才由浏览器按 URL 拉取内容
 export const CHILDREN_PAGE_SIZE = 50;
+// 下载历史每页条数（仅管理员可读）
+export const DOWNLOAD_HISTORY_PAGE_SIZE = 30;
 
 export const isInternalFilesAvailable = () => !!(isSupabaseConfigured && supabase);
 
@@ -423,4 +425,65 @@ export async function deleteNode(node) {
   if (!data || data.length === 0) {
     throw new Error('删除未生效：你可能没有权限删除此项（仅上传者或管理员可删除）。');
   }
+}
+
+/* ============================================
+ * 下载历史：记录一次「下载 / 打印」动作
+ *   action: 'download' | 'print'
+ *   仅在成员真正点「下载 / 打印」按钮时调用（点开预览本身不记录）。
+ *   记录失败不应打断用户的下载/打印，故内部吞掉异常仅告警。
+ *   file_name / user_name 做快照，文件或成员日后被删除历史仍可读。
+ * ============================================ */
+export async function logFileDownload(node, action, user) {
+  if (!isInternalFilesAvailable()) return;
+  if (!node || node.isFolder) return;
+  const act = action === 'print' ? 'print' : 'download';
+  try {
+    const { error } = await supabase.from('internal_file_downloads').insert({
+      file_id: node.id || null,
+      file_name: node.name || '',
+      action: act,
+      user_id: user?.id || null,
+      user_name: user?.nickname || user?.name || '',
+    });
+    if (error) throw error;
+  } catch (err) {
+    console.warn('[InternalFiles] 记录下载历史失败：', err?.message || err);
+  }
+}
+
+/* 下载历史行 → 前端对象 */
+function downloadRowToEntry(row) {
+  return {
+    id: row.id,
+    fileId: row.file_id || null,
+    fileName: row.file_name || '',
+    action: row.action === 'print' ? 'print' : 'download',
+    userId: row.user_id || null,
+    userName: row.user_name || '',
+    createdAt: row.created_at || null,
+  };
+}
+
+/* ============================================
+ * 分页读取下载历史（按时间倒序，最新在前）
+ *   仅管理员 / 所有者可读（RLS 约束）；普通成员会得到空结果。
+ *   返回 { items, total, hasMore }
+ * ============================================ */
+export async function fetchDownloadHistoryPage({
+  offset = 0,
+  limit = DOWNLOAD_HISTORY_PAGE_SIZE,
+} = {}) {
+  requireRemote();
+  const { data, error, count } = await supabase
+    .from('internal_file_downloads')
+    .select('*', { count: 'exact' })
+    .order('created_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+  if (error) throw error;
+  const items = (data || []).map(downloadRowToEntry);
+  const total = typeof count === 'number' ? count : null;
+  const hasMore =
+    total != null ? offset + items.length < total : items.length === limit;
+  return { items, total, hasMore };
 }
