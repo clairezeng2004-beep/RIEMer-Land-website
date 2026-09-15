@@ -6,14 +6,11 @@
   z-index: 1000;
   background: #ffffff;
   transition: background 0.25s ease,
-              box-shadow 0.25s ease,
-              border-color 0.25s ease;
-  border-bottom: 1px solid transparent;
+              box-shadow 0.25s ease;
 }
 
 .navbar--scrolled {
   background: #ffffff;
-  border-bottom-color: var(--color-border-light);
   box-shadow: var(--shadow-sm);
 }
 
