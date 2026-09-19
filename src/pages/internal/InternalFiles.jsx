@@ -102,6 +102,73 @@ function toDownloadUrl(url, name) {
   return `${url}${sep}download=${encodeURIComponent(name || '')}`;
 }
 
+/* ============================================
+ * 目录首页本地缓存（stale-while-revalidate）
+ *   初次进入 / 切目录时先用上次的结果瞬时渲染，再后台拉最新替换，
+ *   消除「列表要转很久才出来」的等待感。只缓存第一页（≤50 项）。
+ *   localStorage 不可用（隐私模式 / 超额）时全部静默跳过。
+ * ============================================ */
+const LIST_CACHE_PREFIX = 'riemer:if:list:v1:';
+const LIST_CACHE_INDEX = 'riemer:if:list:v1:index';
+const LIST_CACHE_MAX = 24; // 最多缓存的目录数，超出按最久未用淘汰
+
+function listCacheKey(folderId) {
+  return LIST_CACHE_PREFIX + (folderId || 'root');
+}
+
+function readListCache(folderId) {
+  try {
+    const raw = localStorage.getItem(listCacheKey(folderId));
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeListCache(folderId, data) {
+  try {
+    const key = listCacheKey(folderId);
+    const entry = {
+      items: (data.items || []).slice(0, CHILDREN_PAGE_SIZE),
+      total: data.total ?? null,
+      hasMore: !!data.hasMore,
+      contribs: data.contribs || {},
+      ts: Date.now(),
+    };
+    localStorage.setItem(key, JSON.stringify(entry));
+    // 维护 LRU 索引，超出上限淘汰最久未写入的目录
+    let index = [];
+    try {
+      index = JSON.parse(localStorage.getItem(LIST_CACHE_INDEX) || '[]');
+    } catch {
+      index = [];
+    }
+    index = index.filter((k) => k !== key);
+    index.push(key);
+    while (index.length > LIST_CACHE_MAX) {
+      const old = index.shift();
+      try { localStorage.removeItem(old); } catch { /* ignore */ }
+    }
+    localStorage.setItem(LIST_CACHE_INDEX, JSON.stringify(index));
+  } catch {
+    /* 写缓存失败不影响功能，静默跳过 */
+  }
+}
+
+/* 把某目录里各文件夹的贡献者并入其列表缓存（贡献者晚于列表算出） */
+function mergeContribCache(folderId, contribSlice) {
+  try {
+    const key = listCacheKey(folderId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const entry = JSON.parse(raw);
+    entry.contribs = { ...(entry.contribs || {}), ...contribSlice };
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    /* ignore */
+  }
+}
+
 /* 备注单元格：上传者本人可点击编辑，其余人只读 */
 function NoteCell({ node, editable, busy, onEdit }) {
   const hasNote = !!(node.note && node.note.trim());
@@ -232,13 +299,41 @@ export default function InternalFiles() {
     pressTimerRef.current = null;
   }, []);
 
-  // 首屏加载 / 刷新：只取第一页目录项与面包屑（懒加载，不预取文件内容）
+  // 后台拉取一批文件夹的贡献者并静默并入（不清空已渲染的名字，避免闪烁），
+  // 同时写回该目录的列表缓存，供下次瞬时渲染
+  const refreshContribs = useCallback((targetId, pageItems) => {
+    const folderIds = (pageItems || []).filter((n) => n.isFolder).map((n) => n.id);
+    if (folderIds.length === 0) return;
+    fetchFolderContributors(folderIds)
+      .then((map) => {
+        const slice = {};
+        for (const id of folderIds) slice[id] = map[id] || [];
+        setFolderContribs((prev) => ({ ...prev, ...slice }));
+        mergeContribCache(targetId, slice);
+      })
+      .catch(() => {});
+  }, []);
+
+  // 首屏加载 / 刷新：先用本地缓存瞬时渲染，再后台拉最新替换（stale-while-revalidate）
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
     inflightRef.current = true;
-    setLoading(true);
     setError('');
-    setFolderContribs({}); // 换目录 / 刷新：清空贡献者缓存，重新按最新数据计算
+
+    // 1) 命中缓存 → 立即渲染上次结果，去掉等待感
+    const cached = readListCache(targetId);
+    if (cached && Array.isArray(cached.items) && cached.items.length) {
+      setItems(sortNodes(cached.items));
+      setTotal(cached.total ?? null);
+      setHasMore(!!cached.hasMore);
+      setFolderContribs(cached.contribs || {});
+      setLoading(false);
+    } else {
+      setLoading(true);
+      setFolderContribs({});
+    }
+
+    // 2) 后台拉最新，替换缓存内容
     try {
       const [page, crumb] = await Promise.all([
         fetchChildrenPage(targetId, { offset: 0, limit: CHILDREN_PAGE_SIZE }),
@@ -248,14 +343,24 @@ export default function InternalFiles() {
       setTotal(page.total);
       setHasMore(page.hasMore);
       setBreadcrumb(crumb);
+      writeListCache(targetId, {
+        items: page.items,
+        total: page.total,
+        hasMore: page.hasMore,
+        contribs: {},
+      });
+      refreshContribs(targetId, page.items);
     } catch (err) {
       console.error('[InternalFiles] 加载失败：', err);
-      setError(err?.message || '加载失败，请稍后重试。');
+      // 已有缓存则继续显示缓存，不用报错盖掉列表
+      if (!(cached && cached.items && cached.items.length)) {
+        setError(err?.message || '加载失败，请稍后重试。');
+      }
     } finally {
       setLoading(false);
       inflightRef.current = false;
     }
-  }, []);
+  }, [refreshContribs]);
 
   // 加载下一页并追加到当前列表（偏移量按已加载数量，与服务端排序对齐）
   const loadMore = useCallback(async () => {
@@ -270,6 +375,7 @@ export default function InternalFiles() {
       setItems((prev) => sortNodes([...prev, ...page.items]));
       setTotal(page.total);
       setHasMore(page.hasMore);
+      refreshContribs(folderId, page.items); // 新翻出来的文件夹补算贡献者
     } catch (err) {
       console.error('[InternalFiles] 加载更多失败：', err);
       setError(err?.message || '加载更多失败，请稍后重试。');
@@ -277,7 +383,7 @@ export default function InternalFiles() {
       setLoadingMore(false);
       inflightRef.current = false;
     }
-  }, [folderId, items.length, hasMore, loadingMore]);
+  }, [folderId, items.length, hasMore, loadingMore, refreshContribs]);
 
   useEffect(() => {
     if (isAuthenticated && isInternalFilesAvailable()) {
@@ -286,30 +392,6 @@ export default function InternalFiles() {
       setLoading(false);
     }
   }, [isAuthenticated, folderId, load]);
-
-  // 为当前列表中「尚未取过贡献者」的文件夹批量拉取贡献者名单
-  // （load 会清空缓存 → 刷新后重算；loadMore 追加的新文件夹也会在此补齐）
-  useEffect(() => {
-    const missing = items
-      .filter((n) => n.isFolder && !(n.id in folderContribs))
-      .map((n) => n.id);
-    if (missing.length === 0) return;
-    let cancelled = false;
-    fetchFolderContributors(missing)
-      .then((map) => {
-        if (cancelled) return;
-        setFolderContribs((prev) => {
-          const next = { ...prev };
-          // 请求过的 id 都落一个键（无贡献者则空数组），避免重复请求
-          for (const id of missing) next[id] = map[id] || [];
-          return next;
-        });
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [items, folderContribs]);
 
   const openFolder = (id) => {
     // 长按刚触发过详情，抑制这次点击，避免误进文件夹
