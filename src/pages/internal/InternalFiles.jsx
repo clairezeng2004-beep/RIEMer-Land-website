@@ -12,6 +12,7 @@ import {
   updateNote,
   deleteNode,
   sortNodes,
+  fetchFolderContributors,
   CHILDREN_PAGE_SIZE,
 } from '../../services/internalFilesService';
 import {
@@ -35,6 +36,7 @@ import {
   StickyNote,
   Info,
   User,
+  Users,
   Clock,
   X,
 } from 'lucide-react';
@@ -130,6 +132,42 @@ function NoteCell({ node, editable, busy, onEdit }) {
   );
 }
 
+/* 内容贡献者单元格
+ *   文件：上传者本人（固定不变）
+ *   文件夹：所有在其中上传过资料的人（按最早上传排序，随他人上传而更新）
+ *   人数较多时（尤其手机）名字省略显示，点「N 人」看完整名单（详情弹窗）
+ */
+function ContribCell({ contributors, loading, onDetail }) {
+  if (loading) {
+    return <span className="if-col-contrib is-loading">…</span>;
+  }
+  const list = contributors || [];
+  if (list.length === 0) {
+    return (
+      <span className="if-col-contrib is-empty">
+        <span className="if-contrib-dash">—</span>
+      </span>
+    );
+  }
+  const names = list.map((c) => c.name).join('、');
+  return (
+    <span className="if-col-contrib" title={names}>
+      <Users size={13} className="if-contrib-icon" />
+      <span className="if-contrib-names">{names}</span>
+      {list.length > 1 && (
+        <button
+          type="button"
+          className="if-contrib-more"
+          onClick={onDetail}
+          title="查看全部贡献者"
+        >
+          {list.length} 人
+        </button>
+      )}
+    </span>
+  );
+}
+
 export default function InternalFiles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
 
@@ -145,6 +183,7 @@ export default function InternalFiles() {
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
+  const [folderContribs, setFolderContribs] = useState({}); // { folderId: [{id,name}] } 文件夹贡献者
 
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
@@ -157,6 +196,26 @@ export default function InternalFiles() {
   const canModify = useCallback(
     (node) => isAdmin || (node.createdById && node.createdById === user?.id),
     [isAdmin, user?.id]
+  );
+
+  // 归一化某节点的「内容贡献者」
+  //   文件：上传者本人（固定）
+  //   文件夹：已取到的贡献者名单；空文件夹（无人上传资料）回退为文件夹创建者
+  //   返回 { list, loading }
+  const contribsFor = useCallback(
+    (node) => {
+      if (!node.isFolder) {
+        const name = node.createdBy || '';
+        return { list: name ? [{ id: node.createdById, name }] : [], loading: false };
+      }
+      if (!(node.id in folderContribs)) return { list: [], loading: true };
+      const list = folderContribs[node.id] || [];
+      if (list.length === 0 && node.createdBy) {
+        return { list: [{ id: node.createdById, name: node.createdBy }], loading: false };
+      }
+      return { list, loading: false };
+    },
+    [folderContribs]
   );
 
   const startPress = useCallback((node) => {
@@ -179,6 +238,7 @@ export default function InternalFiles() {
     inflightRef.current = true;
     setLoading(true);
     setError('');
+    setFolderContribs({}); // 换目录 / 刷新：清空贡献者缓存，重新按最新数据计算
     try {
       const [page, crumb] = await Promise.all([
         fetchChildrenPage(targetId, { offset: 0, limit: CHILDREN_PAGE_SIZE }),
@@ -226,6 +286,30 @@ export default function InternalFiles() {
       setLoading(false);
     }
   }, [isAuthenticated, folderId, load]);
+
+  // 为当前列表中「尚未取过贡献者」的文件夹批量拉取贡献者名单
+  // （load 会清空缓存 → 刷新后重算；loadMore 追加的新文件夹也会在此补齐）
+  useEffect(() => {
+    const missing = items
+      .filter((n) => n.isFolder && !(n.id in folderContribs))
+      .map((n) => n.id);
+    if (missing.length === 0) return;
+    let cancelled = false;
+    fetchFolderContributors(missing)
+      .then((map) => {
+        if (cancelled) return;
+        setFolderContribs((prev) => {
+          const next = { ...prev };
+          // 请求过的 id 都落一个键（无贡献者则空数组），避免重复请求
+          for (const id of missing) next[id] = map[id] || [];
+          return next;
+        });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [items, folderContribs]);
 
   const openFolder = (id) => {
     // 长按刚触发过详情，抑制这次点击，避免误进文件夹
@@ -483,6 +567,7 @@ export default function InternalFiles() {
               <div className="if-table__head">
                 <span className="if-col-name">名称</span>
                 <span className="if-col-size">大小</span>
+                <span className="if-col-contrib">内容贡献者</span>
                 <span className="if-col-note">备注</span>
                 <span className="if-col-actions" />
               </div>
@@ -510,6 +595,16 @@ export default function InternalFiles() {
                         <span className="if-name-text">{node.name}</span>
                       </button>
                       <span className="if-col-size">文件夹</span>
+                      {(() => {
+                        const { list, loading: contribLoading } = contribsFor(node);
+                        return (
+                          <ContribCell
+                            contributors={list}
+                            loading={contribLoading}
+                            onDetail={() => setDetailNode(node)}
+                          />
+                        );
+                      })()}
                       <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                       <span className="if-col-actions">
                         <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
@@ -559,6 +654,16 @@ export default function InternalFiles() {
                       <span className="if-badge">{label}</span>
                     </a>
                     <span className="if-col-size">{formatSize(node.sizeBytes)}</span>
+                    {(() => {
+                      const { list, loading: contribLoading } = contribsFor(node);
+                      return (
+                        <ContribCell
+                          contributors={list}
+                          loading={contribLoading}
+                          onDetail={() => setDetailNode(node)}
+                        />
+                      );
+                    })()}
                     <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
                       <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
@@ -643,8 +748,17 @@ export default function InternalFiles() {
             </div>
             <div className="if-detail__name">{detailNode.name}</div>
             <ul className="if-detail__list">
-              <li><User size={14} /><span>上传者</span><b>{detailNode.createdBy || '未知'}</b></li>
-              <li><Clock size={14} /><span>上传时间</span><b>{formatDate(detailNode.createdAt) || '未知'}</b></li>
+              <li><User size={14} /><span>{detailNode.isFolder ? '创建者' : '上传者'}</span><b>{detailNode.createdBy || '未知'}</b></li>
+              <li><Clock size={14} /><span>{detailNode.isFolder ? '创建时间' : '上传时间'}</span><b>{formatDate(detailNode.createdAt) || '未知'}</b></li>
+              {detailNode.isFolder && (() => {
+                const { list } = contribsFor(detailNode);
+                return (
+                  <li>
+                    <Users size={14} /><span>贡献者</span>
+                    <b>{list.length ? list.map((c) => c.name).join('、') : '（暂无上传）'}</b>
+                  </li>
+                );
+              })()}
               {!detailNode.isFolder && (
                 <li><Info size={14} /><span>大小</span><b>{formatSize(detailNode.sizeBytes)}</b></li>
               )}

@@ -132,6 +132,36 @@ export async function fetchChildrenPage(
   return { items, total, hasMore };
 }
 
+/* ============================================
+ * 文件夹「内容贡献者」：批量取若干文件夹的贡献者
+ *   文件夹 = 递归汇总其中（含所有子孙）上传过文件的人，按最早上传时间排序；
+ *   有人新上传后重新取即自动更新。
+ *   返回 { [folderId]: [{ id, name }, ...] }
+ *   迁移 SQL（internal_folder_contributors）尚未执行时优雅降级为空对象，
+ *   不阻塞列表渲染。
+ * ============================================ */
+export async function fetchFolderContributors(folderIds) {
+  requireRemote();
+  const ids = [...new Set((folderIds || []).filter(Boolean))];
+  if (ids.length === 0) return {};
+  const { data, error } = await supabase.rpc('internal_folder_contributors', {
+    folder_ids: ids,
+  });
+  if (error) {
+    console.warn('[InternalFiles] 获取文件夹贡献者失败（可能未执行迁移 SQL）：', error.message);
+    return {};
+  }
+  const map = {};
+  for (const row of data || []) {
+    const list = Array.isArray(row.contributors) ? row.contributors : [];
+    map[row.folder_id] = list.map((c) => ({
+      id: c?.id || null,
+      name: c?.name || '未知',
+    }));
+  }
+  return map;
+}
+
 /* 单个节点（用于面包屑 / 校验） */
 export async function fetchNode(id) {
   requireRemote();

@@ -124,6 +124,55 @@ CREATE POLICY "internal_files_owner_delete" ON storage.objects
 
 
 -- ════════════════════════════════════════════════════════════
+-- PART D: 文件夹「内容贡献者」聚合函数
+--   给定若干文件夹 id，递归汇总每个文件夹里（含所有子孙层级）上传过
+--   「文件」的人，按各人最早一次上传时间升序返回。
+--   * 只统计文件行（is_folder = false）——即真正「上传过资料」的人；
+--   * 有人在文件夹内新上传，下次读取即自动包含其贡献者；
+--   * security invoker：沿用调用者身份与既有 SELECT RLS（已登录可读全部）。
+-- ════════════════════════════════════════════════════════════
+CREATE OR REPLACE FUNCTION public.internal_folder_contributors(folder_ids UUID[])
+RETURNS TABLE (folder_id UUID, contributors JSONB)
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path = public
+AS $$
+  WITH RECURSIVE tree AS (
+    -- 种子：每个请求文件夹的直接子项，标记归属的根文件夹 root
+    SELECT f.id, f.parent_id, f.is_folder, f.created_by, f.created_by_id, f.created_at, r.root
+    FROM public.internal_files f
+    JOIN unnest(folder_ids) AS r(root) ON f.parent_id = r.root
+    UNION ALL
+    -- 递归：继续向下收集子孙，沿用同一个 root
+    SELECT c.id, c.parent_id, c.is_folder, c.created_by, c.created_by_id, c.created_at, t.root
+    FROM public.internal_files c
+    JOIN tree t ON c.parent_id = t.id
+  ),
+  people AS (
+    SELECT
+      root,
+      created_by_id,
+      COALESCE(NULLIF(created_by, ''), '未知') AS person_name,
+      MIN(created_at) AS first_at
+    FROM tree
+    WHERE is_folder = false
+    GROUP BY root, created_by_id, COALESCE(NULLIF(created_by, ''), '未知')
+  )
+  SELECT
+    root AS folder_id,
+    jsonb_agg(
+      jsonb_build_object('id', created_by_id, 'name', person_name)
+      ORDER BY first_at ASC
+    ) AS contributors
+  FROM people
+  GROUP BY root;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.internal_folder_contributors(UUID[]) TO authenticated;
+
+
+-- ════════════════════════════════════════════════════════════
 -- 完成 ✅
 --   如果你看到 "Success. No rows returned" 就全部成功
 -- ════════════════════════════════════════════════════════════
