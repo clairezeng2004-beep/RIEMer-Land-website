@@ -506,6 +506,14 @@ export default function Tasks() {
     });
     return Array.from(optionMap.values());
   }, [authorizedMembers, authorizedMembersLoading, teamMembers, tasks]);
+
+  // 负责人 id → 真名，用于只读展示（手机卡片右侧的负责人）
+  const assigneeLabelById = useMemo(() => {
+    const m = new Map();
+    assigneeOptions.forEach((o) => m.set(o.value, o.label));
+    return m;
+  }, [assigneeOptions]);
+
   // 亮点总结 / 经验复盘 的 Supabase 写入防抖计时器
   // 结构：{ [taskId]: { [field]: number(timerId) } }
   const writeTimersRef = useRef({});
@@ -1530,6 +1538,12 @@ export default function Tasks() {
               ? task.statusHistory[task.statusHistory.length - 1]
               : null;
             const statusDate = formatCompactTaskDate(latestStatusChange?.date || task.createdAt || '');
+            const cardAssigneeIds = Array.isArray(task.assignee)
+              ? task.assignee
+              : task.assignee ? [task.assignee] : [];
+            const ownerNames = cardAssigneeIds
+              .map((id) => assigneeLabelById.get(id) || '未知成员')
+              .filter(Boolean);
             return (
               <li key={task.id} className="tasks-mobile-list__item">
                 <button
@@ -1541,8 +1555,15 @@ export default function Tasks() {
                     <span className="tasks-mobile-card__title">
                       {task.title || '（未命名事项）'}
                     </span>
-                    {statusDate && (
-                      <span className="tasks-mobile-card__date">{statusDate}</span>
+                    {(statusDate || task.category) && (
+                      <span className="tasks-mobile-card__meta">
+                        {statusDate && (
+                          <span className="tasks-mobile-card__date">{statusDate}</span>
+                        )}
+                        {task.category && (
+                          <span className="tasks-mobile-card__category">{task.category}</span>
+                        )}
+                      </span>
                     )}
                   </span>
                   <span className="tasks-mobile-card__tags">
@@ -1555,9 +1576,11 @@ export default function Tasks() {
                     >
                       {task.status}
                     </span>
-                    {task.category && (
-                      <span className="tasks-mobile-card__category">{task.category}</span>
-                    )}
+                    <span
+                      className={`tasks-mobile-card__owner ${ownerNames.length ? '' : 'is-empty'}`}
+                    >
+                      {ownerNames.length ? ownerNames.join('、') : '未指派'}
+                    </span>
                   </span>
                 </button>
               </li>

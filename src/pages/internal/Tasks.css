@@ -923,10 +923,19 @@
   overflow: hidden;
 }
 
+/* 日期 + 分类 一行：分类挪到日期右边，二者视觉上协调 */
+.tasks-mobile-card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
 .tasks-mobile-card__date {
   font-size: 11px;
   color: var(--color-text-muted);
   opacity: 0.75;
+  flex-shrink: 0;
 }
 
 .tasks-mobile-card__tags {
@@ -948,8 +957,9 @@
   background: var(--color-bg);
 }
 
+/* 分类：跟随日期的小号标签，浅底细胶囊，和日期同一行协调呈现 */
 .tasks-mobile-card__category {
-  padding: 1px 8px;
+  padding: 1px 7px;
   border-radius: var(--radius-full);
   font-size: 11px;
   font-weight: 500;
@@ -958,7 +968,25 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* 负责人：卡片右侧，只读展示，多人用「、」连接，过长省略 */
+.tasks-mobile-card__owner {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   max-width: 100%;
+  text-align: right;
+}
+
+.tasks-mobile-card__owner.is-empty {
+  color: var(--color-text-muted);
+  font-weight: 400;
+  opacity: 0.7;
 }
 
 /* 详情抽屉：从底部滑出的面板 */
