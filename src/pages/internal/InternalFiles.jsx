@@ -889,9 +889,17 @@ export default function InternalFiles() {
               )}
               <li><StickyNote size={14} /><span>备注</span><b>{detailNode.note?.trim() || '（空）'}</b></li>
             </ul>
-            {/* 管理操作：手机版行内不放重命名/删除，改到这里 */}
+            {/* 管理操作：手机版行内不放编辑备注/重命名/删除，改到这里 */}
             {canModify(detailNode) && (
               <div className="if-detail__actions">
+                <button
+                  type="button"
+                  className="if-detail__act-btn"
+                  disabled={busy}
+                  onClick={() => { const n = detailNode; setDetailNode(null); handleEditNote(n); }}
+                >
+                  <StickyNote size={15} /> 编辑备注
+                </button>
                 <button
                   type="button"
                   className="if-detail__act-btn"
