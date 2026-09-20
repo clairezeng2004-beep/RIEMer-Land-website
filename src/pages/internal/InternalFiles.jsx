@@ -4,6 +4,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   isInternalFilesAvailable,
   fetchChildrenPage,
+  fetchChildrenCount,
   fetchBreadcrumb,
   createFolder,
   uploadFiles,
@@ -169,6 +170,20 @@ function mergeContribCache(folderId, contribSlice) {
   }
 }
 
+/* 把单独算出的总数并回列表缓存（总数晚于列表返回，供下次首帧直接显示「共 N 项」） */
+function mergeTotalCache(folderId, total) {
+  try {
+    const key = listCacheKey(folderId);
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    const entry = JSON.parse(raw);
+    entry.total = total;
+    localStorage.setItem(key, JSON.stringify(entry));
+  } catch {
+    /* ignore */
+  }
+}
+
 /* 备注单元格：上传者本人可点击编辑，其余人只读 */
 function NoteCell({ node, editable, busy, onEdit }) {
   const hasNote = !!(node.note && node.note.trim());
@@ -238,23 +253,41 @@ function ContribCell({ contributors, loading, onDetail }) {
 export default function InternalFiles() {
   const { isAuthenticated, isAdmin, user } = useAuth();
 
+  // 首帧种子：初始进入的是根目录（folderId=null），若本地有它的列表缓存，就在
+  // useState 初始化时同步注入首帧——与成员分享页一致，省去先渲染一帧「加载中…」
+  // 再补内容的空窗。惰性初始化只读一次，避免每次渲染都碰 localStorage。
+  const [seed] = useState(() => {
+    const c = readListCache(null);
+    return c && Array.isArray(c.items) && c.items.length
+      ? {
+          items: sortNodes(c.items),
+          total: c.total ?? null,
+          hasMore: !!c.hasMore,
+          contribs: c.contribs || {},
+        }
+      : null;
+  });
+
   const [folderId, setFolderId] = useState(null); // null = 根目录
   const [breadcrumb, setBreadcrumb] = useState([]); // [{id,name}, ...]
-  const [items, setItems] = useState([]);
-  const [total, setTotal] = useState(null); // 当前目录项总数（服务端 count）
-  const [hasMore, setHasMore] = useState(false); // 是否还有下一页
-  const [loading, setLoading] = useState(true); // 首屏 / 切换目录加载
+  const [items, setItems] = useState(() => (seed ? seed.items : []));
+  const [total, setTotal] = useState(() => (seed ? seed.total : null)); // 当前目录项总数（单独并行拉取）
+  const [hasMore, setHasMore] = useState(() => (seed ? seed.hasMore : false)); // 是否还有下一页
+  const [loading, setLoading] = useState(() => !seed); // 首屏 / 切换目录加载（有种子即非加载态）
   const [loadingMore, setLoadingMore] = useState(false); // 「加载更多」进行中
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false); // 上传/新建等写操作进行中
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
-  const [folderContribs, setFolderContribs] = useState({}); // { folderId: [{id,name}] } 文件夹贡献者
+  const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
   const inflightRef = useRef(false);
+  // 每次 load 递增的令牌：单独并行拉取的「总数」回来晚，用它挡掉切目录后
+  // 落到错误目录上的旧计数。
+  const loadTokenRef = useRef(0);
   // 长按检测：按住 ~500ms 视为长按，弹出上传详情，并抑制随后的点击（进文件夹/打开文件）
   const pressTimerRef = useRef(null);
   const longPressedRef = useRef(false);
@@ -318,6 +351,7 @@ export default function InternalFiles() {
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
     inflightRef.current = true;
+    const token = ++loadTokenRef.current;
     setError('');
 
     // 1) 命中缓存 → 立即渲染上次结果，去掉等待感
@@ -333,6 +367,15 @@ export default function InternalFiles() {
       setFolderContribs({});
     }
 
+    // 总数不阻塞行数据：单独并行拉取，回来后再补「共 N 项」，并挡掉切目录后的旧计数。
+    fetchChildrenCount(targetId)
+      .then((count) => {
+        if (token !== loadTokenRef.current) return;
+        setTotal(count);
+        mergeTotalCache(targetId, count);
+      })
+      .catch(() => {});
+
     // 2) 后台拉最新，替换缓存内容
     try {
       const [page, crumb] = await Promise.all([
@@ -340,12 +383,12 @@ export default function InternalFiles() {
         targetId ? fetchBreadcrumb(targetId) : Promise.resolve([]),
       ]);
       setItems(sortNodes(page.items));
-      setTotal(page.total);
+      // total 由上面的 fetchChildrenCount 单独维护，这里不用 page.total（恒为 null）覆盖它
       setHasMore(page.hasMore);
       setBreadcrumb(crumb);
       writeListCache(targetId, {
         items: page.items,
-        total: page.total,
+        total: cached?.total ?? null, // 先沿用旧计数占位，新计数到达后由 mergeTotalCache 覆盖
         hasMore: page.hasMore,
         contribs: {},
       });
@@ -373,7 +416,7 @@ export default function InternalFiles() {
         limit: CHILDREN_PAGE_SIZE,
       });
       setItems((prev) => sortNodes([...prev, ...page.items]));
-      setTotal(page.total);
+      // total 由 fetchChildrenCount 维护，这里不用 page.total（null）覆盖
       setHasMore(page.hasMore);
       refreshContribs(folderId, page.items); // 新翻出来的文件夹补算贡献者
     } catch (err) {
@@ -694,10 +737,10 @@ export default function InternalFiles() {
                         </button>
                         {canModify(node) && (
                           <>
-                            <button className="if-icon-btn" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
+                            <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
                               <Pencil size={15} />
                             </button>
-                            <button className="if-icon-btn if-icon-btn--danger" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
+                            <button className="if-icon-btn if-icon-btn--danger if-row-modify" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
                               <Trash2 size={15} />
                             </button>
                           </>
@@ -761,10 +804,10 @@ export default function InternalFiles() {
                       </a>
                       {canModify(node) && (
                         <>
-                          <button className="if-icon-btn" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
+                          <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
                             <Pencil size={15} />
                           </button>
-                          <button className="if-icon-btn if-icon-btn--danger" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
+                          <button className="if-icon-btn if-icon-btn--danger if-row-modify" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
                             <Trash2 size={15} />
                           </button>
                         </>
@@ -846,6 +889,27 @@ export default function InternalFiles() {
               )}
               <li><StickyNote size={14} /><span>备注</span><b>{detailNode.note?.trim() || '（空）'}</b></li>
             </ul>
+            {/* 管理操作：手机版行内不放重命名/删除，改到这里 */}
+            {canModify(detailNode) && (
+              <div className="if-detail__actions">
+                <button
+                  type="button"
+                  className="if-detail__act-btn"
+                  disabled={busy}
+                  onClick={() => { const n = detailNode; setDetailNode(null); handleRename(n); }}
+                >
+                  <Pencil size={15} /> 重命名
+                </button>
+                <button
+                  type="button"
+                  className="if-detail__act-btn if-detail__act-btn--danger"
+                  disabled={busy}
+                  onClick={() => { const n = detailNode; setDetailNode(null); handleDelete(n); }}
+                >
+                  <Trash2 size={15} /> 删除
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}

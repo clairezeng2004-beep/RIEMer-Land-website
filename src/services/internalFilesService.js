@@ -110,7 +110,12 @@ export async function fetchChildren(parentId = null) {
  * 数据库排序（文件夹在前、再按 name）来切分页；已加载项在前端
  * 仍用中文/数字友好的 sortNodes 展示，两者互不影响分页游标。
  *
- * 返回 { items, total, hasMore }
+ * ⚠️ 首屏性能：这里刻意不带 `count: 'exact'`。精确计数会让 Postgres
+ * 在同一请求里额外全量扫一遍再返回，行数据被计数拖慢。总数改由
+ * fetchChildrenCount 单独并行拉取（见页面层），行数据尽快返回渲染。
+ * hasMore 用「取满一页即可能还有」来判断，翻到空页时自然收敛。
+ *
+ * 返回 { items, total: null, hasMore }
  * ============================================ */
 export async function fetchChildrenPage(
   parentId = null,
@@ -119,17 +124,31 @@ export async function fetchChildrenPage(
   requireRemote();
   let query = supabase
     .from('internal_files')
-    .select('*', { count: 'exact' })
+    .select('*')
     .order('is_folder', { ascending: false })
     .order('name', { ascending: true });
   query = parentId ? query.eq('parent_id', parentId) : query.is('parent_id', null);
-  const { data, error, count } = await query.range(offset, offset + limit - 1);
+  const { data, error } = await query.range(offset, offset + limit - 1);
   if (error) throw error;
   const items = (data || []).map(rowToNode);
-  const total = typeof count === 'number' ? count : null;
-  const hasMore =
-    total != null ? offset + items.length < total : items.length === limit;
-  return { items, total, hasMore };
+  const hasMore = items.length === limit;
+  return { items, total: null, hasMore };
+}
+
+/* ============================================
+ * 单独取某目录的直接子项总数（不取行，仅 head + exact count）
+ *   与 fetchChildrenPage 并行调用：行数据先渲染，总数回来后再补
+ *   「共 N 项 / 还有 N 项」。失败（或未连接）时返回 null，页面优雅降级。
+ * ============================================ */
+export async function fetchChildrenCount(parentId = null) {
+  requireRemote();
+  let query = supabase
+    .from('internal_files')
+    .select('id', { count: 'exact', head: true });
+  query = parentId ? query.eq('parent_id', parentId) : query.is('parent_id', null);
+  const { count, error } = await query;
+  if (error) throw error;
+  return typeof count === 'number' ? count : null;
 }
 
 /* ============================================
