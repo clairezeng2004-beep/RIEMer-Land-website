@@ -567,6 +567,47 @@
   word-break: break-word;
 }
 
+/* 详情弹窗内的管理操作（重命名 / 删除）——仅手机版显示 */
+.if-detail__actions {
+  display: none;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding-top: var(--space-md);
+  border-top: 1px solid var(--color-border-light);
+}
+
+.if-detail__act-btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg, 12px);
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.if-detail__act-btn:hover:not(:disabled) {
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+}
+
+.if-detail__act-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.if-detail__act-btn--danger:hover:not(:disabled) {
+  border-color: var(--color-danger, #C0392B);
+  color: var(--color-danger, #C0392B);
+  background: rgba(192, 57, 43, 0.06);
+}
+
 /* 响应式 */
 @media (max-width: 900px) {
   .if-btn__text { display: none; }
@@ -585,12 +626,17 @@
   }
   .if-table__head,
   .if-row {
-    /* 手机：名称 | 内容贡献者 | 操作（大小与备注移入「详情」弹窗） */
-    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) auto;
+    /* 手机：名称 | 内容贡献者 | 操作（大小与备注移入「详情」弹窗）。
+       操作列用固定宽度而非 auto——表头这列为空，用 auto 会让表头与数据行
+       各自算出不同的列宽，导致表头和下面对不齐。 */
+    grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr) 64px;
     padding: 10px var(--space-md);
   }
   .if-col-size { display: none; }
   .if-col-note { display: none; }
+  /* 手机版行内去掉重命名/删除，改到「详情」弹窗里操作 */
+  .if-row-modify { display: none; }
+  .if-detail__actions { display: flex; }
   /* 贡献者较多时只显示首位 + 省略号，点「N 人」看完整名单 */
   .if-contrib-names { max-width: 100%; }
 }
