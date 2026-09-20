@@ -26,7 +26,6 @@ import {
   FolderPlus,
   Upload,
   FolderUp,
-  Download,
   Pencil,
   Trash2,
   ChevronRight,
@@ -94,13 +93,6 @@ function getFileMeta(node) {
     return { Icon: File, label: '压缩包', cls: 'is-zip' };
   }
   return { Icon: File, label: ext ? ext.toUpperCase() : '文件', cls: 'is-generic' };
-}
-
-/* 给公开 URL 追加 download 参数，点击时以「下载」而非「预览」方式返回 */
-function toDownloadUrl(url, name) {
-  if (!url) return url;
-  const sep = url.includes('?') ? '&' : '?';
-  return `${url}${sep}download=${encodeURIComponent(name || '')}`;
 }
 
 /* ============================================
@@ -794,14 +786,6 @@ export default function InternalFiles() {
                       <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
                         <Info size={15} />
                       </button>
-                      <a
-                        className="if-icon-btn"
-                        href={toDownloadUrl(node.url, node.name)}
-                        title="下载"
-                        download={node.name}
-                      >
-                        <Download size={15} />
-                      </a>
                       {canModify(node) && (
                         <>
                           <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
