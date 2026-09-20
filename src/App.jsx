@@ -1,6 +1,6 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { SiteContentProvider } from './contexts/SiteContentContext';
 import { NotificationProvider } from './contexts/NotificationContext';
 import ScrollToTop from './components/ScrollToTop';
@@ -155,6 +155,16 @@ function RouteSkeleton({ isInternal }) {
   return isInternal ? <InternalRouteSkeleton /> : <PublicRouteSkeleton />;
 }
 
+/* 板块访问守卫：无权限的成员即使直接敲 URL 也会被挡回内部首页。
+   等待登录态验证期间不做判定，避免误跳（canViewSection 在 user 未就绪时会返回 false）。 */
+function SectionGuard({ section, children }) {
+  const { canViewSection, loading, isAuthenticated } = useAuth();
+  if (loading) return null;
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!canViewSection(section)) return <Navigate to="/internal" replace />;
+  return children;
+}
+
 function AppShell() {
   const { pathname } = useLocation();
   usePageTracking();
@@ -175,8 +185,8 @@ function AppShell() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
-      <Route path="/internal/member-sharing/create" element={<MemberSharingCreate />} />
-      <Route path="/internal/member-sharing/view/:id" element={<MemberSharingDetail />} />
+      <Route path="/internal/member-sharing/create" element={<SectionGuard section="memberSharing"><MemberSharingCreate /></SectionGuard>} />
+      <Route path="/internal/member-sharing/view/:id" element={<SectionGuard section="memberSharing"><MemberSharingDetail /></SectionGuard>} />
       <Route path="/internal/process-templates/create" element={<ProcessTemplateCreate />} />
       <Route path="/internal/process-templates/view/:id" element={<ProcessTemplateDetail />} />
 
@@ -184,8 +194,8 @@ function AppShell() {
       <Route path="/internal" element={<InternalLayout />}>
         <Route index element={<Navigate to="notifications" replace />} />
         <Route path="process-templates" element={<ProcessTemplates />} />
-        <Route path="member-sharing" element={<MemberSharing />} />
-        <Route path="member-sharing/:id" element={<MemberSharingDetail />} />
+        <Route path="member-sharing" element={<SectionGuard section="memberSharing"><MemberSharing /></SectionGuard>} />
+        <Route path="member-sharing/:id" element={<SectionGuard section="memberSharing"><MemberSharingDetail /></SectionGuard>} />
         {/* 兼容旧链接 */}
         <Route path="documents" element={<Documents />} />
         <Route path="articles" element={<InternalArticles />} />
@@ -202,7 +212,7 @@ function AppShell() {
         <Route path="guestbook" element={<Guestbook />} />
         <Route path="profile" element={<Profile />} />
         <Route path="member-profiles" element={<MemberProfiles />} />
-        <Route path="internal-files" element={<InternalFiles />} />
+        <Route path="internal-files" element={<SectionGuard section="internalFiles"><InternalFiles /></SectionGuard>} />
         <Route path="event-publish" element={<EventPublish />} />
         <Route path="sync-diagnostic" element={<SyncDiagnostic />} />
         <Route path="recycle-bin" element={<RecycleBin />} />

@@ -14,6 +14,7 @@ import {
   UserCheck,
   UserX,
   Eye,
+  EyeOff,
   Mail,
   Plus,
   Trash2,
@@ -44,6 +45,7 @@ export default function UserManagement() {
     authorizeUser,
     revokeUser,
     changeUserRole,
+    setSectionAccess,
     deleteUser,
     preAuthorizeByEmail,
     getPreAuthorizedEmails,
@@ -52,6 +54,13 @@ export default function UserManagement() {
   const { internalConfig, updateInternalConfig } = useSiteContent();
   const { editing } = useWysiwyg();
   const uc = internalConfig.users || {};
+  const sidebarCfg = internalConfig.sidebar || {};
+
+  // 受管板块：key → { field, label }。label 跟随侧边栏自定义名称，保持一致。
+  const MANAGED_SECTIONS = [
+    { key: 'memberSharing', field: 'can_view_member_sharing', label: sidebarCfg.labelMemberSharing || '成员内部分享' },
+    { key: 'internalFiles', field: 'can_view_internal_files', label: sidebarCfg.labelInternalFiles || '内部资料' },
+  ];
 
   const updateUsers = useCallback(
     (key, val) => updateInternalConfig({ users: { [key]: val } }),
@@ -376,6 +385,21 @@ export default function UserManagement() {
 
   const handleRoleChange = async (userId, newRole) => {
     await changeUserRole(userId, newRole);
+    setRefreshKey((k) => k + 1);
+  };
+
+  // 切换某成员对某板块的访问权限（乐观更新 + 落库）
+  const handleSectionToggle = async (targetUser, field, nextValue) => {
+    const sectionKey = MANAGED_SECTIONS.find((s) => s.field === field)?.key;
+    if (!sectionKey) return;
+    // 乐观更新：先本地即时反映，再落库
+    setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? { ...u, [field]: nextValue } : u)));
+    const res = await setSectionAccess(targetUser.id, sectionKey, nextValue);
+    if (!res?.success) {
+      // 失败回滚
+      setUsers((prev) => prev.map((u) => (u.id === targetUser.id ? { ...u, [field]: !nextValue } : u)));
+      alert('权限更新失败：' + (res?.message || '未知错误'));
+    }
     setRefreshKey((k) => k + 1);
   };
 
@@ -845,6 +869,26 @@ export default function UserManagement() {
                     {isAdmin && (
                       <td>
                         <div className="users-table__actions">
+                          {u.role !== 'admin' && (
+                            <div className="users-table__section-perms">
+                              {MANAGED_SECTIONS.map((s) => {
+                                const allowed = u[s.field] !== false;
+                                return (
+                                  <button
+                                    key={s.key}
+                                    type="button"
+                                    className={`users-table__perm-toggle ${allowed ? 'is-on' : 'is-off'}`}
+                                    onClick={() => handleSectionToggle(u, s.field, !allowed)}
+                                    title={allowed ? `点击关闭「${s.label}」访问权限` : `点击开启「${s.label}」访问权限`}
+                                    aria-pressed={allowed}
+                                  >
+                                    {allowed ? <Eye size={13} /> : <EyeOff size={13} />}
+                                    <span>{s.label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
                           {canManageAuth(u) ? (
                             <button
                               className="btn btn-ghost btn-sm"

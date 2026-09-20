@@ -154,7 +154,7 @@ function pointToDock(p, vp) {
 function MobileDialNav() {
   const { unreadCount } = useNotifications();
   const { internalConfig } = useSiteContent();
-  const { isAdmin } = useAuth();
+  const { isAdmin, canViewSection } = useAuth();
   const { editing } = useWysiwyg();
   const sc = internalConfig.sidebar || {};
   const navigate = useNavigate();
@@ -170,8 +170,8 @@ function MobileDialNav() {
     { to: '/internal/contributions', icon: BarChart3, label: sc.labelContributions },
     { to: '/internal/guestbook', icon: MessageCircle, label: sc.labelGuestbook },
     // 成员（对齐 InternalSidebar.memberItems：内部分享 → 内部资料 → 通讯录 → 建设建议 → 互动相册 → 个人主页）
-    { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing },
-    { to: '/internal/internal-files', icon: HardDrive, label: sc.labelInternalFiles },
+    { to: '/internal/member-sharing', icon: Share2, label: sc.labelMemberSharing, section: 'memberSharing' },
+    { to: '/internal/internal-files', icon: HardDrive, label: sc.labelInternalFiles, section: 'internalFiles' },
     { to: '/internal/member-profiles', icon: Contact, label: sc.labelMemberProfiles },
     { to: '/internal/suggestions', icon: MessageSquarePlus, label: sc.labelSuggestions },
     { to: '/internal/gallery', icon: Camera, label: sc.labelGallery },
@@ -185,7 +185,7 @@ function MobileDialNav() {
     ...(isAdmin ? [
       { to: '/internal/sync-diagnostic', icon: Activity, label: '同步诊断' },
     ] : []),
-  ];
+  ].filter((item) => !item.section || canViewSection(item.section));
 
   const N = navItems.length;
   const STEP = 360 / N; // 相邻板块的角间距，能整除 360 => 闭环无缝、可无限循环

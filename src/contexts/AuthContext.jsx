@@ -11,6 +11,17 @@ const AuthContext = createContext(null);
 const ROLES = ['admin', 'member'];
 const ROLE_LABELS = { admin: '管理员', member: '成员' };
 
+// ============================================
+// 板块访问权限
+// --------------------------------------------
+// 受管板块 key → profiles 表对应列名。
+// 语义：列值显式为 false 才拦截；缺失 / null（迁移前或旧缓存）视为放行，
+// 兼容现有成员。新注册成员由数据库列默认值 false 拦截。管理员始终放行。
+const SECTION_ACCESS_FIELDS = {
+  memberSharing: 'can_view_member_sharing',
+  internalFiles: 'can_view_internal_files',
+};
+
 function hasRole(userRole, requiredRole) {
   const userLevel = ROLES.indexOf(userRole);
   const requiredLevel = ROLES.indexOf(requiredRole);
@@ -30,7 +41,7 @@ const PROFILE_CACHE_KEY = 'riemer_profile_cache';
 const PRE_AUTH_EMAILS_KEY = 'riemer_pre_authorized_emails';
 const USER_LIST_QUERY_TIMEOUT_MS = 7000;
 const USER_LIST_SESSION_TIMEOUT_MS = 2500;
-const USER_LIST_COLUMNS = 'id, email, name, nickname, avatar, signature, role, authorized, created_at';
+const USER_LIST_COLUMNS = 'id, email, name, nickname, avatar, signature, role, authorized, can_view_member_sharing, can_view_internal_files, created_at';
 
 const withTimeout = (promise, ms, label) => {
   return Promise.race([
@@ -546,6 +557,8 @@ export function AuthProvider({ children }) {
           signature: '',
           role: 'member',
           authorized: false,
+          can_view_member_sharing: false,
+          can_view_internal_files: false,
           created_at: new Date().toISOString(),
         };
         await supabase.from('profiles').insert(newProfile);
@@ -994,6 +1007,8 @@ export function AuthProvider({ children }) {
       signature: '',
       role: 'member',
       authorized: preAuthorized,
+      can_view_member_sharing: false,
+      can_view_internal_files: false,
       createdAt: new Date().toISOString(),
     };
     users.push(newUser);
@@ -1061,6 +1076,8 @@ export function AuthProvider({ children }) {
           signature: '',
           role: 'member',
           authorized: preAuthorized,
+          can_view_member_sharing: false,
+          can_view_internal_files: false,
           created_at: new Date().toISOString(),
         };
 
@@ -1630,6 +1647,43 @@ export function AuthProvider({ children }) {
     }
   }, [supabaseOk]);
 
+  // ---- 设置某成员对某板块的访问权限（管理员操作） ----
+  const setSectionAccess = useCallback(async (userId, sectionKey, canView) => {
+    const field = SECTION_ACCESS_FIELDS[sectionKey];
+    if (!field) return { success: false, message: '未知板块' };
+    const value = !!canView;
+
+    // 始终同步本地用户数据库
+    const users = getLocalUsers();
+    const idx = users.findIndex((u) => u.id === userId);
+    if (idx >= 0) {
+      users[idx][field] = value;
+      saveLocalUsers(users);
+    }
+
+    // 若改的是当前登录用户，立即反映到前端状态 + 缓存
+    if (user?.id === userId) {
+      const updated = { ...user, [field]: value };
+      setUser(updated);
+      cacheProfile(updated);
+    }
+
+    const useLocal = !isSupabaseConfigured || supabaseOk === false;
+    if (!useLocal) {
+      try {
+        const { error } = await supabase.from('profiles').update({ [field]: value }).eq('id', userId);
+        if (error) {
+          console.warn('[Auth] Supabase 板块权限更新失败:', error.message);
+          return { success: false, message: error.message };
+        }
+      } catch (err) {
+        console.warn('[Auth] Supabase 板块权限更新异常:', err.message);
+        return { success: false, message: err.message };
+      }
+    }
+    return { success: true };
+  }, [user, supabaseOk]);
+
   // ---- 预授权邮箱：管理员直接输入邮箱授权 ----
   const preAuthorizeByEmail = useCallback(async (email) => {
     if (!email || !email.trim()) return { success: false, message: '请输入邮箱地址' };
@@ -1951,6 +2005,17 @@ export function AuthProvider({ children }) {
     return hasRole(userRole, requiredRole);
   }, [userRole]);
 
+  // 检查当前用户能否访问某个受管板块（成员内部分享 / 内部资料）
+  // 语义：管理员始终可见；受管板块列显式为 false 才拦截；
+  // 列缺失 / null（迁移前或旧缓存 profile）视为放行，兼容现有成员。
+  const canViewSection = useCallback((sectionKey) => {
+    const field = SECTION_ACCESS_FIELDS[sectionKey];
+    if (!field) return true;       // 未纳管的板块一律可见
+    if (isAdmin) return true;      // 管理员始终可见
+    if (!user) return false;
+    return user[field] !== false;
+  }, [user, isAdmin]);
+
   return (
     <AuthContext.Provider
       value={{
@@ -1970,12 +2035,14 @@ export function AuthProvider({ children }) {
         isAdmin,
         isMember,
         hasMinRole,
+        canViewSection,
         supabaseOk,
         getAllUsers,
         authorizeUser,
         revokeUser,
         deleteUser,
         changeUserRole,
+        setSectionAccess,
         preAuthorizeByEmail,
         getPreAuthorizedEmails,
         removePreAuthorizedEmail,
