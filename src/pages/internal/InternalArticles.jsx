@@ -2006,7 +2006,7 @@ export default function InternalArticles() {
                         inputMode="numeric"
                         pattern="[0-9]*"
                         defaultValue={article.readNum || ''}
-                        placeholder="阅读量"
+                        placeholder="0"
                         disabled={savingReadNumId === article.id}
                         onChange={(e) => {
                           e.currentTarget.value = e.currentTarget.value.replace(/[^0-9]/g, '');

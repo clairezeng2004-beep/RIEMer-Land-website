@@ -657,12 +657,16 @@
   display: inline-block;
   font-size: var(--text-xs);
   font-weight: 600;
-  padding: 0.15rem 0.6rem;
+  padding: 0.12rem 0.45rem;
   border-radius: var(--radius-full);
   background: rgba(91, 140, 62, 0.1);
   color: var(--color-primary);
   /* 放在卡片底部一行，并靠右与日期同行 */
   margin-left: auto;
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .ia-card__title {
@@ -706,11 +710,12 @@
 .ia-card__footer {
   display: flex;
   align-items: center;
-  gap: var(--space-md);
+  gap: 8px;
   padding-top: 0.75rem;
   border-top: 1px solid var(--color-border-light);
   margin-top: auto;
   min-height: 2rem;
+  flex-wrap: nowrap;
 }
 
 .ia-card__meta {
@@ -720,6 +725,7 @@
   line-height: 1.4;
   font-size: var(--text-xs);
   color: var(--color-text-muted);
+  flex: 0 0 auto;
 }
 
 .ia-card__comments {
@@ -734,16 +740,21 @@
 .ia-card__readnum {
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
   flex-shrink: 0;
   color: var(--color-text-muted);
   cursor: text;
 }
 
+.ia-card__readnum svg {
+  width: 11px;
+  height: 11px;
+}
+
 .ia-card__readnum input {
-  width: 74px;
-  min-height: 26px;
-  padding: 3px 7px;
+  width: 48px;
+  min-height: 24px;
+  padding: 2px 5px;
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-sm, 6px);
   background: var(--color-bg-card, #fff);
