@@ -403,6 +403,13 @@ export default function EventPublish() {
     });
   }, [sortedEvents, searchTerm, selectedCategories]);
 
+  const saveEventsNow = async (nextEvents) => {
+    if (!flushSettingToCloud || !CTX_SITE_KEYS?.EVENTS) {
+      return { success: false, error: '活动同步入口不可用，请刷新页面后重试。' };
+    }
+    return flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+  };
+
   // ---- 分类 CRUD ----
   // 普通成员快速新增（打开弹窗）
   const openAddCatModal = () => {
@@ -657,7 +664,7 @@ export default function EventPublish() {
     setFormError('');
     setIsPublishingEvent(true);
     try {
-      const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+      const res = await saveEventsNow(nextEvents);
       if (!res?.success) {
         setFormError(`活动没有写入云端：${res?.error || '未知错误'}。请稍后重试。`);
         return;
@@ -745,7 +752,7 @@ export default function EventPublish() {
     setEditFormError('');
     setIsSavingEventEdit(true);
     try {
-      const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+      const res = await saveEventsNow(nextEvents);
       if (!res?.success) {
         setEditFormError(`活动没有写入云端：${res?.error || '未知错误'}。请稍后重试。`);
         return;
@@ -765,7 +772,7 @@ export default function EventPublish() {
     if (!window.confirm(`确定删除「${title}」这个活动吗？`)) return;
 
     const nextEvents = events.filter((item) => String(item.id) !== String(event.id));
-    const res = await flushSettingToCloud(CTX_SITE_KEYS.EVENTS, nextEvents);
+    const res = await saveEventsNow(nextEvents);
     if (!res?.success) {
       alert(`活动没有从云端删除：${res?.error || '未知错误'}。请稍后重试。`);
       return;
@@ -1560,6 +1567,11 @@ export default function EventPublish() {
 
             <div className="ia-modal__body">
               <div className="ia-modal__step-confirm">
+                {editFormError && (
+                  <div className="ia-modal__error ep-modal__top-error">
+                    <AlertCircle size={16} /> {editFormError}
+                  </div>
+                )}
                 <div className="ia-modal__field">
                   <label className="ia-modal__label">
                     <ExternalLink size={14} /> 公众号推文链接
@@ -1568,7 +1580,10 @@ export default function EventPublish() {
                     type="url"
                     className="ia-modal__text-input"
                     value={editingEvent.officialUrl || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, officialUrl: e.target.value })}
+                    onChange={(e) => {
+                      setEditingEvent({ ...editingEvent, officialUrl: e.target.value });
+                      setEditFormError('');
+                    }}
                     placeholder="https://mp.weixin.qq.com/s/…（填写后点击卡片将直接跳转）"
                   />
                 </div>
@@ -1579,7 +1594,10 @@ export default function EventPublish() {
                     type="text"
                     className="ia-modal__text-input"
                     value={editingEvent.title}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, title: e.target.value })}
+                    onChange={(e) => {
+                      setEditingEvent({ ...editingEvent, title: e.target.value });
+                      setEditFormError('');
+                    }}
                     autoFocus
                   />
                 </div>
@@ -1591,7 +1609,10 @@ export default function EventPublish() {
                       type="date"
                       className="ia-modal__text-input"
                       value={editingEvent.date || ''}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, date: e.target.value })}
+                      onChange={(e) => {
+                        setEditingEvent({ ...editingEvent, date: e.target.value });
+                        setEditFormError('');
+                      }}
                     />
                   </div>
                   <div className="ia-modal__field">
@@ -1599,7 +1620,10 @@ export default function EventPublish() {
                     <select
                       className="ia-modal__text-input"
                       value={editingEvent.category}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, category: e.target.value })}
+                      onChange={(e) => {
+                        setEditingEvent({ ...editingEvent, category: e.target.value });
+                        setEditFormError('');
+                      }}
                     >
                       {categoryList.map((cat) => (
                         <option key={cat} value={cat}>{cat}</option>
@@ -1617,7 +1641,10 @@ export default function EventPublish() {
                         className="ia-modal__text-input"
                         placeholder="请输入新分类名称，保存时将自动加入筛选项"
                         value={editCustomCategoryInput}
-                        onChange={(e) => setEditCustomCategoryInput(e.target.value)}
+                        onChange={(e) => {
+                          setEditCustomCategoryInput(e.target.value);
+                          setEditFormError('');
+                        }}
                         style={{ marginTop: 8 }}
                         maxLength={20}
                       />
@@ -1631,7 +1658,10 @@ export default function EventPublish() {
                     type="text"
                     className="ia-modal__text-input"
                     value={editingEvent.location || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, location: e.target.value })}
+                    onChange={(e) => {
+                      setEditingEvent({ ...editingEvent, location: e.target.value });
+                      setEditFormError('');
+                    }}
                     placeholder="如：线上腾讯会议 / 西南财经大学"
                   />
                 </div>
@@ -1641,7 +1671,10 @@ export default function EventPublish() {
                   <textarea
                     className="ia-modal__textarea"
                     value={editingEvent.excerpt || ''}
-                    onChange={(e) => setEditingEvent({ ...editingEvent, excerpt: e.target.value })}
+                    onChange={(e) => {
+                      setEditingEvent({ ...editingEvent, excerpt: e.target.value });
+                      setEditFormError('');
+                    }}
                     rows={3}
                     placeholder="简要介绍活动内容…"
                   />
@@ -1652,7 +1685,10 @@ export default function EventPublish() {
                     <input
                       type="checkbox"
                       checked={!!editingEvent.hasReplay}
-                      onChange={(e) => setEditingEvent({ ...editingEvent, hasReplay: e.target.checked })}
+                      onChange={(e) => {
+                        setEditingEvent({ ...editingEvent, hasReplay: e.target.checked });
+                        setEditFormError('');
+                      }}
                     />
                     <Video size={14} /> 提供活动回放（需设置链接与访问密码）
                   </label>
@@ -1666,7 +1702,10 @@ export default function EventPublish() {
                         type="url"
                         className="ia-modal__text-input"
                         value={editingEvent.replayUrl || ''}
-                        onChange={(e) => setEditingEvent({ ...editingEvent, replayUrl: e.target.value })}
+                        onChange={(e) => {
+                          setEditingEvent({ ...editingEvent, replayUrl: e.target.value });
+                          setEditFormError('');
+                        }}
                         placeholder="https://meeting.tencent.com/…"
                       />
                     </div>
@@ -1676,18 +1715,16 @@ export default function EventPublish() {
                         type="text"
                         className="ia-modal__text-input"
                         value={editingEvent.replayPassword || ''}
-                        onChange={(e) => setEditingEvent({ ...editingEvent, replayPassword: e.target.value })}
+                        onChange={(e) => {
+                          setEditingEvent({ ...editingEvent, replayPassword: e.target.value });
+                          setEditFormError('');
+                        }}
                         placeholder="为回放设置访问密码，留空则无需密码即可访问"
                       />
                     </div>
                   </>
                 )}
 
-                {editFormError && (
-                  <div className="ia-modal__error">
-                    <AlertCircle size={16} /> {editFormError}
-                  </div>
-                )}
               </div>
             </div>
 
