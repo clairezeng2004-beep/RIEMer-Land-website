@@ -53,8 +53,8 @@ import {
   updateSharing,
   fetchSharingById,
   fetchCategories,
+  getLocalCategories,
   addCategory as addCategoryRemote,
-  DEFAULT_CATEGORIES,
 } from '../../services/memberSharingService';
 import './MemberSharingCreate.css';
 
@@ -599,7 +599,7 @@ export default function MemberSharingCreate() {
   } = useMarkdownSyncScroll(false);
 
   // 加载动态分类（先本地默认，然后从云端拉取）
-  const [cats, setCats] = useState(DEFAULT_CATEGORIES);
+  const [cats, setCats] = useState(() => getVisibleCategories(getLocalCategories()));
 
   useEffect(() => {
     let cancelled = false;
@@ -626,6 +626,14 @@ export default function MemberSharingCreate() {
   const [isPublishing, setIsPublishing] = useState(false);
   const [editingSource, setEditingSource] = useState(null);
   const isSimpleFolderCreate = newPost.format === 'folder' && !isEditingPost;
+
+  useEffect(() => {
+    if (isEditingPost) return;
+    setNewPost((prev) => {
+      if (cats.some((cat) => cat.key === prev.category)) return prev;
+      return { ...prev, category: cats[0]?.key || '' };
+    });
+  }, [cats, isEditingPost]);
 
   /* ============ 贡献者多选 ============
      和流程模板文件一致：支持「分享迁移」——发布者本人不一定是贡献者，可多选。

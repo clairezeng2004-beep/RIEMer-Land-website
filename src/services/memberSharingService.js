@@ -659,7 +659,9 @@ export async function fetchCategories() {
       return getLocalCategories();
     }
     // 云端真实结果（可能为空数组，空 = 用户清空了所有分类，必须原样返回）
-    return (data || []).map((r) => ({ key: r.key, label: r.label, color: r.color }));
+    const categories = (data || []).map((r) => ({ key: r.key, label: r.label, color: r.color }));
+    saveLocalCategories(categories);
+    return categories;
   } catch (err) {
     console.warn('[MemberSharingDB] 获取分类异常，回退本地:', err.message);
     return getLocalCategories();
@@ -819,10 +821,13 @@ function deleteLocalSharing(id) {
   saveLocalSharings(next);
 }
 
-function getLocalCategories() {
+export function getLocalCategories() {
   try {
     const raw = localStorage.getItem(LOCAL_CATEGORIES_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed;
+    }
   } catch { /* ignore */ }
   return DEFAULT_CATEGORIES;
 }

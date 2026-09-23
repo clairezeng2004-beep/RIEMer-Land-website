@@ -24,7 +24,7 @@ import {
   deleteCategory as deleteCategoryRemote,
   subscribeCategories,
   getCachedSharings,
-  DEFAULT_CATEGORIES,
+  getLocalCategories,
 } from '../../services/memberSharingService';
 import { moveToRecycleBin } from '../../services/recycleBinService';
 import {
@@ -213,7 +213,7 @@ export default function MemberSharing() {
   const pendingLikesRef = useRef(new Map());
 
   // 动态分类管理
-  const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
+  const [categoryList, setCategoryList] = useState(() => getVisibleCategories(getLocalCategories()));
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
 
   // 首次加载：从云端拉取分享 + 分类，并把本地已有的旧数据一次性迁移到云端

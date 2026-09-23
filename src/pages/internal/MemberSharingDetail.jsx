@@ -50,7 +50,7 @@ import {
   updateSharing,
   fetchCategories,
   getCachedSharings,
-  DEFAULT_CATEGORIES,
+  getLocalCategories,
 } from '../../services/memberSharingService';
 import './MemberSharingDetail.css';
 
@@ -254,7 +254,7 @@ export default function MemberSharingDetail() {
   );
 
   // 动态分类
-  const [categoryList, setCategoryList] = useState(DEFAULT_CATEGORIES);
+  const [categoryList, setCategoryList] = useState(() => getLocalCategories());
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
 
   const [sharings, setSharings] = useState(() => getCachedSharings());
