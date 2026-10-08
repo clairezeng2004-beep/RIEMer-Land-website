@@ -586,6 +586,40 @@
   margin-top: 1px;
 }
 
+/* 底部提示：一行一条，左边是小标题 */
+.if-hint-list {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.if-hint-list li {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-sm);
+}
+
+.if-hint-list b {
+  flex: 0 0 4.5em;
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.if-hint-list li span {
+  flex: 1;
+  min-width: 0;
+}
+
+.if-hint-list li svg {
+  vertical-align: -2px;
+  margin-top: 0;
+}
+
 /* 上传详情弹窗 */
 .if-detail-overlay {
   position: fixed;
