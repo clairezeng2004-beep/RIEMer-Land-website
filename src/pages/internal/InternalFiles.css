@@ -34,6 +34,39 @@
   margin: 0;
 }
 
+/* 标题 + 「资料上传规范（必看）」小按钮 */
+.internal-files-page__header .if-title-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm) var(--space-md);
+  margin-bottom: var(--space-xs);
+}
+
+.internal-files-page__header .if-title-row h1 {
+  margin: 0;
+}
+
+.if-rules-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border: 1px solid var(--color-accent, #D4A44C);
+  border-radius: 999px;
+  background: rgba(212, 164, 76, 0.12);
+  color: #9A6B12;
+  font-size: var(--text-xs);
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast);
+}
+
+.if-rules-btn:hover {
+  background: rgba(212, 164, 76, 0.22);
+}
+
 .internal-files-page__actions {
   display: flex;
   align-items: center;
@@ -691,6 +724,35 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-sm);
+}
+
+/* 资料上传规范弹窗（复用详情弹窗外壳） */
+.if-detail.if-rules {
+  max-width: 460px;
+}
+
+.if-rules__body {
+  max-height: 65vh;
+  overflow-y: auto;
+}
+
+.if-rules__section + .if-rules__section {
+  margin-top: var(--space-md);
+}
+
+.if-rules__section h3 {
+  margin: 0 0 6px;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text);
+}
+
+.if-rules__section ul {
+  margin: 0;
+  padding-left: 1.2em;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+  line-height: 1.7;
 }
 
 /* 「移动到…」弹窗里的目标列表 */

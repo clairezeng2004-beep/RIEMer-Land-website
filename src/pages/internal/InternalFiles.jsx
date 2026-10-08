@@ -40,6 +40,7 @@ import {
   ListChecks,
   Square,
   CheckSquare,
+  ClipboardList,
   Link2,
   Pencil,
   Trash2,
@@ -195,6 +196,38 @@ function mergeTotalCache(folderId, total) {
   }
 }
 
+/* 资料上传规范（标题旁「必看」按钮弹出） */
+const UPLOAD_RULES = [
+  {
+    title: '传什么',
+    items: [
+      '多传与考试相关的资料：课后作业、考试卷、课本答案等，越全越好。',
+      '容易获取的资料不用多次传：课本、每一届都一样的 PPT、课程大纲等。',
+    ],
+  },
+  {
+    title: '什么时候传',
+    items: [
+      '平时做好资料留存，作业、试卷等随手存一份。',
+      '每学期末集中更新一次。',
+    ],
+  },
+  {
+    title: '怎么命名',
+    items: [
+      '文件名要一目了然：让人不点开就知道里面有什么、资料情况如何（是否完整、有没有答案、具体内容、时间点等）。',
+      '例如：2025秋高等数学期末试卷_含答案、概率论黄勔半期复习手写笔记。',
+    ],
+  },
+  {
+    title: '大文件怎么传',
+    items: [
+      '超过 10MB 的文件，尽量先上传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接，节省存储空间。',
+      '记得在网盘里把分享权限设为「可查看」，否则别人打不开。',
+    ],
+  },
+];
+
 // 拖到面包屑「全部资料」上 = 移到根目录；根目录 id 为 null，高亮态另用一个占位键
 const ROOT_DROP_KEY = '__root__';
 
@@ -299,6 +332,7 @@ export default function InternalFiles() {
   const [moveSources, setMoveSources] = useState(null); // 「移动到…」弹窗里待移动的条目（数组）
   const [selectMode, setSelectMode] = useState(false); // 多选模式：点条目 = 勾选，而不是打开
   const [selectedIds, setSelectedIds] = useState(() => new Set());
+  const [rulesOpen, setRulesOpen] = useState(false); // 「资料上传规范」弹窗
   const [linkDraft, setLinkDraft] = useState(null); // 「添加链接」弹窗：{ text, name, nameEdited }
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
@@ -801,8 +835,13 @@ export default function InternalFiles() {
         {/* 头部 */}
         <div className="internal-files-page__header">
           <div>
-            <h1><HardDrive size={28} /> 内部资料</h1>
-            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹；超过 20MB 的大文件，先传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接</p>
+            <div className="if-title-row">
+              <h1><HardDrive size={28} /> 内部资料</h1>
+              <button type="button" className="if-rules-btn" onClick={() => setRulesOpen(true)}>
+                <ClipboardList size={14} /> 资料上传规范（必看）
+              </button>
+            </div>
+            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹；超过 10MB 的文件，尽量先传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接</p>
           </div>
           <div className="internal-files-page__actions">
             <button
@@ -1213,6 +1252,32 @@ export default function InternalFiles() {
         );
       })()}
 
+      {/* 资料上传规范弹窗 */}
+      {rulesOpen && (
+        <div className="if-detail-overlay" onClick={() => setRulesOpen(false)}>
+          <div className="if-detail if-rules" onClick={(e) => e.stopPropagation()}>
+            <div className="if-detail__head">
+              <span className="if-detail__title">资料上传规范</span>
+              <button className="if-icon-btn" onClick={() => setRulesOpen(false)} title="关闭">
+                <X size={16} />
+              </button>
+            </div>
+            <div className="if-rules__body">
+              {UPLOAD_RULES.map((section, idx) => (
+                <section key={section.title} className="if-rules__section">
+                  <h3>{idx + 1}. {section.title}</h3>
+                  <ul>
+                    {section.items.map((item) => (
+                      <li key={item}>{item}</li>
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 添加链接弹窗 */}
       {linkDraft && (() => {
         const parsed = parseSharedLink(linkDraft.text);
@@ -1228,7 +1293,7 @@ export default function InternalFiles() {
                 </button>
               </div>
               <p className="if-link-form__tip">
-                适合 20MB 以上的大文件：先把文件传到 WPS、腾讯文档、百度网盘等，点「分享」复制链接，再整段粘贴到下面。
+                适合 10MB 以上的文件：先把文件传到 WPS、腾讯文档、百度网盘等，点「分享」复制链接，再整段粘贴到下面。
               </p>
               <label className="if-link-form__label" htmlFor="if-link-text">分享内容或网址</label>
               <textarea
