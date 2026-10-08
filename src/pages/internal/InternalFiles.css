@@ -67,6 +67,20 @@
   background: rgba(212, 164, 76, 0.22);
 }
 
+/* 次要的说明按钮（使用说明）：不抢「必看」的风头 */
+.if-rules-btn--plain {
+  border-color: var(--color-border-light);
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.if-rules-btn--plain:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-card, #fff);
+  color: var(--color-primary);
+}
+
 .internal-files-page__actions {
   display: flex;
   align-items: center;
@@ -568,58 +582,6 @@
 }
 
 /* 底部提示 */
-.internal-files-page__hint {
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-sm);
-  margin-top: var(--space-xl);
-  padding: var(--space-md);
-  background: rgba(91, 140, 62, 0.04);
-  border-radius: var(--radius-lg, 12px);
-  font-size: var(--text-xs);
-  color: var(--color-text-muted);
-  line-height: 1.5;
-}
-
-.internal-files-page__hint svg {
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-/* 底部提示：一行一条，左边是小标题 */
-.if-hint-list {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-  list-style: none;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.if-hint-list li {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-}
-
-.if-hint-list b {
-  flex: 0 0 4.5em;
-  color: var(--color-text);
-  font-weight: 600;
-}
-
-.if-hint-list li span {
-  flex: 1;
-  min-width: 0;
-}
-
-.if-hint-list li svg {
-  vertical-align: -2px;
-  margin-top: 0;
-}
-
 /* 上传详情弹窗 */
 .if-detail-overlay {
   position: fixed;
@@ -789,6 +751,11 @@
   line-height: 1.7;
 }
 
+.if-rules__section li svg {
+  vertical-align: -2px;
+  color: var(--color-text-muted);
+}
+
 /* 「移动到…」弹窗里的目标列表 */
 .if-move-list {
   display: flex;
@@ -895,6 +862,21 @@
   }
   .internal-files-page__header h1 {
     font-size: var(--text-xl);
+  }
+  /* 手机：标题独占一行，两个说明按钮并排在下一行，按钮加大便于点按 */
+  .internal-files-page__header .if-title-row h1 {
+    flex: 1 0 100%;
+  }
+  .if-rules-btn {
+    padding: 7px 12px;
+  }
+  /* 说明弹窗贴近屏幕宽度，正文可滚动，不会顶出屏幕 */
+  .if-detail-overlay {
+    padding: var(--space-md);
+  }
+  .if-rules__body {
+    max-height: 70vh;
+    -webkit-overflow-scrolling: touch;
   }
   .if-table__head,
   .if-row {

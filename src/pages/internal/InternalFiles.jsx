@@ -228,6 +228,56 @@ const UPLOAD_RULES = [
   },
 ];
 
+/* 使用说明（标题旁按钮弹出；原先是页面底部的一整段提示） */
+const USAGE_TIPS = [
+  {
+    title: '大文件',
+    items: [
+      '超过 10MB 建议用「添加链接」：先传到 WPS、腾讯文档等网盘，复制分享链接粘贴进来，名称会自动识别，点击条目即跳转查看。',
+      '记得把分享权限设为可查看。',
+    ],
+  },
+  {
+    title: '压缩包',
+    items: [
+      '上传 .zip 时可选自动解压成文件夹，或原样上传。',
+      '不支持带密码的包。',
+    ],
+  },
+  {
+    title: '移动',
+    items: [
+      '把文件或文件夹拖到同目录的文件夹上即可移入，拖到上方路径里的上级目录可移出。',
+      '手机上长按条目后点「移动到」。',
+      '一次移动多个：先点路径右侧的「多选」勾选，再拖动或点「移动到…」。',
+    ],
+  },
+  {
+    title: '权限',
+    items: [
+      '所有成员均可查看与上传。',
+      '备注、重命名、移动与删除仅限上传者本人或管理员。',
+    ],
+  },
+  {
+    title: '上传详情',
+    items: [
+      <>长按（手机）或点击 <Info size={13} /> 可查看「谁在何时上传」。</>,
+    ],
+  },
+  {
+    title: '删除',
+    items: [
+      '删除文件夹会一并删除其中全部内容，且不可撤销。',
+    ],
+  },
+];
+
+const INFO_MODALS = {
+  rules: { title: '资料上传规范', sections: UPLOAD_RULES },
+  tips: { title: '使用说明', sections: USAGE_TIPS },
+};
+
 // 拖到面包屑「全部资料」上 = 移到根目录；根目录 id 为 null，高亮态另用一个占位键
 const ROOT_DROP_KEY = '__root__';
 
@@ -332,7 +382,7 @@ export default function InternalFiles() {
   const [moveSources, setMoveSources] = useState(null); // 「移动到…」弹窗里待移动的条目（数组）
   const [selectMode, setSelectMode] = useState(false); // 多选模式：点条目 = 勾选，而不是打开
   const [selectedIds, setSelectedIds] = useState(() => new Set());
-  const [rulesOpen, setRulesOpen] = useState(false); // 「资料上传规范」弹窗
+  const [infoModal, setInfoModal] = useState(null); // 标题旁的说明弹窗：'rules' | 'tips' | null
   const [linkDraft, setLinkDraft] = useState(null); // 「添加链接」弹窗：{ text, name, nameEdited }
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
@@ -837,8 +887,11 @@ export default function InternalFiles() {
           <div>
             <div className="if-title-row">
               <h1><HardDrive size={28} /> 内部资料</h1>
-              <button type="button" className="if-rules-btn" onClick={() => setRulesOpen(true)}>
+              <button type="button" className="if-rules-btn" onClick={() => setInfoModal('rules')}>
                 <ClipboardList size={14} /> 资料上传规范（必看）
+              </button>
+              <button type="button" className="if-rules-btn if-rules-btn--plain" onClick={() => setInfoModal('tips')}>
+                <Info size={14} /> 使用说明
               </button>
             </div>
             <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹；超过 10MB 的文件，尽量先传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接</p>
@@ -1196,40 +1249,6 @@ export default function InternalFiles() {
             )}
           </div>
         )}
-
-        <div className="internal-files-page__hint">
-          <AlertCircle size={14} />
-          <ul className="if-hint-list">
-            <li>
-              <b>大文件</b>
-              <span>超过 10MB 建议用「添加链接」：先传到 WPS、腾讯文档等网盘，复制分享链接粘贴进来，名称会自动识别，点击条目即跳转查看。记得把分享权限设为可查看。</span>
-            </li>
-            <li>
-              <b>压缩包</b>
-              <span>上传 .zip 时可选自动解压成文件夹，或原样上传；不支持带密码的包。</span>
-            </li>
-            <li>
-              <b>移动</b>
-              <span>把文件或文件夹拖到同目录的文件夹上即可移入，拖到上方路径里的上级目录可移出；手机上长按条目后点「移动到」。</span>
-            </li>
-            <li>
-              <b>批量移动</b>
-              <span>先点路径右侧的「多选」勾选，再拖动或点「移动到…」。</span>
-            </li>
-            <li>
-              <b>权限</b>
-              <span>所有成员均可查看与上传；备注、重命名、移动与删除仅限上传者本人或管理员。</span>
-            </li>
-            <li>
-              <b>上传详情</b>
-              <span>长按（手机）或点击 <Info size={12} /> 可查看「谁在何时上传」。</span>
-            </li>
-            <li>
-              <b>删除</b>
-              <span>删除文件夹会一并删除其中全部内容，且不可撤销。</span>
-            </li>
-          </ul>
-        </div>
       </div>
 
       {/* 「移动到…」弹窗：手机无法拖拽，用它选目标；电脑上也可用 */}
@@ -1281,23 +1300,23 @@ export default function InternalFiles() {
         );
       })()}
 
-      {/* 资料上传规范弹窗 */}
-      {rulesOpen && (
-        <div className="if-detail-overlay" onClick={() => setRulesOpen(false)}>
+      {/* 说明弹窗：资料上传规范 / 使用说明 */}
+      {infoModal && (
+        <div className="if-detail-overlay" onClick={() => setInfoModal(null)}>
           <div className="if-detail if-rules" onClick={(e) => e.stopPropagation()}>
             <div className="if-detail__head">
-              <span className="if-detail__title">资料上传规范</span>
-              <button className="if-icon-btn" onClick={() => setRulesOpen(false)} title="关闭">
+              <span className="if-detail__title">{INFO_MODALS[infoModal].title}</span>
+              <button className="if-icon-btn" onClick={() => setInfoModal(null)} title="关闭">
                 <X size={16} />
               </button>
             </div>
             <div className="if-rules__body">
-              {UPLOAD_RULES.map((section, idx) => (
+              {INFO_MODALS[infoModal].sections.map((section, idx) => (
                 <section key={section.title} className="if-rules__section">
                   <h3>{idx + 1}. {section.title}</h3>
                   <ul>
-                    {section.items.map((item) => (
-                      <li key={item}>{item}</li>
+                    {section.items.map((item, i) => (
+                      <li key={i}>{item}</li>
                     ))}
                   </ul>
                 </section>
