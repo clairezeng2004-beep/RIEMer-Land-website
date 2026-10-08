@@ -24,6 +24,7 @@ import {
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
 import { ensureResponsiveTableWrappers } from '../../utils/responsiveTables';
+import { linkSourceLabel } from '../../utils/sharedLink';
 import ImageLightbox from '../../components/ImageLightbox';
 import WordPreview from '../../components/WordPreview';
 import ViewLogPopover from '../../components/ViewLogPopover';
@@ -634,7 +635,7 @@ export default function MemberSharingDetail() {
                         <IconComp size={20} className="msd-attachments__item-icon" />
                         <div className="msd-attachments__item-info">
                           <span className="msd-attachments__item-name">{file?.name || '未命名附件'}</span>
-                          <span className="msd-attachments__item-size">{isLink ? '在线文档链接' : formatFileSize(file?.size)}</span>
+                          <span className="msd-attachments__item-size">{isLink ? `${linkSourceLabel(file?.url)} 在线文档链接`.trim() : formatFileSize(file?.size)}</span>
                         </div>
                         <button
                           type="button"

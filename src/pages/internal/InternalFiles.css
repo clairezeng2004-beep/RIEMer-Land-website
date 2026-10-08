@@ -572,6 +572,63 @@
   word-break: break-all;
 }
 
+/* 添加链接弹窗（复用详情弹窗外壳） */
+.if-detail.if-link-form {
+  max-width: 440px;
+}
+
+.if-link-form__tip {
+  margin: 0 0 var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.6;
+}
+
+.if-link-form__label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+}
+
+.if-link-form__input {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: var(--space-md);
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-bg-card, #fff);
+  color: var(--color-text);
+  font: inherit;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.if-link-form__input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+}
+
+.if-link-form__status {
+  margin: calc(var(--space-sm) * -1) 0 var(--space-md);
+  font-size: var(--text-xs);
+  color: var(--color-primary);
+  line-height: 1.5;
+  word-break: break-all;
+}
+
+.if-link-form__status.is-error {
+  color: #C0392B;
+}
+
+.if-link-form__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-sm);
+}
+
 /* 详情弹窗内的管理操作（重命名 / 删除）——仅手机版显示 */
 .if-detail__actions {
   display: none;

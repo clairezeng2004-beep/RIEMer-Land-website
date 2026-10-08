@@ -15,6 +15,10 @@
 // 未配置 Supabase 时不可用（内部资料需登录并连接服务器）。
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
+import { parseSharedLink, linkSourceLabel } from '../utils/sharedLink';
+
+// 链接识别放在 utils/sharedLink（成员分享也在用），这里转出口保持原有引用不变
+export { parseSharedLink, linkSourceLabel };
 
 const BUCKET = 'internal-files';
 const STORAGE_UPLOAD_ATTEMPTS = 4;
@@ -236,7 +240,8 @@ export async function createFolder(parentId, name, user) {
 }
 
 /* ============================================
- * 外部链接条目（大文件放 WPS / 金山文档等网盘，这里只存网址）
+ * 外部链接条目（大文件放 WPS / 腾讯文档等网盘，这里只存网址）
+ *   不限 WPS：腾讯文档、飞书、百度网盘等任何 http(s) 网址都可以。
  *   复用文件行：storage_path 为空、url 存外部网址、mime_type 用
  *   LINK_MIME 作标记，因此无需改表结构，删除时也没有 Storage 对象要清理。
  * ============================================ */
@@ -244,24 +249,7 @@ export const LINK_MIME = 'text/x-url';
 
 export const isLinkNode = (node) => !node?.isFolder && node?.mimeType === LINK_MIME;
 
-/* 从粘贴内容里拆出网址与名称
- *   支持直接粘贴 WPS 的分享文案，如：
- *   「【金山文档 | WPS云文档】 期末复习小专题笔记 https://www.kdocs.cn/l/xxxx」
- *   返回 { url, name }；找不到 http(s) 网址时 url 为空串 */
-export function parseSharedLink(text) {
-  const raw = String(text || '').trim();
-  const match = raw.match(/https?:\/\/[^\s<>"']+/i);
-  if (!match) return { url: '', name: '' };
-  const url = match[0];
-  const name = raw
-    .replace(url, ' ')
-    .replace(/^\s*【[^】]*】/, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return { url, name };
-}
-
-export async function createLink(parentId, { name, url }, user) {
+export async function createLink(parentId, { name, url, note = '' }, user) {
   requireRemote();
   const cleanUrl = parseSharedLink(url).url;
   if (!cleanUrl) throw new Error('链接需以 http:// 或 https:// 开头。');
@@ -276,6 +264,7 @@ export async function createLink(parentId, { name, url }, user) {
       url: cleanUrl,
       mime_type: LINK_MIME,
       size_bytes: 0,
+      note: (note || '').trim().slice(0, 200),
       created_by_id: user?.id || null,
       created_by: user?.nickname || user?.name || '',
     })
@@ -384,11 +373,23 @@ export async function uploadFolderTree(parentId, files, user, onProgress) {
   requireRemote();
   const list = Array.from(files || []);
   if (list.length === 0) return { results: [], errors: [] };
+  const entries = list.map((file) => ({
+    relPath: file.webkitRelativePath || file.name || '',
+    getFile: () => file,
+  }));
+  return uploadEntryTree(parentId, entries, user, onProgress);
+}
+
+/* 按相对路径把一批条目建成目录树并上传（上传文件夹 / 解压压缩包共用）
+ *   entries: [{ relPath: 'a/b/c.pdf', getFile: () => File | Promise<File> }]
+ *   getFile 在轮到该文件上传时才调用，压缩包可借此边解压边传，不必全部先读进内存 */
+async function uploadEntryTree(parentId, entries, user, onProgress) {
+  const list = entries;
 
   // 1) 收集所有需要创建的目录（相对当前目录），按层级深度升序
   const dirSet = new Set();
   for (const f of list) {
-    const rel = f.webkitRelativePath || f.name || '';
+    const rel = f.relPath;
     const parts = rel.split('/');
     parts.pop(); // 去掉文件名
     let acc = '';
@@ -416,20 +417,136 @@ export async function uploadFolderTree(parentId, files, user, onProgress) {
   }
 
   // 3) 逐个文件放入对应文件夹并上传
-  const tasks = list.map((file) => {
-    const rel = file.webkitRelativePath || file.name || '';
+  const tasks = list.map((entry) => {
+    const rel = entry.relPath;
     const idx = rel.lastIndexOf('/');
     const dir = idx === -1 ? '' : rel.slice(0, idx);
     const targetId = folderIdByPath.has(dir)
       ? folderIdByPath.get(dir)
       : parentId || null;
     return {
-      label: rel || file.name,
-      run: () => uploadOneFile(targetId, file, user),
+      label: rel,
+      run: async () => uploadOneFile(targetId, await entry.getFile(), user),
     };
   });
 
   return runUploads(tasks, onProgress);
+}
+
+/* ============================================
+ * 上传压缩包并自动解压（仅 .zip）
+ *   在浏览器里解压，按包内目录结构建成文件夹，效果等同「上传文件夹」
+ *   （手机浏览器不支持选文件夹，可用它代替）。
+ *   不想解压时仍可走 uploadFiles 原样上传压缩包。
+ * ============================================ */
+// 解压要把整个压缩包读进内存，过大会卡死页面，超过此大小不解压
+export const ZIP_EXTRACT_MAX_BYTES = 200 * 1024 * 1024;
+
+export const isZipFile = (file) => /\.zip$/i.test(file?.name || '');
+
+// 解压出的文件没有 MIME，按扩展名补上，否则 PDF / 图片点开会变成下载而不是预览
+const MIME_BY_EXT = {
+  pdf: 'application/pdf',
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  svg: 'image/svg+xml',
+  txt: 'text/plain',
+  md: 'text/markdown',
+  csv: 'text/csv',
+  json: 'application/json',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp3: 'audio/mpeg',
+  mp4: 'video/mp4',
+  zip: 'application/zip',
+};
+
+function mimeFromName(name) {
+  const ext = (name?.split('.').pop() || '').toLowerCase();
+  return MIME_BY_EXT[ext] || '';
+}
+
+// Windows 自带压缩 / 部分国产软件打的包，中文文件名是 GBK 而非 UTF-8，直接解会乱码
+function decodeZipFileName(bytes) {
+  const buf = bytes instanceof Uint8Array ? bytes : Uint8Array.from(bytes);
+  try {
+    return new TextDecoder('utf-8', { fatal: true }).decode(buf);
+  } catch {
+    try {
+      return new TextDecoder('gbk').decode(buf);
+    } catch {
+      return new TextDecoder().decode(buf);
+    }
+  }
+}
+
+// 系统自动塞进压缩包的垃圾文件，不上传
+const ZIP_JUNK_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);
+
+export async function uploadZipAsFolder(parentId, zipFile, user, onProgress) {
+  requireRemote();
+  if (zipFile.size > ZIP_EXTRACT_MAX_BYTES) {
+    throw new Error('压缩包过大，无法在浏览器里解压。');
+  }
+
+  const { default: JSZip } = await import('jszip');
+  let zip;
+  try {
+    zip = await JSZip.loadAsync(zipFile, { decodeFileName: decodeZipFileName });
+  } catch (err) {
+    if (/encrypt/i.test(err?.message || '')) {
+      throw new Error('压缩包设了密码，无法自动解压。');
+    }
+    throw new Error('无法读取压缩包（文件可能已损坏，或不是标准 zip 格式）。');
+  }
+
+  const found = [];
+  zip.forEach((path, entry) => {
+    if (entry.dir) return;
+    const segs = path
+      .replace(/\\/g, '/')
+      .split('/')
+      .filter((seg) => seg && seg !== '.' && seg !== '..');
+    if (segs.length === 0 || segs[0] === '__MACOSX') return;
+    const fileName = segs[segs.length - 1];
+    if (ZIP_JUNK_NAMES.has(fileName.toLowerCase()) || fileName.startsWith('._')) return;
+    found.push({ segs, entry });
+  });
+  if (found.length === 0) throw new Error('压缩包里没有可上传的文件。');
+
+  // 包内已自带唯一的顶层文件夹就直接用它；否则用压缩包名建一个，避免散落在当前目录
+  const top = found[0].segs[0];
+  const hasSingleRoot = found.every((f) => f.segs.length > 1 && f.segs[0] === top);
+  const rootName = (zipFile.name || '').replace(/\.zip$/i, '').trim() || '压缩包';
+
+  const entries = found.map(({ segs, entry }) => {
+    const fileName = segs[segs.length - 1];
+    return {
+      relPath: (hasSingleRoot ? segs : [rootName, ...segs]).join('/'),
+      getFile: async () => {
+        try {
+          const blob = await entry.async('blob');
+          return new File([blob], fileName, {
+            type: mimeFromName(fileName),
+            lastModified: entry.date ? entry.date.getTime() : Date.now(),
+          });
+        } catch (err) {
+          if (/encrypt/i.test(err?.message || '')) throw new Error('文件设了密码，无法解压。');
+          throw err;
+        }
+      },
+    };
+  });
+
+  return uploadEntryTree(parentId, entries, user, onProgress);
 }
 
 /* ============================================

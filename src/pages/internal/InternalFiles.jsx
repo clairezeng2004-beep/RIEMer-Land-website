@@ -9,6 +9,9 @@ import {
   createFolder,
   uploadFiles,
   uploadFolderTree,
+  uploadZipAsFolder,
+  isZipFile,
+  ZIP_EXTRACT_MAX_BYTES,
   renameNode,
   updateNote,
   deleteNode,
@@ -17,6 +20,7 @@ import {
   createLink,
   parseSharedLink,
   isLinkNode,
+  linkSourceLabel,
   CHILDREN_PAGE_SIZE,
 } from '../../services/internalFilesService';
 import {
@@ -29,6 +33,7 @@ import {
   FolderPlus,
   Upload,
   FolderUp,
+  FolderArchive,
   Link2,
   Pencil,
   Trash2,
@@ -72,19 +77,11 @@ function formatDate(value) {
   });
 }
 
-function linkHost(url) {
-  try {
-    return new URL(url).hostname;
-  } catch {
-    return '';
-  }
-}
-
 /* 按扩展名 / MIME 选择图标与类别标签 */
 function getFileMeta(node) {
   if (isLinkNode(node)) {
-    const isWps = /(^|\.)(kdocs\.cn|wps\.cn)$/i.test(linkHost(node.url));
-    return { Icon: Link2, label: isWps ? 'WPS 链接' : '链接', cls: 'is-link' };
+    const source = linkSourceLabel(node.url);
+    return { Icon: Link2, label: source ? `${source} 链接` : '链接', cls: 'is-link' };
   }
   const name = (node.name || '').toLowerCase();
   const mime = (node.mimeType || '').toLowerCase();
@@ -288,10 +285,12 @@ export default function InternalFiles() {
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
+  const [linkDraft, setLinkDraft] = useState(null); // 「添加链接」弹窗：{ text, name, nameEdited }
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
   const filesInputRef = useRef(null);
   const folderInputRef = useRef(null);
+  const zipInputRef = useRef(null);
   const inflightRef = useRef(false);
   // 每次 load 递增的令牌：单独并行拉取的「总数」回来晚，用它挡掉切目录后
   // 落到错误目录上的旧计数。
@@ -484,20 +483,32 @@ export default function InternalFiles() {
     }
   };
 
-  /* ---- 添加链接（大文件放 WPS 等网盘，这里只存网址）---- */
-  const handleAddLink = async () => {
-    const pasted = window.prompt('粘贴 WPS / 金山文档的分享内容或链接：', '');
-    if (pasted === null) return;
-    const { url, name: parsedName } = parseSharedLink(pasted);
-    if (!url) {
-      alert('没有识别到链接，请粘贴以 http:// 或 https:// 开头的网址。');
-      return;
-    }
-    const name = window.prompt('显示名称：', parsedName || '');
-    if (name === null) return;
+  /* ---- 添加链接（大文件放 WPS / 腾讯文档等网盘，这里只存网址）---- */
+  // 粘贴内容变化时自动识别名称；用户手动改过名称后不再覆盖
+  const handleLinkTextChange = (text) => {
+    setLinkDraft((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        text,
+        name: prev.nameEdited ? prev.name : parseSharedLink(text).name,
+      };
+    });
+  };
+
+  const handleSubmitLink = async (e) => {
+    e.preventDefault();
+    if (!linkDraft || busy) return;
+    const { url, code } = parseSharedLink(linkDraft.text);
+    if (!url) return;
     setBusy(true);
     try {
-      await createLink(folderId, { name, url }, user);
+      await createLink(
+        folderId,
+        { name: linkDraft.name, url, note: code ? `提取码：${code}` : '' },
+        user
+      );
+      setLinkDraft(null);
       await load(folderId);
     } catch (err) {
       alert('添加链接失败：' + (err?.message || err));
@@ -506,20 +517,61 @@ export default function InternalFiles() {
     }
   };
 
-  /* ---- 上传（文件 / 文件夹） ---- */
+  /* ---- 上传（文件 / 文件夹 / 压缩包） ---- */
+  // 普通上传里遇到 .zip 时逐个询问：解压成文件夹，还是原样上传压缩包
+  const askExtractZips = (list) => {
+    const plain = [];
+    const zips = [];
+    for (const file of list) {
+      if (!isZipFile(file)) {
+        plain.push(file);
+      } else if (file.size > ZIP_EXTRACT_MAX_BYTES) {
+        const ok = window.confirm(
+          `「${file.name}」超过 ${Math.round(ZIP_EXTRACT_MAX_BYTES / 1024 / 1024)}MB，无法在线解压。\n\n确定：不解压，原样上传压缩包\n取消：跳过这个文件（大文件建议改用「添加链接」）`
+        );
+        if (ok) plain.push(file);
+      } else {
+        const extract = window.confirm(
+          `「${file.name}」是压缩包，要自动解压吗？\n\n确定：解压，按包内目录结构存成文件夹\n取消：不解压，原样上传压缩包`
+        );
+        (extract ? zips : plain).push(file);
+      }
+    }
+    return { plain, zips };
+  };
+
   const doUpload = async (fileList, isFolder) => {
     const list = Array.from(fileList || []);
     if (list.length === 0) return;
+    const { plain, zips } = isFolder ? { plain: list, zips: [] } : askExtractZips(list);
+    if (plain.length === 0 && zips.length === 0) return;
     setBusy(true);
-    setProgress({ done: 0, total: list.length, current: '' });
+    setProgress({ done: 0, total: plain.length, current: '' });
     try {
       const onProgress = (done, total, current) =>
         setProgress({ done, total, current });
-      const fn = isFolder ? uploadFolderTree : uploadFiles;
-      const { errors } = await fn(folderId, list, user, onProgress);
+      let failed = 0;
+      if (plain.length > 0) {
+        const fn = isFolder ? uploadFolderTree : uploadFiles;
+        const { errors } = await fn(folderId, plain, user, onProgress);
+        failed += errors?.length || 0;
+      }
+      const zipFailures = [];
+      for (const zip of zips) {
+        setProgress({ done: 0, total: 0, current: zip.name, label: '正在解压' });
+        try {
+          const { errors } = await uploadZipAsFolder(folderId, zip, user, onProgress);
+          failed += errors?.length || 0;
+        } catch (err) {
+          zipFailures.push(`「${zip.name}」：${err?.message || err}`);
+        }
+      }
       await load(folderId);
-      if (errors && errors.length > 0) {
-        alert(`部分文件上传失败（${errors.length} 个），其余已成功上传。`);
+      if (zipFailures.length > 0) {
+        alert(`以下压缩包未能解压，可重新选择并改为「不解压，原样上传」：\n${zipFailures.join('\n')}`);
+      }
+      if (failed > 0) {
+        alert(`部分文件上传失败（${failed} 个），其余已成功上传。`);
       }
     } catch (err) {
       alert('上传失败：' + (err?.message || err));
@@ -614,7 +666,7 @@ export default function InternalFiles() {
         <div className="internal-files-page__header">
           <div>
             <h1><HardDrive size={28} /> 内部资料</h1>
-            <p>团队内部文件资源库 · 可上传文件 / 文件夹，大文件可添加 WPS 链接，也可自行新建文件夹整理</p>
+            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹；超过 20MB 的大文件，先传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接</p>
           </div>
           <div className="internal-files-page__actions">
             <button
@@ -638,7 +690,21 @@ export default function InternalFiles() {
               <FolderUp size={16} />
               <span className="if-btn__text">上传文件夹</span>
             </button>
-            <button className="if-btn" onClick={handleAddLink} disabled={busy} title="大文件可放 WPS，在这里添加分享链接">
+            <button
+              className="if-btn"
+              onClick={() => zipInputRef.current?.click()}
+              disabled={busy}
+              title="上传 .zip 压缩包，可自动解压成文件夹（手机上可代替「上传文件夹」）"
+            >
+              <FolderArchive size={16} />
+              <span className="if-btn__text">上传压缩包</span>
+            </button>
+            <button
+              className="if-btn"
+              onClick={() => setLinkDraft({ text: '', name: '', nameEdited: false })}
+              disabled={busy}
+              title="大文件先传到 WPS / 腾讯文档等网盘，再在这里添加分享链接"
+            >
               <Link2 size={16} />
               <span className="if-btn__text">添加链接</span>
             </button>
@@ -661,6 +727,14 @@ export default function InternalFiles() {
           directory=""
           multiple
           onChange={handleFolderPicked}
+        />
+        <input
+          ref={zipInputRef}
+          type="file"
+          accept=".zip,application/zip,application/x-zip-compressed"
+          multiple
+          hidden
+          onChange={handleFilesPicked}
         />
 
         {/* 面包屑 */}
@@ -691,7 +765,7 @@ export default function InternalFiles() {
           <div className="internal-files-page__progress">
             <RefreshCw size={16} className="if-spin" />
             <span>
-              正在上传 {progress.done}/{progress.total}
+              {progress.label || `正在上传 ${progress.done}/${progress.total}`}
               {progress.current ? ` · ${progress.current}` : ''}
             </span>
           </div>
@@ -719,7 +793,7 @@ export default function InternalFiles() {
             <div className="internal-files-page__empty">
               <Inbox size={40} />
               <p>这个文件夹是空的</p>
-              <span>点击右上角「上传文件 / 上传文件夹 / 添加链接」，或把文件拖拽到此处</span>
+              <span>点击右上角「上传文件 / 上传文件夹 / 上传压缩包 / 添加链接」，或把文件拖拽到此处</span>
             </div>
           ) : (
             <div className="if-table">
@@ -883,9 +957,68 @@ export default function InternalFiles() {
 
         <div className="internal-files-page__hint">
           <AlertCircle size={14} />
-          <span>所有成员均可查看与上传；备注、重命名与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
+          <span>大文件直接上传又慢又容易失败，建议改用「添加链接」：先把文件传到 WPS、腾讯文档等网盘并复制分享链接，粘贴进来后会自动识别名称，点击条目即跳转到网盘查看（记得在网盘里把分享权限设为可查看）。上传 zip 压缩包时可选择自动解压（按包内目录存成文件夹）或原样上传，仅支持 .zip，不支持带密码的包。所有成员均可查看与上传；备注、重命名与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
         </div>
       </div>
+
+      {/* 添加链接弹窗 */}
+      {linkDraft && (() => {
+        const parsed = parseSharedLink(linkDraft.text);
+        const source = linkSourceLabel(parsed.url);
+        const hasText = !!linkDraft.text.trim();
+        return (
+          <div className="if-detail-overlay" onClick={() => !busy && setLinkDraft(null)}>
+            <form className="if-detail if-link-form" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmitLink}>
+              <div className="if-detail__head">
+                <span className="if-detail__title">添加链接</span>
+                <button type="button" className="if-icon-btn" onClick={() => setLinkDraft(null)} disabled={busy} title="关闭">
+                  <X size={16} />
+                </button>
+              </div>
+              <p className="if-link-form__tip">
+                适合 20MB 以上的大文件：先把文件传到 WPS、腾讯文档、百度网盘等，点「分享」复制链接，再整段粘贴到下面。
+              </p>
+              <label className="if-link-form__label" htmlFor="if-link-text">分享内容或网址</label>
+              <textarea
+                id="if-link-text"
+                className="if-link-form__input"
+                rows={3}
+                autoFocus
+                placeholder="例如：【腾讯文档】期末复习笔记 https://docs.qq.com/doc/xxxx"
+                value={linkDraft.text}
+                onChange={(e) => handleLinkTextChange(e.target.value)}
+              />
+              {hasText && (
+                <div className={`if-link-form__status ${parsed.url ? '' : 'is-error'}`}>
+                  {parsed.url
+                    ? `已识别${source ? ` ${source} ` : ''}链接：${parsed.url}${parsed.code ? `（提取码 ${parsed.code} 会写入备注）` : ''}`
+                    : '没有识别到网址，需包含以 http:// 或 https:// 开头的链接。'}
+                </div>
+              )}
+              <label className="if-link-form__label" htmlFor="if-link-name">显示名称</label>
+              <input
+                id="if-link-name"
+                className="if-link-form__input"
+                type="text"
+                placeholder="列表里显示的文件名"
+                value={linkDraft.name}
+                onChange={(e) => {
+                  const name = e.target.value;
+                  setLinkDraft((prev) => (prev ? { ...prev, name, nameEdited: true } : prev));
+                }}
+              />
+              <div className="if-link-form__actions">
+                <button type="button" className="if-btn if-btn--ghost" onClick={() => setLinkDraft(null)} disabled={busy}>
+                  取消
+                </button>
+                <button type="submit" className="if-btn" disabled={busy || !parsed.url || !linkDraft.name.trim()}>
+                  {busy ? '添加中…' : '添加'}
+                </button>
+              </div>
+            </form>
+          </div>
+        );
+      })()}
 
       {/* 上传详情弹窗（长按 / Info 触发） */}
       {detailNode && (

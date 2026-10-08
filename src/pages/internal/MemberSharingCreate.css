@@ -524,6 +524,14 @@
   position: relative;
 }
 
+/* 「添加链接」展开面板（输入框样式复用 FolderItemsEditor） */
+.msc-form__link-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .msc-form__attach-badge {
   display: inline-flex;
   align-items: center;

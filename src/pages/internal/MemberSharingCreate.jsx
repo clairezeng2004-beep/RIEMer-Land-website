@@ -26,6 +26,7 @@ import {
   FileArchive,
   FolderOpen,
   Loader2,
+  Link as LinkIcon,
 } from 'lucide-react';
 import { attachWordImageEditor } from '../../utils/wordImageEditor';
 import {
@@ -56,6 +57,12 @@ import {
   getLocalCategories,
   addCategory as addCategoryRemote,
 } from '../../services/memberSharingService';
+import {
+  buildLinkAttachment,
+  linkSourceLabel,
+  normalizeLinkUrl,
+  splitPastedLink,
+} from '../../utils/sharedLink';
 import './MemberSharingCreate.css';
 
 const HIDDEN_CATEGORY_KEYS = new Set(['history']);
@@ -624,6 +631,10 @@ export default function MemberSharingCreate() {
     attachments: [],
   });
   const [isPublishing, setIsPublishing] = useState(false);
+  // 「添加链接」：把 WPS / 腾讯文档等在线文档作为链接附件挂到分享上
+  const [linkFormOpen, setLinkFormOpen] = useState(false);
+  const [linkName, setLinkName] = useState('');
+  const [linkUrl, setLinkUrl] = useState('');
   const [editingSource, setEditingSource] = useState(null);
   const isSimpleFolderCreate = newPost.format === 'folder' && !isEditingPost;
 
@@ -929,6 +940,40 @@ export default function MemberSharingCreate() {
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
 
+  const handleLinkUrlChange = (value) => {
+    // 整段粘贴分享文案时，自动拆出网址并填好名称
+    const split = splitPastedLink(value);
+    if (!split) {
+      setLinkUrl(value);
+      return;
+    }
+    setLinkUrl(split.url);
+    if (!linkName.trim() && split.name) setLinkName(split.name);
+  };
+
+  const handleAddLink = () => {
+    const url = normalizeLinkUrl(linkUrl);
+    if (!url) {
+      alert('请填写在线文档链接');
+      return;
+    }
+    if (newPost.attachments.length >= 10) {
+      alert('最多只能添加 10 个附件');
+      return;
+    }
+    const name = linkName.trim();
+    const link = buildLinkAttachment({ name, url });
+    setNewPost((prev) => ({
+      ...prev,
+      // 还没写标题时，直接用文档名当标题，贴完链接即可发布
+      title: prev.title.trim() ? prev.title : name || prev.title,
+      attachments: [...prev.attachments, link],
+    }));
+    setLinkName('');
+    setLinkUrl('');
+    setLinkFormOpen(false);
+  };
+
   // 构建要保存的 post 对象；标题缺失或正文/附件都为空时返回 null（用于自动保存时静默跳过）
   const buildPost = () => {
     const currentContent = newPost.format === 'word' && wordEditorRef.current
@@ -1004,7 +1049,7 @@ export default function MemberSharingCreate() {
       if (!silent) {
         alert(newPost.format === 'folder'
           ? '请先填写文件夹标题'
-          : '请先填写标题，并提供正文内容或上传至少一个附件');
+          : '请先填写标题，并提供正文内容、上传附件或添加在线文档链接');
       }
       return false;
     }
@@ -1053,7 +1098,7 @@ export default function MemberSharingCreate() {
     if (!post) {
       alert(newPost.format === 'folder'
         ? '请填写文件夹标题'
-        : '请填写标题，并提供正文内容或上传至少一个附件');
+        : '请填写标题，并提供正文内容、上传附件或添加在线文档链接');
       return;
     }
     setIsPublishing(true);
@@ -1136,7 +1181,7 @@ export default function MemberSharingCreate() {
               ? '修改分享内容，保存后会同步更新列表与详情页'
               : newPost.format === 'folder'
                 ? '填写名称后即可创建，文件夹内容可以之后再添加'
-                : '填写以下内容发布分享，支持 Markdown、Word 和文件夹'}
+                : '填写以下内容发布分享，支持 Markdown、Word 和文件夹；文章已写在 WPS / 腾讯文档等在线文档里的，点「添加链接」粘贴分享链接即可，正文可留空'}
           </p>
 
           <form id="msc-create-form" onSubmit={handleCreate} className="msc-form">
@@ -1323,7 +1368,50 @@ export default function MemberSharingCreate() {
                     e.target.value = '';
                   }}
                 />
+                {newPost.format !== 'folder' && (
+                  <button
+                    type="button"
+                    className={`msc-form__format-btn msc-form__attach-btn ${linkFormOpen ? 'msc-form__format-btn--active' : ''}`}
+                    onClick={() => setLinkFormOpen((open) => !open)}
+                    title="文章在 WPS / 腾讯文档等在线文档里？粘贴分享链接即可"
+                  >
+                    <LinkIcon size={14} /> 添加链接
+                  </button>
+                )}
               </div>
+              {linkFormOpen && newPost.format !== 'folder' && (
+                <div className="msc-form__link-panel">
+                  <div className="folder-editor__link-form">
+                    <input
+                      type="text"
+                      value={linkName}
+                      onChange={(e) => setLinkName(e.target.value)}
+                      placeholder="文档名称"
+                      className="folder-editor__link-input"
+                    />
+                    <input
+                      type="text"
+                      value={linkUrl}
+                      onChange={(e) => handleLinkUrlChange(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddLink();
+                        }
+                      }}
+                      placeholder="粘贴 WPS / 腾讯文档等的分享内容或网址"
+                      className="folder-editor__link-input folder-editor__link-input--url"
+                      autoFocus
+                    />
+                    <button type="button" className="folder-editor__link-add" onClick={handleAddLink}>
+                      <LinkIcon size={15} /> 添加
+                    </button>
+                  </div>
+                  <span className="msc-form__hint">
+                    整段粘贴分享内容会自动识别文档名称；读者在详情页点击即跳转到在线文档，记得把文档的分享权限设为可查看。
+                  </span>
+                </div>
+              )}
             </div>
             )}
 
@@ -1441,17 +1529,20 @@ export default function MemberSharingCreate() {
               <div className="msc-form__field">
                 <label>
                   <Paperclip size={14} /> 已上传附件
-                  <span className="msc-form__hint">共 {newPost.attachments.length} 个文件</span>
+                  <span className="msc-form__hint">共 {newPost.attachments.length} 项</span>
                 </label>
                 <div className="msc-attach__list">
                   {newPost.attachments.map((file) => {
-                    const IconComp = getFileIcon(file.name);
+                    const isLink = file.kind === 'link' || file.type === 'link';
+                    const IconComp = isLink ? LinkIcon : getFileIcon(file.name);
                     return (
                       <div key={file.id} className="msc-attach__item">
                         <IconComp size={18} className="msc-attach__item-icon" />
                         <div className="msc-attach__item-info">
                           <span className="msc-attach__item-name">{file.name}</span>
-                          <span className="msc-attach__item-size">{formatFileSize(file.size)}</span>
+                          <span className="msc-attach__item-size">
+                            {isLink ? `${linkSourceLabel(file.url)} 在线文档链接`.trim() : formatFileSize(file.size)}
+                          </span>
                         </div>
                         <button
                           type="button"

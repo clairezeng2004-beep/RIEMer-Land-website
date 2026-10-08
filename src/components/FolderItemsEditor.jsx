@@ -10,6 +10,7 @@ import {
   FileSpreadsheet,
   FileArchive,
 } from 'lucide-react';
+import { buildLinkAttachment, normalizeLinkUrl, splitPastedLink } from '../utils/sharedLink';
 import './FolderItemsEditor.css';
 
 const MAX_ITEMS = 20;
@@ -39,13 +40,6 @@ function formatFileSize(bytes) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
-
-function normalizeUrl(value) {
-  const url = String(value || '').trim();
-  if (!url) return '';
-  if (/^https?:\/\//i.test(url)) return url;
-  return `https://${url}`;
 }
 
 export default function FolderItemsEditor({ items = [], onChange, title = '文件夹内容' }) {
@@ -79,8 +73,7 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
   }, [onChange, safeItems]);
 
   const addLink = useCallback(() => {
-    const url = normalizeUrl(linkUrl);
-    const name = linkName.trim() || url;
+    const url = normalizeLinkUrl(linkUrl);
     if (!url) {
       alert('请填写在线文档链接');
       return;
@@ -91,13 +84,7 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
     }
     onChange([
       ...safeItems,
-      {
-        id: `folder_link_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
-        kind: 'link',
-        name,
-        url,
-        type: 'link',
-      },
+      buildLinkAttachment({ name: linkName, url }),
     ]);
     setLinkName('');
     setLinkUrl('');
@@ -146,8 +133,17 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
           <input
             type="url"
             value={linkUrl}
-            onChange={(event) => setLinkUrl(event.target.value)}
-            placeholder="在线文档链接"
+            onChange={(event) => {
+              // 整段粘贴 WPS / 腾讯文档等的分享文案时，自动拆出网址并填好名称
+              const split = splitPastedLink(event.target.value);
+              if (!split) {
+                setLinkUrl(event.target.value);
+                return;
+              }
+              setLinkUrl(split.url);
+              if (!linkName.trim() && split.name) setLinkName(split.name);
+            }}
+            placeholder="在线文档链接（可直接粘贴分享内容）"
             className="folder-editor__link-input folder-editor__link-input--url"
           />
           <button type="button" className="folder-editor__link-add" onClick={addLink}>
