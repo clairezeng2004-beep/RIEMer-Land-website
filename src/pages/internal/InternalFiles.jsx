@@ -14,6 +14,9 @@ import {
   deleteNode,
   sortNodes,
   fetchFolderContributors,
+  createLink,
+  parseSharedLink,
+  isLinkNode,
   CHILDREN_PAGE_SIZE,
 } from '../../services/internalFilesService';
 import {
@@ -26,6 +29,7 @@ import {
   FolderPlus,
   Upload,
   FolderUp,
+  Link2,
   Pencil,
   Trash2,
   ChevronRight,
@@ -68,8 +72,20 @@ function formatDate(value) {
   });
 }
 
+function linkHost(url) {
+  try {
+    return new URL(url).hostname;
+  } catch {
+    return '';
+  }
+}
+
 /* 按扩展名 / MIME 选择图标与类别标签 */
 function getFileMeta(node) {
+  if (isLinkNode(node)) {
+    const isWps = /(^|\.)(kdocs\.cn|wps\.cn)$/i.test(linkHost(node.url));
+    return { Icon: Link2, label: isWps ? 'WPS 链接' : '链接', cls: 'is-link' };
+  }
   const name = (node.name || '').toLowerCase();
   const mime = (node.mimeType || '').toLowerCase();
   const ext = name.includes('.') ? name.split('.').pop() : '';
@@ -468,6 +484,28 @@ export default function InternalFiles() {
     }
   };
 
+  /* ---- 添加链接（大文件放 WPS 等网盘，这里只存网址）---- */
+  const handleAddLink = async () => {
+    const pasted = window.prompt('粘贴 WPS / 金山文档的分享内容或链接：', '');
+    if (pasted === null) return;
+    const { url, name: parsedName } = parseSharedLink(pasted);
+    if (!url) {
+      alert('没有识别到链接，请粘贴以 http:// 或 https:// 开头的网址。');
+      return;
+    }
+    const name = window.prompt('显示名称：', parsedName || '');
+    if (name === null) return;
+    setBusy(true);
+    try {
+      await createLink(folderId, { name, url }, user);
+      await load(folderId);
+    } catch (err) {
+      alert('添加链接失败：' + (err?.message || err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   /* ---- 上传（文件 / 文件夹） ---- */
   const doUpload = async (fileList, isFolder) => {
     const list = Array.from(fileList || []);
@@ -576,7 +614,7 @@ export default function InternalFiles() {
         <div className="internal-files-page__header">
           <div>
             <h1><HardDrive size={28} /> 内部资料</h1>
-            <p>团队内部文件资源库 · 可上传文件 / 文件夹，也可自行新建文件夹整理</p>
+            <p>团队内部文件资源库 · 可上传文件 / 文件夹，大文件可添加 WPS 链接，也可自行新建文件夹整理</p>
           </div>
           <div className="internal-files-page__actions">
             <button
@@ -599,6 +637,10 @@ export default function InternalFiles() {
             <button className="if-btn" onClick={() => folderInputRef.current?.click()} disabled={busy}>
               <FolderUp size={16} />
               <span className="if-btn__text">上传文件夹</span>
+            </button>
+            <button className="if-btn" onClick={handleAddLink} disabled={busy} title="大文件可放 WPS，在这里添加分享链接">
+              <Link2 size={16} />
+              <span className="if-btn__text">添加链接</span>
             </button>
           </div>
         </div>
@@ -677,7 +719,7 @@ export default function InternalFiles() {
             <div className="internal-files-page__empty">
               <Inbox size={40} />
               <p>这个文件夹是空的</p>
-              <span>点击右上角「上传文件 / 上传文件夹」，或把文件拖拽到此处</span>
+              <span>点击右上角「上传文件 / 上传文件夹 / 添加链接」，或把文件拖拽到此处</span>
             </div>
           ) : (
             <div className="if-table">
@@ -758,7 +800,7 @@ export default function InternalFiles() {
                       href={node.url || '#'}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`${node.name} · 点击预览（${detailTitle}）`}
+                      title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : '点击预览'}（${detailTitle}）`}
                       onClick={(e) => {
                         if (longPressedRef.current) {
                           e.preventDefault();
@@ -770,7 +812,7 @@ export default function InternalFiles() {
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
                     </a>
-                    <span className="if-col-size">{formatSize(node.sizeBytes)}</span>
+                    <span className="if-col-size">{isLinkNode(node) ? '链接' : formatSize(node.sizeBytes)}</span>
                     {(() => {
                       const { list, loading: contribLoading } = contribsFor(node);
                       return (
@@ -868,9 +910,11 @@ export default function InternalFiles() {
                   </li>
                 );
               })()}
-              {!detailNode.isFolder && (
+              {!detailNode.isFolder && (isLinkNode(detailNode) ? (
+                <li><Link2 size={14} /><span>链接</span><b className="if-detail__url">{detailNode.url}</b></li>
+              ) : (
                 <li><Info size={14} /><span>大小</span><b>{formatSize(detailNode.sizeBytes)}</b></li>
-              )}
+              ))}
               <li><StickyNote size={14} /><span>备注</span><b>{detailNode.note?.trim() || '（空）'}</b></li>
             </ul>
             {/* 管理操作：手机版行内不放编辑备注/重命名/删除，改到这里 */}

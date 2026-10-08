@@ -235,6 +235,56 @@ export async function createFolder(parentId, name, user) {
   return rowToNode(data);
 }
 
+/* ============================================
+ * 外部链接条目（大文件放 WPS / 金山文档等网盘，这里只存网址）
+ *   复用文件行：storage_path 为空、url 存外部网址、mime_type 用
+ *   LINK_MIME 作标记，因此无需改表结构，删除时也没有 Storage 对象要清理。
+ * ============================================ */
+export const LINK_MIME = 'text/x-url';
+
+export const isLinkNode = (node) => !node?.isFolder && node?.mimeType === LINK_MIME;
+
+/* 从粘贴内容里拆出网址与名称
+ *   支持直接粘贴 WPS 的分享文案，如：
+ *   「【金山文档 | WPS云文档】 期末复习小专题笔记 https://www.kdocs.cn/l/xxxx」
+ *   返回 { url, name }；找不到 http(s) 网址时 url 为空串 */
+export function parseSharedLink(text) {
+  const raw = String(text || '').trim();
+  const match = raw.match(/https?:\/\/[^\s<>"']+/i);
+  if (!match) return { url: '', name: '' };
+  const url = match[0];
+  const name = raw
+    .replace(url, ' ')
+    .replace(/^\s*【[^】]*】/, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return { url, name };
+}
+
+export async function createLink(parentId, { name, url }, user) {
+  requireRemote();
+  const cleanUrl = parseSharedLink(url).url;
+  if (!cleanUrl) throw new Error('链接需以 http:// 或 https:// 开头。');
+  const cleanName = (name || '').trim() || cleanUrl;
+  const { data, error } = await supabase
+    .from('internal_files')
+    .insert({
+      parent_id: parentId || null,
+      name: cleanName,
+      is_folder: false,
+      storage_path: null,
+      url: cleanUrl,
+      mime_type: LINK_MIME,
+      size_bytes: 0,
+      created_by_id: user?.id || null,
+      created_by: user?.nickname || user?.name || '',
+    })
+    .select('*')
+    .single();
+  if (error) throw error;
+  return rowToNode(data);
+}
+
 /* 生成 Storage 对象路径（保留扩展名，主体随机不可枚举） */
 function buildStoragePath(userId, fileName) {
   const ext = (fileName?.split('.').pop() || '').toLowerCase();

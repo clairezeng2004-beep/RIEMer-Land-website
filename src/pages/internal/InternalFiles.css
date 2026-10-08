@@ -291,6 +291,7 @@
 .if-icon.is-image  { color: #8E44AD; background: rgba(142, 68, 173, 0.12); }
 .if-icon.is-ppt    { color: #E07B39; background: rgba(224, 123, 57, 0.12); }
 .if-icon.is-zip    { color: #7A8A6C; background: rgba(122, 138, 108, 0.14); }
+.if-icon.is-link   { color: #2F8F9D; background: rgba(47, 143, 157, 0.12); }
 
 .if-badge {
   flex-shrink: 0;
@@ -565,6 +566,10 @@
   color: var(--color-text);
   font-weight: 500;
   word-break: break-word;
+}
+
+.if-detail__list li b.if-detail__url {
+  word-break: break-all;
 }
 
 /* 详情弹窗内的管理操作（重命名 / 删除）——仅手机版显示 */
