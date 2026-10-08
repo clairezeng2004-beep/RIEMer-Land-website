@@ -13,6 +13,7 @@ import {
   isZipFile,
   ZIP_EXTRACT_MAX_BYTES,
   renameNode,
+  moveNode,
   updateNote,
   deleteNode,
   sortNodes,
@@ -34,6 +35,8 @@ import {
   Upload,
   FolderUp,
   FolderArchive,
+  FolderInput,
+  CornerLeftUp,
   Link2,
   Pencil,
   Trash2,
@@ -189,6 +192,9 @@ function mergeTotalCache(folderId, total) {
   }
 }
 
+// 拖到面包屑「全部资料」上 = 移到根目录；根目录 id 为 null，高亮态另用一个占位键
+const ROOT_DROP_KEY = '__root__';
+
 /* 备注单元格：上传者本人可点击编辑，其余人只读 */
 function NoteCell({ node, editable, busy, onEdit }) {
   const hasNote = !!(node.note && node.note.trim());
@@ -285,6 +291,9 @@ export default function InternalFiles() {
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
+  const [dragNode, setDragNode] = useState(null); // 正在被拖动的条目（站内拖拽移动）
+  const [dropKey, setDropKey] = useState(null); // 当前悬停的投放目标（文件夹 id / ROOT_DROP_KEY）
+  const [moveSource, setMoveSource] = useState(null); // 「移动到…」弹窗里待移动的条目
   const [linkDraft, setLinkDraft] = useState(null); // 「添加链接」弹窗：{ text, name, nameEdited }
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
@@ -591,7 +600,74 @@ export default function InternalFiles() {
     e.target.value = '';
   };
 
+  /* ---- 移动（拖到文件夹 / 面包屑上，或在「移动到…」里选）---- */
+  const handleMove = async (node, targetId) => {
+    const target = targetId || null;
+    if (!node || busy || node.id === target || (node.parentId || null) === target) return;
+    setBusy(true);
+    try {
+      await moveNode(node, target);
+      await load(folderId);
+    } catch (err) {
+      alert('移动失败：' + (err?.message || err));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // 可拖动的行：仅上传者本人或管理员（与重命名 / 删除同一权限）
+  const dragProps = (node) => {
+    if (!canModify(node) || busy) return {};
+    return {
+      draggable: true,
+      onDragStart: (e) => {
+        cancelPress(); // 拖动不算长按，别弹详情
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('text/plain', node.name || '');
+        // 延后到下一拍再改状态：在 dragstart 里同步改动被拖元素的 DOM，Chrome 会直接取消拖动
+        setTimeout(() => setDragNode(node), 0);
+      },
+      onDragEnd: () => {
+        setDragNode(null);
+        setDropKey(null);
+      },
+    };
+  };
+
+  // 可投放的目标：文件夹行、面包屑上的上级目录。targetId 为 null 表示根目录
+  const dropProps = (targetId) => {
+    const target = targetId || null;
+    const key = target || ROOT_DROP_KEY;
+    const accepts =
+      !!dragNode && dragNode.id !== target && (dragNode.parentId || null) !== target;
+    return {
+      onDragOver: (e) => {
+        if (!accepts) return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'move';
+        if (dropKey !== key) setDropKey(key);
+      },
+      onDragLeave: (e) => {
+        if (e.currentTarget.contains(e.relatedTarget)) return; // 只是移到了行内的子元素上
+        setDropKey((k) => (k === key ? null : k));
+      },
+      onDrop: (e) => {
+        if (!accepts) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const node = dragNode;
+        setDragNode(null);
+        setDropKey(null);
+        handleMove(node, target);
+      },
+    };
+  };
+
   /* ---- 拖拽上传（文件） ---- */
+  // 只认从电脑拖进来的文件；站内拖动条目（移动）不触发上传高亮
+  const isExternalFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
+
   const handleDrop = (e) => {
     e.preventDefault();
     setDragOver(false);
@@ -740,9 +816,10 @@ export default function InternalFiles() {
         {/* 面包屑 */}
         <div className="internal-files-page__breadcrumb">
           <button
-            className={`if-crumb ${folderId ? '' : 'if-crumb--active'}`}
+            className={`if-crumb ${folderId ? '' : 'if-crumb--active'} ${dropKey === ROOT_DROP_KEY ? 'is-drop-target' : ''}`}
             onClick={() => openFolder(null)}
             disabled={busy}
+            {...dropProps(null)}
           >
             <Folder size={14} /> 全部资料
           </button>
@@ -750,9 +827,10 @@ export default function InternalFiles() {
             <span key={node.id} className="if-crumb-wrap">
               <ChevronRight size={14} className="if-crumb-sep" />
               <button
-                className={`if-crumb ${idx === breadcrumb.length - 1 ? 'if-crumb--active' : ''}`}
+                className={`if-crumb ${idx === breadcrumb.length - 1 ? 'if-crumb--active' : ''} ${dropKey === node.id ? 'is-drop-target' : ''}`}
                 onClick={() => openFolder(node.id)}
                 disabled={busy}
+                {...dropProps(node.id)}
               >
                 {node.name}
               </button>
@@ -780,7 +858,11 @@ export default function InternalFiles() {
         {/* 文件列表 */}
         <div
           className={`internal-files-page__body ${dragOver ? 'is-dragover' : ''}`}
-          onDragOver={(e) => { e.preventDefault(); if (!busy) setDragOver(true); }}
+          onDragOver={(e) => {
+            if (!isExternalFileDrag(e)) return;
+            e.preventDefault();
+            if (!busy) setDragOver(true);
+          }}
           onDragLeave={() => setDragOver(false)}
           onDrop={handleDrop}
         >
@@ -811,7 +893,9 @@ export default function InternalFiles() {
                   return (
                     <div
                       key={node.id}
-                      className="if-row"
+                      className={`if-row ${dropKey === node.id ? 'is-drop-target' : ''} ${dragNode?.id === node.id ? 'is-dragging' : ''}`}
+                      {...dragProps(node)}
+                      {...dropProps(node.id)}
                       onPointerDown={() => startPress(node)}
                       onPointerUp={cancelPress}
                       onPointerLeave={cancelPress}
@@ -845,6 +929,9 @@ export default function InternalFiles() {
                         </button>
                         {canModify(node) && (
                           <>
+                            <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSource(node)} disabled={busy}>
+                              <FolderInput size={15} />
+                            </button>
                             <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
                               <Pencil size={15} />
                             </button>
@@ -862,7 +949,8 @@ export default function InternalFiles() {
                 return (
                   <div
                     key={node.id}
-                    className="if-row"
+                    className={`if-row ${dragNode?.id === node.id ? 'is-dragging' : ''}`}
+                    {...dragProps(node)}
                     onPointerDown={() => startPress(node)}
                     onPointerUp={cancelPress}
                     onPointerLeave={cancelPress}
@@ -872,6 +960,7 @@ export default function InternalFiles() {
                     <a
                       className="if-col-name if-name-btn"
                       href={node.url || '#'}
+                      draggable={false}
                       target="_blank"
                       rel="noopener noreferrer"
                       title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : '点击预览'}（${detailTitle}）`}
@@ -904,6 +993,9 @@ export default function InternalFiles() {
                       </button>
                       {canModify(node) && (
                         <>
+                          <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSource(node)} disabled={busy}>
+                            <FolderInput size={15} />
+                          </button>
                           <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
                             <Pencil size={15} />
                           </button>
@@ -957,9 +1049,53 @@ export default function InternalFiles() {
 
         <div className="internal-files-page__hint">
           <AlertCircle size={14} />
-          <span>大文件直接上传又慢又容易失败，建议改用「添加链接」：先把文件传到 WPS、腾讯文档等网盘并复制分享链接，粘贴进来后会自动识别名称，点击条目即跳转到网盘查看（记得在网盘里把分享权限设为可查看）。上传 zip 压缩包时可选择自动解压（按包内目录存成文件夹）或原样上传，仅支持 .zip，不支持带密码的包。所有成员均可查看与上传；备注、重命名与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
+          <span>大文件直接上传又慢又容易失败，建议改用「添加链接」：先把文件传到 WPS、腾讯文档等网盘并复制分享链接，粘贴进来后会自动识别名称，点击条目即跳转到网盘查看（记得在网盘里把分享权限设为可查看）。上传 zip 压缩包时可选择自动解压（按包内目录存成文件夹）或原样上传，仅支持 .zip，不支持带密码的包。整理资料：把文件或文件夹拖到同目录的文件夹上即可移入，拖到上方路径里的上级目录可移出；手机上长按条目后点「移动到」。所有成员均可查看与上传；备注、重命名、移动与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
         </div>
       </div>
+
+      {/* 「移动到…」弹窗：手机无法拖拽，用它选目标；电脑上也可用 */}
+      {moveSource && (() => {
+        const parentCrumb = breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2] : null;
+        const folders = items.filter((n) => n.isFolder && n.id !== moveSource.id);
+        const pick = (targetId) => {
+          const node = moveSource;
+          setMoveSource(null);
+          handleMove(node, targetId);
+        };
+        return (
+          <div className="if-detail-overlay" onClick={() => setMoveSource(null)}>
+            <div className="if-detail" onClick={(e) => e.stopPropagation()}>
+              <div className="if-detail__head">
+                <span className="if-detail__title">移动到</span>
+                <button className="if-icon-btn" onClick={() => setMoveSource(null)} title="关闭">
+                  <X size={16} />
+                </button>
+              </div>
+              <div className="if-detail__name">{moveSource.name}</div>
+              <div className="if-move-list">
+                {folderId && (
+                  <button type="button" className="if-move-list__item" onClick={() => pick(parentCrumb?.id || null)}>
+                    <CornerLeftUp size={16} />
+                    <span>上一级：{parentCrumb?.name || '全部资料'}</span>
+                  </button>
+                )}
+                {folders.map((f) => (
+                  <button type="button" key={f.id} className="if-move-list__item" onClick={() => pick(f.id)}>
+                    <Folder size={16} />
+                    <span>{f.name}</span>
+                  </button>
+                ))}
+                {!folderId && folders.length === 0 && (
+                  <p className="if-move-list__empty">这里还没有别的文件夹，请先点「新建文件夹」。</p>
+                )}
+              </div>
+              {hasMore && (
+                <p className="if-move-list__empty">只列出了已加载的文件夹，找不到目标时请先在列表底部点「加载更多」。</p>
+              )}
+            </div>
+          </div>
+        );
+      })()}
 
       {/* 添加链接弹窗 */}
       {linkDraft && (() => {
@@ -1060,6 +1196,14 @@ export default function InternalFiles() {
                   onClick={() => { const n = detailNode; setDetailNode(null); handleEditNote(n); }}
                 >
                   <StickyNote size={15} /> 编辑备注
+                </button>
+                <button
+                  type="button"
+                  className="if-detail__act-btn"
+                  disabled={busy}
+                  onClick={() => { const n = detailNode; setDetailNode(null); setMoveSource(n); }}
+                >
+                  <FolderInput size={15} /> 移动到
                 </button>
                 <button
                   type="button"

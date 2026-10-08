@@ -241,6 +241,23 @@
   background: var(--color-bg-hover);
 }
 
+/* 站内拖拽移动：被拖的行变淡，可投放的文件夹 / 面包屑高亮 */
+.if-row.is-dragging {
+  opacity: 0.45;
+}
+
+.if-row.is-drop-target,
+.if-row.is-drop-target:hover {
+  background: var(--color-primary-light);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.if-crumb.is-drop-target {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
 /* 名称列 */
 .if-col-name {
   display: flex;
@@ -627,6 +644,54 @@
   display: flex;
   justify-content: flex-end;
   gap: var(--space-sm);
+}
+
+/* 「移动到…」弹窗里的目标列表 */
+.if-move-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 50vh;
+  overflow-y: auto;
+}
+
+.if-move-list__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: 9px 10px;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  background: none;
+  color: var(--color-text);
+  font-size: var(--text-sm);
+  text-align: left;
+  cursor: pointer;
+}
+
+.if-move-list__item:hover {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+.if-move-list__item svg {
+  flex-shrink: 0;
+  color: var(--color-accent, #D4A44C);
+}
+
+.if-move-list__item span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.if-move-list__empty {
+  margin: var(--space-sm) 0 0;
+  font-size: var(--text-xs);
+  color: var(--color-text-muted);
+  line-height: 1.5;
 }
 
 /* 详情弹窗内的管理操作（重命名 / 删除）——仅手机版显示 */

@@ -550,6 +550,32 @@ export async function uploadZipAsFolder(parentId, zipFile, user, onProgress) {
 }
 
 /* ============================================
+ * 移动文件夹 / 文件到另一个文件夹（只改 parent_id，不动 Storage）
+ *   targetParentId 为 null 表示移到根目录
+ * ============================================ */
+export async function moveNode(node, targetParentId) {
+  requireRemote();
+  const target = targetParentId || null;
+  if ((node.parentId || null) === target) return;
+  if (node.isFolder && target) {
+    // 文件夹不能移进自己或自己的子孙，否则整棵子树会从目录里「断开」再也点不到
+    const chain = await fetchBreadcrumb(target);
+    if (chain.some((n) => n.id === node.id)) {
+      throw new Error('不能把文件夹移动到它自己里面。');
+    }
+  }
+  const { data, error } = await supabase
+    .from('internal_files')
+    .update({ parent_id: target, updated_at: new Date().toISOString() })
+    .eq('id', node.id)
+    .select('id');
+  if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('移动未生效：你可能没有权限移动此项（仅上传者或管理员可操作）。');
+  }
+}
+
+/* ============================================
  * 重命名文件夹 / 文件（仅改显示名，不动 Storage 路径）
  * ============================================ */
 export async function renameNode(node, newName) {
