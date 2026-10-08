@@ -13,7 +13,7 @@ import {
   isZipFile,
   ZIP_EXTRACT_MAX_BYTES,
   renameNode,
-  moveNode,
+  moveNodes,
   updateNote,
   deleteNode,
   sortNodes,
@@ -37,6 +37,9 @@ import {
   FolderArchive,
   FolderInput,
   CornerLeftUp,
+  ListChecks,
+  Square,
+  CheckSquare,
   Link2,
   Pencil,
   Trash2,
@@ -291,9 +294,11 @@ export default function InternalFiles() {
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
-  const [dragNode, setDragNode] = useState(null); // 正在被拖动的条目（站内拖拽移动）
+  const [dragNodes, setDragNodes] = useState(null); // 正在被拖动的条目（站内拖拽移动；多选时是一批）
   const [dropKey, setDropKey] = useState(null); // 当前悬停的投放目标（文件夹 id / ROOT_DROP_KEY）
-  const [moveSource, setMoveSource] = useState(null); // 「移动到…」弹窗里待移动的条目
+  const [moveSources, setMoveSources] = useState(null); // 「移动到…」弹窗里待移动的条目（数组）
+  const [selectMode, setSelectMode] = useState(false); // 多选模式：点条目 = 勾选，而不是打开
+  const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [linkDraft, setLinkDraft] = useState(null); // 「添加链接」弹窗：{ text, name, nameEdited }
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
@@ -334,14 +339,33 @@ export default function InternalFiles() {
     [folderContribs]
   );
 
+  // 多选：只有自己能移动的条目才可勾选（与移动权限一致）
+  const selectedNodes = items.filter((n) => selectedIds.has(n.id));
+
+  const toggleSelect = (node) => {
+    if (!canModify(node)) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(node.id)) next.delete(node.id);
+      else next.add(node.id);
+      return next;
+    });
+  };
+
+  const exitSelect = () => {
+    setSelectMode(false);
+    setSelectedIds(new Set());
+  };
+
   const startPress = useCallback((node) => {
     longPressedRef.current = false;
     clearTimeout(pressTimerRef.current);
+    if (selectMode) return; // 多选时按住是在勾选 / 拖动，不弹详情
     pressTimerRef.current = setTimeout(() => {
       longPressedRef.current = true;
       setDetailNode(node);
     }, 500);
-  }, []);
+  }, [selectMode]);
 
   const cancelPress = useCallback(() => {
     clearTimeout(pressTimerRef.current);
@@ -459,6 +483,7 @@ export default function InternalFiles() {
       return;
     }
     if (busy) return;
+    exitSelect(); // 勾选只在当前目录内有效
     setFolderId(id);
   };
 
@@ -600,14 +625,22 @@ export default function InternalFiles() {
     e.target.value = '';
   };
 
-  /* ---- 移动（拖到文件夹 / 面包屑上，或在「移动到…」里选）---- */
-  const handleMove = async (node, targetId) => {
+  /* ---- 移动（拖到文件夹 / 面包屑上，或在「移动到…」里选；多选时整批一起）---- */
+  const handleMove = async (nodes, targetId) => {
     const target = targetId || null;
-    if (!node || busy || node.id === target || (node.parentId || null) === target) return;
+    const list = (nodes || []).filter(
+      (n) => n && n.id !== target && (n.parentId || null) !== target
+    );
+    if (busy || list.length === 0) return;
     setBusy(true);
     try {
-      await moveNode(node, target);
+      const { blocked } = await moveNodes(list, target);
+      exitSelect();
       await load(folderId);
+      if (blocked.length > 0) {
+        const names = blocked.map((n) => `「${n.name}」`).join('、');
+        alert(`有 ${blocked.length} 项没有移动（只有上传者本人或管理员可以移动）：${names}`);
+      }
     } catch (err) {
       alert('移动失败：' + (err?.message || err));
     } finally {
@@ -622,24 +655,33 @@ export default function InternalFiles() {
       draggable: true,
       onDragStart: (e) => {
         cancelPress(); // 拖动不算长按，别弹详情
+        // 多选时拖其中一个已勾选的条目 = 拖走整批；拖没勾选的仍只拖它自己
+        const nodes = selectMode && selectedIds.has(node.id) ? selectedNodes : [node];
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('text/plain', node.name || '');
+        e.dataTransfer.setData(
+          'text/plain',
+          nodes.length > 1 ? `${nodes.length} 项` : node.name || ''
+        );
         // 延后到下一拍再改状态：在 dragstart 里同步改动被拖元素的 DOM，Chrome 会直接取消拖动
-        setTimeout(() => setDragNode(node), 0);
+        setTimeout(() => setDragNodes(nodes), 0);
       },
       onDragEnd: () => {
-        setDragNode(null);
+        setDragNodes(null);
         setDropKey(null);
       },
     };
   };
+
+  const isDragging = (node) => !!dragNodes && dragNodes.some((n) => n.id === node.id);
 
   // 可投放的目标：文件夹行、面包屑上的上级目录。targetId 为 null 表示根目录
   const dropProps = (targetId) => {
     const target = targetId || null;
     const key = target || ROOT_DROP_KEY;
     const accepts =
-      !!dragNode && dragNode.id !== target && (dragNode.parentId || null) !== target;
+      !!dragNodes &&
+      !dragNodes.some((n) => n.id === target) && // 不能拖进被拖的文件夹自己
+      dragNodes.some((n) => (n.parentId || null) !== target); // 已经在目标里就不用移
     return {
       onDragOver: (e) => {
         if (!accepts) return;
@@ -656,13 +698,31 @@ export default function InternalFiles() {
         if (!accepts) return;
         e.preventDefault();
         e.stopPropagation();
-        const node = dragNode;
-        setDragNode(null);
+        const nodes = dragNodes;
+        setDragNodes(null);
         setDropKey(null);
-        handleMove(node, target);
+        handleMove(nodes, target);
       },
     };
   };
+
+  // 多选模式下名称前的图标：可勾选的显示勾选框，其余保持原图标
+  const renderRowIcon = (node, fallback) => {
+    if (!selectMode || !canModify(node)) return fallback;
+    return (
+      <span className={`if-icon is-check ${selectedIds.has(node.id) ? 'is-checked' : ''}`}>
+        {selectedIds.has(node.id) ? <CheckSquare size={20} /> : <Square size={20} />}
+      </span>
+    );
+  };
+
+  const rowStateClass = (node) =>
+    [
+      isDragging(node) ? 'is-dragging' : '',
+      selectMode && selectedIds.has(node.id) ? 'is-selected' : '',
+      // 勾不了的文件变淡；文件夹不变淡，因为它仍可作为移入的目标
+      selectMode && !node.isFolder && !canModify(node) ? 'is-unselectable' : '',
+    ].join(' ');
 
   /* ---- 拖拽上传（文件） ---- */
   // 只认从电脑拖进来的文件；站内拖动条目（移动）不触发上传高亮
@@ -836,6 +896,17 @@ export default function InternalFiles() {
               </button>
             </span>
           ))}
+          {!loading && items.length > 0 && (
+            <button
+              type="button"
+              className={`if-crumb if-select-toggle ${selectMode ? 'if-crumb--active' : ''}`}
+              onClick={() => (selectMode ? exitSelect() : setSelectMode(true))}
+              disabled={busy}
+              title="勾选多个文件 / 文件夹后一起移动"
+            >
+              <ListChecks size={14} /> {selectMode ? '退出多选' : '多选'}
+            </button>
+          )}
         </div>
 
         {/* 上传进度 */}
@@ -893,7 +964,7 @@ export default function InternalFiles() {
                   return (
                     <div
                       key={node.id}
-                      className={`if-row ${dropKey === node.id ? 'is-drop-target' : ''} ${dragNode?.id === node.id ? 'is-dragging' : ''}`}
+                      className={`if-row ${dropKey === node.id ? 'is-drop-target' : ''} ${rowStateClass(node)}`}
                       {...dragProps(node)}
                       {...dropProps(node.id)}
                       onPointerDown={() => startPress(node)}
@@ -904,11 +975,11 @@ export default function InternalFiles() {
                     >
                       <button
                         className="if-col-name if-name-btn"
-                        onClick={() => openFolder(node.id)}
+                        onClick={() => (selectMode ? toggleSelect(node) : openFolder(node.id))}
                         disabled={busy}
                         title={`${node.name}（${detailTitle}）`}
                       >
-                        <span className="if-icon is-folder"><Folder size={20} /></span>
+                        {renderRowIcon(node, <span className="if-icon is-folder"><Folder size={20} /></span>)}
                         <span className="if-name-text">{node.name}</span>
                       </button>
                       <span className="if-col-size">文件夹</span>
@@ -929,7 +1000,7 @@ export default function InternalFiles() {
                         </button>
                         {canModify(node) && (
                           <>
-                            <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSource(node)} disabled={busy}>
+                            <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSources([node])} disabled={busy}>
                               <FolderInput size={15} />
                             </button>
                             <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
@@ -949,7 +1020,7 @@ export default function InternalFiles() {
                 return (
                   <div
                     key={node.id}
-                    className={`if-row ${dragNode?.id === node.id ? 'is-dragging' : ''}`}
+                    className={`if-row ${rowStateClass(node)}`}
                     {...dragProps(node)}
                     onPointerDown={() => startPress(node)}
                     onPointerUp={cancelPress}
@@ -965,13 +1036,18 @@ export default function InternalFiles() {
                       rel="noopener noreferrer"
                       title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : '点击预览'}（${detailTitle}）`}
                       onClick={(e) => {
+                        if (selectMode) {
+                          e.preventDefault(); // 多选时点击是勾选，不打开文件
+                          toggleSelect(node);
+                          return;
+                        }
                         if (longPressedRef.current) {
                           e.preventDefault();
                           longPressedRef.current = false;
                         }
                       }}
                     >
-                      <span className={`if-icon ${cls}`}><Icon size={20} /></span>
+                      {renderRowIcon(node, <span className={`if-icon ${cls}`}><Icon size={20} /></span>)}
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
                     </a>
@@ -993,7 +1069,7 @@ export default function InternalFiles() {
                       </button>
                       {canModify(node) && (
                         <>
-                          <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSource(node)} disabled={busy}>
+                          <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSources([node])} disabled={busy}>
                             <FolderInput size={15} />
                           </button>
                           <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
@@ -1037,6 +1113,41 @@ export default function InternalFiles() {
           )}
         </div>
 
+        {selectMode && (() => {
+          const selectable = items.filter(canModify);
+          const allSelected = selectable.length > 0 && selectedNodes.length === selectable.length;
+          return (
+            <div className="if-select-bar">
+              <span className="if-select-bar__count">
+                {selectable.length === 0
+                  ? '这里没有你可以移动的条目（仅上传者本人或管理员可移动）'
+                  : `已选 ${selectedNodes.length} 项`}
+              </span>
+              {selectable.length > 0 && (
+                <button
+                  type="button"
+                  className="if-btn if-btn--ghost"
+                  disabled={busy}
+                  onClick={() => setSelectedIds(allSelected ? new Set() : new Set(selectable.map((n) => n.id)))}
+                >
+                  {allSelected ? '取消全选' : '全选'}
+                </button>
+              )}
+              <button
+                type="button"
+                className="if-btn"
+                disabled={busy || selectedNodes.length === 0}
+                onClick={() => setMoveSources(selectedNodes)}
+              >
+                <FolderInput size={16} /> 移动到…
+              </button>
+              <button type="button" className="if-btn if-btn--ghost" disabled={busy} onClick={exitSelect}>
+                退出多选
+              </button>
+            </div>
+          );
+        })()}
+
         {!loading && items.length > 0 && (
           <div className="internal-files-page__stats">
             <span><Folder size={13} /> {folderCount} 个文件夹</span>
@@ -1049,29 +1160,34 @@ export default function InternalFiles() {
 
         <div className="internal-files-page__hint">
           <AlertCircle size={14} />
-          <span>大文件直接上传又慢又容易失败，建议改用「添加链接」：先把文件传到 WPS、腾讯文档等网盘并复制分享链接，粘贴进来后会自动识别名称，点击条目即跳转到网盘查看（记得在网盘里把分享权限设为可查看）。上传 zip 压缩包时可选择自动解压（按包内目录存成文件夹）或原样上传，仅支持 .zip，不支持带密码的包。整理资料：把文件或文件夹拖到同目录的文件夹上即可移入，拖到上方路径里的上级目录可移出；手机上长按条目后点「移动到」。所有成员均可查看与上传；备注、重命名、移动与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
+          <span>大文件直接上传又慢又容易失败，建议改用「添加链接」：先把文件传到 WPS、腾讯文档等网盘并复制分享链接，粘贴进来后会自动识别名称，点击条目即跳转到网盘查看（记得在网盘里把分享权限设为可查看）。上传 zip 压缩包时可选择自动解压（按包内目录存成文件夹）或原样上传，仅支持 .zip，不支持带密码的包。整理资料：把文件或文件夹拖到同目录的文件夹上即可移入，拖到上方路径里的上级目录可移出；手机上长按条目后点「移动到」；要一次移动多个，先点路径右侧的「多选」勾选，再拖动或点「移动到…」。所有成员均可查看与上传；备注、重命名、移动与删除仅限上传者本人或管理员。长按（手机）或按住 / 点击 <Info size={12} /> 可查看「谁在何时上传」。删除文件夹会一并删除其中全部内容，且不可撤销。</span>
         </div>
       </div>
 
       {/* 「移动到…」弹窗：手机无法拖拽，用它选目标；电脑上也可用 */}
-      {moveSource && (() => {
+      {moveSources && moveSources.length > 0 && (() => {
         const parentCrumb = breadcrumb.length >= 2 ? breadcrumb[breadcrumb.length - 2] : null;
-        const folders = items.filter((n) => n.isFolder && n.id !== moveSource.id);
+        const sourceIds = new Set(moveSources.map((n) => n.id));
+        const folders = items.filter((n) => n.isFolder && !sourceIds.has(n.id));
         const pick = (targetId) => {
-          const node = moveSource;
-          setMoveSource(null);
-          handleMove(node, targetId);
+          const nodes = moveSources;
+          setMoveSources(null);
+          handleMove(nodes, targetId);
         };
         return (
-          <div className="if-detail-overlay" onClick={() => setMoveSource(null)}>
+          <div className="if-detail-overlay" onClick={() => setMoveSources(null)}>
             <div className="if-detail" onClick={(e) => e.stopPropagation()}>
               <div className="if-detail__head">
                 <span className="if-detail__title">移动到</span>
-                <button className="if-icon-btn" onClick={() => setMoveSource(null)} title="关闭">
+                <button className="if-icon-btn" onClick={() => setMoveSources(null)} title="关闭">
                   <X size={16} />
                 </button>
               </div>
-              <div className="if-detail__name">{moveSource.name}</div>
+              <div className="if-detail__name">
+                {moveSources.length === 1
+                  ? moveSources[0].name
+                  : `已选 ${moveSources.length} 项：${moveSources.slice(0, 3).map((n) => n.name).join('、')}${moveSources.length > 3 ? ' 等' : ''}`}
+              </div>
               <div className="if-move-list">
                 {folderId && (
                   <button type="button" className="if-move-list__item" onClick={() => pick(parentCrumb?.id || null)}>
@@ -1201,7 +1317,7 @@ export default function InternalFiles() {
                   type="button"
                   className="if-detail__act-btn"
                   disabled={busy}
-                  onClick={() => { const n = detailNode; setDetailNode(null); setMoveSource(n); }}
+                  onClick={() => { const n = detailNode; setDetailNode(null); setMoveSources([n]); }}
                 >
                   <FolderInput size={15} /> 移动到
                 </button>

@@ -241,6 +241,53 @@
   background: var(--color-bg-hover);
 }
 
+/* 多选 */
+.if-select-toggle {
+  margin-left: auto;
+}
+
+.if-row.is-selected,
+.if-row.is-selected:hover {
+  background: var(--color-primary-light);
+}
+
+.if-row.is-unselectable {
+  opacity: 0.5;
+}
+
+.if-icon.is-check {
+  color: var(--color-text-muted);
+  background: none;
+}
+
+.if-icon.is-check.is-checked {
+  color: var(--color-primary);
+}
+
+/* 多选操作条：列表很长时吸在视口底部，勾到哪都点得到 */
+.if-select-bar {
+  position: sticky;
+  bottom: var(--space-md);
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-sm);
+  margin-top: var(--space-md);
+  padding: var(--space-sm) var(--space-md);
+  background: var(--color-bg-card, #fff);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: var(--shadow-lg);
+}
+
+.if-select-bar__count {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: var(--text-sm);
+  color: var(--color-text);
+}
+
 /* 站内拖拽移动：被拖的行变淡，可投放的文件夹 / 面包屑高亮 */
 .if-row.is-dragging {
   opacity: 0.45;

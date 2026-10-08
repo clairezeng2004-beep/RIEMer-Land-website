@@ -550,29 +550,45 @@ export async function uploadZipAsFolder(parentId, zipFile, user, onProgress) {
 }
 
 /* ============================================
- * 移动文件夹 / 文件到另一个文件夹（只改 parent_id，不动 Storage）
+ * 移动一批文件夹 / 文件到另一个文件夹（只改 parent_id，不动 Storage）
  *   targetParentId 为 null 表示移到根目录
+ *   整批一次请求完成；返回 { moved, blocked }——blocked 是被 RLS 拦下
+ *   （不是上传者本人也不是管理员）而没有移动的条目
  * ============================================ */
-export async function moveNode(node, targetParentId) {
+export async function moveNodes(nodes, targetParentId) {
   requireRemote();
   const target = targetParentId || null;
-  if ((node.parentId || null) === target) return;
-  if (node.isFolder && target) {
+  const list = (nodes || []).filter(
+    (n) => n && n.id !== target && (n.parentId || null) !== target
+  );
+  if (list.length === 0) return { moved: [], blocked: [] };
+
+  if (target && list.some((n) => n.isFolder)) {
     // 文件夹不能移进自己或自己的子孙，否则整棵子树会从目录里「断开」再也点不到
     const chain = await fetchBreadcrumb(target);
-    if (chain.some((n) => n.id === node.id)) {
+    const chainIds = new Set(chain.map((n) => n.id));
+    if (list.some((n) => n.isFolder && chainIds.has(n.id))) {
       throw new Error('不能把文件夹移动到它自己里面。');
     }
   }
-  const { data, error } = await supabase
-    .from('internal_files')
-    .update({ parent_id: target, updated_at: new Date().toISOString() })
-    .eq('id', node.id)
-    .select('id');
-  if (error) throw error;
-  if (!data || data.length === 0) {
-    throw new Error('移动未生效：你可能没有权限移动此项（仅上传者或管理员可操作）。');
+
+  const movedIds = new Set();
+  const now = new Date().toISOString();
+  // id 列表拼在请求网址里，分批避免超长
+  for (let i = 0; i < list.length; i += 100) {
+    const ids = list.slice(i, i + 100).map((n) => n.id);
+    const { data, error } = await supabase
+      .from('internal_files')
+      .update({ parent_id: target, updated_at: now })
+      .in('id', ids)
+      .select('id');
+    if (error) throw error;
+    for (const row of data || []) movedIds.add(row.id);
   }
+  return {
+    moved: list.filter((n) => movedIds.has(n.id)),
+    blocked: list.filter((n) => !movedIds.has(n.id)),
+  };
 }
 
 /* ============================================
