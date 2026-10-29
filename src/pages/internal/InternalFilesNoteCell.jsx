@@ -47,14 +47,14 @@ export default function InternalFilesNoteCell({ node, editable, busy, onSave }) 
       <button type="button" className={`if-col-note if-note-btn ${hasNote ? '' : 'is-empty'}`}
         onClick={() => { setValue(node.note || ''); setError(''); setEditing(true); }}
         disabled={busy} title={hasNote ? `${node.note}（点击编辑）` : '点击添加备注'}>
-        <StickyNote size={13} className="if-note-icon" />
+        {!hasNote && <StickyNote size={13} className="if-note-icon" />}
         <span className="if-note-text">{hasNote ? node.note : '添加备注'}</span>
       </button>
     );
   }
   return (
     <span className={`if-col-note if-note-readonly ${hasNote ? '' : 'is-empty'}`} title={node.note || ''}>
-      {hasNote ? <><StickyNote size={13} className="if-note-icon" /><span className="if-note-text">{node.note}</span></>
+      {hasNote ? <span className="if-note-text">{node.note}</span>
         : <span className="if-note-dash">—</span>}
     </span>
   );
