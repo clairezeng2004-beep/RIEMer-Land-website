@@ -560,6 +560,11 @@ export default function InternalFiles() {
     }
   }, [isAuthenticated, folderId, load]);
 
+  // 目录切换不改变路由，需要单独重置页面滚动位置。
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [folderId]);
+
   const openFolder = (id) => {
     // 长按刚触发过详情，抑制这次点击，避免误进文件夹
     if (longPressedRef.current) {
