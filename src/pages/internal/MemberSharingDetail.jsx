@@ -23,7 +23,7 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
-import MemberSharingFolderUpload from '../../components/MemberSharingFolderUpload';
+import MemberSharingFolderView from './MemberSharingFolderView';
 import { ensureResponsiveTableWrappers } from '../../utils/responsiveTables';
 import { linkSourceLabel } from '../../utils/sharedLink';
 import ImageLightbox from '../../components/ImageLightbox';
@@ -513,6 +513,8 @@ export default function MemberSharingDetail() {
     (Array.isArray(post.contributorIds) && post.contributorIds.map(String).includes(String(user.id)))
   ));
 
+  if (post.format === 'folder') return <MemberSharingFolderView post={post} user={user} canWrite={canEdit} />;
+
   return (
     <div className="msd-page">
       {/* 顶部导航栏 — 类似 MemberSharingCreate */}
@@ -607,8 +609,6 @@ export default function MemberSharingDetail() {
             <ImageLightbox containerRef={contentRef} />
 
             {/* 附件列表 */}
-            {post.format === 'folder' && canEdit && <MemberSharingFolderUpload key={post.id} postId={post.id}
-              onSaved={(saved) => setSharings((prev) => prev.map((item) => String(item.id) === String(saved.id) ? saved : item))} />}
             {Array.isArray(post.attachments) && post.attachments.length > 0 && (
               <div className="msd-attachments">
                 <div className="msd-attachments__header">

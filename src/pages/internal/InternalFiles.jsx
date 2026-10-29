@@ -1,25 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import * as defaultFileService from '../../services/internalFilesService';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
-  isInternalFilesAvailable,
-  fetchChildrenPage,
-  fetchBreadcrumb,
-  createFolder,
-  createTextMaterial,
-  uploadFiles,
-  uploadFolderTree,
-  uploadZipAsFolder,
   isZipFile,
   ZIP_EXTRACT_MAX_BYTES,
-  renameNode,
-  moveNodes,
-  updateNote,
-  updateContributors,
-  deleteNode,
   sortNodes,
-  fetchFolderContributors,
-  createLink,
   parseSharedLink,
   isLinkNode,
   linkSourceLabel,
@@ -325,14 +311,23 @@ function ContribCell({ contributors, loading, onDetail, editable, busy, onEdit }
   );
 }
 
-export default function InternalFiles() {
+export default function InternalFiles({ fileService, title = '内部资料', rootLabel = '全部资料', onBack, canWrite = true }) {
+  const {
+    isInternalFilesAvailable, fetchChildrenPage, fetchBreadcrumb, createFolder, createTextMaterial,
+    uploadFiles, uploadFolderTree, uploadZipAsFolder, createLink, renameNode, moveNodes, updateNote,
+    updateContributors, deleteNode, fetchFolderContributors,
+  } = fileService || defaultFileService;
+  // Sharing folders have their own records; never read or overwrite the internal-library cache.
+  const readCache = fileService ? () => null : readListCache;
+  const writeCache = fileService ? () => {} : writeListCache;
+
   const { isAuthenticated, isAdmin, user } = useAuth();
 
   // 首帧种子：初始进入的是根目录（folderId=null），若本地有它的列表缓存，就在
   // useState 初始化时同步注入首帧——与成员分享页一致，省去先渲染一帧「加载中…」
   // 再补内容的空窗。惰性初始化只读一次，避免每次渲染都碰 localStorage。
   const [seed] = useState(() => {
-    const c = readListCache(null);
+    const c = readCache(null);
     return c && Array.isArray(c.items) && c.items.length
       ? {
           items: sortNodes(c.items),
@@ -373,8 +368,8 @@ export default function InternalFiles() {
 
   // 重命名 / 删除 / 编辑备注：上传者本人或管理员
   const canModify = useCallback(
-    (node) => isAdmin || (node.createdById && node.createdById === user?.id),
-    [isAdmin, user?.id]
+    (node) => canWrite && (fileService ? true : isAdmin || (node.createdById && node.createdById === user?.id)),
+    [isAdmin, user?.id, canWrite, fileService]
   );
 
   // 归一化某节点的「内容贡献者」
@@ -445,10 +440,10 @@ export default function InternalFiles() {
         const slice = {};
         for (const id of folderIds) slice[id] = map[id] || [];
         setFolderContribs((prev) => ({ ...prev, ...slice }));
-        mergeContribCache(targetId, slice);
+        if (!fileService) mergeContribCache(targetId, slice);
       })
       .catch(() => {});
-  }, []);
+  }, [fetchFolderContributors, fileService]);
 
   // 首屏加载 / 刷新：先用本地缓存瞬时渲染，再后台拉最新替换（stale-while-revalidate）
   const load = useCallback(async (targetId) => {
@@ -457,7 +452,7 @@ export default function InternalFiles() {
     setError('');
 
     // 1) 命中缓存 → 立即渲染上次结果，去掉等待感
-    const cached = readListCache(targetId);
+    const cached = readCache(targetId);
     if (cached && Array.isArray(cached.items) && cached.items.length) {
       setItems(sortNodes(cached.items));
       setTotal(cached.total ?? null);
@@ -479,7 +474,7 @@ export default function InternalFiles() {
       setTotal(page.total);
       setHasMore(page.hasMore);
       setBreadcrumb(crumb);
-      writeListCache(targetId, {
+      writeCache(targetId, {
         items: page.items,
         total: page.total,
         hasMore: page.hasMore,
@@ -496,7 +491,7 @@ export default function InternalFiles() {
       setLoading(false);
       inflightRef.current = false;
     }
-  }, [refreshContribs]);
+  }, [refreshContribs, fetchChildrenPage, fetchBreadcrumb]);
 
   // 追加整体排序后的下一页。
   const loadMore = useCallback(async () => {
@@ -603,6 +598,7 @@ export default function InternalFiles() {
   };
 
   const doUpload = async (fileList, isFolder, metadata) => {
+    if (!canWrite) return false;
     const list = Array.from(fileList || []);
     if (list.length === 0) return;
     const { plain, zips } = isFolder ? { plain: list, zips: [] } : askExtractZips(list);
@@ -652,7 +648,7 @@ export default function InternalFiles() {
   };
 
   const handlePublish = async (draft) => {
-    if (busy) return false;
+    if (busy || !canWrite) return false;
     const metadata = { name: draft.name, contributors: draft.contributors, note: draft.note };
     if (draft.type === 'text') {
       setBusy(true);
@@ -789,7 +785,7 @@ export default function InternalFiles() {
     e.preventDefault();
     e.stopPropagation();
     setDragOver(false);
-    if (busy) return;
+    if (busy || !canWrite) return;
     const dropped = e.dataTransfer?.files;
     if (dropped && dropped.length > 0) doUpload(dropped, false);
   };
@@ -797,8 +793,8 @@ export default function InternalFiles() {
   /* ---- 删除 ---- */
   const handleDelete = async (node) => {
     const msg = node.isFolder
-      ? `确定删除文件夹「${node.name}」及其中的全部内容吗？此操作不可撤销。`
-      : `确定删除文件「${node.name}」吗？此操作不可撤销。`;
+      ? `确定删除文件夹「${node.name}」及其中的全部内容吗？${fileService ? '删除后可在回收站恢复。' : '此操作不可撤销。'}`
+      : `确定删除文件「${node.name}」吗？${fileService ? '删除后可在回收站恢复。' : '此操作不可撤销。'}`;
     if (!window.confirm(msg)) return;
     setBusy(true);
     try {
@@ -821,7 +817,7 @@ export default function InternalFiles() {
         <div className="container">
           <div className="internal-files-page__header">
             <div>
-              <h1><HardDrive size={28} /> 内部资料</h1>
+              <h1><HardDrive size={28} /> {title}</h1>
               <p>团队内部文件资源库</p>
             </div>
           </div>
@@ -847,7 +843,7 @@ export default function InternalFiles() {
           e.preventDefault();
           e.stopPropagation();
           e.dataTransfer.dropEffect = busy ? 'none' : 'copy';
-          if (!busy) setDragOver(true);
+          if (!busy && canWrite) setDragOver(true);
         }}
         onDragLeave={(e) => {
           if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
@@ -857,8 +853,9 @@ export default function InternalFiles() {
         {/* 头部 */}
         <div className="internal-files-page__header">
           <div>
+            {onBack && <button type="button" className="if-crumb" onClick={onBack}><CornerLeftUp size={16} /> 返回成员经验分享</button>}
             <div className="if-title-row">
-              <h1><HardDrive size={28} /> 内部资料</h1>
+              <h1><HardDrive size={28} /> {title}</h1>
               <button type="button" className="if-rules-btn" onClick={() => setInfoModal('rules')}>
                 <ClipboardList size={14} /> 资料上传规范（必看）
               </button>
@@ -878,11 +875,11 @@ export default function InternalFiles() {
               <RefreshCw size={16} className={loading ? 'if-spin' : ''} />
               <span className="if-btn__text">刷新</span>
             </button>
-            <button className="if-btn" onClick={handleNewFolder} disabled={busy}>
+            <button className="if-btn" onClick={handleNewFolder} disabled={busy || !canWrite}>
               <FolderPlus size={16} />
               <span className="if-btn__text">新建文件夹</span>
             </button>
-            <button className="if-btn" onClick={() => setPublishOpen(true)} disabled={busy}>
+            <button className="if-btn" onClick={() => setPublishOpen(true)} disabled={busy || !canWrite}>
               <Upload size={16} />
               <span>发布资料</span>
             </button>
@@ -897,7 +894,7 @@ export default function InternalFiles() {
             disabled={busy}
             {...dropProps(null)}
           >
-            <Folder size={14} /> 全部资料
+            <Folder size={14} /> {rootLabel}
           </button>
           {breadcrumb.map((node, idx) => (
             <span key={node.id} className="if-crumb-wrap">
@@ -1109,7 +1106,7 @@ export default function InternalFiles() {
             </div>
           )}
 
-          {!loading && items.length > 0 && (
+          {!loading && canWrite && items.length > 0 && (
             <div className="if-upload-dropzone">
               <Upload size={24} />
               <p>{busy ? '正在处理资料，请稍候…' : dragOver ? '松开文件，上传到当前文件夹' : '继续上传资料'}</p>
@@ -1217,7 +1214,7 @@ export default function InternalFiles() {
                 {folderId && (
                   <button type="button" className="if-move-list__item" onClick={() => pick(parentCrumb?.id || null)}>
                     <CornerLeftUp size={16} />
-                    <span>上一级：{parentCrumb?.name || '全部资料'}</span>
+                    <span>上一级：{parentCrumb?.name || rootLabel}</span>
                   </button>
                 )}
                 {folders.map((f) => (
@@ -1275,7 +1272,7 @@ export default function InternalFiles() {
 
       {publishOpen && (
         <InternalFilesPublish
-          destination={breadcrumb.map((node) => node.name).join(' / ') || '全部资料'}
+          destination={breadcrumb.map((node) => node.name).join(' / ') || rootLabel}
           busy={busy}
           progress={progress}
           onClose={() => setPublishOpen(false)}
