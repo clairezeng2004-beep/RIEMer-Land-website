@@ -380,7 +380,7 @@ export async function fetchSharings() {
 }
 
 /** 按 id 获取单条分享 */
-export async function fetchSharingById(id) {
+export async function fetchSharingById(id, { strict = false } = {}) {
   const localMatch = getLocalSharings().find((s) => String(s.id) === String(id)) || null;
   if (!isSupabaseConfigured || !supabase) {
     return localMatch;
@@ -396,6 +396,7 @@ export async function fetchSharingById(id) {
       '获取成员分享详情',
     );
     if (error) {
+      if (strict) throw new Error(error.message || '获取文件夹失败');
       console.warn('[MemberSharingDB] 获取单条分享失败:', error.message);
       return localMatch;
     }
@@ -404,6 +405,7 @@ export async function fetchSharingById(id) {
     addLocalSharing(fresh);
     return fresh;
   } catch (err) {
+    if (strict) throw err;
     console.warn('[MemberSharingDB] 获取单条分享异常:', err.message);
     return localMatch;
   }
@@ -519,8 +521,10 @@ export async function updateSharing(id, updates) {
       };
     }
     // 图片上传完成后再写本地，避免把 blob: / data: 临时地址缓存成后续破图。
-    updateLocalSharing(id, localUpdates);
-    if (!isSupabaseConfigured || !supabase) return;
+    if (!isSupabaseConfigured || !supabase) {
+      updateLocalSharing(id, localUpdates);
+      return localUpdates;
+    }
     const dbUpdates = frontendToDbUpdate(cloudUpdates);
     let { error } = await withTimeout(
       supabase
@@ -548,10 +552,28 @@ export async function updateSharing(id, updates) {
       console.warn('[MemberSharingDB] 更新分享失败:', error.message);
       throw new Error(error.message || '成员分享更新失败');
     }
+    updateLocalSharing(id, localUpdates);
+    return localUpdates;
   } catch (err) {
     console.warn('[MemberSharingDB] 更新分享异常:', err.message);
     throw err;
   }
+}
+
+/** Append to a folder using fresh contents; stable ids make retries avoid duplicate entries. */
+export async function appendSharingFolderItems(id, items) {
+  if (!Array.isArray(items) || !items.length) throw new Error('请先选择文件或添加链接。');
+  const latest = await fetchSharingById(id, { strict: true });
+  if (!latest || latest.format !== 'folder') throw new Error('文件夹已不存在，请刷新页面。');
+  const attachments = [...(latest.attachments || [])];
+  const existingIds = new Set(attachments.map((item) => item.id).filter(Boolean));
+  for (const item of items) {
+    if (item.id && existingIds.has(item.id)) continue;
+    attachments.push(item);
+    if (item.id) existingIds.add(item.id);
+  }
+  const saved = await updateSharing(id, { attachments });
+  return { ...latest, ...saved };
 }
 
 /** 删除分享 */

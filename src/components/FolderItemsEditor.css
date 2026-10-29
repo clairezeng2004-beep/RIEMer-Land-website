@@ -163,3 +163,7 @@
     width: 100%;
   }
 }
+
+fieldset.folder-editor__actions { margin: 0; min-width: 0; border: 0; border-bottom: 1px solid rgba(91, 140, 62, 0.12); }
+.folder-editor__drop-hint { margin: 12px 14px; font-size: 13px; color: var(--color-text-secondary); }
+.folder-editor:has(.folder-editor__actions:disabled) { opacity: .7; }
