@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   isInternalFilesAvailable,
   fetchChildrenPage,
-  fetchChildrenCount,
   fetchBreadcrumb,
   createFolder,
   uploadFiles,
@@ -15,6 +14,7 @@ import {
   renameNode,
   moveNodes,
   updateNote,
+  updateContributors,
   deleteNode,
   sortNodes,
   fetchFolderContributors,
@@ -33,8 +33,6 @@ import {
   FileImage,
   FolderPlus,
   Upload,
-  FolderUp,
-  FolderArchive,
   FolderInput,
   CornerLeftUp,
   ListChecks,
@@ -56,6 +54,8 @@ import {
   Clock,
   X,
 } from 'lucide-react';
+import InternalFilePreview from '../../components/InternalFilePreview';
+import InternalFilesPublish from './InternalFilesPublish';
 import './InternalFiles.css';
 
 /* 文件大小格式化 */
@@ -121,8 +121,8 @@ function getFileMeta(node) {
  *   消除「列表要转很久才出来」的等待感。只缓存第一页（≤50 项）。
  *   localStorage 不可用（隐私模式 / 超额）时全部静默跳过。
  * ============================================ */
-const LIST_CACHE_PREFIX = 'riemer:if:list:v1:';
-const LIST_CACHE_INDEX = 'riemer:if:list:v1:index';
+const LIST_CACHE_PREFIX = 'riemer:if:list:v2:';
+const LIST_CACHE_INDEX = 'riemer:if:list:v2:index';
 const LIST_CACHE_MAX = 24; // 最多缓存的目录数，超出按最久未用淘汰
 
 function listCacheKey(folderId) {
@@ -182,20 +182,6 @@ function mergeContribCache(folderId, contribSlice) {
   }
 }
 
-/* 把单独算出的总数并回列表缓存（总数晚于列表返回，供下次首帧直接显示「共 N 项」） */
-function mergeTotalCache(folderId, total) {
-  try {
-    const key = listCacheKey(folderId);
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    const entry = JSON.parse(raw);
-    entry.total = total;
-    localStorage.setItem(key, JSON.stringify(entry));
-  } catch {
-    /* ignore */
-  }
-}
-
 /* 资料上传规范（标题旁「必看」按钮弹出） */
 const UPLOAD_RULES = [
   {
@@ -222,7 +208,7 @@ const UPLOAD_RULES = [
   {
     title: '大文件怎么传',
     items: [
-      '超过 10MB 的文件，尽量先上传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接，节省存储空间。',
+      '超过 10MB 的文件，尽量先上传到 WPS / 腾讯文档等网盘，再点「发布资料 → 添加链接」粘贴分享链接，节省存储空间。',
       '记得在网盘里把分享权限设为「可查看」，否则别人打不开。',
     ],
   },
@@ -312,11 +298,27 @@ function NoteCell({ node, editable, busy, onEdit }) {
 }
 
 /* 内容贡献者单元格
- *   文件：上传者本人（固定不变）
+ *   支持手动名单；未设置时，文件显示上传者
  *   文件夹：所有在其中上传过资料的人（按最早上传排序，随他人上传而更新）
  *   人数较多时（尤其手机）名字省略显示，点「N 人」看完整名单（详情弹窗）
  */
-function ContribCell({ contributors, loading, onDetail }) {
+function ContribCell({ contributors, loading, onDetail, editable, busy, onEdit }) {
+  if (editable) {
+    const names = (contributors || []).map((c) => c.name).join('、');
+    return (
+      <button
+        className="if-col-contrib if-note-btn"
+        onClick={onEdit}
+        disabled={busy || loading}
+        title={loading ? '正在加载贡献者' : `${names || '暂无贡献者'}（点击编辑）`}
+        aria-label="编辑内容贡献者"
+      >
+        <Users size={13} className="if-contrib-icon" />
+        <span className="if-contrib-names">{loading ? '…' : names || '添加贡献者'}</span>
+        <Pencil size={12} />
+      </button>
+    );
+  }
   if (loading) {
     return <span className="if-col-contrib is-loading">…</span>;
   }
@@ -376,6 +378,7 @@ export default function InternalFiles() {
   const [busy, setBusy] = useState(false); // 上传/新建等写操作进行中
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
   const [dragNodes, setDragNodes] = useState(null); // 正在被拖动的条目（站内拖拽移动；多选时是一批）
   const [dropKey, setDropKey] = useState(null); // 当前悬停的投放目标（文件夹 id / ROOT_DROP_KEY）
@@ -383,16 +386,10 @@ export default function InternalFiles() {
   const [selectMode, setSelectMode] = useState(false); // 多选模式：点条目 = 勾选，而不是打开
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [infoModal, setInfoModal] = useState(null); // 标题旁的说明弹窗：'rules' | 'tips' | null
-  const [linkDraft, setLinkDraft] = useState(null); // 「添加链接」弹窗：{ text, name, nameEdited }
+  const [publishOpen, setPublishOpen] = useState(false);
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
-  const filesInputRef = useRef(null);
-  const folderInputRef = useRef(null);
-  const zipInputRef = useRef(null);
   const inflightRef = useRef(false);
-  // 每次 load 递增的令牌：单独并行拉取的「总数」回来晚，用它挡掉切目录后
-  // 落到错误目录上的旧计数。
-  const loadTokenRef = useRef(0);
   // 长按检测：按住 ~500ms 视为长按，弹出上传详情，并抑制随后的点击（进文件夹/打开文件）
   const pressTimerRef = useRef(null);
   const longPressedRef = useRef(false);
@@ -409,6 +406,11 @@ export default function InternalFiles() {
   //   返回 { list, loading }
   const contribsFor = useCallback(
     (node) => {
+      if (node.contributorsOverride != null) {
+        const list = node.contributorsOverride.split(/[、，,;；\n]+/)
+          .map((name) => name.trim()).filter(Boolean).map((name) => ({ id: null, name }));
+        return { list, loading: false };
+      }
       if (!node.isFolder) {
         const name = node.createdBy || '';
         return { list: name ? [{ id: node.createdById, name }] : [], loading: false };
@@ -475,7 +477,6 @@ export default function InternalFiles() {
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
     inflightRef.current = true;
-    const token = ++loadTokenRef.current;
     setError('');
 
     // 1) 命中缓存 → 立即渲染上次结果，去掉等待感
@@ -491,15 +492,6 @@ export default function InternalFiles() {
       setFolderContribs({});
     }
 
-    // 总数不阻塞行数据：单独并行拉取，回来后再补「共 N 项」，并挡掉切目录后的旧计数。
-    fetchChildrenCount(targetId)
-      .then((count) => {
-        if (token !== loadTokenRef.current) return;
-        setTotal(count);
-        mergeTotalCache(targetId, count);
-      })
-      .catch(() => {});
-
     // 2) 后台拉最新，替换缓存内容
     try {
       const [page, crumb] = await Promise.all([
@@ -507,12 +499,12 @@ export default function InternalFiles() {
         targetId ? fetchBreadcrumb(targetId) : Promise.resolve([]),
       ]);
       setItems(sortNodes(page.items));
-      // total 由上面的 fetchChildrenCount 单独维护，这里不用 page.total（恒为 null）覆盖它
+      setTotal(page.total);
       setHasMore(page.hasMore);
       setBreadcrumb(crumb);
       writeListCache(targetId, {
         items: page.items,
-        total: cached?.total ?? null, // 先沿用旧计数占位，新计数到达后由 mergeTotalCache 覆盖
+        total: page.total,
         hasMore: page.hasMore,
         contribs: {},
       });
@@ -529,7 +521,7 @@ export default function InternalFiles() {
     }
   }, [refreshContribs]);
 
-  // 加载下一页并追加到当前列表（偏移量按已加载数量，与服务端排序对齐）
+  // 追加整体排序后的下一页。
   const loadMore = useCallback(async () => {
     if (inflightRef.current || loadingMore || !hasMore) return;
     inflightRef.current = true;
@@ -540,7 +532,7 @@ export default function InternalFiles() {
         limit: CHILDREN_PAGE_SIZE,
       });
       setItems((prev) => sortNodes([...prev, ...page.items]));
-      // total 由 fetchChildrenCount 维护，这里不用 page.total（null）覆盖
+      setTotal(page.total);
       setHasMore(page.hasMore);
       refreshContribs(folderId, page.items); // 新翻出来的文件夹补算贡献者
     } catch (err) {
@@ -560,6 +552,11 @@ export default function InternalFiles() {
     }
   }, [isAuthenticated, folderId, load]);
 
+  // 目录切换不改变路由，需要单独重置页面滚动位置。
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+  }, [folderId]);
+
   const openFolder = (id) => {
     // 长按刚触发过详情，抑制这次点击，避免误进文件夹
     if (longPressedRef.current) {
@@ -569,6 +566,22 @@ export default function InternalFiles() {
     if (busy) return;
     exitSelect(); // 勾选只在当前目录内有效
     setFolderId(id);
+  };
+
+  const handleEditContributors = async (node) => {
+    const { list } = contribsFor(node);
+    const next = window.prompt('内容贡献者（多人用顿号分隔；清空后恢复自动显示）：',
+      node.contributorsOverride ?? list.map((c) => c.name).join('、'));
+    if (next === null) return;
+    setBusy(true);
+    try {
+      await updateContributors(node, next);
+      await load(folderId);
+    } catch (err) {
+      alert('保存贡献者失败：' + (err?.message || err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---- 编辑备注（仅上传者本人）---- */
@@ -601,40 +614,6 @@ export default function InternalFiles() {
     }
   };
 
-  /* ---- 添加链接（大文件放 WPS / 腾讯文档等网盘，这里只存网址）---- */
-  // 粘贴内容变化时自动识别名称；用户手动改过名称后不再覆盖
-  const handleLinkTextChange = (text) => {
-    setLinkDraft((prev) => {
-      if (!prev) return prev;
-      return {
-        ...prev,
-        text,
-        name: prev.nameEdited ? prev.name : parseSharedLink(text).name,
-      };
-    });
-  };
-
-  const handleSubmitLink = async (e) => {
-    e.preventDefault();
-    if (!linkDraft || busy) return;
-    const { url, code } = parseSharedLink(linkDraft.text);
-    if (!url) return;
-    setBusy(true);
-    try {
-      await createLink(
-        folderId,
-        { name: linkDraft.name, url, note: code ? `提取码：${code}` : '' },
-        user
-      );
-      setLinkDraft(null);
-      await load(folderId);
-    } catch (err) {
-      alert('添加链接失败：' + (err?.message || err));
-    } finally {
-      setBusy(false);
-    }
-  };
-
   /* ---- 上传（文件 / 文件夹 / 压缩包） ---- */
   // 普通上传里遇到 .zip 时逐个询问：解压成文件夹，还是原样上传压缩包
   const askExtractZips = (list) => {
@@ -658,7 +637,7 @@ export default function InternalFiles() {
     return { plain, zips };
   };
 
-  const doUpload = async (fileList, isFolder) => {
+  const doUpload = async (fileList, isFolder, metadata) => {
     const list = Array.from(fileList || []);
     if (list.length === 0) return;
     const { plain, zips } = isFolder ? { plain: list, zips: [] } : askExtractZips(list);
@@ -669,29 +648,37 @@ export default function InternalFiles() {
       const onProgress = (done, total, current) =>
         setProgress({ done, total, current });
       let failed = 0;
+      let succeeded = 0;
       if (plain.length > 0) {
         const fn = isFolder ? uploadFolderTree : uploadFiles;
-        const { errors } = await fn(folderId, plain, user, onProgress);
+        const { results, errors } = await fn(folderId, plain, user, onProgress, metadata);
+        succeeded += results?.length || 0;
         failed += errors?.length || 0;
       }
       const zipFailures = [];
       for (const zip of zips) {
         setProgress({ done: 0, total: 0, current: zip.name, label: '正在解压' });
         try {
-          const { errors } = await uploadZipAsFolder(folderId, zip, user, onProgress);
+          const { results, errors } = await uploadZipAsFolder(folderId, zip, user, onProgress, metadata);
+          succeeded += results?.length || 0;
           failed += errors?.length || 0;
         } catch (err) {
           zipFailures.push(`「${zip.name}」：${err?.message || err}`);
         }
       }
       await load(folderId);
+      if (metadata && succeeded === 0) {
+        throw new Error(`没有文件发布成功，请检查网络和上传权限后重试。${zipFailures.join('；')}`);
+      }
       if (zipFailures.length > 0) {
         alert(`以下压缩包未能解压，可重新选择并改为「不解压，原样上传」：\n${zipFailures.join('\n')}`);
       }
       if (failed > 0) {
         alert(`部分文件上传失败（${failed} 个），其余已成功上传。`);
       }
+      return true;
     } catch (err) {
+      if (metadata) throw err;
       alert('上传失败：' + (err?.message || err));
     } finally {
       setBusy(false);
@@ -699,14 +686,24 @@ export default function InternalFiles() {
     }
   };
 
-  const handleFilesPicked = (e) => {
-    doUpload(e.target.files, false);
-    e.target.value = ''; // 允许再次选择同一文件
-  };
-
-  const handleFolderPicked = (e) => {
-    doUpload(e.target.files, true);
-    e.target.value = '';
+  const handlePublish = async (draft) => {
+    if (busy) return false;
+    const metadata = { name: draft.name, contributors: draft.contributors, note: draft.note };
+    if (draft.type !== 'link') {
+      return doUpload(draft.files, draft.type === 'folder', metadata);
+    }
+    const { url, code } = parseSharedLink(draft.text);
+    if (!url || !draft.name.trim()) throw new Error('请填写标题和有效链接。');
+    const note = [draft.note.trim(), code ? `提取码：${code}` : ''].filter(Boolean).join('；');
+    if (note.length > 200) throw new Error('备注加提取码最多 200 字，请缩短备注。');
+    setBusy(true);
+    try {
+      await createLink(folderId, { ...metadata, url, note }, user);
+      await load(folderId);
+      return true;
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---- 移动（拖到文件夹 / 面包屑上，或在「移动到…」里选；多选时整批一起）---- */
@@ -894,7 +891,7 @@ export default function InternalFiles() {
                 <Info size={14} /> 使用说明
               </button>
             </div>
-            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹；超过 10MB 的文件，尽量先传到 WPS / 腾讯文档等网盘，再点「添加链接」粘贴分享链接</p>
+            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹；超过 10MB 的文件，尽量先传到 WPS / 腾讯文档等网盘，再点「发布资料 → 添加链接」粘贴分享链接</p>
           </div>
           <div className="internal-files-page__actions">
             <button
@@ -910,60 +907,12 @@ export default function InternalFiles() {
               <FolderPlus size={16} />
               <span className="if-btn__text">新建文件夹</span>
             </button>
-            <button className="if-btn" onClick={() => filesInputRef.current?.click()} disabled={busy}>
+            <button className="if-btn" onClick={() => setPublishOpen(true)} disabled={busy}>
               <Upload size={16} />
-              <span className="if-btn__text">上传文件</span>
-            </button>
-            <button className="if-btn" onClick={() => folderInputRef.current?.click()} disabled={busy}>
-              <FolderUp size={16} />
-              <span className="if-btn__text">上传文件夹</span>
-            </button>
-            <button
-              className="if-btn"
-              onClick={() => zipInputRef.current?.click()}
-              disabled={busy}
-              title="上传 .zip 压缩包，可自动解压成文件夹（手机上可代替「上传文件夹」）"
-            >
-              <FolderArchive size={16} />
-              <span className="if-btn__text">上传压缩包</span>
-            </button>
-            <button
-              className="if-btn"
-              onClick={() => setLinkDraft({ text: '', name: '', nameEdited: false })}
-              disabled={busy}
-              title="大文件先传到 WPS / 腾讯文档等网盘，再在这里添加分享链接"
-            >
-              <Link2 size={16} />
-              <span className="if-btn__text">添加链接</span>
+              <span>发布资料</span>
             </button>
           </div>
         </div>
-
-        {/* 隐藏的文件选择框 */}
-        <input
-          ref={filesInputRef}
-          type="file"
-          multiple
-          hidden
-          onChange={handleFilesPicked}
-        />
-        <input
-          ref={folderInputRef}
-          type="file"
-          hidden
-          webkitdirectory=""
-          directory=""
-          multiple
-          onChange={handleFolderPicked}
-        />
-        <input
-          ref={zipInputRef}
-          type="file"
-          accept=".zip,application/zip,application/x-zip-compressed"
-          multiple
-          hidden
-          onChange={handleFilesPicked}
-        />
 
         {/* 面包屑 */}
         <div className="internal-files-page__breadcrumb">
@@ -1038,7 +987,7 @@ export default function InternalFiles() {
             <div className="internal-files-page__empty">
               <Inbox size={40} />
               <p>这个文件夹是空的</p>
-              <span>点击右上角「上传文件 / 上传文件夹 / 上传压缩包 / 添加链接」，或把文件拖拽到此处</span>
+              <span>点击右上角「发布资料」选择文件、文件夹、压缩包或链接，或把文件拖拽到此处</span>
             </div>
           ) : (
             <div className="if-table">
@@ -1080,6 +1029,9 @@ export default function InternalFiles() {
                         return (
                           <ContribCell
                             contributors={list}
+                          editable={canModify(node)}
+                          busy={busy}
+                          onEdit={() => handleEditContributors(node)}
                             loading={contribLoading}
                             onDetail={() => setDetailNode(node)}
                           />
@@ -1087,18 +1039,18 @@ export default function InternalFiles() {
                       })()}
                       <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                       <span className="if-col-actions">
-                        <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
+                        <button className="if-icon-btn" aria-label="上传详情" onClick={() => setDetailNode(node)}>
                           <Info size={15} />
                         </button>
                         {canModify(node) && (
                           <>
-                            <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSources([node])} disabled={busy}>
+                            <button className="if-icon-btn if-row-modify" aria-label="移动" onClick={() => setMoveSources([node])} disabled={busy}>
                               <FolderInput size={15} />
                             </button>
-                            <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
+                            <button className="if-icon-btn if-row-modify" aria-label="修改" onClick={() => handleRename(node)} disabled={busy}>
                               <Pencil size={15} />
                             </button>
-                            <button className="if-icon-btn if-icon-btn--danger if-row-modify" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
+                            <button className="if-icon-btn if-icon-btn--danger if-row-modify" aria-label="删除" onClick={() => handleDelete(node)} disabled={busy}>
                               <Trash2 size={15} />
                             </button>
                           </>
@@ -1109,6 +1061,7 @@ export default function InternalFiles() {
                 }
 
                 const { Icon, label, cls } = getFileMeta(node);
+                const NameTag = isLinkNode(node) ? 'a' : 'button';
                 return (
                   <div
                     key={node.id}
@@ -1120,12 +1073,13 @@ export default function InternalFiles() {
                     onPointerCancel={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
                   >
-                    <a
+                    <NameTag
                       className="if-col-name if-name-btn"
-                      href={node.url || '#'}
+                      href={isLinkNode(node) ? node.url || '#' : undefined}
+                      type={isLinkNode(node) ? undefined : 'button'}
                       draggable={false}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target={isLinkNode(node) ? '_blank' : undefined}
+                      rel={isLinkNode(node) ? 'noopener noreferrer' : undefined}
                       title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : '点击预览'}（${detailTitle}）`}
                       onClick={(e) => {
                         if (selectMode) {
@@ -1136,19 +1090,27 @@ export default function InternalFiles() {
                         if (longPressedRef.current) {
                           e.preventDefault();
                           longPressedRef.current = false;
+                          return;
+                        }
+                        if (!isLinkNode(node)) {
+                          e.preventDefault();
+                          setPreviewFile(node);
                         }
                       }}
                     >
                       {renderRowIcon(node, <span className={`if-icon ${cls}`}><Icon size={20} /></span>)}
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
-                    </a>
+                    </NameTag>
                     <span className="if-col-size">{isLinkNode(node) ? '链接' : formatSize(node.sizeBytes)}</span>
                     {(() => {
                       const { list, loading: contribLoading } = contribsFor(node);
                       return (
                         <ContribCell
                           contributors={list}
+                          editable={canModify(node)}
+                          busy={busy}
+                          onEdit={() => handleEditContributors(node)}
                           loading={contribLoading}
                           onDetail={() => setDetailNode(node)}
                         />
@@ -1156,18 +1118,18 @@ export default function InternalFiles() {
                     })()}
                     <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
-                      <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
+                      <button className="if-icon-btn" aria-label="上传详情" onClick={() => setDetailNode(node)}>
                         <Info size={15} />
                       </button>
                       {canModify(node) && (
                         <>
-                          <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSources([node])} disabled={busy}>
+                          <button className="if-icon-btn if-row-modify" aria-label="移动" onClick={() => setMoveSources([node])} disabled={busy}>
                             <FolderInput size={15} />
                           </button>
-                          <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
+                          <button className="if-icon-btn if-row-modify" aria-label="修改" onClick={() => handleRename(node)} disabled={busy}>
                             <Pencil size={15} />
                           </button>
-                          <button className="if-icon-btn if-icon-btn--danger if-row-modify" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
+                          <button className="if-icon-btn if-icon-btn--danger if-row-modify" aria-label="删除" onClick={() => handleDelete(node)} disabled={busy}>
                             <Trash2 size={15} />
                           </button>
                         </>
@@ -1326,64 +1288,17 @@ export default function InternalFiles() {
         </div>
       )}
 
-      {/* 添加链接弹窗 */}
-      {linkDraft && (() => {
-        const parsed = parseSharedLink(linkDraft.text);
-        const source = linkSourceLabel(parsed.url);
-        const hasText = !!linkDraft.text.trim();
-        return (
-          <div className="if-detail-overlay" onClick={() => !busy && setLinkDraft(null)}>
-            <form className="if-detail if-link-form" onClick={(e) => e.stopPropagation()} onSubmit={handleSubmitLink}>
-              <div className="if-detail__head">
-                <span className="if-detail__title">添加链接</span>
-                <button type="button" className="if-icon-btn" onClick={() => setLinkDraft(null)} disabled={busy} title="关闭">
-                  <X size={16} />
-                </button>
-              </div>
-              <p className="if-link-form__tip">
-                适合 10MB 以上的文件：先把文件传到 WPS、腾讯文档、百度网盘等，点「分享」复制链接，再整段粘贴到下面。
-              </p>
-              <label className="if-link-form__label" htmlFor="if-link-text">分享内容或网址</label>
-              <textarea
-                id="if-link-text"
-                className="if-link-form__input"
-                rows={3}
-                autoFocus
-                placeholder="例如：【腾讯文档】期末复习笔记 https://docs.qq.com/doc/xxxx"
-                value={linkDraft.text}
-                onChange={(e) => handleLinkTextChange(e.target.value)}
-              />
-              {hasText && (
-                <div className={`if-link-form__status ${parsed.url ? '' : 'is-error'}`}>
-                  {parsed.url
-                    ? `已识别${source ? ` ${source} ` : ''}链接：${parsed.url}${parsed.code ? `（提取码 ${parsed.code} 会写入备注）` : ''}`
-                    : '没有识别到网址，需包含以 http:// 或 https:// 开头的链接。'}
-                </div>
-              )}
-              <label className="if-link-form__label" htmlFor="if-link-name">显示名称</label>
-              <input
-                id="if-link-name"
-                className="if-link-form__input"
-                type="text"
-                placeholder="列表里显示的文件名"
-                value={linkDraft.name}
-                onChange={(e) => {
-                  const name = e.target.value;
-                  setLinkDraft((prev) => (prev ? { ...prev, name, nameEdited: true } : prev));
-                }}
-              />
-              <div className="if-link-form__actions">
-                <button type="button" className="if-btn if-btn--ghost" onClick={() => setLinkDraft(null)} disabled={busy}>
-                  取消
-                </button>
-                <button type="submit" className="if-btn" disabled={busy || !parsed.url || !linkDraft.name.trim()}>
-                  {busy ? '添加中…' : '添加'}
-                </button>
-              </div>
-            </form>
-          </div>
-        );
-      })()}
+      {publishOpen && (
+        <InternalFilesPublish
+          destination={breadcrumb.map((node) => node.name).join(' / ') || '全部资料'}
+          busy={busy}
+          progress={progress}
+          onClose={() => setPublishOpen(false)}
+          onPublish={handlePublish}
+        />
+      )}
+
+      {previewFile && <InternalFilePreview key={previewFile.id} file={previewFile} onClose={() => setPreviewFile(null)} />}
 
       {/* 上传详情弹窗（长按 / Info 触发） */}
       {detailNode && (
