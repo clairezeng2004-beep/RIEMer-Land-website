@@ -55,6 +55,7 @@ import {
   X,
 } from 'lucide-react';
 import InternalFilePreview from '../../components/InternalFilePreview';
+import NoteCell from './InternalFilesNoteCell';
 import InternalFilesTextEditor from './InternalFilesTextEditor';
 import InternalFilesPublish from './InternalFilesPublish';
 import './InternalFiles.css';
@@ -267,36 +268,6 @@ const INFO_MODALS = {
 
 // 拖到面包屑「全部资料」上 = 移到根目录；根目录 id 为 null，高亮态另用一个占位键
 const ROOT_DROP_KEY = '__root__';
-
-/* 备注单元格：上传者本人可点击编辑，其余人只读 */
-function NoteCell({ node, editable, busy, onEdit }) {
-  const hasNote = !!(node.note && node.note.trim());
-  if (editable) {
-    return (
-      <button
-        className={`if-col-note if-note-btn ${hasNote ? '' : 'is-empty'}`}
-        onClick={() => onEdit(node)}
-        disabled={busy}
-        title={hasNote ? `${node.note}（点击编辑）` : '点击添加备注'}
-      >
-        <StickyNote size={13} className="if-note-icon" />
-        <span className="if-note-text">{hasNote ? node.note : '添加备注'}</span>
-      </button>
-    );
-  }
-  return (
-    <span className={`if-col-note if-note-readonly ${hasNote ? '' : 'is-empty'}`} title={node.note || ''}>
-      {hasNote ? (
-        <>
-          <StickyNote size={13} className="if-note-icon" />
-          <span className="if-note-text">{node.note}</span>
-        </>
-      ) : (
-        <span className="if-note-dash">—</span>
-      )}
-    </span>
-  );
-}
 
 /* 内容贡献者单元格
  *   支持手动名单；未设置时，文件显示上传者
@@ -577,6 +548,15 @@ export default function InternalFiles() {
   };
 
   const handleEditNote = (node) => setTextDraft({ kind: 'note', node, value: node.note || '' });
+  const handleSaveNote = async (node, value) => {
+    setBusy(true);
+    try {
+      await updateNote(node, value);
+      await load(folderId);
+    } finally {
+      setBusy(false);
+    }
+  };
   const handleNewFolder = () => setTextDraft({ kind: 'folder', value: '新建文件夹' });
   const handleRename = (node) => setTextDraft({ kind: 'name', node, value: node.name });
 
@@ -1011,7 +991,7 @@ export default function InternalFiles() {
                           />
                         );
                       })()}
-                      <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
+                      <NoteCell node={node} editable={canModify(node)} busy={busy} onSave={handleSaveNote} />
                       <span className="if-col-actions">
                         <button className="if-icon-btn" aria-label="上传详情" onClick={() => setDetailNode(node)}>
                           <Info size={15} />
@@ -1090,7 +1070,7 @@ export default function InternalFiles() {
                         />
                       );
                     })()}
-                    <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
+                    <NoteCell node={node} editable={canModify(node)} busy={busy} onSave={handleSaveNote} />
                     <span className="if-col-actions">
                       <button className="if-icon-btn" aria-label="上传详情" onClick={() => setDetailNode(node)}>
                         <Info size={15} />
