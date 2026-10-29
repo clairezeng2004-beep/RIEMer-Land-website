@@ -15,6 +15,7 @@ import {
   renameNode,
   moveNodes,
   updateNote,
+  updateContributors,
   deleteNode,
   sortNodes,
   fetchFolderContributors,
@@ -312,11 +313,27 @@ function NoteCell({ node, editable, busy, onEdit }) {
 }
 
 /* 内容贡献者单元格
- *   文件：上传者本人（固定不变）
+ *   支持手动名单；未设置时，文件显示上传者
  *   文件夹：所有在其中上传过资料的人（按最早上传排序，随他人上传而更新）
  *   人数较多时（尤其手机）名字省略显示，点「N 人」看完整名单（详情弹窗）
  */
-function ContribCell({ contributors, loading, onDetail }) {
+function ContribCell({ contributors, loading, onDetail, editable, busy, onEdit }) {
+  if (editable) {
+    const names = (contributors || []).map((c) => c.name).join('、');
+    return (
+      <button
+        className="if-col-contrib if-note-btn"
+        onClick={onEdit}
+        disabled={busy || loading}
+        title={loading ? '正在加载贡献者' : `${names || '暂无贡献者'}（点击编辑）`}
+        aria-label="编辑内容贡献者"
+      >
+        <Users size={13} className="if-contrib-icon" />
+        <span className="if-contrib-names">{loading ? '…' : names || '添加贡献者'}</span>
+        <Pencil size={12} />
+      </button>
+    );
+  }
   if (loading) {
     return <span className="if-col-contrib is-loading">…</span>;
   }
@@ -409,6 +426,11 @@ export default function InternalFiles() {
   //   返回 { list, loading }
   const contribsFor = useCallback(
     (node) => {
+      if (node.contributorsOverride != null) {
+        const list = node.contributorsOverride.split(/[、，,;；\n]+/)
+          .map((name) => name.trim()).filter(Boolean).map((name) => ({ id: null, name }));
+        return { list, loading: false };
+      }
       if (!node.isFolder) {
         const name = node.createdBy || '';
         return { list: name ? [{ id: node.createdById, name }] : [], loading: false };
@@ -574,6 +596,22 @@ export default function InternalFiles() {
     if (busy) return;
     exitSelect(); // 勾选只在当前目录内有效
     setFolderId(id);
+  };
+
+  const handleEditContributors = async (node) => {
+    const { list } = contribsFor(node);
+    const next = window.prompt('内容贡献者（多人用顿号分隔；清空后恢复自动显示）：',
+      node.contributorsOverride ?? list.map((c) => c.name).join('、'));
+    if (next === null) return;
+    setBusy(true);
+    try {
+      await updateContributors(node, next);
+      await load(folderId);
+    } catch (err) {
+      alert('保存贡献者失败：' + (err?.message || err));
+    } finally {
+      setBusy(false);
+    }
   };
 
   /* ---- 编辑备注（仅上传者本人）---- */
@@ -1085,6 +1123,9 @@ export default function InternalFiles() {
                         return (
                           <ContribCell
                             contributors={list}
+                          editable={canModify(node)}
+                          busy={busy}
+                          onEdit={() => handleEditContributors(node)}
                             loading={contribLoading}
                             onDetail={() => setDetailNode(node)}
                           />
@@ -1154,6 +1195,9 @@ export default function InternalFiles() {
                       return (
                         <ContribCell
                           contributors={list}
+                          editable={canModify(node)}
+                          busy={busy}
+                          onEdit={() => handleEditContributors(node)}
                           loading={contribLoading}
                           onDetail={() => setDetailNode(node)}
                         />

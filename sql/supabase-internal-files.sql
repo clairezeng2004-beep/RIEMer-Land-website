@@ -36,6 +36,10 @@ CREATE TABLE IF NOT EXISTS public.internal_files (
 -- 为「已存在的旧表」补齐 note 列（幂等）
 ALTER TABLE public.internal_files ADD COLUMN IF NOT EXISTS note TEXT DEFAULT '';
 
+-- 手动贡献者显示名单；NULL 使用原有自动汇总，不改变实际上传者及权限。
+ALTER TABLE public.internal_files ADD COLUMN IF NOT EXISTS contributors_override TEXT
+  CHECK (char_length(contributors_override) <= 500);
+
 -- 常用索引：按父目录列子项 / 按创建者过滤
 CREATE INDEX IF NOT EXISTS idx_internal_files_parent ON public.internal_files(parent_id);
 CREATE INDEX IF NOT EXISTS idx_internal_files_parent_folder_name

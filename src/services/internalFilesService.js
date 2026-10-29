@@ -46,6 +46,7 @@ function rowToNode(row) {
     mimeType: row.mime_type || '',
     sizeBytes: Number(row.size_bytes || 0),
     note: row.note || '',
+    contributorsOverride: row.contributors_override ?? null,
     createdById: row.created_by_id || null,
     createdBy: row.created_by || '',
     createdAt: row.created_at || null,
@@ -628,6 +629,20 @@ export async function updateNote(node, note) {
     throw new Error('备注未生效：只有上传者本人或管理员可以编辑备注。');
   }
   return data[0].note || '';
+}
+
+/* 手动贡献者名单；null 恢复自动汇总，不改变上传归属和权限。 */
+export async function updateContributors(node, names) {
+  requireRemote();
+  const clean = (names || '').split(/[、，,;；\n]+/).map((name) => name.trim()).filter(Boolean).join('、');
+  if (clean.length > 500) throw new Error('贡献者名单最多 500 字。');
+  const { data, error } = await supabase
+    .from('internal_files')
+    .update({ contributors_override: clean || null, updated_at: new Date().toISOString() })
+    .eq('id', node.id)
+    .select('id');
+  if (error) throw error;
+  if (!data?.length) throw new Error('保存失败：只有上传者本人或管理员可以编辑贡献者。');
 }
 
 /* 递归收集某文件夹下所有子孙的 Storage 路径（BFS） */
