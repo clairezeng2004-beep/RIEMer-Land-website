@@ -34,3 +34,5 @@
 .if-preview__body > img { display: block; max-width: 100%; height: auto; margin: auto; }
 .if-preview__message { padding: 24px; text-align: center; }
 .if-preview__download-hint { margin: 0; padding: 8px 16px; font-size: 12px; color: var(--color-text-muted); }
+
+.if-preview__text { padding: 24px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; font-size: 16px; }

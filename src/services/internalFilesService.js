@@ -271,6 +271,17 @@ export async function createLink(parentId, { name, url, note = '', contributors 
   return rowToNode(data);
 }
 
+/* 直接发布文字资料，沿用文件上传、权限、移动与清理流程。 */
+export async function createTextMaterial(parentId, { name, content, note, contributors }, user) {
+  requireRemote();
+  const title = (name || '').trim();
+  if (!title) throw new Error('请填写资料标题。');
+  if (!content?.trim()) throw new Error('请填写资料正文。');
+  const fileName = /\.txt$/i.test(title) ? title : `${title}.txt`;
+  const file = new File([content], fileName, { type: 'text/plain;charset=utf-8' });
+  return uploadOneFile(parentId, file, user, { name: fileName, note, contributors });
+}
+
 /* 生成 Storage 对象路径（保留扩展名，主体随机不可枚举） */
 function buildStoragePath(userId, fileName) {
   const ext = (fileName?.split('.').pop() || '').toLowerCase();

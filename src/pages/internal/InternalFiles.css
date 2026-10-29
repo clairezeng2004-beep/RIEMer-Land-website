@@ -1008,3 +1008,5 @@
 .if-note-editor__actions { display: flex; justify-content: flex-end; gap: 6px; }
 .if-note-editor__actions .if-btn { padding: 5px 10px; font-size: 12px; }
 .if-note-editor__error { color: var(--color-danger, #c0392b); overflow-wrap: anywhere; }
+
+.if-publish-content { min-height: 220px; line-height: 1.8; }

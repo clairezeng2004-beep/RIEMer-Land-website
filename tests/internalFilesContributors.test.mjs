@@ -49,6 +49,7 @@ test('contributor edits persist separately, reset to automatic, and report failu
 
 test('publishing persists metadata with files and nested folders, preserving upload ownership', async () => {
   const rows = [];
+  const uploadedFiles = [];
   const supabase = {
     from() {
       let row;
@@ -59,7 +60,7 @@ test('publishing persists metadata with files and nested folders, preserving upl
       };
     },
     storage: { from() { return {
-      async upload() { return { error: null }; },
+      async upload(_path, file) { uploadedFiles.push(file); return { error: null }; },
       getPublicUrl() { return { data: { publicUrl: 'https://example.com/file' } }; },
     }; } },
   };
@@ -72,7 +73,7 @@ test('publishing persists metadata with files and nested folders, preserving upl
     });
   });
   await service.evaluate();
-  const { uploadFiles, uploadFolderTree, createLink } = service.namespace;
+  const { uploadFiles, uploadFolderTree, createLink, createTextMaterial } = service.namespace;
   const user = { id: 'uploader', name: '实际上传者' };
   const metadata = { name: '自定义标题.pdf', note: ' 期末资料 ', contributors: '张三, 李四' };
   const result = await uploadFiles('destination', [{ name: 'original.pdf' }], user, null, metadata);
@@ -93,6 +94,16 @@ test('publishing persists metadata with files and nested folders, preserving upl
   assert.equal(rows.at(-1).contributors_override, '张三、李四');
   await createLink('destination', { name: '自动名单', url: 'https://example.com' }, user);
   assert.equal('contributors_override' in rows.at(-1), false);
+  await createTextMaterial('destination', { name: '课程笔记', content: '第一行\n第二行', note: '复习用', contributors: '张三' }, user);
+  assert.equal(rows.at(-1).name, '课程笔记.txt');
+  assert.equal(rows.at(-1).mime_type, 'text/plain;charset=utf-8');
+  assert.equal(rows.at(-1).note, '复习用');
+  assert.equal(rows.at(-1).contributors_override, '张三');
+  assert.equal(rows.at(-1).parent_id, 'destination');
+  assert.equal(await uploadedFiles.at(-1).text(), '第一行\n第二行');
+  await assert.rejects(createTextMaterial(null, { name: '', content: '正文' }, user), /标题/);
+  await assert.rejects(createTextMaterial(null, { name: '笔记', content: '  ' }, user), /正文/);
+
 });
 
 test('alphabetical ordering mixes folders/files, uses pinyin, and sorts before pagination', async () => {
