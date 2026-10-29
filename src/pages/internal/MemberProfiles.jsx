@@ -1,4 +1,4 @@
-import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { supabase, isSupabaseConfigured } from '../../lib/supabase';
 import { useSiteContent } from '../../contexts/SiteContentContext';
@@ -16,6 +16,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
+import { safeParseDate, compareMemberJoinedAt } from '../../utils/memberProfilesOrder';
 import './MemberProfiles.css';
 
 // ============================================
@@ -49,19 +50,6 @@ const MONTH_OPTIONS = Array.from({ length: 12 }, (_, i) => i + 1);
 //   - '2024-01-01 10:00:00+00'      Postgres 默认格式（带空格，Edge/Safari 早期版本 Invalid Date）
 //   - '2024-01-01 10:00:00'         无时区
 // 统一修正为浏览器都能解析的 ISO 8601。
-function safeParseDate(raw) {
-  if (!raw) return null;
-  if (raw instanceof Date) return isNaN(raw.getTime()) ? null : raw;
-  if (typeof raw !== 'string') return null;
-  let s = raw.trim();
-  // 把中间的空格替换为 'T'（Postgres TIMESTAMPTZ 输出常见格式）
-  s = s.replace(' ', 'T');
-  // 处理 '+00' / '-05' 这类单段时区（需补成 '+00:00'）
-  s = s.replace(/([+-])(\d{2})$/, '$1$2:00');
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d;
-}
-
 // 将 ISO 日期转为 { year, month }
 function dateToYearMonth(dateStr) {
   const d = safeParseDate(dateStr);
@@ -164,15 +152,12 @@ export default function MemberProfiles() {
             const d = safeParseDate(p.joined_at);
             return d ? `${d.getFullYear()}年${d.getMonth() + 1}月` : '';
           })(),
-        })).sort((a, b) => {
-          const da = safeParseDate(a.joined_at);
-          const db = safeParseDate(b.joined_at);
-          return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
-        });
+        })).sort(compareMemberJoinedAt);
       }
     } catch { /* ignore */ }
     return [];
   });
+  const orderedProfiles = useMemo(() => [...profiles].sort(compareMemberJoinedAt), [profiles]);
   const [editingId, setEditingId] = useState(null);
   const [editData, setEditData] = useState({});
   // 手机端「成员通讯录」不再用横向滚动表格，而是一列卡片：左名字、右年级+一句话简介。
@@ -246,11 +231,7 @@ export default function MemberProfiles() {
           })(),
         };
       })
-      .sort((a, b) => {
-        const da = safeParseDate(a.joined_at);
-        const db = safeParseDate(b.joined_at);
-        return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
-      });
+      .sort(compareMemberJoinedAt);
 
     setProfiles(formatted);
   }, [getAllUsers]);
@@ -539,11 +520,7 @@ export default function MemberProfiles() {
               next = prev.map((p) => (p.user_id === row.user_id ? formatted : p));
             } else {
               // INSERT：按 joined_at 升序插入新行
-              next = [...prev, formatted].sort((a, b) => {
-                const da = safeParseDate(a.joined_at);
-                const db = safeParseDate(b.joined_at);
-                return (da ? da.getTime() : 0) - (db ? db.getTime() : 0);
-              });
+              next = [...prev, formatted].sort(compareMemberJoinedAt);
               // 新成员 JOIN 姓名可能为空，异步补一下（不阻塞 UI）
               if (!formatted.name || formatted.name === '未知用户') {
                 (async () => {
@@ -1114,7 +1091,7 @@ export default function MemberProfiles() {
               </tr>
             </thead>
             <tbody>
-              {profiles.map((profile, idx) => {
+              {orderedProfiles.map((profile, idx) => {
                 const isEditing = editingId === profile.user_id;
                 const isSelf = isOwnRow(profile);
 
@@ -1287,7 +1264,7 @@ export default function MemberProfiles() {
         {/* 手机端卡片列表：一列卡片，左名字、右年级 + 一句话简介，点击进详情。
             桌面端通过 CSS 隐藏（.member-profiles-mobile-list），与表格互斥展示。 */}
         <ul className="member-profiles-mobile-list">
-          {profiles.map((profile, idx) => {
+          {orderedProfiles.map((profile, idx) => {
             const isSelf = isOwnRow(profile);
             return (
               <li key={profile.user_id} className="member-profiles-mobile-list__item">
