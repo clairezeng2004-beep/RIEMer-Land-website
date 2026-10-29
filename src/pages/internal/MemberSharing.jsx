@@ -953,15 +953,6 @@ export default function MemberSharing() {
                           ))}
                         </div>
                       )}
-                      <span
-                        className="ms-card__badge"
-                        style={{
-                          color: categoryColors[post.category] || '#6B7280',
-                          background: `${categoryColors[post.category] || '#6B7280'}15`,
-                        }}
-                      >
-                        {categoryLabels[post.category] || post.category}
-                      </span>
                       {post.format === 'folder' ? (
                         <span className="ms-card__format-tag">
                           <FolderOpen size={13} /> 文件夹
