@@ -42,19 +42,27 @@ function formatFileSize(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-export default function FolderItemsEditor({ items = [], onChange, title = '文件夹内容' }) {
+export default function FolderItemsEditor({ items = [], onChange, title = '文件夹内容', maxItems = MAX_ITEMS, disabled = false, onReadingChange }) {
   const inputRef = useRef(null);
   const [linkName, setLinkName] = useState('');
   const [linkUrl, setLinkUrl] = useState('');
+  const [reading, setReading] = useState(false);
+  const [error, setError] = useState('');
+  const readingRef = useRef(false);
   const safeItems = Array.isArray(items) ? items : [];
 
   const addFiles = useCallback(async (fileList) => {
     const files = Array.from(fileList || []);
     if (files.length === 0) return;
+    if (disabled || readingRef.current) return;
+    readingRef.current = true;
+    setReading(true);
+    onReadingChange?.(true);
+    setError('');
     const nextFiles = [];
     for (const file of files) {
-      if (safeItems.length + nextFiles.length >= MAX_ITEMS) {
-        alert(`文件夹最多放 ${MAX_ITEMS} 项`);
+      if (safeItems.length + nextFiles.length >= maxItems) {
+        setError(`文件夹最多放 ${maxItems} 项`);
         break;
       }
       try {
@@ -67,19 +75,22 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
           type: file.type,
           dataUrl,
         });
-      } catch { /* ignore */ }
+      } catch { setError(`无法读取 ${file.name}，请重新选择文件。`); }
     }
     if (nextFiles.length > 0) onChange([...safeItems, ...nextFiles]);
-  }, [onChange, safeItems]);
+    readingRef.current = false;
+    setReading(false);
+    onReadingChange?.(false);
+  }, [onChange, safeItems, maxItems, disabled, onReadingChange]);
 
   const addLink = useCallback(() => {
     const url = normalizeLinkUrl(linkUrl);
     if (!url) {
-      alert('请填写在线文档链接');
+      setError('请填写在线文档链接');
       return;
     }
-    if (safeItems.length >= MAX_ITEMS) {
-      alert(`文件夹最多放 ${MAX_ITEMS} 项`);
+    if (safeItems.length >= maxItems) {
+      setError(`文件夹最多放 ${maxItems} 项`);
       return;
     }
     onChange([
@@ -88,14 +99,21 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
     ]);
     setLinkName('');
     setLinkUrl('');
-  }, [linkName, linkUrl, onChange, safeItems]);
+    setError('');
+  }, [linkName, linkUrl, onChange, safeItems, maxItems]);
 
   const removeItem = useCallback((id) => {
     onChange(safeItems.filter((item) => item.id !== id));
   }, [onChange, safeItems]);
 
   return (
-    <div className="folder-editor">
+    <div className="folder-editor" onDragOver={(event) => {
+      if (Array.from(event.dataTransfer.types).includes('Files')) event.preventDefault();
+    }} onDrop={(event) => {
+      if (!Array.from(event.dataTransfer.types).includes('Files')) return;
+      event.preventDefault();
+      addFiles(event.dataTransfer.files);
+    }}>
       <div className="folder-editor__header">
         <div className="folder-editor__title">
           <FolderOpen size={18} />
@@ -104,7 +122,10 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
         <span className="folder-editor__count">{safeItems.length} 项</span>
       </div>
 
-      <div className="folder-editor__actions">
+      <p className="folder-editor__drop-hint">将文件拖到此处，或点击“添加文件”。已有文件时也可以继续添加。</p>
+      {reading && <p className="folder-editor__drop-hint" role="status">正在读取文件…</p>}
+      {error && <p className="folder-editor__drop-hint" role="alert">{error}</p>}
+      <fieldset disabled={reading || disabled} className="folder-editor__actions">
         <button
           type="button"
           className="folder-editor__upload"
@@ -150,7 +171,7 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
             <LinkIcon size={15} /> 添加链接
           </button>
         </div>
-      </div>
+      </fieldset>
 
       <div className="folder-editor__list">
         {safeItems.length === 0 ? (
@@ -170,6 +191,7 @@ export default function FolderItemsEditor({ items = [], onChange, title = '文�
                 <button
                   type="button"
                   className="folder-editor__remove"
+                  disabled={reading || disabled}
                   onClick={() => removeItem(item.id)}
                   title="移除"
                 >
