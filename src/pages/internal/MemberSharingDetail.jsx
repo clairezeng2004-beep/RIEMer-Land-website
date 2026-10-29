@@ -49,24 +49,12 @@ import {
   fetchSharingById,
   subscribeSharings,
   updateSharing,
-  fetchCategories,
   getCachedSharings,
-  getLocalCategories,
 } from '../../services/memberSharingService';
 import './MemberSharingDetail.css';
 
 const MEMBER_SHARING_VIEWED_KEY = 'riemer_member_sharing_viewed_v2';
 const VIEW_TARGET_TYPE = 'member-sharing';
-
-function buildCategoryMaps(cats) {
-  const labels = { history: '历史会议' };
-  const colors = { history: '#4FBFC4' };
-  cats.forEach((c) => {
-    labels[c.key] = c.label;
-    colors[c.key] = c.color;
-  });
-  return { labels, colors };
-}
 
 /* 附件辅助函数 */
 function getFileIcon(name) {
@@ -257,8 +245,6 @@ export default function MemberSharingDetail({ material, onBack, materialActions 
   );
 
   // 动态分类
-  const [categoryList, setCategoryList] = useState(() => getLocalCategories());
-  const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
 
   const [sharings, setSharings] = useState(() => material ? [material] : getCachedSharings());
   const [loaded, setLoaded] = useState(false);
@@ -294,9 +280,8 @@ export default function MemberSharingDetail({ material, onBack, materialActions 
     })();
 
     (async () => {
-      const [listResult, catsResult, viewsResult] = await Promise.allSettled([
+      const [listResult, viewsResult] = await Promise.allSettled([
         fetchSharings(),
-        fetchCategories(),
         fetchViewCountFromCloud(id, VIEW_TARGET_TYPE),
       ]);
       if (cancelled) return;
@@ -308,9 +293,6 @@ export default function MemberSharingDetail({ material, onBack, materialActions 
             ? [currentPost, ...list.filter((item) => String(item.id) !== String(id))]
             : list;
         });
-      }
-      if (catsResult.status === 'fulfilled' && Array.isArray(catsResult.value)) {
-        setCategoryList(catsResult.value);
       }
       if (viewsResult.status === 'fulfilled') {
         setViews((prev) => ({
@@ -582,16 +564,6 @@ export default function MemberSharingDetail({ material, onBack, materialActions 
           <article className="msd-article">
             {/* 文章头部 */}
             <header className="msd-article__header">
-              <span
-                className="msd-article__badge"
-                style={{
-                  color: categoryColors[post.category] || '#6B7280',
-                  background: `${categoryColors[post.category] || '#6B7280'}15`,
-                }}
-              >
-                {categoryLabels[post.category] || post.category}
-              </span>
-
               <h1 className="msd-article__title">{post.title}</h1>
 
               {post.period && (
