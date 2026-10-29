@@ -55,6 +55,7 @@ import {
   X,
 } from 'lucide-react';
 import InternalFilePreview from '../../components/InternalFilePreview';
+import InternalFilesTextEditor from './InternalFilesTextEditor';
 import InternalFilesPublish from './InternalFilesPublish';
 import './InternalFiles.css';
 
@@ -387,6 +388,7 @@ export default function InternalFiles() {
   const [selectedIds, setSelectedIds] = useState(() => new Set());
   const [infoModal, setInfoModal] = useState(null); // 标题旁的说明弹窗：'rules' | 'tips' | null
   const [publishOpen, setPublishOpen] = useState(false);
+  const [textDraft, setTextDraft] = useState(null);
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
   const inflightRef = useRef(false);
@@ -568,47 +570,26 @@ export default function InternalFiles() {
     setFolderId(id);
   };
 
-  const handleEditContributors = async (node) => {
+  const handleEditContributors = (node) => {
     const { list } = contribsFor(node);
-    const next = window.prompt('内容贡献者（多人用顿号分隔；清空后恢复自动显示）：',
-      node.contributorsOverride ?? list.map((c) => c.name).join('、'));
-    if (next === null) return;
-    setBusy(true);
-    try {
-      await updateContributors(node, next);
-      await load(folderId);
-    } catch (err) {
-      alert('保存贡献者失败：' + (err?.message || err));
-    } finally {
-      setBusy(false);
-    }
+    setTextDraft({ kind: 'contributors', node,
+      value: node.contributorsOverride ?? list.map((c) => c.name).join('、') });
   };
 
-  /* ---- 编辑备注（仅上传者本人）---- */
-  const handleEditNote = async (node) => {
-    const next = window.prompt('备注（简短说明，留空可清除）：', node.note || '');
-    if (next === null || next.trim() === (node.note || '')) return;
-    setBusy(true);
-    try {
-      await updateNote(node, next);
-      await load(folderId);
-    } catch (err) {
-      alert('保存备注失败：' + (err?.message || err));
-    } finally {
-      setBusy(false);
-    }
-  };
+  const handleEditNote = (node) => setTextDraft({ kind: 'note', node, value: node.note || '' });
+  const handleNewFolder = () => setTextDraft({ kind: 'folder', value: '新建文件夹' });
+  const handleRename = (node) => setTextDraft({ kind: 'name', node, value: node.name });
 
-  /* ---- 新建文件夹 ---- */
-  const handleNewFolder = async () => {
-    const name = window.prompt('新建文件夹名称：', '新建文件夹');
-    if (name === null) return;
+  const handleSaveText = async (value) => {
+    if (!textDraft || busy) return;
+    const { kind, node } = textDraft;
     setBusy(true);
     try {
-      await createFolder(folderId, name, user);
+      if (kind === 'folder') await createFolder(folderId, value, user);
+      else if (kind === 'name') await renameNode(node, value);
+      else if (kind === 'note') await updateNote(node, value);
+      else if (kind === 'contributors') await updateContributors(node, value);
       await load(folderId);
-    } catch (err) {
-      alert('新建文件夹失败：' + (err?.message || err));
     } finally {
       setBusy(false);
     }
@@ -817,21 +798,6 @@ export default function InternalFiles() {
     if (busy) return;
     const dropped = e.dataTransfer?.files;
     if (dropped && dropped.length > 0) doUpload(dropped, false);
-  };
-
-  /* ---- 重命名 ---- */
-  const handleRename = async (node) => {
-    const name = window.prompt('重命名：', node.name);
-    if (name === null || name.trim() === node.name) return;
-    setBusy(true);
-    try {
-      await renameNode(node, name);
-      await load(folderId);
-    } catch (err) {
-      alert('重命名失败：' + (err?.message || err));
-    } finally {
-      setBusy(false);
-    }
   };
 
   /* ---- 删除 ---- */
@@ -1302,6 +1268,15 @@ export default function InternalFiles() {
             </div>
           </div>
         </div>
+      )}
+
+      {textDraft && (
+        <InternalFilesTextEditor
+          draft={textDraft}
+          busy={busy}
+          onSave={handleSaveText}
+          onClose={() => setTextDraft(null)}
+        />
       )}
 
       {publishOpen && (
