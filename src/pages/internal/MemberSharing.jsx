@@ -434,13 +434,13 @@ export default function MemberSharing() {
     return matchSearch && matchCat;
   });
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (!window.confirm('确定要删除这篇分享吗？')) return;
     const target = sharings.find((s) => String(s.id) === String(id));
     // 删除前先把整条快照挪进回收站，支持后续恢复
     if (target) {
-      moveToRecycleBin({ itemType: 'member_sharing', item: target, user })
-        .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
+      const saved = await moveToRecycleBin({ itemType: 'member_sharing', item: target, user });
+      if (!saved.success) { alert(`删除已停止：${saved.error}`); return; }
     }
     setSharings((prev) => prev.filter((s) => s.id !== id));
     deleteSharing(id).catch(() => { /* ignore */ });

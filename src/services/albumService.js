@@ -8,6 +8,7 @@
 //   - thumb_url / thumb_path   → 缩略图（供列表/Lightbox 展示）
 // 未配置 Supabase 或失败时，回退到 localStorage。
 
+import { removeStorageObjects } from './storageCleanupService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 const BUCKET = 'album-photos';
@@ -102,13 +103,7 @@ function collectStoragePaths(photos = []) {
 }
 
 async function removeStoragePaths(paths) {
-  if (!hasRemote() || !Array.isArray(paths) || paths.length === 0) return;
-  const uniquePaths = [...new Set(paths.filter(Boolean))];
-  if (uniquePaths.length === 0) return;
-  const { error } = await supabase.storage.from(BUCKET).remove(uniquePaths);
-  if (error) {
-    console.warn('[AlbumService] Storage 清理失败：', error.message);
-  }
+  await removeStorageObjects(BUCKET, paths || []);
 }
 
 async function cleanupUploaded(uploaded = []) {
@@ -265,15 +260,17 @@ export async function fetchAlbumPhotos(albumId) {
     return album ? album.photos || [] : [];
   }
   try {
-    const { data, error } = await supabase
-      .from('album_photos')
-      .select('*')
-      .eq('album_id', albumId)
-      // 兜底排序键；真正的展示顺序在下方按"拍摄时间"重新排序。
-      .order('sort_index', { ascending: true })
-      .order('created_at', { ascending: true });
-    if (error) throw error;
-    return sortPhotosByCapturedAt((data || []).map(rowToPhoto));
+    const rows = [];
+    for (let offset = 0; ; offset += 500) {
+      const { data, error } = await supabase.from('album_photos').select('*')
+        .eq('album_id', albumId).order('sort_index', { ascending: true })
+        .order('created_at', { ascending: true }).order('id', { ascending: true })
+        .range(offset, offset + 499);
+      if (error) throw error;
+      rows.push(...(data || []));
+      if (!data || data.length < 500) break;
+    }
+    return sortPhotosByCapturedAt(rows.map(rowToPhoto));
   } catch (err) {
     console.warn('[AlbumService] 加载相册照片失败：', err.message);
     throw err;
@@ -870,7 +867,7 @@ export async function deleteAlbum(album) {
   }
 
   try {
-    const photos = album._partial ? await fetchAlbumPhotos(album.id) : (album.photos || []);
+    const photos = await fetchAlbumPhotos(album.id);
     const paths = collectStoragePaths(photos);
     await removeStoragePaths(paths);
     // ⚠️ Supabase 的 delete 在被 RLS 行级权限拦截时不会报错，只是删除 0 行。

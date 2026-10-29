@@ -807,7 +807,7 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     setShowUpload(false);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     // 先找到被删除的文档，用于在通知中显示详细信息
     const target = documents.find((d) => d.id === id);
     if (!target) return;
@@ -816,26 +816,16 @@ export default function Documents({ filterTypes, customTitle, customDesc, config
     const confirmMsg = `确定要删除文档「${target.title}」吗？`;
     if (window.confirm(confirmMsg)) {
       const sid = String(id);
+      const isDefaultDoc = documentsData.some((d) => String(d.id) === sid);
+      if (!isDefaultDoc) {
+        const saved = await moveToRecycleBin({ itemType: 'document', item: target, user });
+        if (!saved.success) { alert(`删除已停止：${saved.error}`); return; }
+      }
       pendingDeletedIdsRef.current.add(sid);
       setPendingDeletedIds(Array.from(pendingDeletedIdsRef.current));
       setDocuments((prev) => prev.filter((d) => String(d.id) !== sid));
       setPreviewDoc((prev) => (prev && String(prev.id) === sid ? null : prev));
       setViewLogDoc((prev) => (prev && String(prev.id) === sid ? null : prev));
-
-      // 判断这条到底是「内置默认示例」还是「用户/云端发布的文档」：
-      // 之前用 id 是否以 'doc-' 开头来判断，但新发布的文档 id 其实是纯数字
-      // （Date.now().toString()），导致它被误判为默认示例，云端那一行没被删除，
-      // 刷新后又从云端拉回来 —— 这正是「流程模板删了又出现」的根因。
-      // 现在改为：只有 id 真的存在于内置 documentsData 里才算默认示例，其余一律
-      // 当作用户/云端文档，删除时必须删掉云端那一行。
-      const isDefaultDoc = documentsData.some((d) => String(d.id) === sid);
-
-      // 用户/云端文档：删除前先把整条快照挪进回收站，支持恢复。
-      // 内置默认示例不进回收站（它本来就靠"已删除默认"标记隐藏，可在别处恢复）。
-      if (!isDefaultDoc) {
-        moveToRecycleBin({ itemType: 'document', item: target, user })
-          .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
-      }
 
       // 本地缓存里若有同 id 记录，一并移除（含覆盖层）
       const userDocs = loadUserDocs();
