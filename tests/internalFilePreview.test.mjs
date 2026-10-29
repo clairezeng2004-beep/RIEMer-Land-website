@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { internalFilePreviewType } from '../src/utils/internalFilePreview.js';
+import { internalFilePreviewType, namedInternalFileDownloadUrl } from '../src/utils/internalFilePreview.js';
 
 test('detects preview formats after renaming and leaves unsupported files undownloaded', () => {
   const file = (name, mimeType = '') => ({ name, mimeType, url: 'https://example.com/file' });
@@ -16,4 +16,19 @@ test('detects preview formats after renaming and leaves unsupported files undown
   assert.equal(internalFilePreviewType(file('网盘.pdf', 'text/x-url')), null);
   assert.equal(internalFilePreviewType({ name: 'missing.pdf' }), null);
   assert.equal(internalFilePreviewType({ ...file('folder.pdf'), isFolder: true }), null);
+});
+
+test('storage downloads explicitly request the displayed Unicode filename', () => {
+  const file = {
+    url: 'https://example.supabase.co/storage/v1/object/public/internal-files/u/1730-random.pdf?download=old.pdf#page=2',
+    name: '高等数学 期末 & 答案 #1（修改版）.pdf',
+  };
+  const url = new URL(namedInternalFileDownloadUrl(file));
+  assert.equal(url.searchParams.get('download'), file.name);
+  assert.equal(url.pathname, '/storage/v1/object/public/internal-files/u/1730-random.pdf');
+  assert.equal(url.hash, '');
+  assert.equal(new URL(namedInternalFileDownloadUrl({ ...file, name: '已重命名.pdf' })).searchParams.get('download'), '已重命名.pdf');
+  assert.equal(namedInternalFileDownloadUrl({ url: 'blob:https://example.com/id', name: '资料.pdf' }), null);
+  assert.equal(namedInternalFileDownloadUrl({ url: 'https://example.com/document.pdf' }), null);
+  assert.equal(namedInternalFileDownloadUrl({}), null);
 });
