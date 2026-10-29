@@ -1092,18 +1092,18 @@ export default function InternalFiles() {
                       })()}
                       <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                       <span className="if-col-actions">
-                        <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
+                        <button className="if-icon-btn" aria-label="上传详情" onClick={() => setDetailNode(node)}>
                           <Info size={15} />
                         </button>
                         {canModify(node) && (
                           <>
-                            <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSources([node])} disabled={busy}>
+                            <button className="if-icon-btn if-row-modify" aria-label="移动" onClick={() => setMoveSources([node])} disabled={busy}>
                               <FolderInput size={15} />
                             </button>
-                            <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
+                            <button className="if-icon-btn if-row-modify" aria-label="修改" onClick={() => handleRename(node)} disabled={busy}>
                               <Pencil size={15} />
                             </button>
-                            <button className="if-icon-btn if-icon-btn--danger if-row-modify" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
+                            <button className="if-icon-btn if-icon-btn--danger if-row-modify" aria-label="删除" onClick={() => handleDelete(node)} disabled={busy}>
                               <Trash2 size={15} />
                             </button>
                           </>
@@ -1161,18 +1161,18 @@ export default function InternalFiles() {
                     })()}
                     <NoteCell node={node} editable={canModify(node)} busy={busy} onEdit={handleEditNote} />
                     <span className="if-col-actions">
-                      <button className="if-icon-btn" title="上传详情" onClick={() => setDetailNode(node)}>
+                      <button className="if-icon-btn" aria-label="上传详情" onClick={() => setDetailNode(node)}>
                         <Info size={15} />
                       </button>
                       {canModify(node) && (
                         <>
-                          <button className="if-icon-btn if-row-modify" title="移动到…（也可直接拖到文件夹上）" onClick={() => setMoveSources([node])} disabled={busy}>
+                          <button className="if-icon-btn if-row-modify" aria-label="移动" onClick={() => setMoveSources([node])} disabled={busy}>
                             <FolderInput size={15} />
                           </button>
-                          <button className="if-icon-btn if-row-modify" title="重命名" onClick={() => handleRename(node)} disabled={busy}>
+                          <button className="if-icon-btn if-row-modify" aria-label="修改" onClick={() => handleRename(node)} disabled={busy}>
                             <Pencil size={15} />
                           </button>
-                          <button className="if-icon-btn if-icon-btn--danger if-row-modify" title="删除" onClick={() => handleDelete(node)} disabled={busy}>
+                          <button className="if-icon-btn if-icon-btn--danger if-row-modify" aria-label="删除" onClick={() => handleDelete(node)} disabled={busy}>
                             <Trash2 size={15} />
                           </button>
                         </>

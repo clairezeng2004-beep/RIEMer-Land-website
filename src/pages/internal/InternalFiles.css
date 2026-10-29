@@ -553,6 +553,32 @@
   color: var(--color-primary);
 }
 
+.if-col-actions .if-icon-btn[aria-label] {
+  position: relative;
+}
+
+.if-col-actions .if-icon-btn[aria-label]::after {
+  content: attr(aria-label);
+  position: absolute;
+  bottom: calc(100% + 4px);
+  right: 0;
+  z-index: 2;
+  padding: 5px 8px;
+  border-radius: 6px;
+  background: #111827;
+  color: #fff;
+  font-size: 12px;
+  line-height: 1.4;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+}
+
+.if-col-actions .if-icon-btn[aria-label]:hover::after,
+.if-col-actions .if-icon-btn[aria-label]:focus-visible::after {
+  opacity: 1;
+}
+
 .if-icon-btn--danger:hover {
   background: rgba(192, 57, 43, 0.1);
   color: var(--color-danger, #C0392B);
