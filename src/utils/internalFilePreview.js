@@ -25,3 +25,26 @@ export function namedInternalFileDownloadUrl(file) {
     return null;
   }
 }
+
+export function isTextMaterial(file) {
+  return ['rich', 'markdown', 'text'].includes(internalFilePreviewType(file));
+}
+
+export async function downloadInternalFile(file) {
+  let objectUrl;
+  const namedUrl = namedInternalFileDownloadUrl(file);
+  let href = namedUrl;
+  if (!href) {
+    const response = await fetch(file.url);
+    if (!response.ok) throw new Error('下载失败，请稍后重试。');
+    objectUrl = URL.createObjectURL(await response.blob());
+    href = objectUrl;
+  }
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = file.name || '附件';
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  if (objectUrl) setTimeout(() => URL.revokeObjectURL(objectUrl), 60000);
+}

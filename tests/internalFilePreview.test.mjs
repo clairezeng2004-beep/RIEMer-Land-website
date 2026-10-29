@@ -36,3 +36,12 @@ test('storage downloads explicitly request the displayed Unicode filename', () =
   assert.equal(namedInternalFileDownloadUrl({ url: 'https://example.com/document.pdf' }), null);
   assert.equal(namedInternalFileDownloadUrl({}), null);
 });
+
+test('text materials open as documents while binary attachments keep their preview', async () => {
+  const { isTextMaterial } = await import('../src/utils/internalFilePreview.js');
+  for (const [name,mimeType] of [['资料.html','text/x-riemer-html'],['笔记.md','text/markdown'],['旧文本.txt','text/plain']]) {
+    assert.equal(isTextMaterial({url:'https://example.com/file',name,mimeType}),true);
+  }
+  assert.equal(isTextMaterial({url:'https://example.com/file',name:'附件.pdf',mimeType:'application/pdf'}),false);
+  assert.equal(isTextMaterial({url:'https://example.com',name:'在线文档',mimeType:'text/x-url'}),false);
+});

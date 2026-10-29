@@ -87,6 +87,12 @@ export function createMemberSharingFolderService(postId, user, canWrite) {
   const uploadFiles = (parentId, files, _user, onProgress, extra) => upload(parentId, Array.from(files).map((file) => ({ file, path: file.name })), onProgress, extra);
   return {
     isInternalFilesAvailable: () => true,
+    textHref: (item) => `/internal/member-sharing/folder/${encodeURIComponent(postId)}/text/${encodeURIComponent(item.id)}`,
+    async fetchNode(id) {
+      const post = await read();
+      const item = attachments(post).find((entry) => entry.id === id);
+      return item ? node(item, post) : null;
+    },
     async fetchChildrenPage(parentId, { offset = 0, limit = 50 } = {}) {
       const post = await read();
       const items = sortNodes(attachments(post).filter((item) => (item.parentId || null) === (parentId || null)).map((item) => node(item, post)));

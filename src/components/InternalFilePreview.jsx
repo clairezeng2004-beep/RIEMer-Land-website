@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Download, X } from 'lucide-react';
-import { internalFilePreviewType, namedInternalFileDownloadUrl } from '../utils/internalFilePreview';
+import { internalFilePreviewType, downloadInternalFile } from '../utils/internalFilePreview';
 import { renderInternalMarkdown, sanitizeInternalTextHtml } from '../utils/internalTextHtml';
 import './InternalFilePreview.css';
 
@@ -49,26 +49,7 @@ export default function InternalFilePreview({ file, onClose }) {
   const download = async () => {
     setDownloading(true);
     try {
-      const namedUrl = namedInternalFileDownloadUrl(file);
-      if (namedUrl) {
-        const link = document.createElement('a');
-        link.href = namedUrl;
-        link.download = file.name || '附件';
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-        return;
-      }
-      const response = await fetch(file.url);
-      if (!response.ok) throw new Error('下载失败，请稍后重试。');
-      const url = URL.createObjectURL(await response.blob());
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = file.name || '附件';
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      await downloadInternalFile(file);
     } catch (err) {
       setError(err.message || '下载失败。');
     } finally {

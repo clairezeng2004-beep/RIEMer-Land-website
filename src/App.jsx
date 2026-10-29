@@ -62,6 +62,7 @@ const InternalArticles = lazyWithReload(() => import('./pages/internal/InternalA
 const InternalArticleDetail = lazyWithReload(() => import('./pages/internal/InternalArticleDetail'));
 const MemberContributions = lazyWithReload(() => import('./pages/internal/MemberContributions'));
 const MemberProfiles = lazyWithReload(() => import('./pages/internal/MemberProfiles'));
+const InternalTextDetail = lazyWithReload(() => import('./pages/internal/InternalTextDetail'));
 const InternalFiles = lazyWithReload(() => import('./pages/internal/InternalFiles'));
 const Profile = lazyWithReload(() => import('./pages/internal/Profile'));
 const Suggestions = lazyWithReload(() => import('./pages/internal/Suggestions'));
@@ -78,6 +79,8 @@ const NotificationRulesProvider = lazyWithReload(() =>
 
 /* 独立全屏页面路径（不显示 Navbar / Footer） */
 const FULLSCREEN_PATHS = [
+  '/internal/internal-files/text/',
+  '/internal/member-sharing/folder/',
   '/internal/member-sharing/create',
   '/internal/member-sharing/view/',
   '/internal/process-templates/create',
@@ -185,6 +188,8 @@ function AppShell() {
       <Route path="/reset-password" element={<ResetPassword />} />
 
       {/* 独立全屏页面（不带侧边栏、不带 Navbar/Footer） */}
+      <Route path="/internal/internal-files/text/:id" element={<SectionGuard section="internalFiles"><InternalTextDetail /></SectionGuard>} />
+      <Route path="/internal/member-sharing/folder/:folderId/text/:id" element={<SectionGuard section="memberSharing"><InternalTextDetail /></SectionGuard>} />
       <Route path="/internal/member-sharing/create" element={<SectionGuard section="memberSharing"><MemberSharingCreate /></SectionGuard>} />
       <Route path="/internal/member-sharing/view/:id" element={<SectionGuard section="memberSharing"><MemberSharingDetail /></SectionGuard>} />
       <Route path="/internal/process-templates/create" element={<ProcessTemplateCreate />} />
