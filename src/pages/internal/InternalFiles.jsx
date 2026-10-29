@@ -810,7 +810,9 @@ export default function InternalFiles() {
   const isExternalFileDrag = (e) => Array.from(e.dataTransfer?.types || []).includes('Files');
 
   const handleDrop = (e) => {
+    if (!isExternalFileDrag(e)) return;
     e.preventDefault();
+    e.stopPropagation();
     setDragOver(false);
     if (busy) return;
     const dropped = e.dataTransfer?.files;
@@ -878,7 +880,20 @@ export default function InternalFiles() {
 
   return (
     <div className="internal-files-page">
-      <div className="container">
+      <div
+        className="container if-upload-area"
+        onDragOverCapture={(e) => {
+          if (!isExternalFileDrag(e)) return;
+          e.preventDefault();
+          e.stopPropagation();
+          e.dataTransfer.dropEffect = busy ? 'none' : 'copy';
+          if (!busy) setDragOver(true);
+        }}
+        onDragLeave={(e) => {
+          if (!e.currentTarget.contains(e.relatedTarget)) setDragOver(false);
+        }}
+        onDropCapture={handleDrop}
+      >
         {/* 头部 */}
         <div className="internal-files-page__header">
           <div>
@@ -970,13 +985,6 @@ export default function InternalFiles() {
         {/* 文件列表 */}
         <div
           className={`internal-files-page__body ${dragOver ? 'is-dragover' : ''}`}
-          onDragOver={(e) => {
-            if (!isExternalFileDrag(e)) return;
-            e.preventDefault();
-            if (!busy) setDragOver(true);
-          }}
-          onDragLeave={() => setDragOver(false)}
-          onDrop={handleDrop}
         >
           {loading ? (
             <div className="internal-files-page__loading">
@@ -1138,6 +1146,14 @@ export default function InternalFiles() {
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {!loading && items.length > 0 && (
+            <div className="if-upload-dropzone">
+              <Upload size={24} />
+              <p>{busy ? '正在处理资料，请稍候…' : dragOver ? '松开文件，上传到当前文件夹' : '继续上传资料'}</p>
+              <span>把电脑里的文件拖到这里，或拖到当前目录的列表和空白区域</span>
             </div>
           )}
 
