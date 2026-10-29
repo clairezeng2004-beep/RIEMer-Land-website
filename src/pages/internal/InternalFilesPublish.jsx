@@ -4,14 +4,14 @@ import InternalTextPublish from './InternalTextPublish';
 import { parseSharedLink } from '../../utils/sharedLink';
 
 const TYPES = [
-  ['text', '文本资料'],
   ['files', '上传文件'], ['folder', '上传文件夹'],
   ['zip', '上传压缩包'], ['link', '添加链接'],
+  ['text', '文本资料'],
 ];
 
 export default function InternalFilesPublish({ destination, busy, progress, onClose, onPublish }) {
   const dialogRef = useRef(null);
-  const [type, setType] = useState('text');
+  const [type, setType] = useState('files');
   const [files, setFiles] = useState([]);
   const [name, setName] = useState('');
   const [nameEdited, setNameEdited] = useState(false);
