@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import { SourceTextModule, SyntheticModule } from 'node:vm';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { pinyin } from 'pinyin-pro';
 
 test('contributor edits persist separately, reset to automatic, and report failures', async () => {
   let patch;
@@ -24,7 +25,7 @@ test('contributor edits persist separately, reset to automatic, and report failu
   const source = await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8');
   const service = new SourceTextModule(source);
   await service.link((specifier) => {
-    const exports = specifier.includes('supabase')
+    const exports = specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
       ? { supabase, isSupabaseConfigured: true }
       : { parseSharedLink() {}, linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
@@ -64,7 +65,7 @@ test('publishing persists metadata with files and nested folders, preserving upl
   };
   const service = new SourceTextModule(await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8'));
   await service.link((specifier) => {
-    const exports = specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
+    const exports = specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
       : { parseSharedLink: (url) => ({ url }), linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
@@ -92,4 +93,45 @@ test('publishing persists metadata with files and nested folders, preserving upl
   assert.equal(rows.at(-1).contributors_override, '张三、李四');
   await createLink('destination', { name: '自动名单', url: 'https://example.com' }, user);
   assert.equal('contributors_override' in rows.at(-1), false);
+});
+
+test('alphabetical ordering mixes folders/files, uses pinyin, and sorts before pagination', async () => {
+  const rows = Array.from({ length: 505 }, (_, i) => ({
+    id: String(i).padStart(4, '0'), name: `Zebra ${i}`, is_folder: i % 2 === 0,
+  }));
+  rows[504].name = '阿尔法';
+  rows[503].name = 'Apple';
+  rows[502].name = 'Beta 10';
+  rows[501].name = 'beta 2';
+  const ranges = [];
+  const supabase = { from() { return {
+    select() { return this; }, order() { return this; },
+    eq(key, value) { assert.equal(key, 'parent_id'); assert.equal(value, 'folder'); return this; },
+    async range(start, end) { ranges.push([start, end]); return { data: rows.slice(start, end + 1), error: null }; },
+  }; } };
+  const service = new SourceTextModule(await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8'));
+  await service.link((specifier) => {
+    const exports = specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
+      ? { supabase, isSupabaseConfigured: true } : { parseSharedLink() {}, linkSourceLabel() {} };
+    return new SyntheticModule(Object.keys(exports), function () {
+      for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
+    });
+  });
+  await service.evaluate();
+  const { fetchChildrenPage, sortNodes } = service.namespace;
+  const first = await fetchChildrenPage('folder', { offset: 0, limit: 3 });
+  assert.deepEqual(first.items.map((node) => node.name), ['阿尔法', 'Apple', 'beta 2']);
+  assert.equal(first.items[0].isFolder, true);
+  assert.equal(first.items[1].isFolder, false);
+  assert.equal(first.total, 505);
+  assert.equal(first.hasMore, true);
+  assert.deepEqual(ranges, [[0, 499], [500, 999]]);
+  const second = await fetchChildrenPage('folder', { offset: 3, limit: 3 });
+  assert.equal(second.items[0].name, 'Beta 10');
+  const last = await fetchChildrenPage('folder', { offset: 504, limit: 3 });
+  assert.equal(last.hasMore, false);
+  const source = [{ id: 'b', name: 'alpha' }, { id: 'a', name: 'Alpha' }];
+  assert.deepEqual(sortNodes(source).map((node) => node.id), ['a', 'b']);
+  assert.equal(source[0].id, 'b');
+  assert.deepEqual(sortNodes([]), []);
 });

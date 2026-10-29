@@ -14,6 +14,7 @@
 //
 // 未配置 Supabase 时不可用（内部资料需登录并连接服务器）。
 
+import { pinyin } from 'pinyin-pro';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { parseSharedLink, linkSourceLabel } from '../utils/sharedLink';
 
@@ -23,7 +24,7 @@ export { parseSharedLink, linkSourceLabel };
 const BUCKET = 'internal-files';
 const STORAGE_UPLOAD_ATTEMPTS = 4;
 const UPLOAD_CONCURRENCY = 3;
-// 分页懒加载：一次只取一页目录项，点开文件才由浏览器按 URL 拉取内容
+// 分页展示目录项；文件内容仅在点开时由浏览器按 URL 拉取
 export const CHILDREN_PAGE_SIZE = 50;
 
 export const isInternalFilesAvailable = () => !!(isSupabaseConfigured && supabase);
@@ -64,13 +65,16 @@ function rowToNode(row) {
   };
 }
 
-/* 目录内排序：文件夹在前，同类按名称（中文/数字友好） */
+/* 按名称 A–Z 统一排序：中文转拼音，忽略大小写，数字按自然顺序。 */
 export function sortNodes(nodes) {
-  const collator = new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' });
-  return [...nodes].sort((a, b) => {
-    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
-    return collator.compare(a.name || '', b.name || '');
-  });
+  const collator = new Intl.Collator('en', { numeric: true, sensitivity: 'base' });
+  return nodes.map((node) => ({
+    node,
+    key: pinyin((node.name || '').trim(), { toneType: 'none', separator: '' }),
+  })).sort((a, b) => collator.compare(a.key, b.key)
+    || collator.compare(a.node.name || '', b.node.name || '')
+    || String(a.node.id || '').localeCompare(String(b.node.id || '')))
+    .map(({ node }) => node);
 }
 
 function wait(ms) {
@@ -109,45 +113,32 @@ async function removeStoragePaths(paths) {
  * ============================================ */
 export async function fetchChildren(parentId = null) {
   requireRemote();
-  let query = supabase.from('internal_files').select('*');
-  query = parentId ? query.eq('parent_id', parentId) : query.is('parent_id', null);
-  const { data, error } = await query;
-  if (error) throw error;
-  return sortNodes((data || []).map(rowToNode));
+  const rows = [];
+  // 只读取当前目录的元数据，不下载文件；分批避免服务端行数上限截断目录。
+  const batchSize = 500;
+  while (true) {
+    let query = supabase.from('internal_files').select('*').order('id', { ascending: true });
+    query = parentId ? query.eq('parent_id', parentId) : query.is('parent_id', null);
+    const { data, error } = await query.range(rows.length, rows.length + batchSize - 1);
+    if (error) throw error;
+    rows.push(...(data || []));
+    if (!data?.length || data.length < batchSize) break;
+  }
+  return sortNodes(rows.map(rowToNode));
 }
 
-/* ============================================
- * 分页列出某个目录下的直接子项（懒加载）
- * 只取「目录项」的元数据（名称/大小/URL 等），不下载文件内容——
- * 文件内容仅在用户点开时由浏览器按公开 URL 拉取。
- *
- * 说明：为让「加载更多」的偏移量在多次请求间保持一致，这里用
- * 数据库排序（文件夹在前、再按 name）来切分页；已加载项在前端
- * 仍用中文/数字友好的 sortNodes 展示，两者互不影响分页游标。
- *
- * ⚠️ 首屏性能：这里刻意不带 `count: 'exact'`。精确计数会让 Postgres
- * 在同一请求里额外全量扫一遍再返回，行数据被计数拖慢。总数改由
- * fetchChildrenCount 单独并行拉取（见页面层），行数据尽快返回渲染。
- * hasMore 用「取满一页即可能还有」来判断，翻到空页时自然收敛。
- *
- * 返回 { items, total: null, hasMore }
- * ============================================ */
+/* 先对整个目录按拼音/字母排序，再取显示页，避免仅对各页局部排序。
+ * ponytail: 每页重新读取目录元数据；大目录加载变慢时再增加目录快照缓存。 */
 export async function fetchChildrenPage(
   parentId = null,
   { offset = 0, limit = CHILDREN_PAGE_SIZE } = {}
 ) {
-  requireRemote();
-  let query = supabase
-    .from('internal_files')
-    .select('*')
-    .order('is_folder', { ascending: false })
-    .order('name', { ascending: true });
-  query = parentId ? query.eq('parent_id', parentId) : query.is('parent_id', null);
-  const { data, error } = await query.range(offset, offset + limit - 1);
-  if (error) throw error;
-  const items = (data || []).map(rowToNode);
-  const hasMore = items.length === limit;
-  return { items, total: null, hasMore };
+  const nodes = await fetchChildren(parentId);
+  return {
+    items: nodes.slice(offset, offset + limit),
+    total: nodes.length,
+    hasMore: offset + limit < nodes.length,
+  };
 }
 
 /* ============================================

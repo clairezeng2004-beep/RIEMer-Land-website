@@ -4,7 +4,6 @@ import { useAuth } from '../../contexts/AuthContext';
 import {
   isInternalFilesAvailable,
   fetchChildrenPage,
-  fetchChildrenCount,
   fetchBreadcrumb,
   createFolder,
   uploadFiles,
@@ -121,8 +120,8 @@ function getFileMeta(node) {
  *   消除「列表要转很久才出来」的等待感。只缓存第一页（≤50 项）。
  *   localStorage 不可用（隐私模式 / 超额）时全部静默跳过。
  * ============================================ */
-const LIST_CACHE_PREFIX = 'riemer:if:list:v1:';
-const LIST_CACHE_INDEX = 'riemer:if:list:v1:index';
+const LIST_CACHE_PREFIX = 'riemer:if:list:v2:';
+const LIST_CACHE_INDEX = 'riemer:if:list:v2:index';
 const LIST_CACHE_MAX = 24; // 最多缓存的目录数，超出按最久未用淘汰
 
 function listCacheKey(folderId) {
@@ -176,20 +175,6 @@ function mergeContribCache(folderId, contribSlice) {
     if (!raw) return;
     const entry = JSON.parse(raw);
     entry.contribs = { ...(entry.contribs || {}), ...contribSlice };
-    localStorage.setItem(key, JSON.stringify(entry));
-  } catch {
-    /* ignore */
-  }
-}
-
-/* 把单独算出的总数并回列表缓存（总数晚于列表返回，供下次首帧直接显示「共 N 项」） */
-function mergeTotalCache(folderId, total) {
-  try {
-    const key = listCacheKey(folderId);
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    const entry = JSON.parse(raw);
-    entry.total = total;
     localStorage.setItem(key, JSON.stringify(entry));
   } catch {
     /* ignore */
@@ -403,9 +388,6 @@ export default function InternalFiles() {
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
   const inflightRef = useRef(false);
-  // 每次 load 递增的令牌：单独并行拉取的「总数」回来晚，用它挡掉切目录后
-  // 落到错误目录上的旧计数。
-  const loadTokenRef = useRef(0);
   // 长按检测：按住 ~500ms 视为长按，弹出上传详情，并抑制随后的点击（进文件夹/打开文件）
   const pressTimerRef = useRef(null);
   const longPressedRef = useRef(false);
@@ -493,7 +475,6 @@ export default function InternalFiles() {
   const load = useCallback(async (targetId) => {
     if (inflightRef.current) return;
     inflightRef.current = true;
-    const token = ++loadTokenRef.current;
     setError('');
 
     // 1) 命中缓存 → 立即渲染上次结果，去掉等待感
@@ -509,15 +490,6 @@ export default function InternalFiles() {
       setFolderContribs({});
     }
 
-    // 总数不阻塞行数据：单独并行拉取，回来后再补「共 N 项」，并挡掉切目录后的旧计数。
-    fetchChildrenCount(targetId)
-      .then((count) => {
-        if (token !== loadTokenRef.current) return;
-        setTotal(count);
-        mergeTotalCache(targetId, count);
-      })
-      .catch(() => {});
-
     // 2) 后台拉最新，替换缓存内容
     try {
       const [page, crumb] = await Promise.all([
@@ -525,12 +497,12 @@ export default function InternalFiles() {
         targetId ? fetchBreadcrumb(targetId) : Promise.resolve([]),
       ]);
       setItems(sortNodes(page.items));
-      // total 由上面的 fetchChildrenCount 单独维护，这里不用 page.total（恒为 null）覆盖它
+      setTotal(page.total);
       setHasMore(page.hasMore);
       setBreadcrumb(crumb);
       writeListCache(targetId, {
         items: page.items,
-        total: cached?.total ?? null, // 先沿用旧计数占位，新计数到达后由 mergeTotalCache 覆盖
+        total: page.total,
         hasMore: page.hasMore,
         contribs: {},
       });
@@ -547,7 +519,7 @@ export default function InternalFiles() {
     }
   }, [refreshContribs]);
 
-  // 加载下一页并追加到当前列表（偏移量按已加载数量，与服务端排序对齐）
+  // 追加整体排序后的下一页。
   const loadMore = useCallback(async () => {
     if (inflightRef.current || loadingMore || !hasMore) return;
     inflightRef.current = true;
@@ -558,7 +530,7 @@ export default function InternalFiles() {
         limit: CHILDREN_PAGE_SIZE,
       });
       setItems((prev) => sortNodes([...prev, ...page.items]));
-      // total 由 fetchChildrenCount 维护，这里不用 page.total（null）覆盖
+      setTotal(page.total);
       setHasMore(page.hasMore);
       refreshContribs(folderId, page.items); // 新翻出来的文件夹补算贡献者
     } catch (err) {
