@@ -25,7 +25,7 @@ test('contributor edits persist separately, reset to automatic, and report failu
   const source = await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8');
   const service = new SourceTextModule(source);
   await service.link((specifier) => {
-    const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
+    const exports = specifier.includes('internalTextHtml') ? { sanitizeInternalTextHtml: (value) => value, hasInternalTextContent: (value) => !!value.trim() } : specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
       ? { supabase, isSupabaseConfigured: true }
       : { parseSharedLink() {}, linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
@@ -66,7 +66,7 @@ test('publishing persists metadata with files and nested folders, preserving upl
   };
   const service = new SourceTextModule(await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8'));
   await service.link((specifier) => {
-    const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
+    const exports = specifier.includes('internalTextHtml') ? { sanitizeInternalTextHtml: (value) => value, hasInternalTextContent: (value) => !!value.trim() } : specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
       : { parseSharedLink: (url) => ({ url }), linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
@@ -103,6 +103,16 @@ test('publishing persists metadata with files and nested folders, preserving upl
   assert.equal(await uploadedFiles.at(-1).text(), '第一行\n第二行');
   await assert.rejects(createTextMaterial(null, { name: '', content: '正文' }, user), /标题/);
   await assert.rejects(createTextMaterial(null, { name: '笔记', content: '  ' }, user), /正文/);
+  await createTextMaterial('destination', { name: '排版笔记', content: '<h1>章节</h1><p><strong>重点</strong></p>', format: 'word' }, user);
+  assert.equal(rows.at(-1).name, '排版笔记.html');
+  assert.equal(rows.at(-1).mime_type, 'text/x-riemer-html;charset=utf-8');
+  assert.match(await uploadedFiles.at(-1).text(), /<strong>重点<\/strong>/);
+  await createTextMaterial('destination', { name: 'Markdown 笔记', content: '# 章节\n\n**重点**', format: 'markdown' }, user);
+  assert.equal(rows.at(-1).name, 'Markdown 笔记.md');
+  assert.equal(rows.at(-1).mime_type, 'text/markdown;charset=utf-8');
+  assert.equal(await uploadedFiles.at(-1).text(), '# 章节\n\n**重点**');
+  await assert.rejects(createTextMaterial(null, { name: '笔记', content: '正文', format: 'unsupported' }, user), /格式/);
+
 
 });
 
@@ -122,7 +132,7 @@ test('alphabetical ordering mixes folders/files, uses pinyin, and sorts before p
   }; } };
   const service = new SourceTextModule(await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8'));
   await service.link((specifier) => {
-    const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
+    const exports = specifier.includes('internalTextHtml') ? { sanitizeInternalTextHtml: (value) => value, hasInternalTextContent: (value) => !!value.trim() } : specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
       ? { supabase, isSupabaseConfigured: true } : { parseSharedLink() {}, linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);

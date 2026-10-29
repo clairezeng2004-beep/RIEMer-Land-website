@@ -93,7 +93,7 @@ function getFileMeta(node) {
     const source = linkSourceLabel(node.url);
     return { Icon: Link2, label: source ? `${source} 链接` : '链接', cls: 'is-link' };
   }
-  if (node.mimeType?.startsWith('text/plain') || node.mimeType?.startsWith('text/markdown') || /\.(txt|md)$/i.test(node.name || '')) {
+  if (node.mimeType?.startsWith('text/x-riemer-html') || node.mimeType?.startsWith('text/plain') || node.mimeType?.startsWith('text/markdown') || /\.(txt|md)$/i.test(node.name || '')) {
     return { Icon: FileText, label: '文本资料', cls: 'is-word' };
   }
   const name = (node.name || '').toLowerCase();
@@ -657,7 +657,7 @@ export default function InternalFiles() {
     if (draft.type === 'text') {
       setBusy(true);
       try {
-        await createTextMaterial(folderId, { ...metadata, content: draft.content }, user);
+        await createTextMaterial(folderId, { ...metadata, content: draft.content, format: draft.format }, user);
         await load(folderId);
         return true;
       } finally {

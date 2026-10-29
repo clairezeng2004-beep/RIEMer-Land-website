@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Upload, X } from 'lucide-react';
+import InternalTextPublish from './InternalTextPublish';
 import { parseSharedLink } from '../../utils/sharedLink';
 
 const TYPES = [
@@ -15,25 +16,25 @@ export default function InternalFilesPublish({ destination, busy, progress, onCl
   const [name, setName] = useState('');
   const [nameEdited, setNameEdited] = useState(false);
   const [text, setText] = useState('');
-  const [content, setContent] = useState('');
   const [contributors, setContributors] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState('');
   const parsed = parseSharedLink(text);
-  const showName = type === 'text' || type === 'link' || (type === 'files' && files.length === 1 && !/\.zip$/i.test(files[0].name));
+  const showName = type === 'link' || (type === 'files' && files.length === 1 && !/\.zip$/i.test(files[0].name));
 
   useEffect(() => {
     const dialog = dialogRef.current;
+    if (!dialog) return;
     dialog.showModal();
     return () => dialog.close();
-  }, []);
+  }, [type]);
 
   const submit = async (e) => {
     e.preventDefault();
     if (busy) return;
     setError('');
     try {
-      const done = await onPublish({ type, files, name: showName ? name : '', text, content, contributors, note });
+      const done = await onPublish({ type, files, name: showName ? name : '', text, contributors, note });
       if (done) onClose();
     } catch (err) {
       setError(err?.message || '发布失败，请稍后重试。');
@@ -41,7 +42,10 @@ export default function InternalFilesPublish({ destination, busy, progress, onCl
   };
 
   return (
-    <dialog ref={dialogRef} className="if-publish" aria-labelledby="if-publish-title"
+    <>
+    <InternalTextPublish active={type === 'text'} destination={destination} busy={busy}
+      onClose={onClose} onPublish={onPublish} onSwitchType={setType} />
+    {type !== 'text' && <dialog ref={dialogRef} className="if-publish" aria-labelledby="if-publish-title"
       onCancel={(e) => { e.preventDefault(); if (!busy) onClose(); }}>
       <form onSubmit={submit}>
         <div className="if-detail__head">
@@ -60,12 +64,7 @@ export default function InternalFilesPublish({ destination, busy, progress, onCl
             <input id="if-publish-name" className="if-link-form__input" required value={name}
               onChange={(e) => { setName(e.target.value); setNameEdited(true); }} />
           </>}
-          {type === 'text' ? <>
-            <label className="if-link-form__label" htmlFor="if-publish-content">正文</label>
-            <textarea id="if-publish-content" className="if-link-form__input if-publish-content" rows={10}
-              required value={content} placeholder="直接填写学习笔记、资料说明或其他文字内容，无需上传附件"
-              onChange={(e) => setContent(e.target.value)} />
-          </> : type === 'link' ? <>
+          {type === 'link' ? <>
             <label className="if-link-form__label" htmlFor="if-publish-link">分享内容或网址</label>
             <textarea id="if-publish-link" className="if-link-form__input" rows={3} required value={text}
               placeholder="大文件建议先上传网盘，再粘贴分享链接"
@@ -92,11 +91,12 @@ export default function InternalFilesPublish({ destination, busy, progress, onCl
         {busy && <p className="if-link-form__status" role="status">{progress ? `${progress.label || '正在上传'} ${progress.done}/${progress.total} ${progress.current}` : '正在发布…'}</p>}
         <div className="if-link-form__actions">
           <button type="button" className="if-btn if-btn--ghost" onClick={onClose} disabled={busy}>取消</button>
-          <button type="submit" className="if-btn" disabled={busy || (showName && !name.trim()) || (type === 'text' ? !content.trim() : type === 'link' ? !parsed.url : files.length === 0)}>
+          <button type="submit" className="if-btn" disabled={busy || (showName && !name.trim()) || (type === 'link' ? !parsed.url : files.length === 0)}>
             <Upload size={16} />{busy ? '发布中…' : '发布资料'}
           </button>
         </div>
       </form>
-    </dialog>
+    </dialog>}
+    </>
   );
 }

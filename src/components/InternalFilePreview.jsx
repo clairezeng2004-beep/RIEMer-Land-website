@@ -1,6 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { Download, X } from 'lucide-react';
 import { internalFilePreviewType, namedInternalFileDownloadUrl } from '../utils/internalFilePreview';
+import { renderInternalMarkdown, sanitizeInternalTextHtml } from '../utils/internalTextHtml';
 import './InternalFilePreview.css';
 
 const WordPreview = lazy(() => import('./WordPreview'));
@@ -21,16 +22,16 @@ export default function InternalFilePreview({ file, onClose }) {
   }, []);
 
   useEffect(() => {
-    if (type !== 'pdf' && type !== 'text') return;
+    if (!['pdf', 'text', 'rich', 'markdown'].includes(type)) return;
     const controller = new AbortController();
     let objectUrl;
     (async () => {
       try {
         const response = await fetch(file.url, { signal: controller.signal });
         if (!response.ok) throw new Error('资料加载失败，请稍后重试。');
-        if (type === 'text') {
+        if (type !== 'pdf') {
           const content = await response.text();
-          if (!controller.signal.aborted) { setTextContent(content); setTextLoading(false); }
+          if (!controller.signal.aborted) { setTextContent(type === 'rich' ? sanitizeInternalTextHtml(content) : type === 'markdown' ? renderInternalMarkdown(content) : content); setTextLoading(false); }
           return;
         }
         const blob = await response.blob();
@@ -88,6 +89,9 @@ export default function InternalFilePreview({ file, onClose }) {
       {error && <p className="if-preview__message" role="alert">{error}</p>}
       {type === 'pdf' && <p className="if-preview__download-hint">下载请使用窗口右上角的“下载”，保存名称与网站显示一致。</p>}
       <div className="if-preview__body">
+        {['rich', 'markdown'].includes(type) && (textLoading
+          ? !error && <p className="if-preview__message" role="status">正在加载正文…</p>
+          : <article className="if-preview__rich msc-md-split__preview" dangerouslySetInnerHTML={{ __html: textContent }} />)}
         {type === 'text' && (textLoading
           ? !error && <p className="if-preview__message" role="status">正在加载正文…</p>
           : <article className="if-preview__text">{textContent}</article>)}
