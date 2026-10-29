@@ -8,6 +8,8 @@ const WordPreview = lazy(() => import('./WordPreview'));
 export default function InternalFilePreview({ file, onClose }) {
   const dialogRef = useRef(null);
   const [pdfUrl, setPdfUrl] = useState('');
+  const [textContent, setTextContent] = useState('');
+  const [textLoading, setTextLoading] = useState(true);
   const [error, setError] = useState('');
   const [downloading, setDownloading] = useState(false);
   const type = internalFilePreviewType(file);
@@ -19,13 +21,18 @@ export default function InternalFilePreview({ file, onClose }) {
   }, []);
 
   useEffect(() => {
-    if (type !== 'pdf') return;
+    if (type !== 'pdf' && type !== 'text') return;
     const controller = new AbortController();
     let objectUrl;
     (async () => {
       try {
         const response = await fetch(file.url, { signal: controller.signal });
-        if (!response.ok) throw new Error('PDF 加载失败，请稍后重试。');
+        if (!response.ok) throw new Error('资料加载失败，请稍后重试。');
+        if (type === 'text') {
+          const content = await response.text();
+          if (!controller.signal.aborted) { setTextContent(content); setTextLoading(false); }
+          return;
+        }
         const blob = await response.blob();
         if (controller.signal.aborted) return;
         // 使用明确的 PDF 类型，避免存储服务返回下载响应头而触发下载。
@@ -81,6 +88,9 @@ export default function InternalFilePreview({ file, onClose }) {
       {error && <p className="if-preview__message" role="alert">{error}</p>}
       {type === 'pdf' && <p className="if-preview__download-hint">下载请使用窗口右上角的“下载”，保存名称与网站显示一致。</p>}
       <div className="if-preview__body">
+        {type === 'text' && (textLoading
+          ? !error && <p className="if-preview__message" role="status">正在加载正文…</p>
+          : <article className="if-preview__text">{textContent}</article>)}
         {type === 'pdf' && (pdfUrl
           ? <iframe src={`${pdfUrl}#toolbar=0`} title={file.name || 'PDF 预览'} className="if-preview__frame" />
           : !error && <p className="if-preview__message" role="status">正在加载 PDF…</p>)}

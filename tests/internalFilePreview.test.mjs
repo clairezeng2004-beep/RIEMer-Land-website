@@ -5,6 +5,8 @@ import { internalFilePreviewType, namedInternalFileDownloadUrl } from '../src/ut
 test('detects preview formats after renaming and leaves unsupported files undownloaded', () => {
   const file = (name, mimeType = '') => ({ name, mimeType, url: 'https://example.com/file' });
   assert.equal(internalFilePreviewType(file('课程.PDF')), 'pdf');
+  assert.equal(internalFilePreviewType(file('课程笔记.txt')), 'text');
+  assert.equal(internalFilePreviewType(file('笔记', 'text/plain;charset=utf-8')), 'text');
   assert.equal(internalFilePreviewType(file('重命名资料', 'application/pdf')), 'pdf');
   assert.equal(internalFilePreviewType(file('照片.png')), 'image');
   assert.equal(internalFilePreviewType(file('重命名照片', 'image/jpeg')), 'image');

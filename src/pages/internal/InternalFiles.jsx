@@ -6,6 +6,7 @@ import {
   fetchChildrenPage,
   fetchBreadcrumb,
   createFolder,
+  createTextMaterial,
   uploadFiles,
   uploadFolderTree,
   uploadZipAsFolder,
@@ -91,6 +92,9 @@ function getFileMeta(node) {
   if (isLinkNode(node)) {
     const source = linkSourceLabel(node.url);
     return { Icon: Link2, label: source ? `${source} 链接` : '链接', cls: 'is-link' };
+  }
+  if (node.mimeType?.startsWith('text/plain') || node.mimeType?.startsWith('text/markdown') || /\.(txt|md)$/i.test(node.name || '')) {
+    return { Icon: FileText, label: '文本资料', cls: 'is-word' };
   }
   const name = (node.name || '').toLowerCase();
   const mime = (node.mimeType || '').toLowerCase();
@@ -650,6 +654,16 @@ export default function InternalFiles() {
   const handlePublish = async (draft) => {
     if (busy) return false;
     const metadata = { name: draft.name, contributors: draft.contributors, note: draft.note };
+    if (draft.type === 'text') {
+      setBusy(true);
+      try {
+        await createTextMaterial(folderId, { ...metadata, content: draft.content }, user);
+        await load(folderId);
+        return true;
+      } finally {
+        setBusy(false);
+      }
+    }
     if (draft.type !== 'link') {
       return doUpload(draft.files, draft.type === 'folder', metadata);
     }
