@@ -9,13 +9,14 @@
 //   - moveToRecycleBin：删除时把整条记录的“前端对象快照”存进回收站；
 //   - restoreItem：按 item_type 把快照回写到各自的源服务（成员分享 / 文档 /
 //     文章 / 活动），成功后删掉回收站这条；
-//   - purgeItem：彻底删除，只删回收站这条（源数据早已从源表移除）。
+//   - purgeItem：管理员检查引用，清理受管文件，成功后才移除回收站记录。
 // ============================================
 
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { addSharing } from './memberSharingService';
 import { addArticleToDb } from './articleDbService';
-import { getManagedArticleCoverPath, removeArticleCover } from './articleCoverService';
+import { collectRecycledStorageAssets, RECYCLE_SOURCE_TABLES, RECYCLE_DEFAULT_BUCKETS } from '../utils/recycledStorageAssets';
+import { removeStorageObjects } from './storageCleanupService';
 import { createDoc } from '../lib/documentsService';
 import { SITE_KEYS, fetchSetting, saveSetting } from './siteSettingsService';
 
@@ -103,6 +104,20 @@ function dbToFrontend(row) {
  */
 export async function moveToRecycleBin({ itemType, item, user }) {
   if (!itemType || !item) return { success: false, error: '参数不完整' };
+  // 列表可能没有加载正文和附件，先从源表补齐快照，再允许调用方删除源记录。
+  if (isSupabaseConfigured && supabase && RECYCLE_SOURCE_TABLES[itemType]) {
+    try {
+      const { data, error } = await supabase.from(RECYCLE_SOURCE_TABLES[itemType])
+        .select('*').eq('id', item.id).maybeSingle();
+      if (error) throw error;
+      if (data) item = { ...item, ...data,
+        ...(data.file_url !== undefined ? { fileUrl: data.file_url } : {}),
+        ...(data.cover_image !== undefined ? { coverImage: data.cover_image } : {}),
+      };
+    } catch (err) {
+      return { success: false, error: `无法备份完整资料：${err.message}` };
+    }
+  }
   const { title, author, authorId, excerpt } = extractMeta(itemType, item);
   const entry = {
     id: `rb-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -214,52 +229,90 @@ export async function restoreItem(entry) {
   if (!entry) return { success: false, error: '条目不存在' };
   try {
     await restorePayload(entry);
+    await removeEntryRow(entry.id);
   } catch (err) {
     console.warn('[RecycleBin] 恢复失败:', err.message);
     return { success: false, error: err.message || '恢复失败' };
   }
-  // 回写成功 → 删除回收站这条
-  await removeEntryRow(entry.id);
   return { success: true, error: null };
 }
 
 // ================================================================
 // 彻底删除
 // ================================================================
-export async function purgeItem(entry) {
-  if (!entry) return { success: false, error: '条目不存在' };
-  await removeEntryRow(entry.id);
-  // 文章彻底删除时顺带回收 Storage 封面，避免孤儿文件长期堆积。
-  // 时机说明：只在 purge（彻底删除）而非 moveToRecycleBin（删入回收站）时清理——
-  // 回收站期间文章仍可「恢复」，而 restore 直接复用 payload 里的封面 URL
-  // （见 restorePayload → addArticleToDb），提前删文件会让恢复后的封面 404。
-  // 仅处理受管的 Storage 封面（getManagedArticleCoverPath 命中才删）；
-  // 历史 Base64 / 外链封面返回 null，天然跳过。失败只告警，不影响彻底删除结果。
-  if (entry.itemType === 'article') {
-    try {
-      const cover = entry.payload?.coverImage || entry.payload?.cover_image || null;
-      const path = getManagedArticleCoverPath(cover);
-      if (path) {
-        const res = await removeArticleCover(path);
-        if (!res.success) console.warn('[RecycleBin] 文章封面回收失败:', res.error);
-      }
-    } catch (err) {
-      console.warn('[RecycleBin] 文章封面回收异常:', err?.message || err);
-    }
+async function readCleanupRows(table) {
+  const rows = [];
+  const key = table === 'site_settings' ? 'key' : 'id';
+  for (let offset = 0; ; offset += 500) {
+    const { data, error } = await supabase.from(table).select('*')
+      .order(key, { ascending: true }).range(offset, offset + 499);
+    if (error) throw new Error(`无法检查 ${table} 的文件引用：${error.message}`);
+    rows.push(...(data || []));
+    if (!data || data.length < 500) return rows;
   }
-  return { success: true, error: null };
 }
 
-/** 删除回收站表里的一行（本地 + 云端） */
-async function removeEntryRow(id) {
-  deleteLocalEntry(id);
-  if (!isSupabaseConfigured || !supabase) return;
+export async function purgeItem(entry) {
+  if (!entry) return { success: false, error: '条目不存在' };
   try {
-    const { error } = await supabase.from('recycle_bin').delete().eq('id', String(id));
-    if (error) console.warn('[RecycleBin] 删除条目失败:', error.message);
+    if (!isSupabaseConfigured || !supabase) throw new Error('请连接 Supabase 后再彻底删除。');
+    // 必须能检查全部回收站引用；普通成员的 RLS 只能读取自己的条目。
+    const { data: auth, error: authError } = await supabase.auth.getUser();
+    if (authError || !auth?.user) throw new Error('登录已失效，请重新登录。');
+    const { data: profile, error: profileError } = await supabase.from('profiles')
+      .select('role').eq('id', auth.user.id).single();
+    if (profileError) throw profileError;
+    if (!['admin', 'owner'].includes(profile?.role)) throw new Error('只有管理员可以彻底删除。');
+    const { data: remote, error: entryError } = await supabase.from('recycle_bin')
+      .select('*').eq('id', String(entry.id)).maybeSingle();
+    if (entryError) throw entryError;
+    const current = remote ? dbToFrontend(remote) : entry;
+    const base = supabase.storage.from('documents').getPublicUrl('').data.publicUrl;
+    const candidates = collectRecycledStorageAssets(current.payload, base, RECYCLE_DEFAULT_BUCKETS[current.itemType]);
+    const referenced = new Set();
+    if (candidates.length) {
+      // 任一读取失败就停止，不在引用不明时清理文件。
+      for (const table of ['documents', 'member_sharing', 'articles', 'site_settings', 'internal_files', 'album_photos', 'recycle_bin']) {
+        const rows = await readCleanupRows(table);
+        const defaultBucket = table === 'documents' ? 'documents'
+          : table === 'member_sharing' ? 'member-sharing-attachments' : undefined;
+        for (const row of rows) {
+          if (table === 'recycle_bin' && String(row.id) === String(entry.id)) continue;
+          const bucket = table === 'recycle_bin' ? RECYCLE_DEFAULT_BUCKETS[row.item_type] : defaultBucket;
+          for (const asset of collectRecycledStorageAssets(row, base, bucket)) referenced.add(`${asset.bucket}/${asset.path}`);
+        }
+      }
+      for (const local of getLocalEntries()) {
+        if (String(local.id) === String(entry.id)) continue;
+        for (const asset of collectRecycledStorageAssets(local.payload, base, RECYCLE_DEFAULT_BUCKETS[local.itemType])) {
+          referenced.add(`${asset.bucket}/${asset.path}`);
+        }
+      }
+    }
+    const groups = new Map();
+    let shared = 0;
+    for (const asset of candidates) {
+      if (referenced.has(`${asset.bucket}/${asset.path}`)) { shared++; continue; }
+      if (!groups.has(asset.bucket)) groups.set(asset.bucket, []);
+      groups.get(asset.bucket).push(asset.path);
+    }
+    for (const [bucket, paths] of groups) await removeStorageObjects(bucket, paths);
+    if (remote) await removeEntryRow(entry.id);
+    else deleteLocalEntry(entry.id);
+    return { success: true, error: null, shared };
   } catch (err) {
-    console.warn('[RecycleBin] 删除条目异常:', err.message);
+    return { success: false, error: err.message || '彻底删除失败，请重试。' };
   }
+}
+
+/** 远端确认删除成功后才移除本地副本，失败抛错供恢复/清理界面提示。 */
+async function removeEntryRow(id) {
+  if (isSupabaseConfigured && supabase) {
+    const { data, error } = await supabase.from('recycle_bin').delete().eq('id', String(id)).select('id');
+    if (error) throw error;
+    if (!data?.length) throw new Error('回收站记录未删除，请检查权限后重试。');
+  }
+  deleteLocalEntry(id);
 }
 
 // ================================================================

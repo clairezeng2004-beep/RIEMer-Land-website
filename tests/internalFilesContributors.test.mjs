@@ -25,7 +25,7 @@ test('contributor edits persist separately, reset to automatic, and report failu
   const source = await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8');
   const service = new SourceTextModule(source);
   await service.link((specifier) => {
-    const exports = specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
+    const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
       ? { supabase, isSupabaseConfigured: true }
       : { parseSharedLink() {}, linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
@@ -65,7 +65,7 @@ test('publishing persists metadata with files and nested folders, preserving upl
   };
   const service = new SourceTextModule(await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8'));
   await service.link((specifier) => {
-    const exports = specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
+    const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
       : { parseSharedLink: (url) => ({ url }), linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);
@@ -111,7 +111,7 @@ test('alphabetical ordering mixes folders/files, uses pinyin, and sorts before p
   }; } };
   const service = new SourceTextModule(await readFile(new URL('../src/services/internalFilesService.js', import.meta.url), 'utf8'));
   await service.link((specifier) => {
-    const exports = specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
+    const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async () => {} } : specifier === 'pinyin-pro' ? { pinyin } : specifier.includes('supabase')
       ? { supabase, isSupabaseConfigured: true } : { parseSharedLink() {}, linkSourceLabel() {} };
     return new SyntheticModule(Object.keys(exports), function () {
       for (const [key, value] of Object.entries(exports)) this.setExport(key, value);

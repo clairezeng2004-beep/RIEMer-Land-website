@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import {
@@ -16,6 +16,7 @@ import {
   fetchRecycleBin,
   subscribeRecycleBin,
   restoreItem,
+  purgeItem,
   RECYCLE_TYPE_LABELS,
 } from '../../services/recycleBinService';
 // 复用「活动发布 / 公众号归档」的卡片样式（ia-card / ep-card），保持视觉一致
@@ -46,6 +47,34 @@ export default function RecycleBin() {
   const [searchTerm, setSearchTerm] = useState('');
   const [typeFilter, setTypeFilter] = useState('all');
   const [busyId, setBusyId] = useState(null);
+  const [purgeTarget, setPurgeTarget] = useState(null);
+  const [purgeError, setPurgeError] = useState('');
+  const [notice, setNotice] = useState('');
+  const purgeDialogRef = useRef(null);
+
+  useEffect(() => {
+    if (!purgeTarget) return;
+    const dialog = purgeDialogRef.current;
+    dialog.showModal();
+    return () => dialog.close();
+  }, [purgeTarget]);
+
+  const handlePurge = async () => {
+    if (busyId || !purgeTarget) return;
+    setBusyId(purgeTarget.id);
+    setPurgeError('');
+    try {
+      const result = await purgeItem(purgeTarget);
+      if (!result.success) { setPurgeError(result.error); return; }
+      setEntries((prev) => prev.filter((e) => String(e.id) !== String(purgeTarget.id)));
+      setNotice(result.shared ? `已彻底删除。${result.shared} 个文件仍被其他内容引用，已保留。` : '已彻底删除，相关存储文件已完成清理。');
+      setPurgeTarget(null);
+    } catch (err) {
+      setPurgeError(err.message || '清理失败，请重试。');
+    } finally {
+      setBusyId(null);
+    }
+  };
 
   // 首次加载
   useEffect(() => {
@@ -121,6 +150,19 @@ export default function RecycleBin() {
 
   return (
     <div className="rb-page">
+      {purgeTarget && <dialog ref={purgeDialogRef} className="rb-purge-dialog" aria-labelledby="rb-purge-title"
+        onCancel={(e) => { e.preventDefault(); if (!busyId) setPurgeTarget(null); }}>
+        <h2 id="rb-purge-title">彻底删除</h2>
+        <p>确定彻底删除“{purgeTarget.title}”吗？未被其他内容引用的附件、正文图片和封面也会清理，此操作无法恢复。</p>
+        {purgeError && <p role="alert" className="rb-purge-dialog__error">{purgeError} 条目暂时保留；部分文件可能已清理，请重试彻底删除。</p>}
+        <div className="rb-card__actions">
+          <button type="button" className="rb-card__btn" disabled={!!busyId} onClick={() => setPurgeTarget(null)}>取消</button>
+          <button type="button" className="rb-card__btn rb-card__btn--purge" disabled={!!busyId} onClick={handlePurge}>
+            {busyId ? '正在清理…' : '彻底删除'}
+          </button>
+        </div>
+      </dialog>}
+
       <div className="container">
         <div className="rb-page__header">
           <div>
@@ -154,6 +196,8 @@ export default function RecycleBin() {
           </div>
         </div>
 
+        {notice && <p role="status">{notice}</p>}
+
         {/* 列表 */}
         <div className="rb-list">
           {filtered.map((entry) => {
@@ -186,10 +230,14 @@ export default function RecycleBin() {
                       type="button"
                       className="rb-card__btn rb-card__btn--restore"
                       onClick={() => handleRestore(entry)}
-                      disabled={busyId === entry.id}
+                      disabled={!!busyId}
                     >
                       <RotateCcw size={14} /> 恢复
                     </button>
+                    {isAdmin && <button type="button" className="rb-card__btn rb-card__btn--purge"
+                      onClick={() => { setPurgeError(''); setPurgeTarget(entry); }} disabled={!!busyId}>
+                      <Trash2 size={14} /> 彻底删除
+                    </button>}
                   </div>
                 </div>
               </div>

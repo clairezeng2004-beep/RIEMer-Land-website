@@ -15,6 +15,7 @@
 // 未配置 Supabase 时不可用（内部资料需登录并连接服务器）。
 
 import { pinyin } from 'pinyin-pro';
+import { removeStorageObjects } from './storageCleanupService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { parseSharedLink, linkSourceLabel } from '../utils/sharedLink';
 
@@ -97,14 +98,7 @@ async function uploadStorageObject(path, body, options) {
 }
 
 async function removeStoragePaths(paths) {
-  const unique = [...new Set((paths || []).filter(Boolean))];
-  if (unique.length === 0) return;
-  // Storage remove 一次最多处理有限个对象，分批清理更稳
-  for (let i = 0; i < unique.length; i += 100) {
-    const batch = unique.slice(i, i + 100);
-    const { error } = await supabase.storage.from(BUCKET).remove(batch);
-    if (error) console.warn('[InternalFiles] Storage 清理失败：', error.message);
-  }
+  await removeStorageObjects(BUCKET, paths || []);
 }
 
 /* ============================================
@@ -654,20 +648,26 @@ async function collectDescendantStoragePaths(folderId) {
   const paths = [];
   let frontier = [folderId];
   let guard = 0;
-  while (frontier.length && guard < 1000) {
-    const { data, error } = await supabase
-      .from('internal_files')
-      .select('id, storage_path, is_folder')
-      .in('parent_id', frontier);
-    if (error) throw error;
-    const rows = data || [];
+  while (frontier.length) {
+    if (++guard > 1000) throw new Error('文件夹层级过深，已停止删除，请先整理目录。');
+    const rows = [];
+    for (let batch = 0; batch < frontier.length; batch += 100) {
+      for (let offset = 0; ; offset += 500) {
+        const { data, error } = await supabase.from('internal_files')
+          .select('id, storage_path, is_folder')
+          .in('parent_id', frontier.slice(batch, batch + 100))
+          .order('id', { ascending: true }).range(offset, offset + 499);
+        if (error) throw error;
+        rows.push(...(data || []));
+        if (!data || data.length < 500) break;
+      }
+    }
     const nextFolders = [];
     for (const r of rows) {
       if (r.storage_path) paths.push(r.storage_path);
       if (r.is_folder) nextFolders.push(r.id);
     }
     frontier = nextFolders;
-    guard += 1;
   }
   return paths;
 }

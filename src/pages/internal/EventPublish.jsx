@@ -771,15 +771,14 @@ export default function EventPublish() {
     const title = event.title || '未命名活动';
     if (!window.confirm(`确定删除「${title}」这个活动吗？`)) return;
 
+    const saved = await moveToRecycleBin({ itemType: 'event', item: event, user });
+    if (!saved.success) { alert(`删除已停止：${saved.error}`); return; }
     const nextEvents = events.filter((item) => String(item.id) !== String(event.id));
     const res = await saveEventsNow(nextEvents);
     if (!res?.success) {
       alert(`活动没有从云端删除：${res?.error || '未知错误'}。请稍后重试。`);
       return;
     }
-    // 云端已成功移除 → 把整条快照挪进回收站，支持后续恢复
-    moveToRecycleBin({ itemType: 'event', item: event, user })
-      .catch(() => { /* 回收站写入失败不阻塞删除，已有本地兜底 */ });
     deleteEvent(event.id);
   };
 
