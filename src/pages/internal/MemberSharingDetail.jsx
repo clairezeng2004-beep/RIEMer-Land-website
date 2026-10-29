@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { Navigate, useParams, useNavigate } from 'react-router-dom';
+import { Navigate, useParams, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { markdownToHtml } from '../../utils/markdownWordInterop';
 import {
@@ -23,7 +23,6 @@ import {
   Link as LinkIcon,
 } from 'lucide-react';
 import TextAnnotation from '../../components/TextAnnotation';
-import MemberSharingFolderView from './MemberSharingFolderView';
 import { ensureResponsiveTableWrappers } from '../../utils/responsiveTables';
 import { linkSourceLabel } from '../../utils/sharedLink';
 import ImageLightbox from '../../components/ImageLightbox';
@@ -162,6 +161,7 @@ export default function MemberSharingDetail({ material, onBack, materialActions 
   const { id: routeId } = useParams();
   const id = material?.id || routeId;
   const navigate = useNavigate();
+  const location = useLocation();
   const contentRef = useRef(null);
 
   useEffect(() => {
@@ -525,7 +525,11 @@ export default function MemberSharingDetail({ material, onBack, materialActions 
     (Array.isArray(post.contributorIds) && post.contributorIds.map(String).includes(String(user.id)))
   ));
 
-  if (post.format === 'folder') return <MemberSharingFolderView post={post} user={user} canWrite={canEdit} />;
+  if (post.format === 'folder') {
+    const params = new URLSearchParams(location.search);
+    params.set('sharingFolder', post.id);
+    return <Navigate to={`/internal/member-sharing?${params}`} replace />;
+  }
 
   return (
     <div className="msd-page">

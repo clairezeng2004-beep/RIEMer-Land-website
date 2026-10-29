@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { useSiteContent } from '../../contexts/SiteContentContext';
 import { useWysiwyg } from '../../contexts/WysiwygContext';
@@ -46,6 +46,7 @@ import {
   FolderOpen,
   Loader2,
 } from 'lucide-react';
+import MemberSharingFolderView from './MemberSharingFolderView';
 import './MemberSharing.css';
 
 const HIDDEN_CATEGORY_KEYS = new Set(['history']);
@@ -204,6 +205,8 @@ export default function MemberSharing() {
 
   // 首屏用本地缓存做种子，先把上次的内容立刻显示出来（手机端尤其明显），
   // 云端数据回来后再覆盖/合并，避免"先空一下再加载"的空窗。
+  const [folderParams, setFolderParams] = useSearchParams();
+  const sharingFolderId = folderParams.get('sharingFolder');
   const [sharings, setSharings] = useState(() => getCachedSharings());
   // 首次云端拉取是否完成：未完成且暂无内容时显示"加载中"而不是"暂无分享"
   const [loaded, setLoaded] = useState(false);
@@ -542,6 +545,8 @@ export default function MemberSharing() {
     return text.length > 120 ? text.slice(0, 120) + '…' : text;
   };
 
+  const openedFolder = sharings.find((post) => String(post.id) === sharingFolderId && post.format === 'folder');
+
   return (
     <div className="ms-page">
       <div className="container">
@@ -569,16 +574,22 @@ export default function MemberSharing() {
               </span>
             </p>
           </div>
-          <div className="ms-page__actions">
+          {!sharingFolderId && <div className="ms-page__actions">
             <a href="/internal/member-sharing/create?format=folder" target="_blank" rel="noopener noreferrer" className="btn btn-secondary">
               <FolderOpen size={18} /> 新建文件夹
             </a>
             <a href="/internal/member-sharing/create" target="_blank" rel="noopener noreferrer" className="btn btn-primary">
               <Plus size={18} /> 发布分享
             </a>
-          </div>
+          </div>}
         </div>
 
+        {sharingFolderId ? (openedFolder ? <MemberSharingFolderView post={openedFolder} user={user}
+          canWrite={isAdmin || isPostPublisherOrContributor(openedFolder)}
+          onBack={() => setFolderParams({})} /> : <div className="ms-empty" role="status">
+            <p>{loaded ? '文件夹不存在或已被删除。' : '正在加载文件夹…'}</p>
+            <button className="btn btn-secondary" onClick={() => setFolderParams({})}>返回列表</button>
+          </div>) : <>
         {/* Filters */}
         <div className="ms-filters">
           <div className="ms-filters__search">
@@ -892,7 +903,14 @@ export default function MemberSharing() {
                   <Trash2 size={14} />
                 </button>
               )}
-              <a href={`/internal/member-sharing/view/${post.id}`} target="_blank" rel="noopener noreferrer" className="ms-card__body-link">
+              <a href={post.format === 'folder' ? `/internal/member-sharing?sharingFolder=${encodeURIComponent(post.id)}` : `/internal/member-sharing/view/${post.id}`}
+                target={post.format === 'folder' ? undefined : '_blank'} rel="noopener noreferrer" className="ms-card__body-link"
+                onClick={(event) => {
+                  if (post.format !== 'folder' || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+                  event.preventDefault();
+                  setFolderParams({ sharingFolder: post.id });
+                  window.scrollTo({ top: 0, behavior: 'instant' });
+                }}>
                 <div className="ms-card__body">
                   {Array.isArray(post.attachments) && post.attachments.length > 0 && (
                     <div className="ms-card__top">
@@ -987,6 +1005,7 @@ export default function MemberSharing() {
             <p>点击"发布分享"按钮开始分享内容</p>
           </div>
         )}
+        </>}
       </div>
 
       {/* 访问记录弹层：点击卡片上的浏览数小眼睛时弹出 */}

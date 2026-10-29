@@ -1032,3 +1032,6 @@
 .if-text-publish::backdrop { background: var(--color-bg, #f9fafb); }
 .if-text-publish .msc-form__word-editor-wrapper { position: relative; }
 .if-text-publish .msc-md-split__editor { min-height: 420px; }
+
+.internal-files-page.internal-files-page--embedded { padding: 0; min-height: 0; }
+.internal-files-page--embedded > .container { max-width: none; width: 100%; padding: 0; }

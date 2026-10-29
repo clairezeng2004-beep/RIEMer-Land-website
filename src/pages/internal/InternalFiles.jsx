@@ -260,7 +260,7 @@ function ContribCell({ contributors, loading, onDetail, editable, busy, onEdit }
   );
 }
 
-export default function InternalFiles({ fileService, title = '内部资料', rootLabel = '全部资料', onBack, canWrite = true }) {
+export default function InternalFiles({ fileService, title = '内部资料', rootLabel = '全部资料', onBack, canWrite = true, embedded = false }) {
   const {
     isInternalFilesAvailable, fetchChildrenPage, fetchBreadcrumb, createFolder, createTextMaterial,
     uploadFiles, uploadFolderTree, uploadZipAsFolder, createLink, renameNode, moveNodes, updateNote,
@@ -766,7 +766,7 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
 
   if (!isInternalFilesAvailable()) {
     return (
-      <div className="internal-files-page">
+      <div className={`internal-files-page ${embedded ? 'internal-files-page--embedded' : ''}`}>
         <div className="container">
           <div className="internal-files-page__header">
             <div>
@@ -788,7 +788,7 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
   const fileCount = items.length - folderCount;
 
   return (
-    <div className="internal-files-page">
+    <div className={`internal-files-page ${embedded ? 'internal-files-page--embedded' : ''}`}>
       <div
         className="container if-upload-area"
         onDragOverCapture={(e) => {
@@ -807,13 +807,13 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
         <div className="internal-files-page__header">
           <div>
             {onBack && <button type="button" className="if-crumb" onClick={onBack}><CornerLeftUp size={16} /> 返回成员经验分享</button>}
-            <div className="if-title-row">
+            {!embedded && <><div className="if-title-row">
               <h1><HardDrive size={28} /> {title}</h1>
               <button type="button" className="if-rules-btn" onClick={() => setInfoModal('rules')}>
                 <ClipboardList size={14} /> 资料上传规范（必看）
               </button>
             </div>
-            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹</p>
+            <p>团队内部文件资源库 · 小文件直接上传，zip 压缩包可自动解压成文件夹</p></>}
           </div>
           <div className="internal-files-page__actions">
             <button
@@ -1011,7 +1011,9 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
                           e.preventDefault();
                           if (isTextMaterial(node)) {
                             const href = fileService?.textHref ? fileService.textHref(node) : `/internal/internal-files/text/${encodeURIComponent(node.id)}`;
-                            const returnTo = `${location.pathname}${folderId ? `?folder=${encodeURIComponent(folderId)}` : ''}`;
+                            const params = new URLSearchParams(location.search);
+                            if (folderId) params.set('folder', folderId); else params.delete('folder');
+                            const returnTo = `${location.pathname}${params.size ? `?${params}` : ''}`;
                             navigate(href, { state: { returnTo } });
                           } else setPreviewFile(node);
                         }

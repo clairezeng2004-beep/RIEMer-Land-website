@@ -17,8 +17,8 @@ export default function InternalTextDetail() {
   const [error, setError] = useState('');
   const [downloadError, setDownloadError] = useState('');
   const [downloading, setDownloading] = useState(false);
-  const fallbackBase = folderId ? `/internal/member-sharing/view/${encodeURIComponent(folderId)}` : '/internal/internal-files';
-  const fallback = `${fallbackBase}${file?.parentId ? `?folder=${encodeURIComponent(file.parentId)}` : ''}`;
+  const fallbackBase = folderId ? `/internal/member-sharing?sharingFolder=${encodeURIComponent(folderId)}` : '/internal/internal-files';
+  const fallback = `${fallbackBase}${file?.parentId ? `${folderId ? '&' : '?'}folder=${encodeURIComponent(file.parentId)}` : ''}`;
   const returnTo = location.state?.returnTo?.startsWith('/internal/') ? location.state.returnTo : fallback;
   const back = () => navigate(returnTo);
 
