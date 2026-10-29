@@ -2,6 +2,8 @@ export function internalFilePreviewType(file) {
   if (!file?.url || file.isFolder || file.mimeType === 'text/x-url') return null;
   const name = (file.name || '').toLowerCase();
   const mime = (file.mimeType || '').toLowerCase();
+  if (mime.startsWith('text/x-riemer-html')) return 'rich';
+  if (mime.startsWith('text/markdown') || name.endsWith('.md')) return 'markdown';
   if (mime.startsWith('text/plain') || mime.startsWith('text/markdown') || /\.(txt|md)$/.test(name)) return 'text';
   if (mime.includes('pdf') || name.endsWith('.pdf')) return 'pdf';
   if (mime.startsWith('image/') || /\.(png|jpe?g|gif|webp|svg|bmp|avif)$/.test(name)) return 'image';

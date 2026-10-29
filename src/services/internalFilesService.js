@@ -14,6 +14,7 @@
 //
 // 未配置 Supabase 时不可用（内部资料需登录并连接服务器）。
 
+import { sanitizeInternalTextHtml, hasInternalTextContent } from '../utils/internalTextHtml';
 import { pinyin } from 'pinyin-pro';
 import { removeStorageObjects } from './storageCleanupService';
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
@@ -272,13 +273,17 @@ export async function createLink(parentId, { name, url, note = '', contributors 
 }
 
 /* 直接发布文字资料，沿用文件上传、权限、移动与清理流程。 */
-export async function createTextMaterial(parentId, { name, content, note, contributors }, user) {
+export async function createTextMaterial(parentId, { name, content, format = 'plain', note, contributors }, user) {
   requireRemote();
   const title = (name || '').trim();
   if (!title) throw new Error('请填写资料标题。');
-  if (!content?.trim()) throw new Error('请填写资料正文。');
-  const fileName = /\.txt$/i.test(title) ? title : `${title}.txt`;
-  const file = new File([content], fileName, { type: 'text/plain;charset=utf-8' });
+  if (!['plain', 'word', 'markdown'].includes(format)) throw new Error('不支持的正文格式。');
+  if (!hasInternalTextContent(content || '', format)) throw new Error('请填写资料正文。');
+  const extension = format === 'word' ? 'html' : format === 'markdown' ? 'md' : 'txt';
+  const mime = format === 'word' ? 'text/x-riemer-html' : format === 'markdown' ? 'text/markdown' : 'text/plain';
+  const body = format === 'word' ? sanitizeInternalTextHtml(content) : content;
+  const fileName = title.toLowerCase().endsWith(`.${extension}`) ? title : `${title}.${extension}`;
+  const file = new File([body], fileName, { type: `${mime};charset=utf-8` });
   return uploadOneFile(parentId, file, user, { name: fileName, note, contributors });
 }
 

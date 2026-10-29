@@ -6,6 +6,8 @@ test('detects preview formats after renaming and leaves unsupported files undown
   const file = (name, mimeType = '') => ({ name, mimeType, url: 'https://example.com/file' });
   assert.equal(internalFilePreviewType(file('课程.PDF')), 'pdf');
   assert.equal(internalFilePreviewType(file('课程笔记.txt')), 'text');
+  assert.equal(internalFilePreviewType(file('排版笔记', 'text/x-riemer-html;charset=utf-8')), 'rich');
+  assert.equal(internalFilePreviewType(file('笔记.md')), 'markdown');
   assert.equal(internalFilePreviewType(file('笔记', 'text/plain;charset=utf-8')), 'text');
   assert.equal(internalFilePreviewType(file('重命名资料', 'application/pdf')), 'pdf');
   assert.equal(internalFilePreviewType(file('照片.png')), 'image');

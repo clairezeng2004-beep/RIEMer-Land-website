@@ -1010,3 +1010,25 @@
 .if-note-editor__error { color: var(--color-danger, #c0392b); overflow-wrap: anywhere; }
 
 .if-publish-content { min-height: 220px; line-height: 1.8; }
+
+.if-text-publish {
+  z-index: 1100;
+  display: block;
+  margin: 0;
+  padding: 0;
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  min-height: 0;
+  border: 0;
+  border-radius: 0;
+  color: var(--color-text);
+  overflow: auto;
+}
+.if-text-publish[open] { display: block; }
+.if-text-publish::backdrop { background: var(--color-bg, #f9fafb); }
+.if-text-publish .msc-form__word-editor-wrapper { position: relative; }
+.if-text-publish .msc-md-split__editor { min-height: 420px; }

@@ -147,7 +147,7 @@ test('large folders and albums collect all storage paths; cleanup failure stops 
     const file = kind === 'folder' ? 'internalFilesService.js' : 'albumService.js';
     const mod = new SourceTextModule(await readFile(new URL(`../src/services/${file}`, import.meta.url), 'utf8'));
     await mod.link((specifier) => {
-      const exports = specifier.includes('storageCleanupService') ? { removeStorageObjects: async (_, paths) => {
+      const exports = specifier.includes('internalTextHtml') ? { sanitizeInternalTextHtml: (value) => value, hasInternalTextContent: (value) => !!value.trim() } : specifier.includes('storageCleanupService') ? { removeStorageObjects: async (_, paths) => {
         if (failCleanup) throw new Error('cleanup failed');
         removed.push(...paths);
       } } : specifier.includes('supabase') ? { supabase, isSupabaseConfigured: true }
