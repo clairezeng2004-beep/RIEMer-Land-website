@@ -157,9 +157,10 @@ function hasCountedViewToday(postId, user) {
   }
 }
 
-export default function MemberSharingDetail() {
+export default function MemberSharingDetail({ material, onBack, materialActions }) {
   const { isAuthenticated, loading, user, isAdmin, getAllUsers } = useAuth();
-  const { id } = useParams();
+  const { id: routeId } = useParams();
+  const id = material?.id || routeId;
   const navigate = useNavigate();
   const contentRef = useRef(null);
 
@@ -259,20 +260,21 @@ export default function MemberSharingDetail() {
   const [categoryList, setCategoryList] = useState(() => getLocalCategories());
   const { labels: categoryLabels, colors: categoryColors } = buildCategoryMaps(categoryList);
 
-  const [sharings, setSharings] = useState(() => getCachedSharings());
+  const [sharings, setSharings] = useState(() => material ? [material] : getCachedSharings());
   const [loaded, setLoaded] = useState(false);
   const [views, setViews] = useState(() => loadLocalViews(VIEW_TARGET_TYPE));
-  const post = sharings.find((s) => String(s.id) === String(id));
+  const post = material || sharings.find((s) => String(s.id) === String(id));
 
   // 浏览器标签页标题：新窗口里直观显示这是成员分享的文档
   useEffect(() => {
     const prev = document.title;
-    document.title = '成员内部分享 - 文档查看';
+    document.title = material ? `${material.title} - 文档查看` : '成员内部分享 - 文档查看';
     return () => { document.title = prev; };
   }, []);
 
   // 首次加载：详情内容优先显示；分类 / 浏览数等辅助信息不阻塞正文。
   useEffect(() => {
+    if (material) return;
     let cancelled = false;
     (async () => {
       try {
@@ -321,8 +323,18 @@ export default function MemberSharingDetail() {
     return () => { cancelled = true; };
   }, [id]);
 
+  useEffect(() => {
+    if (!material) return;
+    let cancelled = false;
+    fetchViewCountFromCloud(id, VIEW_TARGET_TYPE).then((count) => {
+      if (!cancelled) setViews((prev) => ({ ...prev, [id]: Math.max(Number(prev[id]) || 0, Number(count) || 0) }));
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [material, id]);
+
   // 订阅 member_sharing 实时变更
   useEffect(() => {
+    if (material) return;
     const unsubscribe = subscribeSharings(({ type, newItem, oldItem }) => {
       if (type === 'INSERT' && newItem) {
         setSharings((prev) => {
@@ -449,7 +461,7 @@ export default function MemberSharingDetail() {
       return (
         <div className="msd-page">
           <div className="msd-topbar">
-            <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
+            <button className="msd-topbar__back" onClick={onBack || (() => navigate('/internal/member-sharing'))}>
               <ChevronLeft size={20} /> 返回列表
             </button>
           </div>
@@ -465,7 +477,7 @@ export default function MemberSharingDetail() {
     return (
       <div className="msd-page">
         <div className="msd-topbar">
-          <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
+          <button className="msd-topbar__back" onClick={onBack || (() => navigate('/internal/member-sharing'))}>
             <ChevronLeft size={20} /> 返回列表
           </button>
         </div>
@@ -474,7 +486,7 @@ export default function MemberSharingDetail() {
             <Share2 size={48} />
             <h3>找不到该分享</h3>
             <p>内容可能已被删除或链接不正确</p>
-            <button className="btn btn-secondary" onClick={() => navigate('/internal/member-sharing')}>
+            <button className="btn btn-secondary" onClick={onBack || (() => navigate('/internal/member-sharing'))}>
               <ChevronLeft size={16} /> 返回列表
             </button>
           </div>
@@ -484,7 +496,7 @@ export default function MemberSharingDetail() {
   }
 
   const handleLike = () => {
-    if (!user) return;
+    if (!user || material) return;
     const likes = Array.isArray(post.likes) ? post.likes : [];
     const already = likes.some((l) => l.userId === user.id);
     const newLikes = already
@@ -507,7 +519,7 @@ export default function MemberSharingDetail() {
   const showToc = toc.length > 0 && (post.format === 'markdown' || post.format === 'word');
 
   // 编辑权限：管理员，或本篇分享的作者 / 任一贡献者本人
-  const canEdit = !!(user && (
+  const canEdit = !!(!material && user && (
     isAdmin ||
     (post.authorId && String(post.authorId) === String(user.id)) ||
     (Array.isArray(post.contributorIds) && post.contributorIds.map(String).includes(String(user.id)))
@@ -519,9 +531,10 @@ export default function MemberSharingDetail() {
     <div className="msd-page">
       {/* 顶部导航栏 — 类似 MemberSharingCreate */}
       <div className="msd-topbar">
-        <button className="msd-topbar__back" onClick={() => navigate('/internal/member-sharing')}>
+        <button className="msd-topbar__back" onClick={onBack || (() => navigate('/internal/member-sharing'))}>
           <ChevronLeft size={20} /> 返回列表
         </button>
+        {materialActions}
         {canEdit && (
           <button
             type="button"
@@ -659,7 +672,7 @@ export default function MemberSharingDetail() {
             )}
 
             {/* 底部点赞 */}
-            <footer className="msd-article__footer">
+            {!material && <footer className="msd-article__footer">
               <button
                 className={`msd-like-btn ${hasLiked ? 'msd-like-btn--active' : ''}`}
                 onClick={handleLike}
@@ -678,10 +691,10 @@ export default function MemberSharingDetail() {
                   </div>
                 </div>
               )}
-            </footer>
+            </footer>}
 
             {/* 上一篇 / 下一篇 —— 同作者优先推荐；两端到尽头时对应卡位会隐去 */}
-            <PrevNextNavigator
+            {!material && <PrevNextNavigator
               prev={prevSharing}
               next={nextSharing}
               prevSameAuthor={prevSameAuthor}
@@ -689,7 +702,7 @@ export default function MemberSharingDetail() {
               getHref={(s) => `/internal/member-sharing/view/${s.id}`}
               getTitle={(s) => s.title}
               getAuthor={(s) => s.author || ''}
-            />
+            />}
           </article>
 
           {/* 右侧：所有用户可划线 / 整体评论（与流程模板文件详情页一致） */}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import * as defaultFileService from '../../services/internalFilesService';
-import { Navigate } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { isTextMaterial } from '../../utils/internalFilePreview';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   isZipFile,
@@ -322,12 +323,16 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
   const writeCache = fileService ? () => {} : writeListCache;
 
   const { isAuthenticated, isAdmin, user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
+  const initialFolderId = searchParams.get('folder') || null;
 
   // 首帧种子：初始进入的是根目录（folderId=null），若本地有它的列表缓存，就在
   // useState 初始化时同步注入首帧——与成员分享页一致，省去先渲染一帧「加载中…」
   // 再补内容的空窗。惰性初始化只读一次，避免每次渲染都碰 localStorage。
   const [seed] = useState(() => {
-    const c = readCache(null);
+    const c = readCache(initialFolderId);
     return c && Array.isArray(c.items) && c.items.length
       ? {
           items: sortNodes(c.items),
@@ -338,7 +343,7 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
       : null;
   });
 
-  const [folderId, setFolderId] = useState(null); // null = 根目录
+  const [folderId, setFolderId] = useState(initialFolderId); // null = 根目录
   const [breadcrumb, setBreadcrumb] = useState([]); // [{id,name}, ...]
   const [items, setItems] = useState(() => (seed ? seed.items : []));
   const [total, setTotal] = useState(() => (seed ? seed.total : null)); // 当前目录项总数（单独并行拉取）
@@ -1045,7 +1050,7 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
                       draggable={false}
                       target={isLinkNode(node) ? '_blank' : undefined}
                       rel={isLinkNode(node) ? 'noopener noreferrer' : undefined}
-                      title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : '点击预览'}（${detailTitle}）`}
+                      title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : isTextMaterial(node) ? '点击阅读全文' : '点击预览'}（${detailTitle}）`}
                       onClick={(e) => {
                         if (selectMode) {
                           e.preventDefault(); // 多选时点击是勾选，不打开文件
@@ -1059,7 +1064,11 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
                         }
                         if (!isLinkNode(node)) {
                           e.preventDefault();
-                          setPreviewFile(node);
+                          if (isTextMaterial(node)) {
+                            const href = fileService?.textHref ? fileService.textHref(node) : `/internal/internal-files/text/${encodeURIComponent(node.id)}`;
+                            const returnTo = `${location.pathname}${folderId ? `?folder=${encodeURIComponent(folderId)}` : ''}`;
+                            navigate(href, { state: { returnTo } });
+                          } else setPreviewFile(node);
                         }
                       }}
                     >

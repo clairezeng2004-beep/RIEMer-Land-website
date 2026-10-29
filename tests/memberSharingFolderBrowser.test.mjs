@@ -40,6 +40,9 @@ test('shared folder browser supports legacy files, folders, uploads, metadata, m
   const {api,post,recycled,fail} = await setup();
   let page = await api.fetchChildrenPage(null, {limit:1});
   assert.equal(page.items[0].name,'A.pdf'); assert.equal(page.hasMore,true);
+  assert.equal((await api.fetchNode('a')).name,'A.pdf');
+  assert.equal(await api.fetchNode('missing'),null);
+  assert.equal(api.textHref({id:'a'}),'/internal/member-sharing/folder/post/text/a');
   const folder = await api.createFolder(null,'子目录');
   const child = await api.createFolder(folder.id,'下级');
   assert.equal((await api.fetchBreadcrumb(child.id)).length,2);
