@@ -34,6 +34,16 @@ const requireRemote = () => {
   }
 };
 
+// 发布时一次写入备注与贡献者，避免上传成功后再补写资料信息。
+function publicationFields({ note = '', contributors = '' } = {}) {
+  const names = contributors.split(/[、，,;；\n]+/).map((name) => name.trim()).filter(Boolean).join('、');
+  if (names.length > 500) throw new Error('贡献者名单最多 500 字。');
+  return {
+    note: note.trim().slice(0, 200),
+    ...(names ? { contributors_override: names } : {}),
+  };
+}
+
 /* ---------- 数据库行 → 前端对象 ---------- */
 function rowToNode(row) {
   return {
@@ -222,7 +232,7 @@ export async function fetchBreadcrumb(folderId) {
 /* ============================================
  * 新建文件夹
  * ============================================ */
-export async function createFolder(parentId, name, user) {
+export async function createFolder(parentId, name, user, metadata) {
   requireRemote();
   const clean = (name || '').trim() || '新建文件夹';
   const { data, error } = await supabase
@@ -231,6 +241,7 @@ export async function createFolder(parentId, name, user) {
       parent_id: parentId || null,
       name: clean,
       is_folder: true,
+      ...publicationFields(metadata),
       created_by_id: user?.id || null,
       created_by: user?.nickname || user?.name || '',
     })
@@ -250,7 +261,7 @@ export const LINK_MIME = 'text/x-url';
 
 export const isLinkNode = (node) => !node?.isFolder && node?.mimeType === LINK_MIME;
 
-export async function createLink(parentId, { name, url, note = '' }, user) {
+export async function createLink(parentId, { name, url, note = '', contributors = '' }, user) {
   requireRemote();
   const cleanUrl = parseSharedLink(url).url;
   if (!cleanUrl) throw new Error('链接需以 http:// 或 https:// 开头。');
@@ -265,7 +276,7 @@ export async function createLink(parentId, { name, url, note = '' }, user) {
       url: cleanUrl,
       mime_type: LINK_MIME,
       size_bytes: 0,
-      note: (note || '').trim().slice(0, 200),
+      ...publicationFields({ note, contributors }),
       created_by_id: user?.id || null,
       created_by: user?.nickname || user?.name || '',
     })
@@ -284,7 +295,8 @@ function buildStoragePath(userId, fileName) {
 }
 
 /* 上传单个文件到 Storage 并写入数据库行 */
-async function uploadOneFile(parentId, file, user) {
+async function uploadOneFile(parentId, file, user, metadata) {
+  const fields = publicationFields(metadata);
   const path = buildStoragePath(user?.id, file.name);
   await uploadStorageObject(path, file, {
     cacheControl: '3600',
@@ -296,7 +308,8 @@ async function uploadOneFile(parentId, file, user) {
     .from('internal_files')
     .insert({
       parent_id: parentId || null,
-      name: file.name || '未命名文件',
+      name: metadata?.name?.trim() || file.name || '未命名文件',
+      ...fields,
       is_folder: false,
       storage_path: path,
       url,
@@ -353,14 +366,14 @@ async function runUploads(tasks, onProgress) {
  * 上传若干文件到当前目录（普通「搬运」上传）
  * files: File[]
  * ============================================ */
-export async function uploadFiles(parentId, files, user, onProgress) {
+export async function uploadFiles(parentId, files, user, onProgress, metadata) {
   requireRemote();
   const list = Array.from(files || []);
   if (list.length === 0) return { results: [], errors: [] };
 
   const tasks = list.map((file) => ({
     label: file.name || '文件',
-    run: () => uploadOneFile(parentId, file, user),
+    run: () => uploadOneFile(parentId, file, user, metadata),
   }));
   return runUploads(tasks, onProgress);
 }
@@ -370,7 +383,7 @@ export async function uploadFiles(parentId, files, user, onProgress) {
  * files 来自 <input webkitdirectory>，每个 File 带 webkitRelativePath
  * 先按深度创建所需文件夹，再把文件放进对应文件夹
  * ============================================ */
-export async function uploadFolderTree(parentId, files, user, onProgress) {
+export async function uploadFolderTree(parentId, files, user, onProgress, metadata) {
   requireRemote();
   const list = Array.from(files || []);
   if (list.length === 0) return { results: [], errors: [] };
@@ -378,13 +391,13 @@ export async function uploadFolderTree(parentId, files, user, onProgress) {
     relPath: file.webkitRelativePath || file.name || '',
     getFile: () => file,
   }));
-  return uploadEntryTree(parentId, entries, user, onProgress);
+  return uploadEntryTree(parentId, entries, user, onProgress, metadata);
 }
 
 /* 按相对路径把一批条目建成目录树并上传（上传文件夹 / 解压压缩包共用）
  *   entries: [{ relPath: 'a/b/c.pdf', getFile: () => File | Promise<File> }]
  *   getFile 在轮到该文件上传时才调用，压缩包可借此边解压边传，不必全部先读进内存 */
-async function uploadEntryTree(parentId, entries, user, onProgress) {
+async function uploadEntryTree(parentId, entries, user, onProgress, metadata) {
   const list = entries;
 
   // 1) 收集所有需要创建的目录（相对当前目录），按层级深度升序
@@ -413,7 +426,7 @@ async function uploadEntryTree(parentId, entries, user, onProgress) {
     const pid = folderIdByPath.has(parentDir)
       ? folderIdByPath.get(parentDir)
       : parentId || null;
-    const node = await createFolder(pid, name, user);
+    const node = await createFolder(pid, name, user, metadata);
     folderIdByPath.set(dir, node.id);
   }
 
@@ -427,7 +440,7 @@ async function uploadEntryTree(parentId, entries, user, onProgress) {
       : parentId || null;
     return {
       label: rel,
-      run: async () => uploadOneFile(targetId, await entry.getFile(), user),
+      run: async () => uploadOneFile(targetId, await entry.getFile(), user, metadata),
     };
   });
 
@@ -492,7 +505,7 @@ function decodeZipFileName(bytes) {
 // 系统自动塞进压缩包的垃圾文件，不上传
 const ZIP_JUNK_NAMES = new Set(['.ds_store', 'thumbs.db', 'desktop.ini']);
 
-export async function uploadZipAsFolder(parentId, zipFile, user, onProgress) {
+export async function uploadZipAsFolder(parentId, zipFile, user, onProgress, metadata) {
   requireRemote();
   if (zipFile.size > ZIP_EXTRACT_MAX_BYTES) {
     throw new Error('压缩包过大，无法在浏览器里解压。');
@@ -547,7 +560,7 @@ export async function uploadZipAsFolder(parentId, zipFile, user, onProgress) {
     };
   });
 
-  return uploadEntryTree(parentId, entries, user, onProgress);
+  return uploadEntryTree(parentId, entries, user, onProgress, metadata);
 }
 
 /* ============================================
