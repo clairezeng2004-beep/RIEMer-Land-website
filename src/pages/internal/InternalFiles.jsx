@@ -54,6 +54,7 @@ import {
   Clock,
   X,
 } from 'lucide-react';
+import InternalFilePreview from '../../components/InternalFilePreview';
 import InternalFilesPublish from './InternalFilesPublish';
 import './InternalFiles.css';
 
@@ -377,6 +378,7 @@ export default function InternalFiles() {
   const [busy, setBusy] = useState(false); // 上传/新建等写操作进行中
   const [progress, setProgress] = useState(null); // {done,total,current}
   const [dragOver, setDragOver] = useState(false);
+  const [previewFile, setPreviewFile] = useState(null);
   const [detailNode, setDetailNode] = useState(null); // 长按/悬停查看的「上传详情」
   const [dragNodes, setDragNodes] = useState(null); // 正在被拖动的条目（站内拖拽移动；多选时是一批）
   const [dropKey, setDropKey] = useState(null); // 当前悬停的投放目标（文件夹 id / ROOT_DROP_KEY）
@@ -1059,6 +1061,7 @@ export default function InternalFiles() {
                 }
 
                 const { Icon, label, cls } = getFileMeta(node);
+                const NameTag = isLinkNode(node) ? 'a' : 'button';
                 return (
                   <div
                     key={node.id}
@@ -1070,12 +1073,13 @@ export default function InternalFiles() {
                     onPointerCancel={cancelPress}
                     onContextMenu={(e) => e.preventDefault()}
                   >
-                    <a
+                    <NameTag
                       className="if-col-name if-name-btn"
-                      href={node.url || '#'}
+                      href={isLinkNode(node) ? node.url || '#' : undefined}
+                      type={isLinkNode(node) ? undefined : 'button'}
                       draggable={false}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      target={isLinkNode(node) ? '_blank' : undefined}
+                      rel={isLinkNode(node) ? 'noopener noreferrer' : undefined}
                       title={`${node.name} · ${isLinkNode(node) ? '点击在新页面打开链接' : '点击预览'}（${detailTitle}）`}
                       onClick={(e) => {
                         if (selectMode) {
@@ -1086,13 +1090,18 @@ export default function InternalFiles() {
                         if (longPressedRef.current) {
                           e.preventDefault();
                           longPressedRef.current = false;
+                          return;
+                        }
+                        if (!isLinkNode(node)) {
+                          e.preventDefault();
+                          setPreviewFile(node);
                         }
                       }}
                     >
                       {renderRowIcon(node, <span className={`if-icon ${cls}`}><Icon size={20} /></span>)}
                       <span className="if-name-text">{node.name}</span>
                       <span className="if-badge">{label}</span>
-                    </a>
+                    </NameTag>
                     <span className="if-col-size">{isLinkNode(node) ? '链接' : formatSize(node.sizeBytes)}</span>
                     {(() => {
                       const { list, loading: contribLoading } = contribsFor(node);
@@ -1288,6 +1297,8 @@ export default function InternalFiles() {
           onPublish={handlePublish}
         />
       )}
+
+      {previewFile && <InternalFilePreview key={previewFile.id} file={previewFile} onClose={() => setPreviewFile(null)} />}
 
       {/* 上传详情弹窗（长按 / Info 触发） */}
       {detailNode && (
