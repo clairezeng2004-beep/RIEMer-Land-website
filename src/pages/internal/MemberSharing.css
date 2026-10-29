@@ -896,6 +896,11 @@
   padding: 0.15rem 0.55rem;
   border-radius: var(--radius-full);
   width: fit-content;
+  margin-top: auto;
+}
+
+.ms-card__period + .ms-card__meta {
+  margin-top: 0.75rem;
 }
 
 .ms-card__meta {
