@@ -31,7 +31,7 @@ const COLUMNS = [
   { key: 'career', label: '工作去向', width: '180px', editable: true, placeholder: '如 XX公司XX岗位 当前base地' },
   { key: 'willing_to_share', label: '我愿意分享什么', width: '320px', editable: true, placeholder: '你愿意和大家分享的内容' },
   { key: 'want_to_learn', label: '我想和大家请教什么', width: '320px', editable: true, placeholder: '你想请教大家的问题' },
-  { key: 'career_interest', label: '感兴趣的职业方向/生活模式', width: '220px', editable: true, placeholder: '如 产品经理、数字游民、慢生活' },
+  { key: 'career_interest', label: '感兴趣的职业方向/生活模式', width: '220px', editable: true, placeholder: '如 科研探索、创作表达、教育公益、自由职业、跨领域发展，或旅居生活、弹性工作、稳定与探索并行……' },
   { key: 'hometown', label: '家乡', width: '130px', editable: true, placeholder: '如 广东广州' },
   { key: 'dream_city', label: '喜爱向往的城市与地区', width: '190px', editable: true, placeholder: '如 北京、上海、川西' },
   { key: 'hobbies', label: '爱好', width: '260px', editable: true, placeholder: '如 摄影、阅读、运动' },
