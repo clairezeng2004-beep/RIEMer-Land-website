@@ -315,6 +315,7 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
   const [folderContribs, setFolderContribs] = useState(() => (seed ? seed.contribs : {})); // { folderId: [{id,name}] } 文件夹贡献者
 
   const inflightRef = useRef(false);
+  const requestRef = useRef(0);
   // 长按检测：按住 ~500ms 视为长按，弹出上传详情，并抑制随后的点击（进文件夹/打开文件）
   const pressTimerRef = useRef(null);
   const longPressedRef = useRef(false);
@@ -385,11 +386,12 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
 
   // 后台拉取一批文件夹的贡献者并静默并入（不清空已渲染的名字，避免闪烁），
   // 同时写回该目录的列表缓存，供下次瞬时渲染
-  const refreshContribs = useCallback((targetId, pageItems) => {
+  const refreshContribs = useCallback((targetId, pageItems, request) => {
     const folderIds = (pageItems || []).filter((n) => n.isFolder).map((n) => n.id);
     if (folderIds.length === 0) return;
     fetchFolderContributors(folderIds)
       .then((map) => {
+        if (request !== requestRef.current) return;
         const slice = {};
         for (const id of folderIds) slice[id] = map[id] || [];
         setFolderContribs((prev) => ({ ...prev, ...slice }));
@@ -400,9 +402,10 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
 
   // 首屏加载 / 刷新：先用本地缓存瞬时渲染，再后台拉最新替换（stale-while-revalidate）
   const load = useCallback(async (targetId) => {
-    if (inflightRef.current) return;
+    const request = ++requestRef.current;
     inflightRef.current = true;
     setError('');
+    setLoadingMore(false);
 
     // 1) 命中缓存 → 立即渲染上次结果，去掉等待感
     const cached = readCache(targetId);
@@ -414,6 +417,10 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
       setLoading(false);
     } else {
       setLoading(true);
+      setItems([]);
+      setTotal(null);
+      setHasMore(false);
+      setBreadcrumb([]);
       setFolderContribs({});
     }
 
@@ -423,6 +430,7 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
         fetchChildrenPage(targetId, { offset: 0, limit: CHILDREN_PAGE_SIZE }),
         targetId ? fetchBreadcrumb(targetId) : Promise.resolve([]),
       ]);
+      if (request !== requestRef.current) return;
       setItems(sortNodes(page.items));
       setTotal(page.total);
       setHasMore(page.hasMore);
@@ -433,22 +441,26 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
         hasMore: page.hasMore,
         contribs: {},
       });
-      refreshContribs(targetId, page.items);
+      refreshContribs(targetId, page.items, request);
     } catch (err) {
+      if (request !== requestRef.current) return;
       console.error('[InternalFiles] 加载失败：', err);
       // 已有缓存则继续显示缓存，不用报错盖掉列表
       if (!(cached && cached.items && cached.items.length)) {
         setError(err?.message || '加载失败，请稍后重试。');
       }
     } finally {
-      setLoading(false);
-      inflightRef.current = false;
+      if (request === requestRef.current) {
+        setLoading(false);
+        inflightRef.current = false;
+      }
     }
   }, [refreshContribs, fetchChildrenPage, fetchBreadcrumb]);
 
   // 追加整体排序后的下一页。
   const loadMore = useCallback(async () => {
     if (inflightRef.current || loadingMore || !hasMore) return;
+    const request = requestRef.current;
     inflightRef.current = true;
     setLoadingMore(true);
     try {
@@ -456,16 +468,20 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
         offset: items.length,
         limit: CHILDREN_PAGE_SIZE,
       });
+      if (request !== requestRef.current) return;
       setItems((prev) => sortNodes([...prev, ...page.items]));
       setTotal(page.total);
       setHasMore(page.hasMore);
-      refreshContribs(folderId, page.items); // 新翻出来的文件夹补算贡献者
+      refreshContribs(folderId, page.items, request); // 新翻出来的文件夹补算贡献者
     } catch (err) {
+      if (request !== requestRef.current) return;
       console.error('[InternalFiles] 加载更多失败：', err);
       setError(err?.message || '加载更多失败，请稍后重试。');
     } finally {
-      setLoadingMore(false);
-      inflightRef.current = false;
+      if (request === requestRef.current) {
+        setLoadingMore(false);
+        inflightRef.current = false;
+      }
     }
   }, [folderId, items.length, hasMore, loadingMore, refreshContribs]);
 
@@ -476,6 +492,11 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
       setLoading(false);
     }
   }, [isAuthenticated, folderId, load]);
+
+  useEffect(() => () => {
+    requestRef.current += 1;
+    clearTimeout(pressTimerRef.current);
+  }, []);
 
   // 目录切换不改变路由，需要单独重置页面滚动位置。
   useEffect(() => {
@@ -489,6 +510,8 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
       return;
     }
     if (busy) return;
+    if (id === folderId) return;
+    requestRef.current += 1;
     exitSelect(); // 勾选只在当前目录内有效
     setFolderId(id);
   };
@@ -901,8 +924,8 @@ export default function InternalFiles({ fileService, title = '内部资料', roo
           ) : items.length === 0 ? (
             <div className="internal-files-page__empty">
               <Inbox size={40} />
-              <p>这个文件夹是空的</p>
-              <span>点击右上角「发布资料」选择文件、文件夹、压缩包或链接，或把文件拖拽到此处</span>
+              <p>{error ? '资料加载失败' : '这个文件夹是空的'}</p>
+              <span>{error ? '请点击右上角“刷新”重试。' : '点击右上角「发布资料」选择文件、文件夹、压缩包或链接，或把文件拖拽到此处'}</span>
             </div>
           ) : (
             <div className="if-table">
